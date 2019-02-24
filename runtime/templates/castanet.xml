@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+
+	<!DOCTYPE vizopProject [
+		<!ELEMENT vizopversion (#PCDATA)>
+		<!ELEMENT FaultTree (id, title)>
+		<!ELEMENT id (#PCDATA)>
+		<!ELEMENT title (#PCDATA)>
+	]>
+<vizopProject>
+<vizopversion>VizopProject0.1</vizopversion> <FaultTree>
+	<id>
+	1643
+	</id>
+	<title>
+	A sample fault tree for a dangerous case
+	</title>
+</FaultTree>
+</vizopProject>
