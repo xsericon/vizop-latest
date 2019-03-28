@@ -1,7 +1,7 @@
 """
 Name: VIZOP_Parser
-Version: 0.2
-Last Modified: 20190324
+Version: 0.3
+Last Modified: 20190328
 Python version: 3.6.3
 """
 
@@ -11,8 +11,10 @@ Python version: 3.6.3
 """[----------IMPORT---------- """
 """"""
 import xml.etree.ElementTree as ET
-from enum import Enum
+import string
 """ ----------IMPORT----------]""" 
+class Chars:
+	VALID_CHARS = "!#$%()*+,-.:;=?@[]^_`{|}~ %s%s" + string.ascii_letters + string.digits
 
 class Node():
 	"""
@@ -20,54 +22,44 @@ class Node():
 	"""
 	#current node id
 	cur_node_id = None
-	
-	#To-Do put structured names in Enum
+
 	NODE_ID_NAME = 'id'
 	NODE_KIND_NAME = 'kind'
-	
-	NODE_TYPES_TEST_NAME = 'Test'
-	NODE_TYPES_NAME_NAME = 'Name'
-	NODE_TYPES_NUMBER_NAME = 'Number'
-	NODE_TYPES_VALUE_NAME = 'Value'
-	NODE_TYPES_BOOKMARK_NAME = 'Bookmark'
-	NODE_TYPES_COMMENT_NAME = 'Comment'
-	NODE_TYPES_ACTIONITEM_NAME = 'Action_Item'
-	NODE_TYPES_PHAOBJECT_NAME = 'PHA_Object'
-	NODE_TYPES_PROCESS_UNIT = 'Process_Unit'
-	NODE_TYPES = [NODE_TYPES_TEST_NAME, NODE_TYPES_NAME_NAME, NODE_TYPES_NUMBER_NAME, NODE_TYPES_VALUE_NAME, NODE_TYPES_BOOKMARK_NAME, NODE_TYPES_COMMENT_NAME, NODE_TYPES_ACTIONITEM_NAME,NODE_TYPES_PHAOBJECT_NAME,NODE_TYPES_PROCESS_UNIT]
+
+	NODE_TYPES = ('Test','Name','Number','Value','Bookmark','Comment','Action_Item','PHA_Object','Process_Unit')
 
 	NODE_VALUE_ATTR_UNIT_NAME = 'unit'
 	NODE_VALUE_ATTR_VALUEKIND_NAME = 'value_kind'
 	
-	NODE_NUMBERINGSYSTEM_TYPE = ['str','Parent','Serial']
+	NODE_NUMBERINGSYSTEM_TYPE = ('str','Parent','Serial')
 	
 	"""
 	#change to attribute
 	a <Unit> tag, whose value is the engineering unit of the numerical value. Valid values are: None, Prob (indicating probability), %, /yr, /hr, FIT, hr, day, wk, month, yr. All are non-case sensitive. If the <Unit> tag is absent, a default unit is taken (varies per parameter).
 	"""
-	NODE_NUMERICAL_UNIT_TYPE = ['None','Prob','%','/yr','/hr','FIT','hr','day','wk','month','yr']
+	NODE_NUMERICAL_UNIT_TYPE = ('None','Prob','%','/yr','/hr','FIT','hr','day','wk','month','yr')
 	
 	"""
 	#change to attribute
 	a <Kind> tag, whose value indicates the kind of the number. Valid values are: Manual (value entered by user), Constant (value fixed to a defined constant), Calc (value calculated according to a formula), Lookup (value looked up in a 2D matrix), Category (one of a list of values defined separately), Linked (value fixed to that of another parameter) (all are non-case sensitive). Defaults to Manual. Currently only Manual is implemented, and other kinds will give undefined results.
 	"""
-	NODE_NUMERICAL_VALUEKIND = ['Manual','Constant','Calc','Lookup','Category','Linked']
+	NODE_NUMERICAL_VALUEKIND = ('Manual','Constant','Calc','Lookup','Category','Linked')
 	
-	NODE_STATUS = ['Deleted']
+	NODE_STATUS = ('Deleted',)
 	
 	"""
 	Boolean tag values are written as True or False. When reading the file, any of the following is considered as True: True, Yes, Y, 1 (not case-sensitive). Any other value is considered as False. If the Boolean value is to be defined as “unset”, the tag should be omitted.
 	"""
-	NODE_BOOLEAN_TAG_TRUE = ['True', 'Yes', 'Y', '1']
+	NODE_BOOLEAN_TAG_TRUE = ('True', 'Yes', 'Y', '1')
 	#Other value would be set as FALSE
-	NODE_BOOLEAN_TAG_UNSET = ['unset']
+	NODE_BOOLEAN_TAG_UNSET = ('unset')
 	
 	"""
 	NODE_DATA_TYPES
 	"""
-	NODE_DATA_TYPES = ['str', 'text', 'int']
+	NODE_DATA_TYPES = ('str', 'text', 'int')
 	
-	NODE_KINDS = ['User','Constant','Lookup','Category','Copied','CopiedFrom']
+	NODE_KINDS = ('User','Constant','Lookup','Category','Copied','CopiedFrom')
 	
 	def __init__(self, \
 	#----------[Compulsory in creation----------
@@ -192,7 +184,7 @@ class Node():
 		
 		self.node_kind = node_kind
 
-		self.node_tag_name = formatString(node_tag_name, noSpace = True)
+		self.node_tag_name = processString(node_tag_name, noSpace = True)
 		
 		if CAN_BOOKMARK:
 			self.node_bookmark = node_bookmark
@@ -207,7 +199,7 @@ class Node():
 			if self.CAN_REPEAT:
 				self.node_values = self.node_values + node_values
 			else:
-				self.node_values.append(formatString(node_values[0]))
+				self.node_values.append(processString(node_values[0]))
 				assert len(self.node_values) == 1
 		
 		self.node_attrs = {Node.NODE_KIND_NAME:self.node_kind, Node.NODE_ID_NAME:str(self.element_id)}
@@ -256,7 +248,7 @@ class Node():
 		LinkChildNodeInput.LinkParentNodes.add(LinkParentNodeInput)
 		pass
 
-	
+
 class Bookmark():
 	cur_bookmark_id = None
 	def __init__(self, isBookmarked):
@@ -281,7 +273,11 @@ class Comment():
 def createNewProject():
 	pass
 
-def convertXmlToProject(XmlFile):
+def convertXmlToProject():
+	#TO-DO
+	tree = ET.parse('TestXML.xml')
+	root = tree.getroot()
+	ET.dump(tree)
 	pass
 	
 def convertProjectToXml(Project):
@@ -304,10 +300,12 @@ def convertProjectToXml(Project):
 
 def main():
 	testCreateProject()
+	convertXmlToProject()
+
 	pass
 
 """[----------UTIL---------- """
-def formatString(inputString, trimString = True, filterForbiddenChar = True, noSpace = False):
+def processString(inputString, trimString = True, filterForbiddenChar = True, noSpace = False):
 	assert type(inputString) == str
 	assert type(trimString) == bool
 	assert type(filterForbiddenChar) == bool
@@ -318,17 +316,24 @@ def formatString(inputString, trimString = True, filterForbiddenChar = True, noS
 		formattedString = formattedString.strip()
 	
 	if filterForbiddenChar:
-		#J: To-Do
-		pass
-		
+		formattedString = ''.join(c for c in formattedString if c in Chars.VALID_CHARS)
+
 	if noSpace:
 		formattedString = ''.join(formattedString.split(' '))
-		pass
 	
 	return formattedString
 	
-def isIdenticalIgnoreCase(StringA, StringB):
-	return StringA.lower() == StringB.lower()
+def isInType(StringInput, TypeInput):
+	#check if input in type
+	assert type(StringInput) == str
+	assert type(TypeInput) in (set,list,tuple)
+	LowerCaseList = list(map(lambda x: x.lower(),TypeInput))
+	return StringInput.lower() in LowerCaseList
+
+def getNumberOfInstance(input_class):
+	#get the number of instance for a Class by using garbage collector
+	import gc
+	return ('Number of {} in memory:{}'.format(input_class,len(list(filter(lambda x: isinstance(x, input_class), gc.get_objects())))))
 
 """ ----------UTIL----------]""" 
 	
@@ -383,7 +388,7 @@ def testCreateProject():
 	ProjectTeamMemberAffiliation = Node(ParentNodes = set([ProjectTeamMembers]), ChildNodes = set([]), node_type = 'Name', node_kind = 'User', node_tag_name = 'ProjectTeamMemberAffiliation', node_values = ['John'])
 
 			#<ProcessUnit>
-	ProcessUnit = Node(ParentNodes = set([VizopProject]), ChildNodes = set([]), node_type = Node.NODE_TYPES_PROCESS_UNIT, node_kind = 'User', node_tag_name = 'ProcessUnit', node_values = [])
+	ProcessUnit = Node(ParentNodes = set([VizopProject]), ChildNodes = set([]), node_type = 'Process_Unit', node_kind = 'User', node_tag_name = 'ProcessUnit', node_values = [])
 				#<ProcessUnit_ID>
 	ProcessUnit_ID = Node(ParentNodes = set([VizopProject]), ChildNodes = set([]), node_type = 'Number', node_kind = 'User', node_tag_name = 'ID', node_values = ['0001'])
 				#<ProcessUnit_UnitNumber>
@@ -394,21 +399,21 @@ def testCreateProject():
 	ProcessUnit_LongName = Node(ParentNodes = set([VizopProject]), ChildNodes = set([]), node_type = 'Name', node_kind = 'User', node_tag_name = 'LongName', node_values = ['UnitLongName'])
 	
 			#<RiskReceptor>
-	RiskReceptor = Node(ParentNodes = set([VizopProject]), ChildNodes = set([]), node_type = Node.NODE_TYPES_PROCESS_UNIT, node_kind = 'User', node_tag_name = 'RiskReceptor', node_values = [])
+	RiskReceptor = Node(ParentNodes = set([VizopProject]), ChildNodes = set([]), node_type = 'Process_Unit', node_kind = 'User', node_tag_name = 'RiskReceptor', node_values = [])
 				#<RiskReceptor_ID>
 	RiskReceptor_ID = Node(ParentNodes = set([RiskReceptor]), ChildNodes = set([]), node_type = 'Number', node_kind = 'User', node_tag_name = 'ID', node_values = ['0001'])
 				#<RiskReceptor_HumanName>
 	RiskReceptor_HumanName = Node(ParentNodes = set([RiskReceptor]), ChildNodes = set([]), node_type = 'Number', node_kind = 'User', node_tag_name = 'HumanName', node_values = ['0001'])
 
 			#<PHAObject>
-	PHAObject = Node(ParentNodes = set([VizopProject]), ChildNodes = set([]), node_type = Node.NODE_TYPES_PHAOBJECT_NAME, node_kind = 'User', node_tag_name = 'PHAObject', node_values = [])
+	PHAObject = Node(ParentNodes = set([VizopProject]), ChildNodes = set([]), node_type = 'PHA_Object', node_kind = 'User', node_tag_name = 'PHAObject', node_values = [])
 				#<FT>
-	FT = Node(ParentNodes = set([PHAObject]), ChildNodes = set([]), node_type = Node.NODE_TYPES_PHAOBJECT_NAME, node_kind = 'User', node_tag_name = 'PHAObject')
+	FT = Node(ParentNodes = set([PHAObject]), ChildNodes = set([]), node_type = 'PHA_Object', node_kind = 'User', node_tag_name = 'PHAObject')
 				#<AlarmRationalization>
-	AlarmRationalization = Node(ParentNodes = set([PHAObject]), ChildNodes = set([]), node_type = Node.NODE_TYPES_PHAOBJECT_NAME, node_kind = 'User', node_tag_name = 'PHAObject')
+	AlarmRationalization = Node(ParentNodes = set([PHAObject]), ChildNodes = set([]), node_type = 'PHA_Object', node_kind = 'User', node_tag_name = 'PHAObject')
 	
 			#<NumberingSystem>
-	NumberingSystem = Node(ParentNodes = set([VizopProject]), ChildNodes = set([]), node_type = Node.NODE_TYPES_PHAOBJECT_NAME, node_kind = 'User', node_tag_name = 'NumberingSystem', node_values = [])
+	NumberingSystem = Node(ParentNodes = set([VizopProject]), ChildNodes = set([]), node_type = 'PHA_Object', node_kind = 'User', node_tag_name = 'NumberingSystem', node_values = [])
 				#<NumberingSystem_ID>
 	NumberingSystem_ID = Node(ParentNodes = set([NumberingSystem]), ChildNodes = set([]), node_type = 'Name', node_kind = 'User', node_tag_name = 'ID', node_values = [])
 				#<Chunk>
@@ -416,15 +421,9 @@ def testCreateProject():
 					#<Type>
 	NumberingSystem_Chunk_Type = Node(ParentNodes = set([NumberingSystem]), ChildNodes = set([]), node_type = 'Name', node_kind = 'User', node_tag_name = 'Type', node_values = ['str'])
 						#<strValue>
-	NumberingSystem_Chunk_strValue = Node(ParentNodes = set([NumberingSystem]), ChildNodes = set([]), node_type = 'Name', node_kind = 'User', node_tag_name = 'Type', node_values = ['str'])
 
 	print ('getNumberOfInstance:{}'.format(getNumberOfInstance(Node)))
 	print ('convertProjectToXml:{}'.format(convertProjectToXml(Project)))
-
-def getNumberOfInstance(input_class):
-	#get the number of instance for a Class by using garbage collector
-	import gc
-	return ('Number of {} in memory:{}'.format(input_class,len(list(filter(lambda x: isinstance(x, input_class), gc.get_objects())))))
 
 def iterateNode(node, root):
 	#iterate through all the nodes and sub-nodes to form an XML tree
@@ -436,7 +435,7 @@ def iterateNode(node, root):
 			inner_root.set(each_key, each_value)
 		#bookmark
 		if hasattr(each_ChildNode, 'node_bookmark'):
-			inner_root_bookmark = ET.SubElement(inner_root, Node.NODE_TYPES_BOOKMARK_NAME)
+			inner_root_bookmark = ET.SubElement(inner_root, 'Bookmark')
 			inner_root_bookmark.set('id', str(each_ChildNode.node_bookmark.id))
 			inner_root_bookmark.text = str(each_ChildNode.node_bookmark.isBookmarked)
 		#comment
@@ -446,7 +445,7 @@ def iterateNode(node, root):
 			inner_root_comment.text = str(each_ChildNode.node_bookmark.comment_content)
 		#create all values
 		for each_node_values in each_ChildNode.node_values:
-			inner_root_value = ET.SubElement(inner_root, Node.NODE_TYPES_VALUE_NAME)
+			inner_root_value = ET.SubElement(inner_root, 'Value')
 			inner_root_value.text = each_node_values
 
 		iterateNode(each_ChildNode, inner_root)
