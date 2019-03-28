@@ -5,6 +5,13 @@ Last Modified: 20190328
 Python version: 3.6.3
 """
 
+"""
+Version: 0.3
+	- Updated:
+		function processString
+		function isInType
+"""
+
 """[----------TEMPLATE---------- """
 """ ----------TEMPLATE----------]""" 
 
