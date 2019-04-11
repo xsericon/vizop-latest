@@ -505,7 +505,8 @@ class ARObjectInCore(core_classes.PHAModelBaseClass):
 			# write tags with multiple numerical values in a list
 			for ThisTag, ThisAttribName in [ (info.ResponseTimeRequiredTag, 'ResponseTimeRequired'),
 											 (info.ResponseTimeAvailableTag, 'ResponseTimeAvailable') ]:
-			for ThisInstance in getattr(ThisAlarm, ThisAttribName):
+				for ThisInstance in getattr(ThisAlarm, ThisAttribName):
+					#J: Indentation fix
 					AttribEl = ElementTree.SubElement(AlarmEl, ThisTag)
 					AttribEl.text = ThisInstance.GetDisplayValue() # TODO display units?
 			# write tags for each classification the alarm belongs to
