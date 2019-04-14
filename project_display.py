@@ -69,7 +69,7 @@ class ProjectInfoModelInCore(core_classes.PHAModelBaseClass):
 		PopulateOverallData(RootElement)
 		return RootElement
 
-	def HandleIncomingRequest(self, MessageReceived=None, Args={}, MessageAsXMLTree=None):
+	def HandleIncomingRequest(self, MessageReceived=None, MessageAsXMLTree=None, **Args):
 		# handle request received by PHA model in datacore from a Viewport. Request can be to edit data
 		# Incoming message can be supplied as either an XML string or XML tree root element
 		# MessageReceived (str or None): XML message containing request info

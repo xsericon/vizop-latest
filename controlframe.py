@@ -1264,7 +1264,7 @@ class ControlFrame(wx.Frame):
 		self.Destroy() # kills Control frame, raises EVT_CLOSE which calls self.OnClose()
 
 	def SetupMenus(self): # initialize menus at the top of the screen
-		# Setting up the "File" menu
+		# Set up the "File" menu
 		FileMenu = wx.Menu()
 		Openmitem = FileMenu.Append(-1, _('&Open Vizop project...'), '')
 #		self.Bind(wx.EVT_MENU, self.OnProjectOpenRequest, Openmitem)
@@ -1275,10 +1275,8 @@ class ControlFrame(wx.Frame):
 		self.Bind(wx.EVT_MENU, vizop_misc.OnAboutRequest, Aboutmitem) # OnAboutRequest is shared with welcome frame
 		Quitmitem = FileMenu.Append(-1, _('E&xit Vizop'), '')
 		self.Bind(wx.EVT_MENU, self.OnExitVizopRequest, Quitmitem)
-		# Creating the menubar
-		self.MenuBar = wx.MenuBar()
-		self.MenuBar.Append(FileMenu, _('&File')) # Adding the menus to the MenuBar
-		
+
+		# Set up the "Edit" menu
 		EditMenu = wx.Menu()
 		self.UndoMenuItemID = wx.NewId()
 		self.UndoMenuItem = EditMenu.Append(self.UndoMenuItemID, _('&Undo'), '')
@@ -1286,8 +1284,13 @@ class ControlFrame(wx.Frame):
 		self.RedoMenuItemID = wx.NewId()
 		self.RedoMenuItem = EditMenu.Append(self.RedoMenuItemID, _('&Redo'), '')
 		self.Bind(wx.EVT_MENU, self.OnRedoRequest, self.RedoMenuItem)
+
+		# Create the menubar
+		self.MenuBar = wx.MenuBar()
+		# add menus to MenuBar
+		self.MenuBar.Append(FileMenu, _('&File'))
 		self.MenuBar.Append(EditMenu, _('&Edit'))
-		self.SetMenuBar(self.MenuBar) # Adding the MenuBar to the MainWindow
+		self.SetMenuBar(self.MenuBar) # Add MenuBar to ControlFrame
 
 	def UpdateMenuStatus(self): # update texts and stati of menu items in control frame
 		Proj = self.CurrentProj
@@ -2161,14 +2164,14 @@ def ControlFrameWithID(IDToFind): # return datacore's ControlFrameShadow object 
 
 def UpdateDisplayModels(CurrentProject):
 	# refresh Viewports after change to data in datacore. For now, we just redraw all Viewports.
-	for ThisViewport in CurrentProject.ViewportShadows:
+	for ThisViewport in CurrentProject.AllViewportShadows:
 		# get refresh data from corresponding PHA object
 		RedrawXMLData = ThisViewport.PHAObj.GetFullRedrawData(Viewport=ThisViewport, ViewportClass=ThisViewport.MyClass)
 		# make XML message with ID of PHA object, followed by full redraw data
-		FullXMLData = vizop_misc.MakeXMLMessage(RootName='RP_RedrawViewport', RootText=ThisViewport.ID,
+		FullXMLData = vizop_misc.MakeXMLMessage(RootName='RQ_RedrawViewport', RootText=ThisViewport.ID,
 			Elements={info.IDTag: ThisViewport.PHAObj.ID})
 		FullXMLData.append(RedrawXMLData)
-		# send it to Viewport
-		print("CF1514 sending on socket: ", ThisViewport.C2DSocketREQObj.SocketLabel)
-		vizop_misc.SendRequest(Socket=ThisViewport.C2DSocketREQObj.Socket, Command='RP_RedrawViewport',
+		# send it to Viewport. TODO work through steps in "Viewport - General" spec to create required sockets on each end
+		print("CF1514 sending on socket: ", ThisViewport.D2CSocketREQObj.SocketLabel)
+		vizop_misc.SendRequest(Socket=ThisViewport.D2CSocketREQObj.Socket, Command='RQ_RedrawViewport',
 			XMLRoot=FullXMLData)

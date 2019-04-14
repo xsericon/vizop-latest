@@ -3066,7 +3066,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			setattr(ComponentHost, ComponentToUpdate, NewValueObj)
 		return vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
 
-	def HandleIncomingRequest(self, MessageReceived=None, Args={}, MessageAsXMLTree=None):
+	def HandleIncomingRequest(self, MessageReceived=None, MessageAsXMLTree=None, **Args):
 		# handle request received by FT model in datacore from a Viewport. Request can be to edit data (eg add new element)
 		# Incoming message can be supplied as either an XML string or XML tree root element
 		# MessageReceived (str or None): XML message containing request info
