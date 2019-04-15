@@ -13,7 +13,8 @@ from wx.lib.agw import supertooltip as ToolTip
 import xml.etree.ElementTree as ElementTree
 from platform import system
 # vizop modules needed:
-import settings, text, vizop_misc, art, display_utilities, info, utilities, core_classes, projects, project_display
+#@Jack
+import settings, text, vizop_misc, art, display_utilities, info, utilities, core_classes, projects, project_display, VIZOP_Parser
 import undo
 from display_utilities import UIWidgetItem
 
@@ -1270,9 +1271,15 @@ class ControlFrame(wx.Frame):
 #		self.Bind(wx.EVT_MENU, self.OnProjectOpenRequest, Openmitem)
 		Savemitem = FileMenu.Append(-1, _('&Save Vizop project'), '')
 #		self.Bind(wx.EVT_MENU, self.OnProjectSaveRequest, Savemitem)
+
+		#@Jack
+		Testmitem = FileMenu.Append(-1, _('Test Output XML file'), '') # Test Output
+		self.Bind(wx.EVT_MENU, VIZOP_Parser.testCreateProject, Testmitem)
+
 		FileMenu.AppendSeparator() # add a separating line in the menu
 		Aboutmitem = FileMenu.Append(-1, _('About &Vizop...'), '')
 		self.Bind(wx.EVT_MENU, vizop_misc.OnAboutRequest, Aboutmitem) # OnAboutRequest is shared with welcome frame
+
 		Quitmitem = FileMenu.Append(-1, _('E&xit Vizop'), '')
 		self.Bind(wx.EVT_MENU, self.OnExitVizopRequest, Quitmitem)
 		# Creating the menubar
