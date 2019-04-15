@@ -1543,7 +1543,7 @@ class ControlFrame(wx.Frame):
 			NewViewport = Args['ViewportInRedoRecord']
 			RequestToDatacore = 'RQ_NewViewport_Redo'
 		else:
-			NewViewport = display_utilities.CreateViewport(Proj, Args['ViewportClass'],
+			NewViewport, D2CSocketNo, C2DSocketNo = display_utilities.CreateViewport(Proj, Args['ViewportClass'],
 				DisplDevice=self.MyEditPanel, Fonts=self.Fonts)
 			RequestToDatacore = 'RQ_NewViewport'
 		self.Viewports.append(NewViewport) # add it to the register for Control Frame
@@ -1552,7 +1552,7 @@ class ControlFrame(wx.Frame):
 		NewViewportAttribs = {'ControlFrame': self.ID, info.SkipRefreshTag: utilities.Bool2Str(Args['Chain']),
 			'ViewportClass': Args['ViewportClass'].InternalName, info.ProjIDTag: Proj.ID, 'Viewport': NewViewport.ID,
 			info.PHAModelIDTag: Args['PHAModel'].ID, info.PHAModelTypeTag: Args['PHAModel'].InternalName,
-			info.MilestoneIDTag: NewMilestone.ID}
+			info.MilestoneIDTag: NewMilestone.ID, info.D2CSocketNoTag: str(D2CSocketNo), info.C2DSocketNoTag: str(C2DSocketNo)}
 		vizop_misc.SendRequest(self.zmqOutwardSocket, Command=RequestToDatacore, **NewViewportAttribs)
 		return vizop_misc.MakeXMLMessage('Null', 'Null')
 
@@ -1778,16 +1778,17 @@ class ControlFrame(wx.Frame):
 		# check if we can proceed to create the Viewport; we may need editing rights (TODO remove this requirement)
 		if Proj.EditAllowed:
 			# make the Viewport shadow
-			NewViewport = ViewportShadow(ThisProj, NewViewportID, MyClass=NewViewportClass)
+			NewViewport = ViewportShadow(ThisProj, NewViewportID, MyClass=NewViewportClass,
+				D2CSocketNumber=int(XMLRoot.find(info.D2CSocketNoTag).text),
+				C2DSocketNumber=int(XMLRoot.find(info.C2DSocketNoTag).text), PHAModel=ExistingPHAObj)
 			# attach existing PHA object to the Viewport
 			NewViewport.PHAObj = ExistingPHAObj
-			ThisPHAObj = ExistingPHAObj
-			ExistingPHAObj.Viewports.append(NewViewport)  # add Viewport to list in the PHA object
+			ExistingPHAObj.Viewports.append(NewViewport) # add Viewport to list in the PHA object
 			# fetch full redraw data of new PHA object
-			RedrawXMLData = ThisPHAObj.GetFullRedrawData(Viewport=NewViewport, ViewportClass=NewViewport.MyClass)
+			RedrawXMLData = ExistingPHAObj.GetFullRedrawData(Viewport=NewViewport, ViewportClass=NewViewport.MyClass)
 			# send ID of PHA model, followed by full redraw data, as reply to ControlFrame
 			Reply = vizop_misc.MakeXMLMessage(RootName='RP_NewViewport', RootText=NewViewportID,
-				Elements={info.IDTag: ThisPHAObj.ID})
+				Elements={info.IDTag: ExistingPHAObj.ID})
 			Reply.append(RedrawXMLData)
 			undo.AddToUndoList(Proj, UndoObj=undo.UndoItem(UndoHandler=self.DatacoreDoNewViewport_Undo,
 				RedoHandler=self.DatacoreDoNewViewport_Redo, ViewportShadow=NewViewport, Chain=Chain,
@@ -2012,9 +2013,9 @@ class ControlFrame(wx.Frame):
 			F2CSocketNoToUse = F2CSocketNumber
 			C2FSocketNoToUse = C2FSocketNumber
 		# create and connect to sockets on control frame side
-		self.zmqOutwardSocket, self.zmqOutwardSocketObj = vizop_misc.SetupNewSocket(SocketType='REQ',
+		self.zmqOutwardSocket, self.zmqOutwardSocketObj, OutwardSocketNumber = vizop_misc.SetupNewSocket(SocketType='REQ',
 			SocketLabel='F2CREQ', SocketNo=F2CSocketNoToUse, BelongsToDatacore=False, AddToRegister=True)
-		self.zmqInwardSocket, self.zmqInwardSocketObj = vizop_misc.SetupNewSocket(SocketType='REP',
+		self.zmqInwardSocket, self.zmqInwardSocketObj, InwardSocketNumber = vizop_misc.SetupNewSocket(SocketType='REP',
 			SocketLabel='C2FREP', SocketNo=C2FSocketNoToUse, BelongsToDatacore=False, AddToRegister=True)
 		return F2CREPSocket, C2FREQSocket
 
@@ -2135,16 +2136,30 @@ def DatacoreDoNewPHAObj(Proj, XMLRoot=None, ViewportID=None, **NewPHAObjArgs):
 	return Reply
 
 class ViewportShadow(object): # defines objects that represent Viewports in the datacore.
-	# These are not the actual (visible) Viewports - those live in the controlframe (local or remote) and aren't accessible
-	# by the datacore.
+	# These are not the actual (visible) Viewports - those live in the controlframe (local or remote) and aren't
+	# directly accessible by the datacore.
 
-	def __init__(self, Proj, ID, MyClass=None): # ID (str) is the same as the ID of the corresponding "real" Viewport
+	def __init__(self, Proj, ID, MyClass=None, D2CSocketNumber=None, C2DSocketNumber=None, PHAModel=None):
+		# ID (str) is the same as the ID of the corresponding "real" Viewport
+		# MyClass (ViewportClasses instance): class of actual Viewport shadowed by this one
+		# D2CSocketNumber and C2DSocketNumber (2 x int): socket numbers assigned in display_utilities.CreateViewport
+		# PHAModel: PHA model owning the real Viewport
 		assert isinstance(Proj, projects.ProjectItem)
 		assert isinstance(ID, str)
 		assert MyClass in display_utilities.ViewportMetaClass.ViewportClasses
+		assert isinstance(D2CSocketNumber, int)
+		assert isinstance(C2DSocketNumber, int)
 		object.__init__(self)
 		self.ID = ID
-		self.MyClass = MyClass # class of actual Viewport shadowed by this one
+		self.MyClass = MyClass
+		# set up sockets using socket numbers provided
+		self.D2CSocketREP, self.D2CSocketREPObj = vizop_misc.SetupNewSocket(SocketType='REP',
+			SocketLabel='D2CREP_' + self.ID,
+			PHAObj=PHAModel, Viewport=self, SocketNo=None, BelongsToDatacore=True, AddToRegister=True)
+		self.C2DSocketREQ, self.C2DSocketREQObj = vizop_misc.SetupNewSocket(SocketType='REQ',
+			SocketLabel=info.ViewportOutSocketLabel + '_' + self.ID,
+			PHAObj=PHAModel, Viewport=self, SocketNo=None, BelongsToDatacore=True, AddToRegister=True)
+		# put the new viewport shadow into the project's list
 		Proj.AllViewportShadows.append(self)
 
 class ControlFrameShadow(object): # defines objects that represent control frames in the datacore.
@@ -2171,7 +2186,7 @@ def UpdateDisplayModels(CurrentProject):
 		FullXMLData = vizop_misc.MakeXMLMessage(RootName='RQ_RedrawViewport', RootText=ThisViewport.ID,
 			Elements={info.IDTag: ThisViewport.PHAObj.ID})
 		FullXMLData.append(RedrawXMLData)
-		# send it to Viewport. TODO work through steps in "Viewport - General" spec to create required sockets on each end
+		# send it to Viewport. TODO work through steps in "Viewport - General" spec to create required sockets on each endm
 		print("CF1514 sending on socket: ", ThisViewport.D2CSocketREQObj.SocketLabel)
 		vizop_misc.SendRequest(Socket=ThisViewport.D2CSocketREQObj.Socket, Command='RQ_RedrawViewport',
 			XMLRoot=FullXMLData)

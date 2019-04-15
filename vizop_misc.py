@@ -285,7 +285,7 @@ def SetupNewSocket(SocketType='REQ', SocketLabel='', Viewport=None, PHAObj=None,
 	# None if we should fetch a new socket number
 	# BelongsToDatacore (bool): whether the socket is the datacore end of the pair
 	# AddToRegister (bool): whether to add the socket to the Vizop register
-	# Return the new socket and its corresponding SocketInRegister instance
+	# Return the new socket, its corresponding SocketInRegister instance, and its socket number (int)
 	# PHAObj currently gets assigned in DoNewViewportCommand() in module controlframe, because it may be available only
 	# after a new PHA object has been created.
 	assert SocketType in ('REQ', 'REP', 'PUSH', 'PULL')
@@ -304,7 +304,7 @@ def SetupNewSocket(SocketType='REQ', SocketLabel='', Viewport=None, PHAObj=None,
 	# put socket in Vizop's global socket register
 	NewSocketObj = RegisterSocket(NewSocket, ThisSocketNo, SocketLabel.strip(), Viewport=Viewport, PHAObj=PHAObj,
 		BelongsToDatacore=BelongsToDatacore, AddToVizopRegister=AddToRegister)
-	return NewSocket, NewSocketObj
+	return NewSocket, NewSocketObj, ThisSocketNo
 
 def ListenToSocket(Socket, Handler=None, SendReply2=True, **Args):
 	# check if any message received on Socket (a zmq socket), call Handler (a callable or None) to handle it,

@@ -233,9 +233,9 @@ def RunCommsThread(): # redundant. Now handled by controlframe's OnIdle()
 	# execute communications thread. Contains a loop for polling comms sockets, and handlers for requests received
 	global CurrentProject
 	# first, set up 2 sockets for communication with local ControlFrame: frame to core (F2C) and vice versa (C2F)
-	ControlFrameInwardSocket, CFInSktObj = vizop_misc.SetupNewSocket(SocketType='REP',
+	ControlFrameInwardSocket, CFInSktObj, N1 = vizop_misc.SetupNewSocket(SocketType='REP',
 		SocketLabel='LocalControlFrameF2CREP', BelongsToDatacore=True)
-	ControlFrameOutwardSocket, CFOutSktObj = vizop_misc.SetupNewSocket(SocketType='REQ',
+	ControlFrameOutwardSocket, CFOutSktObj, N2 = vizop_misc.SetupNewSocket(SocketType='REQ',
 		SocketLabel='LocalControlFrameC2FREQ', BelongsToDatacore=True)
 	# start polling loop. TODO use vizop_misc.ListenToSockets()
 	KeepLooping = True
@@ -298,9 +298,9 @@ OpenProjects = []  # open project objects, in order of opening
 CurrentProject = None # which project is being edited in control frame
 # LaunchCommsThread()  # start thread for handling communication with Viewports
 # set up 2 sockets for communication with local ControlFrame: frame to core (F2C) and vice versa (C2F)
-ControlFrameInwardSocket, CFInSktObj = vizop_misc.SetupNewSocket(SocketType='REP',
+ControlFrameInwardSocket, CFInSktObj, InwardSocketNumber = vizop_misc.SetupNewSocket(SocketType='REP',
 	SocketLabel=info.ControlFrameInSocketLabel + '_Local', BelongsToDatacore=True)
-ControlFrameOutwardSocket, CFOutSktObj = vizop_misc.SetupNewSocket(SocketType='REQ',
+ControlFrameOutwardSocket, CFOutSktObj, OutwardSocketNumber = vizop_misc.SetupNewSocket(SocketType='REQ',
 	SocketLabel=info.ControlFrameOutSocketLabel + '_Local', BelongsToDatacore=True)
 
 # vizop's primary display shows either a welcome frame or a control frame, depending on whether any project is open

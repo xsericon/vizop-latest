@@ -51,7 +51,7 @@ def CreateViewport(Proj, ViewportClass, DisplDevice=None, PHAObj=None, DatacoreI
 	# PHAObj: PHA object to which the Viewport belongs
 	# DatacoreIsLocal (bool): whether datacore is in this instance of Vizop
 	# Fonts: (dict) keys are strings such as 'SmallHeadingFont'; values are wx.Font instances
-	# Return the Viewport instance and datacore's new REQ and REP sockets (or 2 x None if DatacoreIsLocal is False)
+	# Return the Viewport instance, and D2C and C2D socket numbers (2 x int)
 	assert isinstance(DatacoreIsLocal, bool)
 	NewViewport = ViewportClass(Proj=Proj, DisplDevice=DisplDevice, PHAObj=PHAObj, Fonts=Fonts)
 	# append the Viewport to the project's list
@@ -59,27 +59,27 @@ def CreateViewport(Proj, ViewportClass, DisplDevice=None, PHAObj=None, DatacoreI
 	# ID is assigned this way (rather than with master lists per class, as for other objects) to avoid memory leaks
 	# set up sockets for communication with the new Viewport:
 	# D2C (Viewport to core) and C2D. Each socket has both REQ (send) and REP (reply) sides.
-	# If datacore is local (i.e. running in the same instance of Vizop), we set up datacore's side first, to get the
-	# socket numbers.
-	if DatacoreIsLocal:
-		NewViewport.D2CSocketREP, NewViewport.D2CSocketREPObj = vizop_misc.SetupNewSocket(SocketType='REP',
-			SocketLabel='D2CREP_' + NewViewport.ID,
-			PHAObj=PHAObj, Viewport=NewViewport, SocketNo=None, BelongsToDatacore=True, AddToRegister=True)
-		NewViewport.C2DSocketREQ, NewViewport.C2DSocketREQObj = vizop_misc.SetupNewSocket(SocketType='REQ',
-			SocketLabel=info.ViewportOutSocketLabel + '_' + NewViewport.ID,
-			PHAObj=PHAObj, Viewport=NewViewport, SocketNo=None, BelongsToDatacore=True, AddToRegister=True)
-		D2CSocketNo = NewViewport.D2CSocketREPObj.SocketNo
-		C2DSocketNo = NewViewport.C2DSocketREQObj.SocketNo
-	else:
-		D2CSocketNo, C2DSocketNo = FetchSocketNosForNewViewport() # TODO
+#	# If datacore is local (i.e. running in the same instance of Vizop), we set up datacore's side first, to get the
+#	# socket numbers.
+#	if DatacoreIsLocal:
+#		NewViewport.D2CSocketREP, NewViewport.D2CSocketREPObj = vizop_misc.SetupNewSocket(SocketType='REP',
+#			SocketLabel='D2CREP_' + NewViewport.ID,
+#			PHAObj=PHAObj, Viewport=NewViewport, SocketNo=None, BelongsToDatacore=True, AddToRegister=True)
+#		NewViewport.C2DSocketREQ, NewViewport.C2DSocketREQObj = vizop_misc.SetupNewSocket(SocketType='REQ',
+#			SocketLabel=info.ViewportOutSocketLabel + '_' + NewViewport.ID,
+#			PHAObj=PHAObj, Viewport=NewViewport, SocketNo=None, BelongsToDatacore=True, AddToRegister=True)
+#		D2CSocketNo = NewViewport.D2CSocketREPObj.SocketNo
+#		C2DSocketNo = NewViewport.C2DSocketREQObj.SocketNo
+	D2CSocketNo = vizop_misc.GetNewSocketNumber()
+	C2DSocketNo = vizop_misc.GetNewSocketNumber()
 	# Then we fetch the socket numbers and make the corresponding sockets on the Viewport side.
-	NewViewport.D2CSocketREQ, NewViewport.D2CSocketREQObj = vizop_misc.SetupNewSocket(SocketType='REQ',
+	NewViewport.D2CSocketREQ, NewViewport.D2CSocketREQObj, D2CSocketNoReturned = vizop_misc.SetupNewSocket(SocketType='REQ',
 		SocketLabel='D2CREQ_' + NewViewport.ID, PHAObj=PHAObj, Viewport=NewViewport,
 		SocketNo=D2CSocketNo, BelongsToDatacore=False, AddToRegister=True)
-	NewViewport.C2DSocketREP, NewViewport.C2DSocketREPObj = vizop_misc.SetupNewSocket(SocketType='REP',
+	NewViewport.C2DSocketREP, NewViewport.C2DSocketREPObj, C2DSocketNoReturned = vizop_misc.SetupNewSocket(SocketType='REP',
 		SocketLabel='C2DREP_' + NewViewport.ID, PHAObj=PHAObj, Viewport=NewViewport,
 		SocketNo=C2DSocketNo, BelongsToDatacore=False, AddToRegister=True)
-	return NewViewport
+	return NewViewport, D2CSocketNo, C2DSocketNo
 
 def ViewportClassWithName(TargetName):
 	# returns the Viewport class with internal name = TargetName, or None if not found

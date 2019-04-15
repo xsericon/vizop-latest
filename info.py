@@ -85,6 +85,8 @@ ViewportTag = 'viewport'
 SkipRefreshTag = 'skiprefresh'
 ChainWaitingTag = 'chainwaiting'
 ChainedTag = 'chained'
+C2DSocketNoTag = 'C2DSocketNumber'
+D2CSocketNoTag = 'D2CSocketNumber'
 # for alarm list
 AlarmCountTag = 'AlarmCount'
 TotalAlarmCountTag = 'Total'
