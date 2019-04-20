@@ -1454,8 +1454,11 @@ class ControlFrame(wx.Frame):
 			# so that local and remote Viewports are treated the same)
 			if ThisSocketObj.Viewport.PHAObj: # proceed only if Viewport has been assigned to a PHA object
 				# (will not have happened yet if Viewport is newly created)
-				ViewportMessageReceived |= bool(vizop_misc.ListenToSocket(Proj=self.CurrentProj, Socket=ThisSocketObj.Socket,
+				print('CF1457 checking viewport socket: ', ThisSocketObj.SocketNo)
+				ViewportMessageReceivedThisTime = bool(vizop_misc.ListenToSocket(Proj=self.CurrentProj, Socket=ThisSocketObj.Socket,
 					Handler=ThisSocketObj.Viewport.PHAObj.HandleIncomingRequest))
+				if ViewportMessageReceivedThisTime: print('CF1459 incoming viewport message received')
+				ViewportMessageReceived |= ViewportMessageReceivedThisTime
 				MessageReceived |= bool(vizop_misc.ListenToSocket(Socket=[s.Socket for s in vizop_misc.RegisterSocket.Register
 						if s.SocketLabel == info.ViewportOutSocketLabel + '_' + ThisSocketObj.SocketLabel.split('_')[1]][0],
 						Handler=None, SendReply2=False))
@@ -1532,9 +1535,7 @@ class ControlFrame(wx.Frame):
 		if Redoing:
 			assert isinstance(Args['ViewportInRedoRecord'], display_utilities.ViewportBaseClass)
 		else:
-			print("CF1532 Viewport class requested: ", Args['ViewportClass'])
-			print("CF1532 Classes available: ",  display_utilities.ViewportMetaClass.ViewportClasses)
-#			assert Args['ViewportClass'] in display_utilities.ViewportMetaClass.ViewportClasses
+			assert Args['ViewportClass'] in display_utilities.ViewportMetaClass.ViewportClasses
 		# store a navigation milestone to go back to, in case the user undoes creating a new PHA model
 		NewMilestone = core_classes.MilestoneItem(Proj=Proj, DisplDevice=self.MyEditPanel, Displayable=False)
 		Proj.BackwardHistory.append(NewMilestone)
@@ -1545,6 +1546,7 @@ class ControlFrame(wx.Frame):
 		else:
 			NewViewport, D2CSocketNo, C2DSocketNo = display_utilities.CreateViewport(Proj, Args['ViewportClass'],
 				DisplDevice=self.MyEditPanel, Fonts=self.Fonts)
+			print('FT1549 created Viewport with D2C, C2D socket numbers:', D2CSocketNo, C2DSocketNo)
 			RequestToDatacore = 'RQ_NewViewport'
 		self.Viewports.append(NewViewport) # add it to the register for Control Frame
 		self.TrialViewport = NewViewport # set as temporary current viewport, confirmed after successful creation
@@ -1778,6 +1780,7 @@ class ControlFrame(wx.Frame):
 		# check if we can proceed to create the Viewport; we may need editing rights (TODO remove this requirement)
 		if Proj.EditAllowed:
 			# make the Viewport shadow
+			print('FT1783 created Viewport shadow with D2C, C2D socket numbers:', int(XMLRoot.find(info.D2CSocketNoTag).text), int(XMLRoot.find(info.C2DSocketNoTag).text))
 			NewViewport = ViewportShadow(ThisProj, NewViewportID, MyClass=NewViewportClass,
 				D2CSocketNumber=int(XMLRoot.find(info.D2CSocketNoTag).text),
 				C2DSocketNumber=int(XMLRoot.find(info.C2DSocketNoTag).text), PHAModel=ExistingPHAObj)
@@ -2153,10 +2156,10 @@ class ViewportShadow(object): # defines objects that represent Viewports in the 
 		self.ID = ID
 		self.MyClass = MyClass
 		# set up sockets using socket numbers provided
-		self.D2CSocketREP, self.D2CSocketREPObj = vizop_misc.SetupNewSocket(SocketType='REP',
+		self.D2CSocketREP, self.D2CSocketREPObj, D2CSocketNumberReturned = vizop_misc.SetupNewSocket(SocketType='REP',
 			SocketLabel='D2CREP_' + self.ID,
 			PHAObj=PHAModel, Viewport=self, SocketNo=None, BelongsToDatacore=True, AddToRegister=True)
-		self.C2DSocketREQ, self.C2DSocketREQObj = vizop_misc.SetupNewSocket(SocketType='REQ',
+		self.C2DSocketREQ, self.C2DSocketREQObj, C2DSocketNumberReturned = vizop_misc.SetupNewSocket(SocketType='REQ',
 			SocketLabel=info.ViewportOutSocketLabel + '_' + self.ID,
 			PHAObj=PHAModel, Viewport=self, SocketNo=None, BelongsToDatacore=True, AddToRegister=True)
 		# put the new viewport shadow into the project's list

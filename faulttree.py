@@ -1483,13 +1483,15 @@ class FTBuilder(FTBoxyObject): # 'add' button object within an FTColumn.
 			DC.DrawLine(self.SizeXInPx * 0.5, self.SizeYInPx * 0.7, self.SizeXInPx * 0.6, self.SizeYInPx * 0.7)
 			DC.DrawLine(self.SizeXInPx * 0.75, self.SizeYInPx * 0.5, self.SizeXInPx * 0.85, self.SizeYInPx * 0.5)
 
-	def HandleMouseLClickOnMe(self, HitHotspot, **Args): # process mouse left click on HitHotspot (str)
+	def HandleMouseLClickOnMe(self, HitHotspot, **Args): # process mouse left click on HitHotspot (str)%%%
 		# request DataCore to create new FT object, and get back confirmation
 		# If user has clicked on a builder button, IndexInCol is the index at which the new item is to be inserted,
 		# not counting builder buttons. This is found by counting the number of non-builder items above the builder button
+		print('FT1490 in builder HandleMouseLClickOnMe')
 		AllElsInColumn = self.HostFT.Columns[self.ColNo].FTElements
 		IndexInCol = len([El for El in AllElsInColumn[:AllElsInColumn.index(self)] if not isinstance(El, FTBuilder)])
 		# request PHA object to add new element by sending message through zmq
+		print('FT1494 FT sending request on socket: ', self.HostFT.D2CSocketREQ)
 		vizop_misc.SendRequest(Socket=self.HostFT.D2CSocketREQ, Command='RQ_FT_NewElement',
 			Proj=self.HostFT.Proj.ID, PHAObj=self.HostFT.PHAObj.ID, Viewport=self.HostFT.ID,
 			ObjKindRequested=self.ObjTypeRequested.InternalName, ColNo=str(self.ColNo), IndexInCol=str(IndexInCol))
@@ -3073,6 +3075,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		# MessageAsXMLTree (XML element or None): root of XML tree
 		# return Reply (Root object of XML tree)
 		# First, convert MessageReceived to an XML tree for parsing
+		print('FT3088 FT handling incoming request')
 		assert isinstance(MessageReceived, bytes) or (MessageReceived is None)
 		assert isinstance(Args, dict)
 		if MessageReceived is None:
@@ -3775,12 +3778,14 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		# ClickKind (str): 'XY' where X is Left, Centre or Right; Y is Single, Long, Double, Triple
 		# Args can include: CanStartDrag, CanSelect
 		# Find out which element(s), if any, are clicked
+		print('FT3778 in HandleMouseAnyClick')
 		assert ClickKind in [X + Y for X in ['Left', 'Centre', 'Right'] for Y in ['Single', 'Long', 'Double', 'Triple']]
 		Hits = [] # list of dict of elements/hotspots clicked
 		for ThisEl in self.AllClickableObjects():
 			HitHotspot = ThisEl.MouseHit(ClickXInPx, ClickYInPx, TolXInPx=TolXInPx, TolYInPx=TolYInPx)
 			if HitHotspot: Hits.append({'Element': ThisEl, 'Hotspot': HitHotspot})
 		if Hits: # any elements hit? Find the hit element with highest PosZ (z-coordinate)
+			print('FT3785 hits found')
 			HighestZ = max(ThisHit['Element'].PosZ for ThisHit in Hits)
 			HitWithHighestZ = [ThisHit for ThisHit in Hits if ThisHit['Element'].PosZ == HighestZ][0]
 			# capture which element and hotspot were clicked; needed for drag handler
@@ -3796,6 +3801,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 				if ClickKind == 'LeftSingle': Handler = 'HandleMouseLClickOnMe'
 				elif ClickKind == 'LeftDouble': Handler = 'HandleMouseLDClickOnMe'
 				# invoke handler, if clicked element has implemented it
+				print('FT3801 calling handler:', Handler)
 				if hasattr(ElToHandleLClick, Handler):
 					getattr(ElToHandleLClick, Handler)(HitHotspot=HitHotspot, HostViewport=self, MouseX=ClickXInPx, MouseY=ClickYInPx)
 				else: print("FT2105 %s handler not implemented" % ClickKind)

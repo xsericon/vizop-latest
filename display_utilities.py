@@ -29,7 +29,6 @@ class ViewportMetaClass(type): # a class used to build a list of Viewport classe
 		# add new Viewport class to the list, except the base class
 		if not self.IsBaseClass:
 			ViewportMetaClass.ViewportClasses.append(self)
-			print("DU32 Viewportclasses:", ViewportMetaClass.ViewportClasses)
 
 class ViewportBaseClass(object, metaclass=ViewportMetaClass): # base class for all Viewports
 #	__metaclass__ = ViewportMetaClass
