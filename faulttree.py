@@ -1491,8 +1491,8 @@ class FTBuilder(FTBoxyObject): # 'add' button object within an FTColumn.
 		AllElsInColumn = self.HostFT.Columns[self.ColNo].FTElements
 		IndexInCol = len([El for El in AllElsInColumn[:AllElsInColumn.index(self)] if not isinstance(El, FTBuilder)])
 		# request PHA object to add new element by sending message through zmq
-		print('FT1494 FT sending request on socket: ', self.HostFT.D2CSocketREQ)
-		vizop_misc.SendRequest(Socket=self.HostFT.D2CSocketREQ, Command='RQ_FT_NewElement',
+		print('FT1494 FT sending request on socket: ',  [(s.SocketNo, s.SocketLabel) for s in vizop_misc.RegisterSocket.Register if s.Socket == self.HostFT.C2DSocketREQ])
+		vizop_misc.SendRequest(Socket=self.HostFT.C2DSocketREQ, Command='RQ_FT_NewElement',
 			Proj=self.HostFT.Proj.ID, PHAObj=self.HostFT.PHAObj.ID, Viewport=self.HostFT.ID,
 			ObjKindRequested=self.ObjTypeRequested.InternalName, ColNo=str(self.ColNo), IndexInCol=str(IndexInCol))
 
@@ -2893,6 +2893,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		# GetFullRedrawData main procedure
 		# First, make the root element
 		RootElement = ElementTree.Element(ViewportClass.InternalName)
+		print('FT2896 making redraw data using class internal name: ', ViewportClass.InternalName)
 		# populate with overall FT-related data
 		PopulateOverallData(RootElement)
 		# populate with header data
@@ -2900,6 +2901,8 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		# populate with data for each column
 		for Col in self.Columns:
 			ColEl = PopulateColumnData(FT=self, El=RootElement, Col=Col)
+		print('FT2904 sending the following redraw data:')
+		ElementTree.dump(RootElement)
 		return RootElement
 
 	def AddNewElement(self, Proj, ColNo=None, IndexInCol=None, ObjKindRequested=None):
@@ -2920,6 +2923,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		# insert new event
 		NewEvent = NewEventClass(Proj=Proj, FT=self, Column=self.Columns[ThisColIndex])
 		self.Columns[ThisColIndex].FTElements.insert(ThisIndexInCol, NewEvent)
+		# prepare return message requesting redraw of the FT %%% needed?
 		return vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
 
 	def ConnectElements(self, FromEl, ToEl):
@@ -3088,8 +3092,10 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		# prepare default reply if command unknown
 		Reply = vizop_misc.MakeXMLMessage(RootName='Fail', RootText='CommandNotRecognised')
 		# process the command
-		if Command == 'RQ_FT_NewElement': Reply = self.AddNewElement(Proj=Proj, ColNo=XMLRoot.findtext('ColNo'),
-			IndexInCol=XMLRoot.findtext('IndexInCol'), ObjKindRequested=XMLRoot.findtext('ObjKindRequested'))
+		if Command == 'RQ_FT_NewElement':
+			print('FT3095 processing command: ', Command)
+			Reply = self.AddNewElement(Proj=Proj, ColNo=XMLRoot.findtext('ColNo'),
+				IndexInCol=XMLRoot.findtext('IndexInCol'), ObjKindRequested=XMLRoot.findtext('ObjKindRequested'))
 		elif Command == 'RQ_FT_ChangeText':
 			Reply = self.ChangeText(Proj=Proj, ElementID=XMLRoot.findtext('Element'),
 									TextComponentName=XMLRoot.findtext('TextComponent'),
@@ -3437,6 +3443,8 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			return NewGate
 
 		# main procedure for PrepareFullDisplay()
+		print('FT3441 starting PrepareFullDisplay using the following XML data:')
+		ElementTree.dump(XMLData)
 		self.Wipe() # start with a blank FT
 		# find the outer tag containing the FT data
 		FTData = [t for t in XMLData.iter(self.InternalName)][0]

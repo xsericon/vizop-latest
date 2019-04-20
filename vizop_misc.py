@@ -294,6 +294,7 @@ def SetupNewSocket(SocketType='REQ', SocketLabel='', Viewport=None, PHAObj=None,
 	assert isinstance(BelongsToDatacore, bool)
 	assert isinstance(AddToRegister, bool)
 	global zmqContext
+	print('VM297 SetupNewSocket: SocketNo: ', SocketNo)
 	# fetch socket number if required
 	if SocketNo is None: ThisSocketNo = GetNewSocketNumber()
 	else: ThisSocketNo = SocketNo
@@ -318,9 +319,9 @@ def ListenToSocket(Socket, Handler=None, SendReply2=True, **Args):
 #			[(s.SocketNo, s.SocketLabel) for s in RegisterSocket.Register if s.Socket in SocketsWaiting])
 	# any incoming message from Socket?
 	if Socket in SocketsWaiting:
-#		print("VM264 processing socket in ListenToSockets: ", [(s.SocketNo, s.SocketLabel) for s in RegisterSocket.Register if s.Socket == Socket])
+		print("VM264 processing socket in ListenToSockets: ", [(s.SocketNo, s.SocketLabel) for s in RegisterSocket.Register if s.Socket == Socket])
 		MessageReceived = Socket.recv()
-		if getattr(Args, 'Debug', False): print("VM305 message received: ", MessageReceived)
+		if Args.get('Debug', False): print("VM305 message received: ", MessageReceived)
 		if Handler: # any handler supplied?
 			# handle the message and collect an XML tree containing the response to send back to origin
 			ReplyXML = Handler(MessageReceived=MessageReceived, **Args)

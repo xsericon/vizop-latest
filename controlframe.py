@@ -1454,7 +1454,6 @@ class ControlFrame(wx.Frame):
 			# so that local and remote Viewports are treated the same)
 			if ThisSocketObj.Viewport.PHAObj: # proceed only if Viewport has been assigned to a PHA object
 				# (will not have happened yet if Viewport is newly created)
-				print('CF1457 checking viewport socket: ', ThisSocketObj.SocketNo)
 				ViewportMessageReceivedThisTime = bool(vizop_misc.ListenToSocket(Proj=self.CurrentProj, Socket=ThisSocketObj.Socket,
 					Handler=ThisSocketObj.Viewport.PHAObj.HandleIncomingRequest))
 				if ViewportMessageReceivedThisTime: print('CF1459 incoming viewport message received')
@@ -1471,8 +1470,11 @@ class ControlFrame(wx.Frame):
 			SendReply2=False, Debug=True))
 		# 4. likewise for control frame's current Viewport, if any
 		if self.CurrentViewport:
-			MessageReceived |= bool(vizop_misc.ListenToSocket(Socket=self.CurrentViewport.C2DSocketREP, Handler=self.ShowViewport, Debug=True))
-			MessageReceived |= bool(vizop_misc.ListenToSocket(Socket=self.CurrentViewport.D2CSocketREQ, Handler=None, SendReply2=False))
+			MessageReceived |= bool(vizop_misc.ListenToSocket(Socket=self.CurrentViewport.C2DSocketREQ,
+				Handler=self.ShowViewport, Debug=True))
+			MessageReceived |= bool(vizop_misc.ListenToSocket(Socket=self.CurrentViewport.D2CSocketREP,
+				Handler=None, SendReply2=False))
+		# TODO should we discard incoming REQ messages to other Viewports that aren't currently on display?
 		return MessageReceived
 
 	def HandleIncomingMessageToControlFrame(self, MessageReceived=''):
@@ -1546,7 +1548,7 @@ class ControlFrame(wx.Frame):
 		else:
 			NewViewport, D2CSocketNo, C2DSocketNo = display_utilities.CreateViewport(Proj, Args['ViewportClass'],
 				DisplDevice=self.MyEditPanel, Fonts=self.Fonts)
-			print('FT1549 created Viewport with D2C, C2D socket numbers:', D2CSocketNo, C2DSocketNo)
+			print('CF1549 created Viewport with D2C, C2D socket numbers:', D2CSocketNo, C2DSocketNo)
 			RequestToDatacore = 'RQ_NewViewport'
 		self.Viewports.append(NewViewport) # add it to the register for Control Frame
 		self.TrialViewport = NewViewport # set as temporary current viewport, confirmed after successful creation
@@ -1642,7 +1644,7 @@ class ControlFrame(wx.Frame):
 		self.SwitchToViewport(self.TrialViewport)
 		# attach Viewport to PHA object, and label its sockets
 		self.CurrentViewport.PHAObj = PHAObj
-		self.CurrentViewport.D2CSocketREQObj.PHAObj = self.CurrentViewport.C2DSocketREPObj.PHAObj = PHAObj
+		self.CurrentViewport.C2DSocketREQObj.PHAObj = self.CurrentViewport.D2CSocketREPObj.PHAObj = PHAObj
 		# set up the display in the PHA panel
 		self.ShowViewport(MessageAsXMLTree=XMLRoot)
 		# send acknowledgment message back (ListenToSockets does the actual sending)
@@ -1673,7 +1675,7 @@ class ControlFrame(wx.Frame):
 		self.SwitchToViewport(self.TrialViewport)
 		# attach Viewport to PHA object, and label its sockets
 		self.CurrentViewport.PHAObj = PHAObj
-		self.CurrentViewport.D2CSocketREQObj.PHAObj = self.CurrentViewport.C2DSocketREPObj.PHAObj = PHAObj
+		self.CurrentViewport.C2DSocketREQObj.PHAObj = self.CurrentViewport.D2CSocketREPObj.PHAObj = PHAObj
 		# set up the display in the PHA panel
 		self.ShowViewport(MessageAsXMLTree=XMLRoot)
 		# is this redo chained after another redo? If not, post a message in VizopTalks
@@ -1824,7 +1826,24 @@ class ControlFrame(wx.Frame):
 			Elements={info.IDTag: ThisPHAObj.ID})
 		return Reply
 
-	def ShowViewport(self, MessageReceived=None, MessageAsXMLTree=None, Args={}):
+	def HandleMessageToLocalViewport(self, MessageReceived=None, MessageAsXMLTree=None, **Args):
+		# process message received on socket requiring attention by local Viewport
+		# returns acknowledgement message as XML string
+		if MessageReceived is None:
+			assert isinstance(MessageAsXMLTree, ElementTree.Element)
+			XMLTree = MessageAsXMLTree
+		else:
+			assert isinstance(MessageReceived, bytes)
+			XMLTree = ElementTree.fromstring(MessageReceived)
+		# get message root
+		MessageRoot = XMLTree.text
+		# if message is 'OK', it's just an acknowledgement with no action required
+		if MessageRoot == 'OK': return vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
+		else:
+			# draw complete Viewport
+			return self.ShowViewport(MessageReceived=None, MessageAsXMLTree=None, **Args)
+
+	def ShowViewport(self, MessageReceived=None, MessageAsXMLTree=None, **Args):
 		# show Viewport ViewportToShow in PHA panel, using data in MessageReceived (XML string) or, if None, in
 		# MessageAsXMLTree (XML root element)
 		if MessageReceived is None:
@@ -1834,10 +1853,12 @@ class ControlFrame(wx.Frame):
 			assert isinstance(MessageReceived, bytes)
 			XMLTree = ElementTree.fromstring(MessageReceived)
 		# First, tell Viewport to prepare for display, with data from PHA model
+		print('CF1837 calling PrepareFullDisplay with MessageReceived:', MessageReceived)
+		print ('MessageAsXMLTree:', MessageAsXMLTree, "Debug:", Args.get('Debug', False))
 		self.CurrentViewport.PrepareFullDisplay(XMLTree)
 		self.MyEditPanel.EditPanelMode(self.CurrentViewport, 'Select') # set up mouse pointer and bindings (needs OffsetX/Y)
 		self.Refresh()  # trigger OnPaint() so that the panel rendering is refreshed
-		return vizop_misc.MakeXMLMessage(RootName='RP_ShowViewport', RootText="Null")
+		return vizop_misc.MakeXMLMessage(RootName='RP_ShowViewport', RootText='Null')
 
 	def SetupFonts(self):
 		Fonts = {}
@@ -2152,16 +2173,17 @@ class ViewportShadow(object): # defines objects that represent Viewports in the 
 		assert MyClass in display_utilities.ViewportMetaClass.ViewportClasses
 		assert isinstance(D2CSocketNumber, int)
 		assert isinstance(C2DSocketNumber, int)
+		print('CF2155 making Viewport shadow with D2CSocketNumber, C2DSocketNumber:', D2CSocketNumber, C2DSocketNumber)
 		object.__init__(self)
 		self.ID = ID
 		self.MyClass = MyClass
 		# set up sockets using socket numbers provided
-		self.D2CSocketREP, self.D2CSocketREPObj, D2CSocketNumberReturned = vizop_misc.SetupNewSocket(SocketType='REP',
-			SocketLabel='D2CREP_' + self.ID,
-			PHAObj=PHAModel, Viewport=self, SocketNo=None, BelongsToDatacore=True, AddToRegister=True)
-		self.C2DSocketREQ, self.C2DSocketREQObj, C2DSocketNumberReturned = vizop_misc.SetupNewSocket(SocketType='REQ',
+		self.C2DSocketREP, self.C2DSocketREPObj, C2DSocketNumberReturned = vizop_misc.SetupNewSocket(SocketType='REP',
+			SocketLabel='C2DREP_' + self.ID,
+			PHAObj=PHAModel, Viewport=self, SocketNo=C2DSocketNumber, BelongsToDatacore=True, AddToRegister=True)
+		self.D2CSocketREQ, self.D2CSocketREQObj, D2CSocketNumberReturned = vizop_misc.SetupNewSocket(SocketType='REQ',
 			SocketLabel=info.ViewportOutSocketLabel + '_' + self.ID,
-			PHAObj=PHAModel, Viewport=self, SocketNo=None, BelongsToDatacore=True, AddToRegister=True)
+			PHAObj=PHAModel, Viewport=self, SocketNo=D2CSocketNumber, BelongsToDatacore=True, AddToRegister=True)
 		# put the new viewport shadow into the project's list
 		Proj.AllViewportShadows.append(self)
 

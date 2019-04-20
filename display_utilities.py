@@ -40,8 +40,8 @@ class ViewportBaseClass(object, metaclass=ViewportMetaClass): # base class for a
 		self.DisplDevice = None # which wx.Window object the Viewport is displayed on (needs to take a wx.DC)
 		self.ID = None # assigned in CreateViewport()
 		self.Proj = Args['Proj']
-		self.D2CSocketREQ    = self.C2DSocketREP = None # zmq sockets for communication; set in CreateViewport()
-		self.D2CSocketREQObj = self.C2DSocketREPObj = None # SocketInRegister instances matching In/OutwardSocket;
+		self.C2DSocketREQ    = self.D2CSocketREP = None # zmq sockets for communication; set in CreateViewport()
+		self.C2DSocketREQObj = self.D2CSocketREPObj = None # SocketInRegister instances matching In/OutwardSocket;
 			# set in CreateViewport()
 #		self.GotoMilestoneOnUndoCreate = None # a milestone instance to revert to, if creation of this Viewport is undone
 
@@ -72,12 +72,12 @@ def CreateViewport(Proj, ViewportClass, DisplDevice=None, PHAObj=None, DatacoreI
 	D2CSocketNo = vizop_misc.GetNewSocketNumber()
 	C2DSocketNo = vizop_misc.GetNewSocketNumber()
 	# Then we fetch the socket numbers and make the corresponding sockets on the Viewport side.
-	NewViewport.D2CSocketREQ, NewViewport.D2CSocketREQObj, D2CSocketNoReturned = vizop_misc.SetupNewSocket(SocketType='REQ',
-		SocketLabel='D2CREQ_' + NewViewport.ID, PHAObj=PHAObj, Viewport=NewViewport,
-		SocketNo=D2CSocketNo, BelongsToDatacore=False, AddToRegister=True)
-	NewViewport.C2DSocketREP, NewViewport.C2DSocketREPObj, C2DSocketNoReturned = vizop_misc.SetupNewSocket(SocketType='REP',
-		SocketLabel='C2DREP_' + NewViewport.ID, PHAObj=PHAObj, Viewport=NewViewport,
+	NewViewport.C2DSocketREQ, NewViewport.C2DSocketREQObj, C2DSocketNoReturned = vizop_misc.SetupNewSocket(SocketType='REQ',
+		SocketLabel='C2DREQ_' + NewViewport.ID, PHAObj=PHAObj, Viewport=NewViewport,
 		SocketNo=C2DSocketNo, BelongsToDatacore=False, AddToRegister=True)
+	NewViewport.D2CSocketREP, NewViewport.D2CSocketREPObj, D2CSocketNoReturned = vizop_misc.SetupNewSocket(SocketType='REP',
+		SocketLabel='D2CREP_' + NewViewport.ID, PHAObj=PHAObj, Viewport=NewViewport,
+		SocketNo=D2CSocketNo, BelongsToDatacore=False, AddToRegister=True)
 	return NewViewport, D2CSocketNo, C2DSocketNo
 
 def ViewportClassWithName(TargetName):
