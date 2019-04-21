@@ -199,7 +199,6 @@ def SendRequest(Socket=None, Command='RQ_Null', FetchReply=False, XMLRoot=None, 
 				Values = [Values]
 			# make multiple sub-elements, one for each item in Values; set element text to corresponding value in Values
 			for ThisValue in Values:
-	#			NewElement = ElementTree.SubElement(parent=RootElement, tag=Cmd)
 				NewElement = ElementTree.SubElement(RootElement, Cmd)
 				NewElement.text = ThisValue # Can't put this into preceding line as text= arg; it creates a separate attrib in XML tag
 	else: # use XMLRoot supplied
@@ -207,7 +206,10 @@ def SendRequest(Socket=None, Command='RQ_Null', FetchReply=False, XMLRoot=None, 
 	# convert the XML tree to a string
 	XMLString = ElementTree.tostring(RootElement, encoding='UTF-8')
 	# submit the string via zmq
-	Socket.send(XMLString, copy=True) # seems to return None if all is well
+	print('VM209 sending request on socket: ',
+		  [(s.SocketNo, s.SocketLabel) for s in RegisterSocket.Register if
+		   s.Socket == Socket])
+	Socket.send(XMLString, copy=True)
 	if FetchReply: # this path not currently used?
 		ReplyReceived = None
 		while ReplyReceived is None:
@@ -294,7 +296,6 @@ def SetupNewSocket(SocketType='REQ', SocketLabel='', Viewport=None, PHAObj=None,
 	assert isinstance(BelongsToDatacore, bool)
 	assert isinstance(AddToRegister, bool)
 	global zmqContext
-	print('VM297 SetupNewSocket: SocketNo: ', SocketNo)
 	# fetch socket number if required
 	if SocketNo is None: ThisSocketNo = GetNewSocketNumber()
 	else: ThisSocketNo = SocketNo
@@ -319,7 +320,7 @@ def ListenToSocket(Socket, Handler=None, SendReply2=True, **Args):
 #			[(s.SocketNo, s.SocketLabel) for s in RegisterSocket.Register if s.Socket in SocketsWaiting])
 	# any incoming message from Socket?
 	if Socket in SocketsWaiting:
-		print("VM264 processing socket in ListenToSockets: ", [(s.SocketNo, s.SocketLabel) for s in RegisterSocket.Register if s.Socket == Socket])
+		print("VM264 processing socket in ListenToSockets: ", [(s.SocketNo, s.SocketLabel) for s in RegisterSocket.Register if s.Socket == Socket], 'Sending reply: ', SendReply2)
 		MessageReceived = Socket.recv()
 		if Args.get('Debug', False): print("VM305 message received: ", MessageReceived)
 		if Handler: # any handler supplied?
@@ -327,8 +328,9 @@ def ListenToSocket(Socket, Handler=None, SendReply2=True, **Args):
 			ReplyXML = Handler(MessageReceived=MessageReceived, **Args)
 			assert ReplyXML is not None, Handler.__name__
 		else: ReplyXML = MakeXMLMessage('Null', 'Null')
-		if SendReply2: # use SendReply() instead?
-			Socket.send(ElementTree.tostring(ReplyXML, encoding='UTF-8'))
+#		if SendReply2 and (ReplyXML.tag is not 'OK'): # send reply if required; don't send 'OK' as it's just an acknowledgement
+		if SendReply2: # send reply if required
+			Socket.send(ElementTree.tostring(ReplyXML, encoding='UTF-8')) # use SendReply() instead?
 	return MessageReceived
 
 def MakeXMLMessage(RootName='Message', RootText='', **Args):

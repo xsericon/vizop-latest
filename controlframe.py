@@ -1467,13 +1467,14 @@ class ControlFrame(wx.Frame):
 		# 3. check sockets for any messages coming into the control frame, and process
 		MessageReceived |= bool(vizop_misc.ListenToSocket(Socket=self.zmqInwardSocket, Handler=self.HandleIncomingMessageToControlFrame))
 		MessageReceived |= bool(vizop_misc.ListenToSocket(Socket=self.zmqOutwardSocket, Handler=self.HandleIncomingReplyToControlFrame,
-			SendReply2=False, Debug=True))
+			SendReply2=False))
 		# 4. likewise for control frame's current Viewport, if any
 		if self.CurrentViewport:
 			MessageReceived |= bool(vizop_misc.ListenToSocket(Socket=self.CurrentViewport.C2DSocketREQ,
-				Handler=self.ShowViewport, Debug=True))
+				Handler=self.HandleMessageToLocalViewport))
+			# check messages from datacore's Viewport shadow to our local Viewports
 			MessageReceived |= bool(vizop_misc.ListenToSocket(Socket=self.CurrentViewport.D2CSocketREP,
-				Handler=None, SendReply2=False))
+				Handler=self.HandleMessageToLocalViewport, SendReply2=True, Debug=True))
 		# TODO should we discard incoming REQ messages to other Viewports that aren't currently on display?
 		return MessageReceived
 
@@ -1548,7 +1549,6 @@ class ControlFrame(wx.Frame):
 		else:
 			NewViewport, D2CSocketNo, C2DSocketNo = display_utilities.CreateViewport(Proj, Args['ViewportClass'],
 				DisplDevice=self.MyEditPanel, Fonts=self.Fonts)
-			print('CF1549 created Viewport with D2C, C2D socket numbers:', D2CSocketNo, C2DSocketNo)
 			RequestToDatacore = 'RQ_NewViewport'
 		self.Viewports.append(NewViewport) # add it to the register for Control Frame
 		self.TrialViewport = NewViewport # set as temporary current viewport, confirmed after successful creation
@@ -1831,17 +1831,19 @@ class ControlFrame(wx.Frame):
 		# returns acknowledgement message as XML string
 		if MessageReceived is None:
 			assert isinstance(MessageAsXMLTree, ElementTree.Element)
-			XMLTree = MessageAsXMLTree
+			XMLTreeToSend = MessageAsXMLTree
 		else:
 			assert isinstance(MessageReceived, bytes)
-			XMLTree = ElementTree.fromstring(MessageReceived)
+			XMLTreeToSend = ElementTree.fromstring(MessageReceived)
 		# get message root
-		MessageRoot = XMLTree.text
+		MessageRoot = XMLTreeToSend.tag
+		print('CF1840 MessageRoot: ', MessageRoot)
 		# if message is 'OK', it's just an acknowledgement with no action required
+#		if MessageRoot == 'OK': return None # no reply message needed to CheckForIncoming Messages()
 		if MessageRoot == 'OK': return vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
 		else:
 			# draw complete Viewport
-			return self.ShowViewport(MessageReceived=None, MessageAsXMLTree=None, **Args)
+			return self.ShowViewport(MessageReceived=MessageReceived, MessageAsXMLTree=XMLTreeToSend, **Args)
 
 	def ShowViewport(self, MessageReceived=None, MessageAsXMLTree=None, **Args):
 		# show Viewport ViewportToShow in PHA panel, using data in MessageReceived (XML string) or, if None, in
@@ -2211,7 +2213,7 @@ def UpdateDisplayModels(CurrentProject):
 		FullXMLData = vizop_misc.MakeXMLMessage(RootName='RQ_RedrawViewport', RootText=ThisViewport.ID,
 			Elements={info.IDTag: ThisViewport.PHAObj.ID})
 		FullXMLData.append(RedrawXMLData)
-		# send it to Viewport. TODO work through steps in "Viewport - General" spec to create required sockets on each endm
+		# send it to Viewport
 		print("CF1514 sending on socket: ", ThisViewport.D2CSocketREQObj.SocketLabel)
 		vizop_misc.SendRequest(Socket=ThisViewport.D2CSocketREQObj.Socket, Command='RQ_RedrawViewport',
 			XMLRoot=FullXMLData)

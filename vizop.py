@@ -180,29 +180,29 @@ def DoNewPHAObj(Proj, ViewportID=None, NewPHAObjType=None, **NewPHAObjArgs):
 		utilities.ObjectWithID(Proj.AllViewportShadows, ViewportID).PHAObject = PHAObj
 	return PHAObj
 
-def DoNewFTEventNotIPL(Root):
-	# handle request from Control Frame for new non-IPL event in an FT. Redundant, now handled in FTObjInCore class
-	# input data is supplied in Root, an XML ElementTree root element
-	# return reply data (XML tree) to send back to Control Frame
-	global EditAllowed, OpenProjects
-	print("DC612 starting DoNewFTEventNotIPL")
-	# check if we can proceed to edit the PHA model
-	if EditAllowed:
-		# find out which project and PHA model to work in
-		ThisProj = utilities.ObjectWithID(OpenProjects, Root.find('Proj').text)
-		ThisPHAModel = utilities.ObjectWithID(ThisProj.PHAObjs, Root.find('PHAObj').text)
-		# request ThisPHAModel to add the event
-		ThisPHAModel.AddNewFTEventNotIPL(ColNo=Root.find('ColNo').text, IndexInCol=Root.find('IndexInCol').text)
-		Reply = MakeXMLMessage(Elements={'OK': 'NewEventAdded'})
-		# get full redraw data to send back to all applicable Viewports
-		MsgToViewports = ThisPHAModel.GetFullRedrawData()
-		# Send redraw message to all Viewports attached to ThisPHAModel
-		for ThisViewport in ThisPHAModel.Viewports:
-			ThisViewport.C2DSocketREQObj.send(ElementTree.tostring(MsgToViewports, encoding='UTF-8'))
-			# %%% TODO Viewport needs to receive and process the message
-	else:  # couldn't update PHA model because editing is blocked
-		Reply = MakeXMLMessage(Elements={'CantComply': 'EditingBlocked'})
-	return Reply
+# def DoNewFTEventNotIPL(Root):
+# 	# handle request from Control Frame for new non-IPL event in an FT. Redundant, now handled in FTObjInCore class
+# 	# input data is supplied in Root, an XML ElementTree root element
+# 	# return reply data (XML tree) to send back to Control Frame
+# 	global EditAllowed, OpenProjects
+# 	print("DC612 starting DoNewFTEventNotIPL")
+# 	# check if we can proceed to edit the PHA model
+# 	if EditAllowed:
+# 		# find out which project and PHA model to work in
+# 		ThisProj = utilities.ObjectWithID(OpenProjects, Root.find('Proj').text)
+# 		ThisPHAModel = utilities.ObjectWithID(ThisProj.PHAObjs, Root.find('PHAObj').text)
+# 		# request ThisPHAModel to add the event
+# 		ThisPHAModel.AddNewFTEventNotIPL(ColNo=Root.find('ColNo').text, IndexInCol=Root.find('IndexInCol').text)
+# 		Reply = MakeXMLMessage(Elements={'OK': 'NewEventAdded'})
+# 		# get full redraw data to send back to all applicable Viewports
+# 		MsgToViewports = ThisPHAModel.GetFullRedrawData()
+# 		# Send redraw message to all Viewports attached to ThisPHAModel
+# 		for ThisViewport in ThisPHAModel.Viewports:
+# 			ThisViewport.C2DSocketREQObj.send(ElementTree.tostring(MsgToViewports, encoding='UTF-8'))
+# 			# %%% TODO Viewport needs to receive and process the message
+# 	else:  # couldn't update PHA model because editing is blocked
+# 		Reply = MakeXMLMessage(Elements={'CantComply': 'EditingBlocked'})
+# 	return Reply
 
 def MakeXMLMessage(RootName='Message', RootText='', **Args):
 	# duplicate function in vizop_misc. Should remove this copy and transfer references to vizop_misc.

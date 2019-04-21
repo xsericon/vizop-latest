@@ -1483,7 +1483,7 @@ class FTBuilder(FTBoxyObject): # 'add' button object within an FTColumn.
 			DC.DrawLine(self.SizeXInPx * 0.5, self.SizeYInPx * 0.7, self.SizeXInPx * 0.6, self.SizeYInPx * 0.7)
 			DC.DrawLine(self.SizeXInPx * 0.75, self.SizeYInPx * 0.5, self.SizeXInPx * 0.85, self.SizeYInPx * 0.5)
 
-	def HandleMouseLClickOnMe(self, HitHotspot, **Args): # process mouse left click on HitHotspot (str)%%%
+	def HandleMouseLClickOnMe(self, HitHotspot, **Args): # process mouse left click on HitHotspot (str)
 		# request DataCore to create new FT object, and get back confirmation
 		# If user has clicked on a builder button, IndexInCol is the index at which the new item is to be inserted,
 		# not counting builder buttons. This is found by counting the number of non-builder items above the builder button
@@ -2923,7 +2923,6 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		# insert new event
 		NewEvent = NewEventClass(Proj=Proj, FT=self, Column=self.Columns[ThisColIndex])
 		self.Columns[ThisColIndex].FTElements.insert(ThisIndexInCol, NewEvent)
-		# prepare return message requesting redraw of the FT %%% needed?
 		return vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
 
 	def ConnectElements(self, FromEl, ToEl):
@@ -3079,7 +3078,6 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		# MessageAsXMLTree (XML element or None): root of XML tree
 		# return Reply (Root object of XML tree)
 		# First, convert MessageReceived to an XML tree for parsing
-		print('FT3088 FT handling incoming request')
 		assert isinstance(MessageReceived, bytes) or (MessageReceived is None)
 		assert isinstance(Args, dict)
 		if MessageReceived is None:
@@ -3089,6 +3087,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		Proj = Args['Proj'] # get ProjectItem object to which the current FT belongs
 		# get the command - it's the tag of the root element
 		Command = XMLRoot.tag
+		print('FT3088 FT handling incoming request with command: ', Command)
 		# prepare default reply if command unknown
 		Reply = vizop_misc.MakeXMLMessage(RootName='Fail', RootText='CommandNotRecognised')
 		# process the command
@@ -3136,6 +3135,8 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			if ProblemFound:
 				Reply = vizop_misc.MakeXMLMessage(RootName='Problem', RootText=ProblemFound)
 			else: Reply = vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
+		elif Command == 'OK': # dummy for 'OK' responses - received only to clear the sockets
+			Reply = vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
 		return Reply
 
 class ChoiceItem(object): # represents an item in a group of items the user can select from, in an instance of
