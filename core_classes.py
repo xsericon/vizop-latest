@@ -790,7 +790,7 @@ class CategoryNameItem(NumValueItem): # class of objects defining one of a list 
 #	Value = property(fget=GetMyValue, fset=SetMyValue)
 #	Unit = property(fget=GetMyUnit, fset=SetMyUnit)
 
-class AutoNumValueItem(NumValueItem):  # class of values that are calculated by a method in some other class
+class AutoNumValueItem(NumValueItem): # class of values that are calculated by a method in some other class
 	ClassHumanName = _('Calculated')
 	ClassInternalName = 'Calculated'
 	UserSelectable = False  # whether user can manually select this class when assigning a value to a PHA object
@@ -798,7 +798,7 @@ class AutoNumValueItem(NumValueItem):  # class of values that are calculated by 
 	def __init__(self, **Args):
 		NumValueItem.__init__(self, **Args)
 		self.Calculator = None # method used to return value
-		self.UnitGetter = None # method used to return unit
+		self.UnitGetter = None # method used to return unit. When setting it, remember to set StatusGetter as well
 		self.StatusGetter = None # method used to return status
 		self.DefaultValue = None
 
@@ -814,6 +814,9 @@ class AutoNumValueItem(NumValueItem):  # class of values that are calculated by 
 	def GetMyUnit(self, **Args): # return unit obtained from object
 		if self.UnitGetter is None: return NullUnit
 		else: return self.UnitGetter(**Args)
+
+	def GetMyUserDefinedUnit(self, **Args): # return unit defined by user. This is intended as a "UnitGetter" method
+		return super(AutoNumValueItem, self).GetMyUnit(**Args)
 
 	def Status(self, RR=DefaultRiskReceptor, FormulaAntecedents=[], **args):
 		# return NumProblemValue item indicating status of value

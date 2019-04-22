@@ -2207,7 +2207,7 @@ def UpdateAllViewports(Proj=None, Message=None):
 	# Message (str): XML message received requesting update to Viewports
 	# ignore Message if it's just 'OK'
 	print('CF2209 Message coming to UpdateAllViewports:', ElementTree.fromstring(Message).tag)
-	if ElementTree.fromstring(Message).tag != 'OK': # maybe not needed any longer
+#	if ElementTree.fromstring(Message).tag != 'OK': # maybe not needed any longer
 	if True:
 		for ThisViewport in Proj.AllViewportShadows:
 			# get refresh data from corresponding PHA object

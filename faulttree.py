@@ -1487,11 +1487,10 @@ class FTBuilder(FTBoxyObject): # 'add' button object within an FTColumn.
 		# request DataCore to create new FT object, and get back confirmation
 		# If user has clicked on a builder button, IndexInCol is the index at which the new item is to be inserted,
 		# not counting builder buttons. This is found by counting the number of non-builder items above the builder button
-		print('FT1490 in builder HandleMouseLClickOnMe')
 		AllElsInColumn = self.HostFT.Columns[self.ColNo].FTElements
 		IndexInCol = len([El for El in AllElsInColumn[:AllElsInColumn.index(self)] if not isinstance(El, FTBuilder)])
 		# request PHA object to add new element by sending message through zmq
-		print('FT1494 FT sending request on socket: ',  [(s.SocketNo, s.SocketLabel) for s in vizop_misc.RegisterSocket.Register if s.Socket == self.HostFT.C2DSocketREQ])
+#		print('FT1494 FT sending request on socket: ',  [(s.SocketNo, s.SocketLabel) for s in vizop_misc.RegisterSocket.Register if s.Socket == self.HostFT.C2DSocketREQ])
 		vizop_misc.SendRequest(Socket=self.HostFT.C2DSocketREQ, Command='RQ_FT_NewElement',
 			Proj=self.HostFT.Proj.ID, PHAObj=self.HostFT.PHAObj.ID, Viewport=self.HostFT.ID,
 			ObjKindRequested=self.ObjTypeRequested.InternalName, ColNo=str(self.ColNo), IndexInCol=str(IndexInCol))
@@ -1835,7 +1834,7 @@ class FTEventInCore(object): # FT event object used in DataCore by FTObjectInCor
 		if NewValueKind == core_classes.AutoNumValueItem: # set up for 'derived value'
 			self.Value.Calculator = self.GetEventValue  # provide method to get derived value (overridden by SetAsSIFFailureEvent())
 			self.Value.StatusGetter = self.GetEventValueStatus  # provide method to get status
-			self.Value.UnitGetter = lambda : self.Value.GetMyUnit() # return current unit when requested
+			self.Value.UnitGetter = self.Value.GetMyUserDefinedUnit # return current unit when requested%%%
 
 	def SetAsSIFFailureEvent(self): # this function should be called when we want to mark this FT event as the
 		# "SIF failure" initiating event; only for High Demand and Continuous OpModes.
@@ -1942,17 +1941,32 @@ class FTEventInCore(object): # FT event object used in DataCore by FTObjectInCor
 		else: # not an attrib that needs checking
 			return core_classes.NumProblemValue_NoProblem
 
-	def GetEventValue(self, RR, **Args): # return event value if value kind is Auto
-		# this gets called by the NumValue instance's Calculate() call
+	def GetValueOriginObject(self, RR, **Args): # return element that yields value for this element
 		assert isinstance(self.Value, core_classes.AutoNumValueItem)
 		# find event connected to this one (should be only one; we find them all for bug trapping)
 		ConnectFrom = JoinedFrom(self.FT, self, FirstOnly=False)
 		assert len(ConnectFrom) == 1
 		assert isinstance(ConnectFrom[0], (FTEventInCore, FTGateItemInCore, FTConnectorItemInCore))
-		ValueOriginObject = ConnectFrom[0].Value # where to get the value from
+		return ConnectFrom[0].Value # where to get the value from
+
+	def GetEventValue(self, RR, **Args): # return event value if value kind is Auto
+		# this gets called by the NumValue instance's Calculate() call
+		assert isinstance(self.Value, core_classes.AutoNumValueItem)
+		# find event connected to this one (should be only one; we find them all for bug trapping)
+		ValueOriginObject = self.GetValueOriginObject(RR, **Args)
 		if ValueOriginObject.Status(RR=RR) == core_classes.NumProblemValue_NoProblem:
 			# fetch value from connected object, and convert to required unit
 			return ValueOriginObject.GetMyValue(RR=RR) * ValueOriginObject.GetMyUnit().Conversion[self.Value.GetMyUnit()]
+		else: return None # can't get value
+
+	def GetEventUnit(self, RR, **Args): # return event unit if value kind is Auto
+		# this is intended as a UnitGetter method for the number kind class
+		assert isinstance(self.Value, core_classes.AutoNumValueItem)
+		# find event connected to this one (should be only one; we find them all for bug trapping)
+		ValueOriginObject = self.GetValueOriginObject(RR, **Args)
+		if ValueOriginObject.Status(RR=RR) == core_classes.NumProblemValue_NoProblem:
+			# fetch value from connected object, and convert to required unit
+			return ValueOriginObject.GetMyUnit()
 		else: return None # can't get value
 
 	def GetEventValueStatus(self, RR): # return event value status as a NumProblemValue instance, if value kind is Auto
@@ -4064,7 +4078,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 					self.CurrentEditChoice.Destroy()
 					self.CurrentEditElement = self.CurrentEditChoice = None
 					# request PHA object to update choice attribute by sending message through zmq
-					vizop_misc.SendRequest(Socket=self.D2CSocketREQ, Command='RQ_FT_ChangeChoice',
+					vizop_misc.SendRequest(Socket=self.C2DSocketREQ, Command='RQ_FT_ChangeChoice',
 						ProjID=self.Proj.ID, PHAObj=self.PHAObj.ID, Viewport=self.ID,
 						Element=ElementID, TextComponent=EditComponentInternalName,
 						NewValue=ChosenXMLName)
