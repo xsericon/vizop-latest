@@ -320,7 +320,8 @@ def ListenToSocket(Socket, Handler=None, SendReply2=True, **Args):
 #			[(s.SocketNo, s.SocketLabel) for s in RegisterSocket.Register if s.Socket in SocketsWaiting])
 	# any incoming message from Socket?
 	if Socket in SocketsWaiting:
-		print("VM264 processing socket in ListenToSockets: ", [(s.SocketNo, s.SocketLabel) for s in RegisterSocket.Register if s.Socket == Socket], 'Sending reply: ', SendReply2)
+		print("VM264 processing socket in ListenToSockets: ", [(s.SocketNo, s.SocketLabel) for s in RegisterSocket.Register if s.Socket == Socket],
+			'Sending reply: ', SendReply2, 'Origin code:', Args.get('OriginCode', 0))
 		MessageReceived = Socket.recv()
 		if Args.get('Debug', False): print("VM305 message received: ", MessageReceived)
 		if Handler: # any handler supplied?

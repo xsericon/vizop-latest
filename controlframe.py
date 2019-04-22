@@ -1454,16 +1454,16 @@ class ControlFrame(wx.Frame):
 			# so that local and remote Viewports are treated the same)
 			if ThisSocketObj.Viewport.PHAObj: # proceed only if Viewport has been assigned to a PHA object
 				# (will not have happened yet if Viewport is newly created)
-				ViewportMessageReceivedThisTime = bool(vizop_misc.ListenToSocket(Proj=self.CurrentProj, Socket=ThisSocketObj.Socket,
-					Handler=ThisSocketObj.Viewport.PHAObj.HandleIncomingRequest))
+				ViewportMessageReceivedThisTime = vizop_misc.ListenToSocket(Proj=self.CurrentProj, Socket=ThisSocketObj.Socket,
+					Handler=ThisSocketObj.Viewport.PHAObj.HandleIncomingRequest)
 				if ViewportMessageReceivedThisTime: print('CF1459 incoming viewport message received')
-				ViewportMessageReceived |= ViewportMessageReceivedThisTime
+				ViewportMessageReceived |= bool(ViewportMessageReceivedThisTime)
 				MessageReceived |= bool(vizop_misc.ListenToSocket(Socket=[s.Socket for s in vizop_misc.RegisterSocket.Register
 						if s.SocketLabel == info.ViewportOutSocketLabel + '_' + ThisSocketObj.SocketLabel.split('_')[1]][0],
 						Handler=None, SendReply2=False))
 		MessageReceived |= ViewportMessageReceived
 		# update applicable Viewports, if any messages were received
-		if ViewportMessageReceived: UpdateDisplayModels(self.CurrentProj)
+		if ViewportMessageReceived: UpdateAllViewports(Proj=self.CurrentProj, Message=ViewportMessageReceivedThisTime)
 		# 3. check sockets for any messages coming into the control frame, and process
 		MessageReceived |= bool(vizop_misc.ListenToSocket(Socket=self.zmqInwardSocket, Handler=self.HandleIncomingMessageToControlFrame))
 		MessageReceived |= bool(vizop_misc.ListenToSocket(Socket=self.zmqOutwardSocket, Handler=self.HandleIncomingReplyToControlFrame,
@@ -1471,10 +1471,10 @@ class ControlFrame(wx.Frame):
 		# 4. likewise for control frame's current Viewport, if any
 		if self.CurrentViewport:
 			MessageReceived |= bool(vizop_misc.ListenToSocket(Socket=self.CurrentViewport.C2DSocketREQ,
-				Handler=self.HandleMessageToLocalViewport))
+				Handler=self.HandleMessageToLocalViewport, SendReply2=False, OriginCode=11))
 			# check messages from datacore's Viewport shadow to our local Viewports
 			MessageReceived |= bool(vizop_misc.ListenToSocket(Socket=self.CurrentViewport.D2CSocketREP,
-				Handler=self.HandleMessageToLocalViewport, SendReply2=True, Debug=True))
+				Handler=self.HandleMessageToLocalViewport, SendReply2=True, Debug=True, OriginCode=12))
 		# TODO should we discard incoming REQ messages to other Viewports that aren't currently on display?
 		return MessageReceived
 
@@ -1782,7 +1782,6 @@ class ControlFrame(wx.Frame):
 		# check if we can proceed to create the Viewport; we may need editing rights (TODO remove this requirement)
 		if Proj.EditAllowed:
 			# make the Viewport shadow
-			print('FT1783 created Viewport shadow with D2C, C2D socket numbers:', int(XMLRoot.find(info.D2CSocketNoTag).text), int(XMLRoot.find(info.C2DSocketNoTag).text))
 			NewViewport = ViewportShadow(ThisProj, NewViewportID, MyClass=NewViewportClass,
 				D2CSocketNumber=int(XMLRoot.find(info.D2CSocketNoTag).text),
 				C2DSocketNumber=int(XMLRoot.find(info.C2DSocketNoTag).text), PHAModel=ExistingPHAObj)
@@ -1837,7 +1836,7 @@ class ControlFrame(wx.Frame):
 			XMLTreeToSend = ElementTree.fromstring(MessageReceived)
 		# get message root
 		MessageRoot = XMLTreeToSend.tag
-		print('CF1840 MessageRoot: ', MessageRoot)
+#		print('CF1840 MessageRoot: ', MessageRoot)
 		# if message is 'OK', it's just an acknowledgement with no action required
 #		if MessageRoot == 'OK': return None # no reply message needed to CheckForIncoming Messages()
 		if MessageRoot == 'OK': return vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
@@ -1855,8 +1854,8 @@ class ControlFrame(wx.Frame):
 			assert isinstance(MessageReceived, bytes)
 			XMLTree = ElementTree.fromstring(MessageReceived)
 		# First, tell Viewport to prepare for display, with data from PHA model
-		print('CF1837 calling PrepareFullDisplay with MessageReceived:', MessageReceived)
-		print ('MessageAsXMLTree:', MessageAsXMLTree, "Debug:", Args.get('Debug', False))
+#		print('CF1837 calling PrepareFullDisplay with MessageReceived:', MessageReceived)
+#		print ('MessageAsXMLTree:', MessageAsXMLTree, "Debug:", Args.get('Debug', False))
 		self.CurrentViewport.PrepareFullDisplay(XMLTree)
 		self.MyEditPanel.EditPanelMode(self.CurrentViewport, 'Select') # set up mouse pointer and bindings (needs OffsetX/Y)
 		self.Refresh()  # trigger OnPaint() so that the panel rendering is refreshed
@@ -2175,7 +2174,6 @@ class ViewportShadow(object): # defines objects that represent Viewports in the 
 		assert MyClass in display_utilities.ViewportMetaClass.ViewportClasses
 		assert isinstance(D2CSocketNumber, int)
 		assert isinstance(C2DSocketNumber, int)
-		print('CF2155 making Viewport shadow with D2CSocketNumber, C2DSocketNumber:', D2CSocketNumber, C2DSocketNumber)
 		object.__init__(self)
 		self.ID = ID
 		self.MyClass = MyClass
@@ -2204,16 +2202,20 @@ def ControlFrameWithID(IDToFind): # return datacore's ControlFrameShadow object 
 	assert IDToFind in [cf.ID for cf in AllControlFrameShadows]
 	return [cf for cf in AllControlFrameShadows if cf.ID == IDToFind][0]
 
-def UpdateDisplayModels(CurrentProject):
+def UpdateAllViewports(Proj=None, Message=None):
 	# refresh Viewports after change to data in datacore. For now, we just redraw all Viewports.
-	for ThisViewport in CurrentProject.AllViewportShadows:
-		# get refresh data from corresponding PHA object
-		RedrawXMLData = ThisViewport.PHAObj.GetFullRedrawData(Viewport=ThisViewport, ViewportClass=ThisViewport.MyClass)
-		# make XML message with ID of PHA object, followed by full redraw data
-		FullXMLData = vizop_misc.MakeXMLMessage(RootName='RQ_RedrawViewport', RootText=ThisViewport.ID,
-			Elements={info.IDTag: ThisViewport.PHAObj.ID})
-		FullXMLData.append(RedrawXMLData)
-		# send it to Viewport
-		print("CF1514 sending on socket: ", ThisViewport.D2CSocketREQObj.SocketLabel)
-		vizop_misc.SendRequest(Socket=ThisViewport.D2CSocketREQObj.Socket, Command='RQ_RedrawViewport',
-			XMLRoot=FullXMLData)
+	# Message (str): XML message received requesting update to Viewports
+	# ignore Message if it's just 'OK'
+	print('CF2209 Message coming to UpdateAllViewports:', ElementTree.fromstring(Message).tag)
+	if ElementTree.fromstring(Message).tag != 'OK': # maybe not needed any longer
+	if True:
+		for ThisViewport in Proj.AllViewportShadows:
+			# get refresh data from corresponding PHA object
+			RedrawXMLData = ThisViewport.PHAObj.GetFullRedrawData(Viewport=ThisViewport, ViewportClass=ThisViewport.MyClass)
+			# make XML message with ID of PHA object, followed by full redraw data
+			FullXMLData = vizop_misc.MakeXMLMessage(RootName='RQ_RedrawViewport', RootText=ThisViewport.ID,
+				Elements={info.IDTag: ThisViewport.PHAObj.ID})
+			FullXMLData.append(RedrawXMLData)
+			# send it to Viewport
+			vizop_misc.SendRequest(Socket=ThisViewport.D2CSocketREQObj.Socket, Command='RQ_RedrawViewport',
+				XMLRoot=FullXMLData)

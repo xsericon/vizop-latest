@@ -2893,7 +2893,6 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		# GetFullRedrawData main procedure
 		# First, make the root element
 		RootElement = ElementTree.Element(ViewportClass.InternalName)
-		print('FT2896 making redraw data using class internal name: ', ViewportClass.InternalName)
 		# populate with overall FT-related data
 		PopulateOverallData(RootElement)
 		# populate with header data
@@ -2901,8 +2900,6 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		# populate with data for each column
 		for Col in self.Columns:
 			ColEl = PopulateColumnData(FT=self, El=RootElement, Col=Col)
-		print('FT2904 sending the following redraw data:')
-		ElementTree.dump(RootElement)
 		return RootElement
 
 	def AddNewElement(self, Proj, ColNo=None, IndexInCol=None, ObjKindRequested=None):
@@ -3087,12 +3084,11 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		Proj = Args['Proj'] # get ProjectItem object to which the current FT belongs
 		# get the command - it's the tag of the root element
 		Command = XMLRoot.tag
-		print('FT3088 FT handling incoming request with command: ', Command)
+#		print('FT3088 FT handling incoming request with command: ', Command)
 		# prepare default reply if command unknown
 		Reply = vizop_misc.MakeXMLMessage(RootName='Fail', RootText='CommandNotRecognised')
 		# process the command
 		if Command == 'RQ_FT_NewElement':
-			print('FT3095 processing command: ', Command)
 			Reply = self.AddNewElement(Proj=Proj, ColNo=XMLRoot.findtext('ColNo'),
 				IndexInCol=XMLRoot.findtext('IndexInCol'), ObjKindRequested=XMLRoot.findtext('ObjKindRequested'))
 		elif Command == 'RQ_FT_ChangeText':
@@ -3312,9 +3308,9 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		def PopulateFTEvent(XMLObj, Column):
 			# create an FTEvent, get data for FTEvent from XMLObj (XML element). Return the FTEvent
 			assert isinstance(Column, FTColumn)
-			print("FT2236 received event data: ", ElementTree.tostring(XMLObj))
+#			print("FT2236 received event data: ", ElementTree.tostring(XMLObj))
 			NewEvent = FTEvent(FT=self, Column=Column)
-			print("FT3213 making new FTEvent: ", NewEvent)
+#			print("FT3213 making new FTEvent: ", NewEvent)
 			# get event data. In DataInfo, each pair of items is: (XML tag, FTEvent attrib name)
 			DataInfoAsStr = [ (info.IDTag, 'ID'), ('Numbering', 'Numbering'),
 				('EventDescription', 'EventDescription'), ('Value', 'Value'), ('ValueProblemObjectID', 'ValueProblemObjectID'),
@@ -3727,7 +3723,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 				# make a set of elements in right column that are connected to the left column
 				ConnectedOnRightEls = set(utilities.Flatten([Obj.ConnectTo for Obj in
 					self.Columns[LeftColIndex].FTElements]))
-				print("FT3674 ConnectedOnRightEls: ", ConnectedOnRightEls)
+#				print("FT3674 ConnectedOnRightEls: ", ConnectedOnRightEls)
 				# check if right col has any connectable objects
 				RightColConnectable = True in [getattr(El, 'NeedsConnectButton', False)
 					for El in self.Columns[LeftColIndex + 1].FTElements]
