@@ -207,7 +207,7 @@ class ButtonElement(object): # object containing a button and attributes and met
 
 		# find size constraints of drag area: the size of the inter-column strip
 		self.FT.StripCentreXInPx, self.FT.StripMinXInPx, self.FT.StripMinYInPx, self.FT.StripMaxXInPx, self.FT.StripMaxYInPx =\
-			self.FT.GetConnectButtonDragInfo(self) 
+			self.FT.GetConnectButtonDragInfo(self)
 		# find all other buttons this connect button could connect to (for possible future 'snap' to button effect)
 		self.FT.EditingConnectionCanConnectTo = self.FT.ConnectButtonsCanConnectTo(self)
 		# draw the connect button in a dedicated bitmap, with overhang on each edge
