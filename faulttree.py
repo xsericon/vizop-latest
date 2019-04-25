@@ -202,7 +202,7 @@ class ButtonElement(object): # object containing a button and attributes and met
 				# find the buttons associated with elements connected to the start input
 				self.FT.RubberBandTo = [b for ThisEl in StartButtonJoinedFrom for b in self.FT.ConnectButtons
 					if b.HostObject is ThisEl]
-			else: # not connected to anything. Case 3
+			else: # not connected to anything. Case 3 
 				self.FT.RubberBandTo = [self]
 
 		# find size constraints of drag area: the size of the inter-column strip
