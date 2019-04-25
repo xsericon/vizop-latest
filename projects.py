@@ -7,7 +7,7 @@ import os.path
 import xml.etree.ElementTree as ElementTree
 
 # vizop modules needed:
-from vizop_misc import IsReadableFile, IsWritableLocation, select_file_from_all
+from vizop_misc import IsReadableFile, IsWritableLocation, select_file_from_all, VIZOP_Parser
 import settings, core_classes, info
 
 """
@@ -270,7 +270,10 @@ def WriteEntireProjectToFile(Proj, ProjFilename):
 	MyXMLTree._setroot(ElementTree.fromstring(XMLTreeSkeleton)) # set the skeleton as the XML tree root element
 	# later, add more code here to write all PHA objects into the XML tree
 	# write the XML file
-	MyXMLTree.write(ProjFilename, encoding="UTF-8", xml_declaration=True)
+	try:
+		MyXMLTree.write(ProjFilename, encoding="UTF-8", xml_declaration=True)
+	except:
+		return False, ''
 	return True, ''
 	# TODO items to include: core_classes.ConstantItem.AllConstants
 
