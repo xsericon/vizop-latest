@@ -2,6 +2,8 @@
 # Module vizop: part of Vizop, (c) 2018 xSeriCon. Contains main program. Launch vizop by running this module.
 # Main program handles launch of the Welcome screen and the Control frame
 
+#Jack: Git
+
 # library modules
 from __future__ import division  # makes a/b yield exact, not truncated, result. Must be 1st import
 import wx # provides basic GUI functions
