@@ -8,7 +8,7 @@ import zmq, copy
 import xml.etree.ElementTree as ElementTree # XML handling
 
 # other vizop modules required here
-import text, utilities, core_classes, info, vizop_misc, projects, art, display_utilities
+import text, utilities, core_classes, info, vizop_misc, projects, art, display_utilities, undo
 
 # constants applicable to fault tree
 TextElementTopBufferInCU = 2 # y-gap in canvas units between top of a text element and top of its contained text
@@ -170,7 +170,7 @@ class ButtonElement(object): # object containing a button and attributes and met
 		elif CommentKind == 'Value':
 			Show = not self.HostObject.ValueComments # toggle whether comments are visible
 			Command = 'RQ_FT_ValueCommentsVisible'
-		vizop_misc.SendRequest(Socket=self.FT.D2CSocketREQ, Command=Command,
+		vizop_misc.SendRequest(Socket=self.FT.C2DSocketREQ, Command=Command,
 			ProjID=self.FT.Proj.ID, PHAObj=self.FT.PHAObj.ID, Viewport=self.FT.ID, Element=self.HostObject.ID,
 			Visible=utilities.Bool2Str(Show))
 
@@ -178,7 +178,7 @@ class ButtonElement(object): # object containing a button and attributes and met
 		# handle mouse left button single click on action item button
 		Show = not self.HostObject.ShowActionItems # toggle whether action items are visible
 		Command = 'RQ_FT_ActionItemsVisible'
-		vizop_misc.SendRequest(Socket=self.FT.D2CSocketREQ, Command=Command,
+		vizop_misc.SendRequest(Socket=self.FT.C2DSocketREQ, Command=Command,
 			ProjID=self.FT.Proj.ID, PHAObj=self.FT.PHAObj.ID, Viewport=self.FT.ID, Element=self.HostObject.ID,
 			Visible=utilities.Bool2Str(Show))
 
@@ -202,7 +202,7 @@ class ButtonElement(object): # object containing a button and attributes and met
 				# find the buttons associated with elements connected to the start input
 				self.FT.RubberBandTo = [b for ThisEl in StartButtonJoinedFrom for b in self.FT.ConnectButtons
 					if b.HostObject is ThisEl]
-			else: # not connected to anything. Case 3 
+			else: # not connected to anything. Case 3
 				self.FT.RubberBandTo = [self]
 
 		# find size constraints of drag area: the size of the inter-column strip
@@ -587,7 +587,7 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 				self.EditTextCtrl.SetFocus()
 				self.EditTextCtrl.SetInsertionPointEnd() # set cursor to end of existing text
 				self.EditTextCtrl.SetFont(wx.Font(pointSize=int(round(self.Text.PointSize * Zoom)), family=DefaultFontFamily,
-					style=wx.FONTSTYLE_NORMAL, weight=wx.FONTWEIGHT_NORMAL, face=self.Text.Font))
+					style=wx.FONTSTYLE_NORMAL, weight=wx.FONTWEIGHT_NORMAL, faceName=self.Text.Font))
 				self.EditTextCtrl.SetForegroundColour(self.Text.Colour)
 				self.EditTextCtrl.SetBackgroundColour(self.BkgColour)
 				self.EditTextCtrl.Bind(wx.EVT_TEXT_ENTER, self.FT.EndEditingOperation)
@@ -604,7 +604,7 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 					choices=[getattr(c, self.DisplAttrib) for c in self.ObjectChoices])
 				self.EditChoice.SetFocus()
 #				self.EditChoice.SetFont(wx.Font(pointSize=int(round(self.Text.PointSize * Zoom)), family=DefaultFontFamily,
-#					style=wx.FONTSTYLE_NORMAL, weight=wx.FONTWEIGHT_NORMAL, face=self.Text.Font))
+#					style=wx.FONTSTYLE_NORMAL, weight=wx.FONTWEIGHT_NORMAL, faceName=self.Text.Font))
 				self.EditChoice.SetFont(wx.Font(wx.FontInfo(pointSize=int(round(self.Text.PointSize * Zoom))).Family(wx.FONTFAMILY_SWISS)))
 				self.EditChoice.SetForegroundColour(self.Text.Colour)
 				self.EditChoice.SetBackgroundColour(self.BkgColour)
@@ -1834,7 +1834,7 @@ class FTEventInCore(object): # FT event object used in DataCore by FTObjectInCor
 		if NewValueKind == core_classes.AutoNumValueItem: # set up for 'derived value'
 			self.Value.Calculator = self.GetEventValue  # provide method to get derived value (overridden by SetAsSIFFailureEvent())
 			self.Value.StatusGetter = self.GetEventValueStatus  # provide method to get status
-			self.Value.UnitGetter = self.Value.GetMyUserDefinedUnit # return current unit when requested%%%
+			self.Value.UnitGetter = self.Value.GetMyUserDefinedUnit # return current unit when requested
 
 	def SetAsSIFFailureEvent(self): # this function should be called when we want to mark this FT event as the
 		# "SIF failure" initiating event; only for High Demand and Continuous OpModes.
@@ -2711,7 +2711,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 				ObjTypeEl.text = ThisObjType
 				ObjTypeEl.set(info.ApplicableAttribName, utilities.Bool2Str(ThisObjType == FTEvent.EventType))
 				ObjTypeEl.set(info.SerialTag, str(ThisObjTypeIndex)) # add type option serial number
-			# add options for value unit: first, plain units, then options to convert value to new units %%% use PopulateValueUnitField()
+			# add options for value unit: first, plain units, then options to convert value to new units TODO use PopulateValueUnitField()
 			CurrentUnit = FTEvent.Value.GetMyUnit()
 			AcceptableUnits = FTEvent.AcceptableUnits()
 			HowManyAcceptableUnits = len(AcceptableUnits)
@@ -2977,10 +2977,12 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		assert 0 <= NewColIndex <= len(self.Columns)
 		self.Columns.insert(NewColIndex, FTColumnInCore(FT=self, ColNo=NewColIndex))
 
-	def ChangeText(self, Proj, ElementID, TextComponentName, NewValue):
+	def ChangeText(self, Proj, ElementID, TextComponentName, NewValue, ViewportID):
 		# change content of text component in ElementID (int as str, or 'Header') identified by
 		# InternalName=TextComponentName (str) to NewValue (str)
-		# returns XML tree with information about the update
+		# ViewportID is the Viewport that sent the change text request; needed so that undo can tell control frame
+		# which Viewport to display
+		# Returns XML tree with information about the update
 		assert isinstance(Proj, projects.ProjectItem)
 		assert isinstance(ElementID, str)
 		assert isinstance(TextComponentName, str)
@@ -2991,18 +2993,48 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			ComponentHost = self
 		else:
 			HostElement = [El for c in self.Columns for El in c.FTElements if El.ID == ElementID][0]
-#			ComponentToUpdate = HostElement.TextComponentHash[TextComponentName]
 			ComponentToUpdate = TextComponentName
 			ComponentHost = HostElement
-		# update component's text (TODO add undo)
-		if ComponentToUpdate == 'EventValue': # updating Value attrib; try to extract number from user's input
+		# update component's text
+		if ComponentToUpdate == 'EventValue': # updating Value attrib; try to extract number from user's input (TODO add undo)
 			ValueReceived = utilities.str2real(NewValue, 'junk')
 			if ValueReceived != 'junk': # we got a recognisable number; update value in all applicable risk receptors
 				for ThisRR in self.RiskReceptorGroupOnDisplay:
 					ComponentHost.Value.SetMyValue(NewValue=ValueReceived, RR=ThisRR)
 		else: # updating another field
-			setattr(ComponentHost, ComponentToUpdate, NewValue)
+			OldValue = getattr(ComponentHost, ComponentToUpdate) # get old value for saving in Undo record
+			setattr(ComponentHost, ComponentToUpdate, NewValue) # write new value to component
+			# store undo record
+			undo.AddToUndoList(Proj, Redoing=False, UndoObj=undo.UndoItem(UndoHandler=self.ChangeText_Undo,
+				RedoHandler=self.ChangeText_Redo, Chain='NoChain', ComponentHost=ComponentHost, ViewportID=ViewportID,
+				ComponentName=ComponentToUpdate, OldValue=OldValue, NewValue=NewValue,
+				HumanText=_('change %s' % ComponentHost.HumanName)))
 		return vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
+
+	def ChangeText_Undo(self, UndoRecord, **Args): # handle undo for ChangeText%%%
+		assert isinstance(Proj, projects.ProjectItem)
+		assert isinstance(UndoRecord, undo.UndoItem)
+		# find out which Control Frame sent the undo request (so that we know which one to reply to)
+		RequestingControlFrameID = Args['RequestingControlFrameID']
+		# undo the change to the text value
+		setattr(ComponentHost, ComponentToUpdate, UndoRecord.OldValue)
+		# tell Control Frame what we did
+		Notification = vizop_misc.MakeXMLMessage(RootName='NO_FT_ChangeText_Undo', RootText=self.ID,
+			Elements={info.MilestoneIDTag: UndoRecord.MilestoneID,
+			info.SkipRefreshTag: UndoRecord.Chain, info.UserMessageTag: UndoRecord.HumanText,
+			info.ComponentHostIDTag: UndoRecord.ComponentHost.ID, info.ViewportTag: UndoRecord.ViewportID,
+			info.ChainWaitingTag: utilities.Bool2Str(Args['ChainWaiting']),
+			info.ProjIDTag: Proj.ID})
+		# %%% working here. Next, instead of sending "NO_Undo" message, send a "NO_Redraw" message to redraw the Viewport,
+		# with the affected element panned on screen, and with the needed data to update VizopTalks.
+		vizop_misc.SendRequest(Socket=ControlFrameWithID(RequestingControlFrameID).C2FREQSocket.Socket,
+			Command='NO_FT_ChangeText_Undo', XMLRoot=Notification)
+		projects.SaveOnFly(Proj, UpdateData=vizop_misc.MakeXMLMessage(RootName=info.FTTag,
+			Elements={info.IDTag: self.ID, info.ComponentHostIDTag: UndoRecord.ComponentHost.ID}))
+			# TODO add data for the changed component to the Save On Fly data
+		return {'Success': True}
+
+	def ChangeText_Redo(self, RedoRecord, **Args): pass
 
 	def ChangeChoice(self, Proj, ElementID, TextComponentName, NewValue, **Args):
 		# change content of choice component in ElementID (int as str, or 'Header')
@@ -3107,13 +3139,13 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 				IndexInCol=XMLRoot.findtext('IndexInCol'), ObjKindRequested=XMLRoot.findtext('ObjKindRequested'))
 		elif Command == 'RQ_FT_ChangeText':
 			Reply = self.ChangeText(Proj=Proj, ElementID=XMLRoot.findtext('Element'),
-									TextComponentName=XMLRoot.findtext('TextComponent'),
-									NewValue=XMLRoot.findtext('NewValue'))
+				TextComponentName=XMLRoot.findtext('TextComponent'),
+				NewValue=XMLRoot.findtext('NewValue'), ViewportID=XMLRoot.findtext('Viewport'))
 		elif Command == 'RQ_FT_ChangeChoice': Reply = self.ChangeChoice(Proj=Proj, ElementID=XMLRoot.findtext('Element'),
 			TextComponentName=XMLRoot.findtext('TextComponent'),
 			**dict([(ThisTag.tag, ThisTag.text) for ThisTag in XMLRoot.iter()]))
 			# The ** arg sends a dict of all tags and their texts, allowing ChangeChoice to pick up case-specific tags
-			# Attrib NewValue already in the ** arg, so no need to include it explicitly
+			# Attrib NewValue is already in the ** arg, so no need to include it explicitly
 		elif Command == 'RQ_FT_DescriptionCommentsVisible':  # make description comments in/visible in an FT element
 			ThisElementID = XMLRoot.findtext('Element')
 			ThisFTElement = [e for e in WalkOverAllFTObjs(self) if e.ID == ThisElementID][0]
@@ -3402,7 +3434,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			DataInfoAsBool = [ ('ShowDescriptionComments', 'ShowDescriptionComments') ]
 			for Tag, Attrib in DataInfoAsBool:
 				setattr(NewConnector, Attrib, bool(ConnectorEl.findtext(Tag, default='False')))
-			# DataInfoAsList: (Tag of each item in a list, name of the list to put the tag's text into)%%%
+			# DataInfoAsList: (Tag of each item in a list, name of the list to put the tag's text into)
 			DataInfoAsList = [ ('DescriptionComments', 'DescriptionComments'), ('ConnectTo', 'ConnectTo'),
 				('CollapseGroups', 'CollapseGroups') ]
 			for Tag, Attrib in DataInfoAsList:
@@ -3944,7 +3976,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			assert isinstance(ConnectList, list)
 			assert len(DisconnectList) + len(ConnectList) > 0
 			print("FT3870 Disconnect, Connect: ", ','.join([str(i.ID) + '~' + str(j.ID) for i, j in DisconnectList]), '|', ','.join([str(i.ID) + '~' + str(j.ID) for i, j in ConnectList]))
-			vizop_misc.SendRequest(Socket=self.D2CSocketREQ, Command='RQ_FT_ChangeConnection',
+			vizop_misc.SendRequest(Socket=self.C2DSocketREQ, Command='RQ_FT_ChangeConnection',
 				Proj=self.Proj.ID, PHAObj=self.PHAObj.ID, Viewport=self.ID,
 				Disconnect=','.join([str(i.ID) + '~' + str(j.ID) for i, j in DisconnectList]),
 				Connect=','.join([str(i.ID) + '~' + str(j.ID) for i, j in ConnectList]))
@@ -4055,7 +4087,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 					self.CurrentEditTextCtrl.Destroy()
 					self.CurrentEditElement = self.CurrentEditTextCtrl = None
 					# request PHA object to update text attribute by sending message through zmq
-					vizop_misc.SendRequest(Socket=self.D2CSocketREQ, Command='RQ_FT_ChangeText',
+					vizop_misc.SendRequest(Socket=self.C2DSocketREQ, Command='RQ_FT_ChangeText',
 						Proj=self.Proj.ID, PHAObj=self.PHAObj.ID, Viewport=self.ID,
 						Element=ElementID, TextComponent=EditComponentInternalName, NewValue=TextEntered)
 				else:  # no change made, or change rejected; destroy the textctrl widget

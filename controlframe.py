@@ -1089,7 +1089,7 @@ class ControlFrame(wx.Frame):
 
 		def RefreshViewPanel(self, Proj): # update view panel to reflect current display status%%%
 			print("CF1141 starting RefreshViewPanel, coding here")
-			self.DestroyActiveWidgets() # remove all active widgets
+#			self.DestroyActiveWidgets() # remove all active widgets
 
 		def OnPaint(self, Event): pass
 
@@ -1487,7 +1487,8 @@ class ControlFrame(wx.Frame):
 			'NO_NewPHAModel_Undo': self.PostProcessNewPHAModel_Undo,
 			'NO_NewPHAModel_Redo': self.PostProcessNewPHAModel_Redo,
 			'NO_NewViewport_Undo': self.PostProcessNewViewport_Undo,
-			'NO_NewViewport_Redo': self.PostProcessNewViewport_Redo
+			'NO_NewViewport_Redo': self.PostProcessNewViewport_Redo,
+			'NO_FT_ChangeText_Undo': self.RefreshViewportAfterUndo
 			}[XMLRoot.tag.strip()]
 			# this is a placeholder only - RP_ commands are replies, handled in HandleIncomingReplyToControlFrame()
 		# call handler, and return its reply
@@ -1803,6 +1804,21 @@ class ControlFrame(wx.Frame):
 				Elements={'CantComply': 'EditingBlocked'})
 		# send the info back to control frame as a reply message (via ListenToSocket)
 		return Reply
+
+	def RefreshViewportAfterUndo(self, XMLRoot):
+		# handle request to refresh a Viewport after undo of a data change in the Viewport
+		# This code probably to be scrapped. Incomplete
+		global UndoChainWaiting
+		Proj = utilities.ObjectWithID(self.Projects, XMLRoot.find(info.ProjIDTag).text)
+		self.MyVTPanel.SubmitVizopTalksMessage(Title=_('Undone'), MainText=XMLRoot.find(info.UserMessageTag).text,
+			Priority=ConfirmationPriority)
+		# update display, if SkipRefresh tag in XMLRoot is False
+		if not utilities.Bool2Str(XMLRoot.find(info.SkipRefreshTag).text):
+			# request redraw of Viewport, with changed element visible%%%
+			pass # working here
+		# set UndoChainWaiting flag to trigger any further undo items
+		UndoChainWaiting = utilities.Bool2Str(XMLRoot.find(info.ChainWaitingTag).text)
+		return vizop_misc.MakeXMLMessage('Null', 'Null')
 
 	def DatacoreDoNewFTEventNotIPL(self, Root): # handle request to datacore for new FT event that's not an IPL
 		# find out which project to work in

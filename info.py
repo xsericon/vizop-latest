@@ -81,17 +81,23 @@ ShortNameAttribName = 'ShortName'
 LongNameAttribName = 'LongName'
 MilestoneIDTag = 'MilestoneID'
 ViewportTypeTag = 'viewporttype'
-ViewportTag = 'viewport'
+ViewportTag = 'Viewport'
 SkipRefreshTag = 'skiprefresh'
 ChainWaitingTag = 'chainwaiting'
 ChainedTag = 'chained'
 C2DSocketNoTag = 'C2DSocketNumber'
 D2CSocketNoTag = 'D2CSocketNumber'
+UserMessageTag = 'UserMessage'
+
 # for alarm list
 AlarmCountTag = 'AlarmCount'
 TotalAlarmCountTag = 'Total'
 AlarmTag = 'Alarm'
 AlarmTagTag = 'AlarmTag'
+
+# for Fault Tree
+FTTag = 'FT'
+ComponentHostIDTag = 'ComponentHostID'
 
 # XML tags for project files
 ProjectRootTag = 'vizop_project'
