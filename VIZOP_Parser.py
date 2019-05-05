@@ -208,7 +208,6 @@ class Limits(Enum):
 	NODEID_LOWERLIMIT = 0
 	NODEID_UPPERLIMIT = 99999
 
-
 def isInType(StringInput, EnumClass):
 	assert type(StringInput) == str
 	assert inspect.isclass(EnumClass)
