@@ -170,6 +170,120 @@ XMLTreeSkeleton = """<?xml version="1.0" encoding="iso-8859-1"?>
 </vizop_project>
 """ % CurrentProjDocType
 
+#@Jack: TODO XML tree and rules work in progress
+XMLTreeFormat = """
+<Config>
+
+	<!--This config file is to set rules for file input and output. There are two kinds of tags and attributes in this config. 
+
+	The first one is Project structure. It is restricted within the structure of a project format. For example, VizopVersion tag cannot be created under tags other than VizopProject.-->
+
+	<!--
+	•* indicates tags that contain values only, not other tags. (The * should not appear in the actual file.)
+	•% indicates tags that can be repeated. (If non-% tags are repeated, only the first instance in each level will be used.) (The % should not appear in the actual file.)
+	•B indicates tags that can contain <Bookmark> tags. (The B should not appear in the actual file.) The structure of a <Bookmark> tag is as follows:
+			 <Bookmark>*% BookmarkSerialNumber
+	</Bookmark>
+	Bookmark serial numbers are in the order the bookmarks were created.
+	•C indicates tags that can contain <Comment> child tags. (The C should not appear in the actual file.) The structure of a <Comment> tag is as follows:
+			 <Comment>%B CommentSerialNumber
+	</Comment>
+	• indicates tags that contain numerical values. The value (real or integer) must come immediately after the tag, and before any child tags. The tag can optionally contain the following child tags:
+	o   a <Unit> tag, whose value is the engineering unit of the numerical value. Valid values are: None, Prob (indicating probability), %, /yr, /hr, FIT, hr, day, wk, month, yr. All are non-case sensitive. If the <Unit> tag is absent, a default unit is taken (varies per parameter).
+	o   a <Kind> tag, whose value indicates the kind of the number. Valid values are: Manual (value entered by user), Constant (value fixed to a defined constant), Calc (value calculated according to a formula), Lookup (value looked up in a 2D matrix), Category (one of a list of values defined separately), Linked (value fixed to that of another parameter) (all are non-case sensitive). Defaults to Manual. Currently only Manual is implemented, and other kinds will give undefined results.
+	•	U indicates tags that can take an attribute “Status” (for use by Save On The Fly). For example, <Node Status=Deleted>. The Status attribute is optional. Recognised values are detailed in the “Project open and save” specification. Unrecognised values of Status will be ignored (normally silently; a message can be output if we are in Verbose mode).
+	•	! indicates compulsory tags. If missing from the file, vizop can't open the project. All tags not marked ! can be omitted.
+	-->
+	
+	<CommonTagAttribute>
+		<id/>
+		<kind/>
+		<unit/>
+		<bookmark/>
+		<comment/>
+		<deleted/>
+		<action_item/>
+
+	</CommonTagAttribute>
+
+	<ProjectStructure>
+		<!--Fixed Structure Outer Tag-->
+		<VizopProject rules="!" uncommon_attr="VizopVersion">
+			<VizopVersion rules="!" uncommon_attr=""/>
+			<ProjectName rules="" uncommon_attr=""/>
+			<Description rules="" uncommon_attr=""/>
+			<TeamMembers rules="" uncommon_attr="">
+				<TeamMember rules="" uncommon_attr="">
+					<ID rules="" uncommon_attr=""/>
+					<Name rules="" uncommon_attr=""/>
+					<Role rules="" uncommon_attr=""/>
+					<Affiliation rules="" uncommon_attr=""/>
+				</TeamMember>
+			</TeamMembers>
+			<EditNumber rules="" uncommon_attr=""/>
+			<ShortTitle rules="" uncommon_attr=""/>
+			<ProjNumber  rules="" uncommon_attr=""/>
+		</VizopProject>
+	</ProjectStructure>
+
+	<!--The second format is not restricted. Can be use anywhere in the project and even outside the project-->
+
+	<UnboundedStructure>
+		<!--Unbounded Structure-->
+
+		<ProcessUnit rules="" uncommon_attr="">
+			<ID rules="" uncommon_attr=""/>
+			<UnitNumber rules="" uncommon_attr=""/>
+			<ShortName rules="" uncommon_attr=""/>
+			<LongName rules="" uncommon_attr=""/>
+		</ProcessUnit>
+
+		<RiskReceptor rules="" uncommon_attr="">
+			<ID rules="" uncommon_attr=""/>
+			<Name rules="" uncommon_attr=""/>
+		</RiskReceptor>
+
+		<NumberingSystem rules="" uncommon_attr="">
+			<ID rules="" uncommon_attr=""/>
+			<Chunk rules="" uncommon_attr="">
+				<Type rules="" uncommon_attr=""/>
+				<!--Logic to be done for type check-->
+				<!--str-->
+				<Value rules="" uncommon_attr=""/>
+				<!--Parent-->
+				<ID rules="" uncommon_attr=""/>
+				<!--Serial-->
+				<Fieldwidth rules="" uncommon_attr=""/>
+				<PadChar rules="" uncommon_attr=""/>
+				<StartAt rules="" uncommon_attr=""/>
+				<SkipTo rules="" uncommon_attr=""/>
+				<GapBefore rules="" uncommon_attr=""/>
+				<Include rules="" uncommon_attr=""/>
+				<NoValue rules="" uncommon_attr=""/>
+			</Chunk>
+			<Name rules="" uncommon_attr=""/>
+		</NumberingSystem>
+
+		<RiskMatrix rules="" uncommon_attr="">
+			<Category rules="" uncommon_attr="">
+				<ID rules="" uncommon_attr=""/>
+				<Name rules="" uncommon_attr=""/>
+				<Description rules="" uncommon_attr=""/>
+			</Category>
+			<SeverityDimension rules="" uncommon_attr="">
+				<Dimension rules="" uncommon_attr="">
+					<Name rules="" uncommon_attr=""/>
+					<Key rules="" uncommon_attr=""/>
+				</Dimension>
+			</SeverityDimension>
+		</RiskMatrix>
+
+	</UnboundedStructure>
+
+	<!--Constant Tag-->
+
+</Config>
+"""
 
 def OpenProjectFiles(ProjectFilesToOpen, UsingTemplates=False, SaveOnFly=True, ProjectFilesToCreate=[]):
 	# attempt to open project files in ProjectFilesToOpen (list). All files must already be checked as existent and readable.
