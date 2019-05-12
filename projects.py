@@ -179,6 +179,8 @@ XMLTreeFormat = """
 	The first one is Project structure. It is restricted within the structure of a project format. For example, VizopVersion tag cannot be created under tags other than VizopProject.-->
 
 	<!--
+	Rules tag stores the rules as below:
+
 	•* indicates tags that contain values only, not other tags. (The * should not appear in the actual file.)
 	•% indicates tags that can be repeated. (If non-% tags are repeated, only the first instance in each level will be used.) (The % should not appear in the actual file.)
 	•B indicates tags that can contain <Bookmark> tags. (The B should not appear in the actual file.) The structure of a <Bookmark> tag is as follows:
@@ -194,15 +196,20 @@ XMLTreeFormat = """
 	•	U indicates tags that can take an attribute “Status” (for use by Save On The Fly). For example, <Node Status=Deleted>. The Status attribute is optional. Recognised values are detailed in the “Project open and save” specification. Unrecognised values of Status will be ignored (normally silently; a message can be output if we are in Verbose mode).
 	•	! indicates compulsory tags. If missing from the file, vizop can't open the project. All tags not marked ! can be omitted.
 	-->
-	
+
+	<!--
+	Uncommon attribute stores list of attribute that is not commonly used across all tags.
+	-->
+
+	<FileTypeVersion>
+	0.1
+	</FileTypeVersion>
+
 	<CommonTagAttribute>
 		<id/>
 		<kind/>
 		<unit/>
-		<bookmark/>
-		<comment/>
 		<deleted/>
-		<action_item/>
 
 	</CommonTagAttribute>
 
@@ -210,10 +217,10 @@ XMLTreeFormat = """
 		<!--Fixed Structure Outer Tag-->
 		<VizopProject rules="!" uncommon_attr="VizopVersion">
 			<VizopVersion rules="!" uncommon_attr=""/>
-			<ProjectName rules="" uncommon_attr=""/>
-			<Description rules="" uncommon_attr=""/>
-			<TeamMembers rules="" uncommon_attr="">
-				<TeamMember rules="" uncommon_attr="">
+			<ProjectName rules="!" uncommon_attr=""/>
+			<Description rules="!" uncommon_attr=""/>
+			<TeamMembers rules="!" uncommon_attr="">
+				<TeamMember rules="!" uncommon_attr="">
 					<ID rules="" uncommon_attr=""/>
 					<Name rules="" uncommon_attr=""/>
 					<Role rules="" uncommon_attr=""/>
@@ -227,16 +234,18 @@ XMLTreeFormat = """
 	</ProjectStructure>
 
 	<!--The second format is not restricted. Can be use anywhere in the project and even outside the project-->
-
 	<UnboundedStructure>
 		<!--Unbounded Structure-->
 
-		<ProcessUnit rules="" uncommon_attr="">
+		<ProcessUnit rules="%BU" uncommon_attr="">
 			<ID rules="" uncommon_attr=""/>
 			<UnitNumber rules="" uncommon_attr=""/>
 			<ShortName rules="" uncommon_attr=""/>
 			<LongName rules="" uncommon_attr=""/>
+			<PHA rules="*%" uncommon_attr=""/>
 		</ProcessUnit>
+
+		<RecommendationReport rules="BU" uncommon_attr=""/>
 
 		<RiskReceptor rules="" uncommon_attr="">
 			<ID rules="" uncommon_attr=""/>
@@ -264,7 +273,7 @@ XMLTreeFormat = """
 			<Name rules="" uncommon_attr=""/>
 		</NumberingSystem>
 
-		<RiskMatrix rules="" uncommon_attr="">
+		<RiskMatrix rules="%BU" uncommon_attr="">
 			<Category rules="" uncommon_attr="">
 				<ID rules="" uncommon_attr=""/>
 				<Name rules="" uncommon_attr=""/>
@@ -278,8 +287,67 @@ XMLTreeFormat = """
 			</SeverityDimension>
 		</RiskMatrix>
 
-	</UnboundedStructure>
+		<FaultTree rules="%BU" uncommon_attr="GateStyle,OpMode">
+			<HeaderData rules="C" uncommon_attr=""/>
+			<FTColumn rules="%BU" uncommon_attr="">
+				<FTElements rules="*%BC" uncommon_attr="">
+					<FTEvent rules="%BC" uncommon_attr="Description,ConnectTo,IsSIFFailtureEvent,IsFinalEvent">
+						<Value/>
+						<ActionItem/>
+						<CollapseGroup/>
+						<ViewMode/>
 
+					</FTEvent>
+				</FTElements>
+			</FTColumn>
+		</FaultTree>
+
+		<PHA rules="%BU" uncommon_attr="">
+			<ID rules="!" uncommon_attr=""/>
+			<Node rules="*%" uncommon_attr=""/>
+		</PHA>
+
+		<Node rules="%BU" uncommon_attr="">
+			<ID rules="!" uncommon_attr=""/>
+			<Cause rules="" uncommon_attr=""/>
+		</Node>
+
+		<Cause rules="%BU" uncommon_attr="">
+			<ID rules="!" uncommon_attr=""/>
+		</Cause>
+
+		<Alarm rules="%U" uncommon_attr="">
+			<ID rules="!" uncommon_attr=""/>
+		</Alarm>
+
+		<Constant rules="!" uncommon_attr="">
+			<ID rules="!" uncommon_attr=""/>
+			<Name rules="!" uncommon_attr=""/>
+			<LinkFrom rules="!" uncommon_attr=""/>
+			<ConstValue rules="!" uncommon_attr=""/>
+
+		</Constant>
+
+		<Bookmark rules="!" uncommon_attr="">
+			<ID rules="!" uncommon_attr=""/>
+		</Bookmark>
+
+		<Comment rules="!" uncommon_attr="">
+			<ID rules="!" uncommon_attr=""/>
+			<Text rules="*" uncommon_attr=""/>
+			<CopiedTo rules="*%" uncommon_attr=""/>
+			<Link rules="*" uncommon_attr=""/>
+		</Comment>
+
+		<Actionitem rules="!" uncommon_attr="">
+			<ID rules="!" uncommon_attr=""/>
+		</Actionitem>
+
+		<Value rules="!" uncommon_attr="">
+			<ID rules="!" uncommon_attr=""/>
+		</Value>
+
+	</UnboundedStructure>
 	<!--Constant Tag-->
 
 </Config>
