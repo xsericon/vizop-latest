@@ -1,5 +1,5 @@
 """
-Name: VIZOP_Parser
+Name: vizop_Parser
 Version: 0.4
 Last Modified: 20190331
 Python version: 3.6.3
