@@ -172,185 +172,226 @@ XMLTreeSkeleton = """<?xml version="1.0" encoding="iso-8859-1"?>
 
 #@Jack: TODO XML tree and rules work in progress
 XMLTreeFormat = """
-<Config>
+<xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+			<xsd:element name="VizopProject">
+			<xsd:complexType>
+			<xsd:sequence>
+				<xsd:element name="VizopVersion" type="xsd:integer" minOccurs="0"/>
+				<xsd:element name="ProjectName" type="xsd:string" minOccurs="0"/>
+				<xsd:element name="Description" type="xsd:string" minOccurs="0"/>
+				<xsd:element name="TeamMembers" minOccurs="0">
+				<xsd:complexType>
+				<xsd:sequence>
+						<xsd:element name="TeamMember"  minOccurs="0">
+						<xsd:complexType>
+						<xsd:sequence>
+							<xsd:element name="ID" type="xsd:integer" />
+							<xsd:element name="Name" type="xsd:string" />
+							<xsd:element name="Role" type="xsd:string"/>
+							<xsd:element name="Affiliation" type="xsd:string" />
+						</xsd:sequence>
+						</xsd:complexType>
+						</xsd:element>
+				</xsd:sequence>
+				</xsd:complexType>
+				</xsd:element>
+				<xsd:element name="EditNumber" type="xsd:string" minOccurs="0"/>
+				<xsd:element name="ShortTitle" type="xsd:string" minOccurs="0"/>
+				<xsd:element name="ProjNumber" type="xsd:string" minOccurs="0"/>	
+				<xsd:element name="ProjectComponent" minOccurs="0">
+				<xsd:complexType>
+				<xsd:sequence>
+				
+					<xsd:element name="ProcessUnit">
+					<xsd:complexType>
+					<xsd:sequence>
+						<xsd:element name="ID" type="xsd:string"/>
+						<xsd:element name="UnitNumber" type="xsd:integer"/>
+						<xsd:element name="ShortName" type="xsd:string"/>
+						<xsd:element name="LongName" type="xsd:string"/>
+						<xsd:element name="PHA" type="xsd:string"/>
+					</xsd:sequence>
+					</xsd:complexType>
+					</xsd:element>
+					
+					<xsd:element name="RecommendationReport" type="xsd:string" minOccurs="0"/>
+					
+					<xsd:element name="RiskReceptor">
+						<xsd:complexType>
+						<xsd:sequence>
+						<xsd:element name="ID" type="xsd:integer"/>
+						<xsd:element name="Name" type="xsd:string"/>
+						</xsd:sequence>
+						</xsd:complexType>
+					</xsd:element>
+					
+					<xsd:element name="NumberingSystem">
+					<xsd:complexType>
+					<xsd:sequence>
+						<xsd:element name="ID" type="xsd:integer"/>
+						<xsd:element name="Chunk">
+						<xsd:complexType>
+						<xsd:sequence>
+							<xsd:element name="Type" type="xsd:string">/
+							<xsd:element name="Value" type="xsd:string"/>
+							<xsd:element name="ID" type="xsd:string"/>
+							<xsd:element name="Fieldwidth" type="xsd:string"/>
+							<xsd:element name="PadChar" type="xsd:string"/>
+							<xsd:element name="StartAt" type="xsd:string"/>
+							<xsd:element name="SkipTo" type="xsd:string"/>
+							<xsd:element name="GapBefore" type="xsd:string"/>
+							<xsd:element name="Include" type="xsd:string"/>
+							<xsd:element name="Include" type="xsd:string"/>
+							<xsd:element name="NoValue" type="xsd:string"/>
+						</xsd:sequence>
+						</xsd:complexType>
+						</xsd:element>
+					</xsd:sequence>
+					</xsd:complexType>
+					</xsd:element>
+					
+					<xsd:element name="RiskMatrix">
+					<xsd:complexType>
+					<xsd:sequence>
+						<xsd:element name="Category">
+						<xsd:complexType>
+						<xsd:sequence>
+							<xsd:element name="ID" type="xsd:string"/>
+							<xsd:element name="Name" type="xsd:string"/>
+							<xsd:element name="Description" type="xsd:integer"/>
+						</xsd:sequence>
+						</xsd:complexType>
+						</xsd:element>
+						<xsd:element name="SeverityDimension">
+						<xsd:complexType>
+						<xsd:sequence>
+							<xsd:element name="Dimension"/>
+							<xsd:complexType>
+							<xsd:sequence>
+								<xsd:element name="Name" type="xsd:string"/>
+								<xsd:element name="Key" type="xsd:string"/>
+							</xsd:complexType>
+							</xsd:element>
+						</xsd:sequence>
+						</xsd:complexType>
+						</xsd:element>
+					</xsd:sequence>
+					</xsd:complexType>
+					</xsd:element>
+					
+					<xsd:element name="FaultTree">
+					<xsd:complexType>
+					<xsd:sequence>
+						<xsd:element name="HeaderData" type="xsd:string"/>
+						<xsd:element name="FTColumn">
+						<xsd:complexType>
+						<xsd:sequence>
+						
+							<xsd:element name="FTElements">
+							<xsd:complexType>
+							<xsd:sequence>
+							
+								<xsd:element name="FTEvent">
+								<xsd:complexType>
+								<xsd:sequence>
+								
+									<xsd:element name="Value" type="xsd:string"/>
+									<xsd:element name="ActionItem" type="xsd:string"/>
+									<xsd:element name="CollapseGroup" type="xsd:integer"/>
+									<xsd:element name="ViewMode" type="xsd:integer"/>
+									
+								</xsd:sequence>
+								</xsd:complexType>
+								</xsd:element>
+								
+							</xsd:sequence>
+							</xsd:complexType>
 
-	<!--This config file is to set rules for file input and output. There are two kinds of tags and attributes in this config. 
+						</xsd:sequence>
+						</xsd:complexType>
+						</xsd:element>
 
-	The first one is Project structure. It is restricted within the structure of a project format. For example, VizopVersion tag cannot be created under tags other than VizopProject.-->
+					</xsd:sequence>
+					</xsd:complexType>
+					</xsd:element>
+					
+					<xsd:element name="PHA">
+					<xsd:complexType>
+					<xsd:sequence>
+						<xsd:element name="ID" type="xsd:integer"/>
+						<xsd:element name="Node" type="xsd:string"/>
+					</xsd:sequence>
+					</xsd:complexType>
+					</xsd:element>
+					
+					<xsd:element name="PHA">
+					<xsd:complexType>
+					<xsd:sequence>
+						<xsd:element name="ID" type="xsd:integer"/>
+						<xsd:element name="Node" type="xsd:string"/>
+					</xsd:sequence>
+					</xsd:complexType>
+					</xsd:element>
+					
+					<xsd:element name="PHA">
+					<xsd:complexType>
+					<xsd:sequence>
+						<xsd:element name="ID" type="xsd:integer"/>
+						<xsd:element name="Node" type="xsd:string"/>
+					</xsd:sequence>
+					</xsd:complexType>
+					</xsd:element>
+					
+					<xsd:element name="Node">
+					<xsd:complexType>
+					<xsd:sequence>
+						<xsd:element name="ID" type="xsd:integer"/>
+					</xsd:sequence>
+					</xsd:complexType>
+					</xsd:element>
+					
+					<xsd:element name="Cause">
+					<xsd:complexType>
+					<xsd:sequence>
+						<xsd:element name="ID" type="xsd:integer"/>
+					</xsd:sequence>
+					</xsd:complexType>
+					</xsd:element>
+					
+					<xsd:element name="Alarm">
+					<xsd:complexType>
+					<xsd:sequence>
+						<xsd:element name="ID" type="xsd:integer"/>
+					</xsd:sequence>
+					</xsd:complexType>
+					</xsd:element>
+					
+					<xsd:element name="Constant">
+					<xsd:complexType>
+					<xsd:sequence>
+						<xsd:element name="ID" type="xsd:integer"/>
+						<xsd:element name="Name" type="xsd:integer"/>
+						<xsd:element name="LinkFrom" type="xsd:integer"/>
+						<xsd:element name="ConstValue" type="xsd:integer"/>
+					</xsd:sequence>
+					</xsd:complexType>
+					</xsd:element>
+					
+					<xsd:element name="Bookmark">
+					<xsd:complexType>
+					<xsd:sequence>
+						<xsd:element name="ID" type="xsd:integer"/>
+					</xsd:sequence>
+					</xsd:complexType>
+					</xsd:element>
 
-	<!--
-	Rules tag stores the rules as below:
-
-	•* indicates tags that contain values only, not other tags. (The * should not appear in the actual file.)
-	•% indicates tags that can be repeated. (If non-% tags are repeated, only the first instance in each level will be used.) (The % should not appear in the actual file.)
-	•B indicates tags that can contain <Bookmark> tags. (The B should not appear in the actual file.) The structure of a <Bookmark> tag is as follows:
-			 <Bookmark>*% BookmarkSerialNumber
-	</Bookmark>
-	Bookmark serial numbers are in the order the bookmarks were created.
-	•C indicates tags that can contain <Comment> child tags. (The C should not appear in the actual file.) The structure of a <Comment> tag is as follows:
-			 <Comment>%B CommentSerialNumber
-	</Comment>
-	• indicates tags that contain numerical values. The value (real or integer) must come immediately after the tag, and before any child tags. The tag can optionally contain the following child tags:
-	o   a <Unit> tag, whose value is the engineering unit of the numerical value. Valid values are: None, Prob (indicating probability), %, /yr, /hr, FIT, hr, day, wk, month, yr. All are non-case sensitive. If the <Unit> tag is absent, a default unit is taken (varies per parameter).
-	o   a <Kind> tag, whose value indicates the kind of the number. Valid values are: Manual (value entered by user), Constant (value fixed to a defined constant), Calc (value calculated according to a formula), Lookup (value looked up in a 2D matrix), Category (one of a list of values defined separately), Linked (value fixed to that of another parameter) (all are non-case sensitive). Defaults to Manual. Currently only Manual is implemented, and other kinds will give undefined results.
-	•	U indicates tags that can take an attribute “Status” (for use by Save On The Fly). For example, <Node Status=Deleted>. The Status attribute is optional. Recognised values are detailed in the “Project open and save” specification. Unrecognised values of Status will be ignored (normally silently; a message can be output if we are in Verbose mode).
-	•	! indicates compulsory tags. If missing from the file, vizop can't open the project. All tags not marked ! can be omitted.
-	-->
-
-	<!--
-	Uncommon attribute stores list of attribute that is not commonly used across all tags.
-	-->
-
-	<FileTypeVersion>
-	0.1
-	</FileTypeVersion>
-
-	<CommonTagAttribute>
-		<id/>
-		<kind/>
-		<unit/>
-		<deleted/>
-
-	</CommonTagAttribute>
-
-	<ProjectStructure>
-		<!--Fixed Structure Outer Tag-->
-		<VizopProject rules="!" uncommon_attr="VizopVersion">
-			<VizopVersion rules="!" uncommon_attr=""/>
-			<ProjectName rules="!" uncommon_attr=""/>
-			<Description rules="!" uncommon_attr=""/>
-			<TeamMembers rules="!" uncommon_attr="">
-				<TeamMember rules="!" uncommon_attr="">
-					<ID rules="" uncommon_attr=""/>
-					<Name rules="" uncommon_attr=""/>
-					<Role rules="" uncommon_attr=""/>
-					<Affiliation rules="" uncommon_attr=""/>
-				</TeamMember>
-			</TeamMembers>
-			<EditNumber rules="" uncommon_attr=""/>
-			<ShortTitle rules="" uncommon_attr=""/>
-			<ProjNumber  rules="" uncommon_attr=""/>
-		</VizopProject>
-	</ProjectStructure>
-
-	<!--The second format is not restricted. Can be use anywhere in the project and even outside the project-->
-	<UnboundedStructure>
-		<!--Unbounded Structure-->
-
-		<ProcessUnit rules="%BU" uncommon_attr="">
-			<ID rules="" uncommon_attr=""/>
-			<UnitNumber rules="" uncommon_attr=""/>
-			<ShortName rules="" uncommon_attr=""/>
-			<LongName rules="" uncommon_attr=""/>
-			<PHA rules="*%" uncommon_attr=""/>
-		</ProcessUnit>
-
-		<RecommendationReport rules="BU" uncommon_attr=""/>
-
-		<RiskReceptor rules="" uncommon_attr="">
-			<ID rules="" uncommon_attr=""/>
-			<Name rules="" uncommon_attr=""/>
-		</RiskReceptor>
-
-		<NumberingSystem rules="" uncommon_attr="">
-			<ID rules="" uncommon_attr=""/>
-			<Chunk rules="" uncommon_attr="">
-				<Type rules="" uncommon_attr=""/>
-				<!--Logic to be done for type check-->
-				<!--str-->
-				<Value rules="" uncommon_attr=""/>
-				<!--Parent-->
-				<ID rules="" uncommon_attr=""/>
-				<!--Serial-->
-				<Fieldwidth rules="" uncommon_attr=""/>
-				<PadChar rules="" uncommon_attr=""/>
-				<StartAt rules="" uncommon_attr=""/>
-				<SkipTo rules="" uncommon_attr=""/>
-				<GapBefore rules="" uncommon_attr=""/>
-				<Include rules="" uncommon_attr=""/>
-				<NoValue rules="" uncommon_attr=""/>
-			</Chunk>
-			<Name rules="" uncommon_attr=""/>
-		</NumberingSystem>
-
-		<RiskMatrix rules="%BU" uncommon_attr="">
-			<Category rules="" uncommon_attr="">
-				<ID rules="" uncommon_attr=""/>
-				<Name rules="" uncommon_attr=""/>
-				<Description rules="" uncommon_attr=""/>
-			</Category>
-			<SeverityDimension rules="" uncommon_attr="">
-				<Dimension rules="" uncommon_attr="">
-					<Name rules="" uncommon_attr=""/>
-					<Key rules="" uncommon_attr=""/>
-				</Dimension>
-			</SeverityDimension>
-		</RiskMatrix>
-
-		<FaultTree rules="%BU" uncommon_attr="GateStyle,OpMode">
-			<HeaderData rules="C" uncommon_attr=""/>
-			<FTColumn rules="%BU" uncommon_attr="">
-				<FTElements rules="*%BC" uncommon_attr="">
-					<FTEvent rules="%BC" uncommon_attr="Description,ConnectTo,IsSIFFailtureEvent,IsFinalEvent">
-						<Value/>
-						<ActionItem/>
-						<CollapseGroup/>
-						<ViewMode/>
-
-					</FTEvent>
-				</FTElements>
-			</FTColumn>
-		</FaultTree>
-
-		<PHA rules="%BU" uncommon_attr="">
-			<ID rules="!" uncommon_attr=""/>
-			<Node rules="*%" uncommon_attr=""/>
-		</PHA>
-
-		<Node rules="%BU" uncommon_attr="">
-			<ID rules="!" uncommon_attr=""/>
-			<Cause rules="" uncommon_attr=""/>
-		</Node>
-
-		<Cause rules="%BU" uncommon_attr="">
-			<ID rules="!" uncommon_attr=""/>
-		</Cause>
-
-		<Alarm rules="%U" uncommon_attr="">
-			<ID rules="!" uncommon_attr=""/>
-		</Alarm>
-
-		<Constant rules="!" uncommon_attr="">
-			<ID rules="!" uncommon_attr=""/>
-			<Name rules="!" uncommon_attr=""/>
-			<LinkFrom rules="!" uncommon_attr=""/>
-			<ConstValue rules="!" uncommon_attr=""/>
-
-		</Constant>
-
-		<Bookmark rules="!" uncommon_attr="">
-			<ID rules="!" uncommon_attr=""/>
-		</Bookmark>
-
-		<Comment rules="!" uncommon_attr="">
-			<ID rules="!" uncommon_attr=""/>
-			<Text rules="*" uncommon_attr=""/>
-			<CopiedTo rules="*%" uncommon_attr=""/>
-			<Link rules="*" uncommon_attr=""/>
-		</Comment>
-
-		<Actionitem rules="!" uncommon_attr="">
-			<ID rules="!" uncommon_attr=""/>
-		</Actionitem>
-
-		<Value rules="!" uncommon_attr="">
-			<ID rules="!" uncommon_attr=""/>
-		</Value>
-
-	</UnboundedStructure>
-	<!--Constant Tag-->
-
-</Config>
+				</xsd:sequence>
+				</xsd:complexType>
+				</xsd:element>
+			</xsd:sequence>
+			</xsd:complexType>
+			</xsd:element>
+		 </xsd:schema>
 """
 
 def OpenProjectFiles(ProjectFilesToOpen, UsingTemplates=False, SaveOnFly=True, ProjectFilesToCreate=[]):
