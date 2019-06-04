@@ -1488,7 +1488,7 @@ class ControlFrame(wx.Frame):
 			'NO_NewPHAModel_Redo': self.PostProcessNewPHAModel_Redo,
 			'NO_NewViewport_Undo': self.PostProcessNewViewport_Undo,
 			'NO_NewViewport_Redo': self.PostProcessNewViewport_Redo,
-			'NO_FT_ChangeText_Undo': self.RefreshViewportAfterUndo
+			'NO_FT_ChangeText_Undo': self.UpdateAllViewportsAfterUndo
 			}[XMLRoot.tag.strip()]
 			# this is a placeholder only - RP_ commands are replies, handled in HandleIncomingReplyToControlFrame()
 		# call handler, and return its reply
@@ -1805,17 +1805,17 @@ class ControlFrame(wx.Frame):
 		# send the info back to control frame as a reply message (via ListenToSocket)
 		return Reply
 
-	def RefreshViewportAfterUndo(self, XMLRoot):
-		# handle request to refresh a Viewport after undo of a data change in the Viewport
-		# This code probably to be scrapped. Incomplete
+	def UpdateAllViewportsAfterUndo(self, Proj):
+		# handle request to update all Viewports after undo of a data change. %%%
 		global UndoChainWaiting
-		Proj = utilities.ObjectWithID(self.Projects, XMLRoot.find(info.ProjIDTag).text)
+#		Proj = utilities.ObjectWithID(self.Projects, XMLRoot.find(info.ProjIDTag).text)
+		# write undo confirmation message in Vizop Talks panel
 		self.MyVTPanel.SubmitVizopTalksMessage(Title=_('Undone'), MainText=XMLRoot.find(info.UserMessageTag).text,
 			Priority=ConfirmationPriority)
-		# update display, if SkipRefresh tag in XMLRoot is False
+		# update display in local Control Frame, if SkipRefresh tag in XMLRoot is False
 		if not utilities.Bool2Str(XMLRoot.find(info.SkipRefreshTag).text):
-			# request redraw of Viewport, with changed element visible%%%
-			pass # working here
+			# request redraw of Viewport, with changed element visible%%% working here. Need to make RenderInDC force element to be visible
+			ThisViewport.RenderInDC(TargetDC, FullRefresh=True)
 		# set UndoChainWaiting flag to trigger any further undo items
 		UndoChainWaiting = utilities.Bool2Str(XMLRoot.find(info.ChainWaitingTag).text)
 		return vizop_misc.MakeXMLMessage('Null', 'Null')

@@ -3018,7 +3018,11 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		RequestingControlFrameID = Args['RequestingControlFrameID']
 		# undo the change to the text value
 		setattr(ComponentHost, ComponentToUpdate, UndoRecord.OldValue)
-		# tell Control Frame what we did
+		# instruct Control Frame to switch the requesting control frame to the Viewport that was visible when the original
+		# text change was made, with the text field panned on screen (so that the undo is visible to the user)
+		pass # TODO
+		# instruct Control Frame to update any other visible Viewport (on other control frames)
+		pass # TODO
 		Notification = vizop_misc.MakeXMLMessage(RootName='NO_FT_ChangeText_Undo', RootText=self.ID,
 			Elements={info.MilestoneIDTag: UndoRecord.MilestoneID,
 			info.SkipRefreshTag: UndoRecord.Chain, info.UserMessageTag: UndoRecord.HumanText,
