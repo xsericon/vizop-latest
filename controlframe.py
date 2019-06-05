@@ -1488,11 +1488,12 @@ class ControlFrame(wx.Frame):
 			'NO_NewPHAModel_Redo': self.PostProcessNewPHAModel_Redo,
 			'NO_NewViewport_Undo': self.PostProcessNewViewport_Undo,
 			'NO_NewViewport_Redo': self.PostProcessNewViewport_Redo,
-			'NO_FT_ChangeText_Undo': self.UpdateAllViewportsAfterUndo
+			'NO_FT_ChangeText_Undo': self.UpdateAllViewportsAfterUndo,
+			'NO_ShowViewport': self.SwitchToViewport
 			}[XMLRoot.tag.strip()]
 			# this is a placeholder only - RP_ commands are replies, handled in HandleIncomingReplyToControlFrame()
 		# call handler, and return its reply
-		Reply = Handler(XMLRoot)
+		Reply = Handler(XMLRoot=XMLRoot)
 		assert Reply is not None, Handler.__name__
 		return Reply
 
@@ -1588,7 +1589,7 @@ class ControlFrame(wx.Frame):
 			utilities.TextAsString(XMLRoot.find(info.PHAModelIDTag))))
 		return vizop_misc.MakeXMLMessage('Null', 'Null')
 
-	def PostProcessNewPHAModel_Undo(self, XMLRoot):
+	def PostProcessNewPHAModel_Undo(self, XMLRoot=None):
 		# finish handling undo of "new PHA model"
 		# we get the type of PHA model sent in, rather than trying to deduce it from the PHA model's ID number, because
 		# the PHA model has now been destroyed (so exists only in the redo record, which we shouldn't rely on)
@@ -1608,7 +1609,7 @@ class ControlFrame(wx.Frame):
 		UndoChainWaiting = utilities.Bool2Str(XMLRoot.find(info.ChainWaitingTag).text)
 		return vizop_misc.MakeXMLMessage('Null', 'Null')
 
-	def PostProcessNewPHAModel_Redo(self, XMLRoot):
+	def PostProcessNewPHAModel_Redo(self, XMLRoot=None):
 		# finish handling redo of "new PHA model"
 		Proj = utilities.ObjectWithID(self.Projects, XMLRoot.find(info.ProjIDTag).text)
 		self.MyVTPanel.SubmitVizopTalksMessage(Title=_('Redone'), MainText=_("New PHA model: %s") %
@@ -1651,7 +1652,7 @@ class ControlFrame(wx.Frame):
 		# send acknowledgment message back (ListenToSockets does the actual sending)
 		return vizop_misc.MakeXMLMessage('CP_NewViewport', RootText='OK')
 
-	def PostProcessNewViewport_Undo(self, XMLRoot):
+	def PostProcessNewViewport_Undo(self, XMLRoot=None):
 		# finish handling undo of "new Viewport"
 		global UndoChainWaiting
 		Proj = utilities.ObjectWithID(self.Projects, XMLRoot.find(info.ProjIDTag).text)
@@ -1667,7 +1668,7 @@ class ControlFrame(wx.Frame):
 		UndoChainWaiting = utilities.Bool2Str(XMLRoot.find(info.ChainWaitingTag).text)
 		return vizop_misc.MakeXMLMessage('Null', 'Null')
 
-	def PostProcessNewViewport_Redo(self, XMLRoot):
+	def PostProcessNewViewport_Redo(self, XMLRoot=None):
 		# finish handling redo of "new Viewport"
 		print("CF1700 starting PostProcessNewViewport_Redo")
 		global UndoChainWaiting, RedoChainWaiting
@@ -1694,18 +1695,34 @@ class ControlFrame(wx.Frame):
 		return vizop_misc.MakeXMLMessage('Null', 'Null')
 #		return {'Success': True, 'Notification': vizop_misc.MakeXMLMessage('Null', 'Null')}
 
-	def SwitchToViewport(self, TargetViewport):
+	def SwitchToViewport(self, TargetViewport=None, XMLRoot=None):
 		# switch PHA panel display (in local ControlFrame) to show TargetViewport
-		assert isinstance(TargetViewport, display_utilities.ViewportBaseClass)
+		# TargetViewport is either supplied directly as an arg, or via ViewportTag in XMLRoot
+		# first, find which Viewport to show
+		if TargetViewport is None:
+			ViewportToShow = utilities.ObjectWithID(Objects=self.CurrentProj.ActiveViewports,
+				TargetID=XMLRoot.find(info.ViewportTag).text)
+		else: ViewportToShow = TargetViewport
+		assert isinstance(ViewportToShow, display_utilities.ViewportBaseClass)
+		# release any existing Viewport from PHA panel
 		if self.CurrentViewport:
-			# first, release any existing Viewport from PHA panel
 			self.MyEditPanel.ReleaseViewportFromDisplDevice()
 			# remove old Viewport from ActiveViewports
 			print("CF1192 removing an active Viewport with ID: ", self.CurrentViewport.ID, type(self.CurrentViewport))
 			self.CurrentProj.ActiveViewports.remove(self.CurrentViewport)
 		# add target Viewport
-		self.CurrentProj.ActiveViewports.append(TargetViewport)
-		self.CurrentViewport = TargetViewport
+		self.CurrentProj.ActiveViewports.append(ViewportToShow)
+		self.CurrentViewport = ViewportToShow
+		# restore zoom and pan, if provided in XMLRoot
+		if XMLRoot is not None:
+			ThisZoomTag = XMLRoot.find(info.ZoomTag)
+			TargetZoom = ThisZoomTag.text if ThisZoomTag else None
+			ThisPanXTag = XMLRoot.find(info.PanXTag)
+			TargetPanX = ThisXMLTag.text if ThisPanXTag else None
+			ThisPanYTag = XMLRoot.find(info.PanYTag)
+			TargetPanY = ThisPanYTag.text if ThisPanYTag else None
+			display_utilities.ChangeZoomAndPanValues(Viewport=self.CurrentViewport, Zoom=TargetZoom, PanX=TargetPanX, PanY=TargetPanY)
+		# update other GUI elements
 		self.UpdateMenuStatus()
 		self.MyControlPanel.UpdateNavigationButtonStatus(Proj=self.CurrentProj)
 		# TODO still need to call self.ShowViewport() with XML data
@@ -1805,10 +1822,10 @@ class ControlFrame(wx.Frame):
 		# send the info back to control frame as a reply message (via ListenToSocket)
 		return Reply
 
-	def UpdateAllViewportsAfterUndo(self, Proj):
+	def UpdateAllViewportsAfterUndo(self, XMLRoot=None):
 		# handle request to update all Viewports after undo of a data change. %%%
 		global UndoChainWaiting
-#		Proj = utilities.ObjectWithID(self.Projects, XMLRoot.find(info.ProjIDTag).text)
+		Proj = utilities.ObjectWithID(self.Projects, XMLRoot.find(info.ProjIDTag).text)
 		# write undo confirmation message in Vizop Talks panel
 		self.MyVTPanel.SubmitVizopTalksMessage(Title=_('Undone'), MainText=XMLRoot.find(info.UserMessageTag).text,
 			Priority=ConfirmationPriority)
@@ -1874,7 +1891,7 @@ class ControlFrame(wx.Frame):
 #		print ('MessageAsXMLTree:', MessageAsXMLTree, "Debug:", Args.get('Debug', False))
 		self.CurrentViewport.PrepareFullDisplay(XMLTree)
 		self.MyEditPanel.EditPanelMode(self.CurrentViewport, 'Select') # set up mouse pointer and bindings (needs OffsetX/Y)
-		self.Refresh()  # trigger OnPaint() so that the panel rendering is refreshed
+		self.Refresh() # trigger OnPaint() so that the panel rendering is refreshed
 		return vizop_misc.MakeXMLMessage(RootName='RP_ShowViewport', RootText='Null')
 
 	def SetupFonts(self):

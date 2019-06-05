@@ -70,7 +70,6 @@ class ProjectItem(object): # class of PHA project instances
 		self.MaxIDInProj = 0 # (int) highest ID of all objects in the project that are not contained in PHA models
 		self.PHAObjs = [] # list of PHA objects, in order created
 		self.ActiveViewports = [] # list of all currently active Viewports, in order created
-			# (possibly we don't need this, as all Viewports should be attached to PHA objects)
 		self.AllViewportShadows = [] # list of all Viewport shadows (belonging to datacore)
 		self.IPLKinds = []
 		self.CauseKinds = []

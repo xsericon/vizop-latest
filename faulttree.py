@@ -2977,16 +2977,16 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		assert 0 <= NewColIndex <= len(self.Columns)
 		self.Columns.insert(NewColIndex, FTColumnInCore(FT=self, ColNo=NewColIndex))
 
-	def ChangeText(self, Proj, ElementID, TextComponentName, NewValue, ViewportID):
+	def ChangeText(self, Proj, ElementID, TextComponentName, NewValue, Viewport):
 		# change content of text component in ElementID (int as str, or 'Header') identified by
 		# InternalName=TextComponentName (str) to NewValue (str)
-		# ViewportID is the Viewport that sent the change text request; needed so that undo can tell control frame
-		# which Viewport to display
+		# Viewport is the Viewport object that sent the change text request
 		# Returns XML tree with information about the update
 		assert isinstance(Proj, projects.ProjectItem)
 		assert isinstance(ElementID, str)
 		assert isinstance(TextComponentName, str)
 		assert isinstance(NewValue, str)
+		assert isinstance(Viewport, FTForDisplay)
 		# find relevant element containing the component
 		if ElementID == 'Header':
 			ComponentToUpdate = TextComponentName
@@ -3006,9 +3006,10 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			setattr(ComponentHost, ComponentToUpdate, NewValue) # write new value to component
 			# store undo record
 			undo.AddToUndoList(Proj, Redoing=False, UndoObj=undo.UndoItem(UndoHandler=self.ChangeText_Undo,
-				RedoHandler=self.ChangeText_Redo, Chain='NoChain', ComponentHost=ComponentHost, ViewportID=ViewportID,
-				ComponentName=ComponentToUpdate, OldValue=OldValue, NewValue=NewValue,
-				HumanText=_('change %s' % ComponentHost.HumanName)))
+				RedoHandler=self.ChangeText_Redo, Chain='NoChain', ComponentHost=ComponentHost, ViewportID=Viewport.ID,
+				ElementID=ElementID, ComponentName=ComponentToUpdate, OldValue=OldValue, NewValue=NewValue,
+				HumanText=_('change %s' % ComponentHost.HumanName),
+				Zoom=Viewport.Zoom, PanX=Viewport.PanX, PanY=Viewport.PanY))
 		return vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
 
 	def ChangeText_Undo(self, UndoRecord, **Args): # handle undo for ChangeText%%%
@@ -3019,8 +3020,14 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		# undo the change to the text value
 		setattr(ComponentHost, ComponentToUpdate, UndoRecord.OldValue)
 		# instruct Control Frame to switch the requesting control frame to the Viewport that was visible when the original
-		# text change was made, with the text field panned on screen (so that the undo is visible to the user)
-		pass # TODO
+		# text change was made, with the original zoom and pan restored (so that the text field is on screen)
+		# and the changed component highlighted (so that the undo is visible to the user)
+		Notification = vizop_misc.MakeXMLMessage(RootName='NO_ShowViewport', RootText=RequestingControlFrameID,
+			Elements={info.ViewportTag: Args['ViewportID'],
+			info.ElementVisibleTag: Args['ElementID'], info.ComponentToHighlightTag: Args['ComponentName'],
+			info.ZoomTag: Args['Zoom'], info.PanXTag: Args['PanX'], info.PanYTag: Args['PanY']})
+		vizop_misc.SendRequest(Socket=ControlFrameWithID(RequestingControlFrameID).C2FREQSocket.Socket,
+			Command='NO_ShowViewport', XMLRoot=Notification)
 		# instruct Control Frame to update any other visible Viewport (on other control frames)
 		pass # TODO
 		Notification = vizop_misc.MakeXMLMessage(RootName='NO_FT_ChangeText_Undo', RootText=self.ID,
@@ -3135,6 +3142,8 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		# get the command - it's the tag of the root element
 		Command = XMLRoot.tag
 #		print('FT3088 FT handling incoming request with command: ', Command)
+		# get the Viewport from which the command was issued
+		SourceViewport = utilities.ObjectWithID(Objects=Proj.ActiveViewports, TargetID=XMLRoot.findtext('Viewport'))
 		# prepare default reply if command unknown
 		Reply = vizop_misc.MakeXMLMessage(RootName='Fail', RootText='CommandNotRecognised')
 		# process the command
@@ -3144,7 +3153,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		elif Command == 'RQ_FT_ChangeText':
 			Reply = self.ChangeText(Proj=Proj, ElementID=XMLRoot.findtext('Element'),
 				TextComponentName=XMLRoot.findtext('TextComponent'),
-				NewValue=XMLRoot.findtext('NewValue'), ViewportID=XMLRoot.findtext('Viewport'))
+				NewValue=XMLRoot.findtext('NewValue'), Viewport=SourceViewport)
 		elif Command == 'RQ_FT_ChangeChoice': Reply = self.ChangeChoice(Proj=Proj, ElementID=XMLRoot.findtext('Element'),
 			TextComponentName=XMLRoot.findtext('TextComponent'),
 			**dict([(ThisTag.tag, ThisTag.text) for ThisTag in XMLRoot.iter()]))

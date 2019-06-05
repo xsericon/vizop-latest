@@ -766,3 +766,21 @@ def PopulateSizer(Sizer=None, Widgets=[], ActiveWidgetList=[], DefaultFont=None,
 					pos=(RowBase + ThisWidget.RowOffset, ThisWidget.ColLoc + ThisWidget.ColOffset - 1))
 	Sizer.Layout() # refresh sizer
 
+def ChangeZoomAndPanValues(Viewport=None, Zoom=None, PanX=None, PanY=None):
+	# change the values of Zoom and Pan in Viewport (a Viewport object).
+	# Does not actually change the display, only the stored values.
+	# Zoom, PanX and PanY can be values as str or None; if None, they are ignored.
+	assert isinstance(Viewport, display_utilities.ViewportBaseClass)
+	if Zoom:
+		assert isinstance(Zoom, str)
+		TargetZoom = utilities.str2real(Zoom, meaninglessvalue='?')
+		if TargetZoom != '?': Viewport.Zoom = TargetZoom # TODO assert or wrap to within limits
+	if PanX:
+		assert isinstance(PanX, str)
+		TargetPanX = utilities.str2real(PanX, meaninglessvalue='?')
+		if TargetPanX != '?': Viewport.PanX = TargetPanX # TODO assert or wrap to within limits
+	if PanY:
+		assert isinstance(PanY, str)
+		TargetPanY = utilities.str2real(PanY, meaninglessvalue='?')
+		if TargetPanY != '?': Viewport.PanY = TargetPanY # TODO assert or wrap to within limits
+

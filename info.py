@@ -87,7 +87,12 @@ ChainWaitingTag = 'chainwaiting'
 ChainedTag = 'chained'
 C2DSocketNoTag = 'C2DSocketNumber'
 D2CSocketNoTag = 'D2CSocketNumber'
-UserMessageTag = 'UserMessage'
+UserMessageTag = 'userMessage'
+ElementVisibleTag = 'elementVisible'
+ComponentToHighlightTag = 'componentToHighlight'
+ZoomTag = 'zoom'
+PanXTag = 'panX'
+PanYTag = 'panY'
 
 # for alarm list
 AlarmCountTag = 'AlarmCount'
