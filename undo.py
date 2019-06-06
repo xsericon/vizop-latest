@@ -310,7 +310,8 @@ def FindLastRecordToUndo(RecordList, StartFromIndex=None, Redoing=False):
 	ChainAttribName = 'RedoChain' if Redoing else 'Chain'
 	while Undoing and (ThisIndex > 0):  # any more items in record list?
 		# (no need to check the 0'th one, cos we will return 0 anyway)
-		Undoing = getattr(RecordList[ThisIndex], ChainAttribName, False) # stop after this one if Chain/RedoChain==False
+#		Undoing = getattr(RecordList[ThisIndex], ChainAttribName, False) # stop after this one if Chain/RedoChain==False
+		Undoing = (getattr(RecordList[ThisIndex], ChainAttribName) != 'NoChain') # stop after this one if Chain/RedoChain=='NoChain'
 		if Undoing: ThisIndex -= 1
 	return ThisIndex
 

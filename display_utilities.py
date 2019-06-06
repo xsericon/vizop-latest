@@ -770,7 +770,7 @@ def ChangeZoomAndPanValues(Viewport=None, Zoom=None, PanX=None, PanY=None):
 	# change the values of Zoom and Pan in Viewport (a Viewport object).
 	# Does not actually change the display, only the stored values.
 	# Zoom, PanX and PanY can be values as str or None; if None, they are ignored.
-	assert isinstance(Viewport, display_utilities.ViewportBaseClass)
+	assert isinstance(Viewport, ViewportBaseClass)
 	if Zoom:
 		assert isinstance(Zoom, str)
 		TargetZoom = utilities.str2real(Zoom, meaninglessvalue='?')

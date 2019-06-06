@@ -1299,6 +1299,7 @@ class ControlFrame(wx.Frame):
 			# find record that will be undone 'up to' (skipping over any chained records)
 			LastRecordToUndo = Proj.UndoList[undo.FindLastRecordToUndo(Proj.UndoList)]
 			UndoText = _(LastRecordToUndo.HumanText)
+			print('CF1302 last undo item: ', Proj.UndoList[-1].HumanText, '; found for display: ', UndoText)
 			self.UndoMenuItem.SetText((_('&Undo %s')) % UndoText)
 			self.MenuBar.Enable(self.UndoMenuItemID, True)
 		else: # nothing to undo
@@ -1463,7 +1464,7 @@ class ControlFrame(wx.Frame):
 						Handler=None, SendReply2=False))
 		MessageReceived |= ViewportMessageReceived
 		# update applicable Viewports, if any messages were received
-		if ViewportMessageReceived: UpdateAllViewports(Proj=self.CurrentProj, Message=ViewportMessageReceivedThisTime)
+		if ViewportMessageReceived: self.UpdateAllViewports(Proj=self.CurrentProj, Message=ViewportMessageReceivedThisTime)
 		# 3. check sockets for any messages coming into the control frame, and process
 		MessageReceived |= bool(vizop_misc.ListenToSocket(Socket=self.zmqInwardSocket, Handler=self.HandleIncomingMessageToControlFrame))
 		MessageReceived |= bool(vizop_misc.ListenToSocket(Socket=self.zmqOutwardSocket, Handler=self.HandleIncomingReplyToControlFrame,
@@ -1642,13 +1643,13 @@ class ControlFrame(wx.Frame):
 			utilities.TextAsString(PHAObjIDTag))
 		# find the new Viewport from the ID returned from datacore (it's the text of the root tag) for checking
 		assert self.TrialViewport.ID == XMLRoot.text
-		# set Viewport as the current Viewport and release any existing Viewport from display device
-		self.SwitchToViewport(self.TrialViewport)
 		# attach Viewport to PHA object, and label its sockets
-		self.CurrentViewport.PHAObj = PHAObj
-		self.CurrentViewport.C2DSocketREQObj.PHAObj = self.CurrentViewport.D2CSocketREPObj.PHAObj = PHAObj
-		# set up the display in the PHA panel
-		self.ShowViewport(MessageAsXMLTree=XMLRoot)
+		self.TrialViewport.PHAObj = PHAObj
+		self.TrialViewport.C2DSocketREQObj.PHAObj = self.TrialViewport.D2CSocketREPObj.PHAObj = PHAObj
+		# set Viewport as the current Viewport and release any existing Viewport from display device
+		self.SwitchToViewport(TargetViewport=self.TrialViewport, XMLRoot=XMLRoot)
+		# set up the display in the PHA panel; now done in SwitchToViewport(), above
+#		self.ShowViewport(MessageAsXMLTree=XMLRoot)
 		# send acknowledgment message back (ListenToSockets does the actual sending)
 		return vizop_misc.MakeXMLMessage('CP_NewViewport', RootText='OK')
 
@@ -1674,12 +1675,12 @@ class ControlFrame(wx.Frame):
 		global UndoChainWaiting, RedoChainWaiting
 		Proj = utilities.ObjectWithID(self.Projects, XMLRoot.find(info.ProjIDTag).text)
 		# set trial Viewport (created in PostProcessNewPHAModel_Redo) as the current Viewport
-		self.SwitchToViewport(self.TrialViewport)
+		self.SwitchToViewport(TargetViewport=self.TrialViewport, XMLRoot=XMLRoot)
 		# attach Viewport to PHA object, and label its sockets
 		self.CurrentViewport.PHAObj = PHAObj
 		self.CurrentViewport.C2DSocketREQObj.PHAObj = self.CurrentViewport.D2CSocketREPObj.PHAObj = PHAObj
-		# set up the display in the PHA panel
-		self.ShowViewport(MessageAsXMLTree=XMLRoot)
+		# set up the display in the PHA panel; now done in SwitchToViewport(), above
+#		self.ShowViewport(MessageAsXMLTree=XMLRoot)
 		# is this redo chained after another redo? If not, post a message in VizopTalks
 		if not utilities.Bool2Str(XMLRoot.find(info.ChainedTag).text):
 			self.MyVTPanel.SubmitVizopTalksMessage(Title=_('Redone'), MainText=_("New Viewport: %s") %
@@ -1697,7 +1698,7 @@ class ControlFrame(wx.Frame):
 
 	def SwitchToViewport(self, TargetViewport=None, XMLRoot=None):
 		# switch PHA panel display (in local ControlFrame) to show TargetViewport
-		# TargetViewport is either supplied directly as an arg, or via ViewportTag in XMLRoot
+		# TargetViewport is supplied directly as an arg, or (if it's None) via ViewportTag in XMLRoot
 		# first, find which Viewport to show
 		if TargetViewport is None:
 			ViewportToShow = utilities.ObjectWithID(Objects=self.CurrentProj.ActiveViewports,
@@ -1721,12 +1722,15 @@ class ControlFrame(wx.Frame):
 			TargetPanX = ThisXMLTag.text if ThisPanXTag else None
 			ThisPanYTag = XMLRoot.find(info.PanYTag)
 			TargetPanY = ThisPanYTag.text if ThisPanYTag else None
-			display_utilities.ChangeZoomAndPanValues(Viewport=self.CurrentViewport, Zoom=TargetZoom, PanX=TargetPanX, PanY=TargetPanY)
+			display_utilities.ChangeZoomAndPanValues(Viewport=self.CurrentViewport, Zoom=TargetZoom, PanX=TargetPanX,
+				PanY=TargetPanY)
+		# store history for backward navigation
+		self.StoreMilestone(self.CurrentProj, Backward=True)
+		# draw the Viewport
+		self.ShowViewport(MessageAsXMLTree=XMLRoot)
 		# update other GUI elements
 		self.UpdateMenuStatus()
 		self.MyControlPanel.UpdateNavigationButtonStatus(Proj=self.CurrentProj)
-		# TODO still need to call self.ShowViewport() with XML data
-		# TODO store history
 
 	def DatacoreDoNewViewport_Undo(self, Proj, UndoRecord, **Args): # undo creation of new Viewport
 		global UndoChainWaiting
@@ -2115,6 +2119,28 @@ class ControlFrame(wx.Frame):
 		assert isinstance(NewDisplayDevice, wx.Panel)
 		self.DisplayDevices.append(NewDisplayDevice)
 
+	def UpdateAllViewports(self, Proj=None, Message=None):
+		# refresh Viewports after change to data in datacore. For now, we just redraw all Viewports.
+		# Message (str): XML message received requesting update to Viewports
+		# ignore Message if it's just 'OK'
+		print('CF2209 Message coming to UpdateAllViewports:', ElementTree.fromstring(Message).tag)
+		print('CF2209 latest undo: ', Proj.UndoList[-1].HumanText)
+	#	if ElementTree.fromstring(Message).tag != 'OK': # maybe not needed any longer
+		if True:
+			for ThisViewport in Proj.AllViewportShadows:
+				# get refresh data from corresponding PHA object
+				RedrawXMLData = ThisViewport.PHAObj.GetFullRedrawData(Viewport=ThisViewport, ViewportClass=ThisViewport.MyClass)
+				# make XML message with ID of PHA object, followed by full redraw data
+				FullXMLData = vizop_misc.MakeXMLMessage(RootName='RQ_RedrawViewport', RootText=ThisViewport.ID,
+					Elements={info.IDTag: ThisViewport.PHAObj.ID})
+				FullXMLData.append(RedrawXMLData)
+				# send it to Viewport
+				vizop_misc.SendRequest(Socket=ThisViewport.D2CSocketREQObj.Socket, Command='RQ_RedrawViewport',
+					XMLRoot=FullXMLData)
+			# refresh control frame GUI
+			self.UpdateMenuStatus()
+			self.MyControlPanel.UpdateNavigationButtonStatus(Proj=Proj)
+
 class ControlFramePersistent(object):
 	# a persistent object used for returning data from control frame after it is Destroy()ed.
 
@@ -2235,20 +2261,3 @@ def ControlFrameWithID(IDToFind): # return datacore's ControlFrameShadow object 
 	assert IDToFind in [cf.ID for cf in AllControlFrameShadows]
 	return [cf for cf in AllControlFrameShadows if cf.ID == IDToFind][0]
 
-def UpdateAllViewports(Proj=None, Message=None):
-	# refresh Viewports after change to data in datacore. For now, we just redraw all Viewports.
-	# Message (str): XML message received requesting update to Viewports
-	# ignore Message if it's just 'OK'
-	print('CF2209 Message coming to UpdateAllViewports:', ElementTree.fromstring(Message).tag)
-#	if ElementTree.fromstring(Message).tag != 'OK': # maybe not needed any longer
-	if True:
-		for ThisViewport in Proj.AllViewportShadows:
-			# get refresh data from corresponding PHA object
-			RedrawXMLData = ThisViewport.PHAObj.GetFullRedrawData(Viewport=ThisViewport, ViewportClass=ThisViewport.MyClass)
-			# make XML message with ID of PHA object, followed by full redraw data
-			FullXMLData = vizop_misc.MakeXMLMessage(RootName='RQ_RedrawViewport', RootText=ThisViewport.ID,
-				Elements={info.IDTag: ThisViewport.PHAObj.ID})
-			FullXMLData.append(RedrawXMLData)
-			# send it to Viewport
-			vizop_misc.SendRequest(Socket=ThisViewport.D2CSocketREQObj.Socket, Command='RQ_RedrawViewport',
-				XMLRoot=FullXMLData)

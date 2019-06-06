@@ -2350,6 +2350,12 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 	RRGroupingOptions = ['Grouped', 'Singly'] # whether risk receptors are shown grouped or separately
 	DefaultRRGroupingOption = RRGroupingOptions[0]
 	DefaultViewportType = FTForDisplay
+	# names of attribs referring to header, whose value is the same as the text in the XML tag
+	TextComponentNames = ['SIFName', 'Rev', 'SILTargetValue', 'TargetRiskRedMeasure', 'BackgColour',
+							   'TextColour']
+	# English names for components; keys are attrib names in this class. Values are translated at point of display
+	ComponentEnglishNames = {'SIFName': 'SIF name', 'Rev': 'Revision', 'OpMode': 'Operating mode',
+		'TolFreq': 'Tolerable frequency', 'SILTargetValue': 'SIL target'}
 
 	def __init__(self, Proj, **Args):
 		core_classes.PHAModelBaseClass.__init__(self, Proj, **Args)
@@ -2367,9 +2373,6 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		self.TextColour = '255,255,255'
 		# data content of FTObjectInCore
 		self.Columns = [FTColumnInCore(self)] # contains FTColumnInCore instances. Start with one empty column
-		# names of attribs referring to header, whose value is the same as the text in the XML tag
-		self.TextComponentNames = ['SIFName', 'Rev', 'SILTargetValue', 'TargetRiskRedMeasure', 'BackgColour',
-				'TextColour']
 		# AttribTypeHash (dict): keys are attrib names in FTObjectInCore (str), values are acceptable values for the attrib (list)
 		# Need a key for each attrib that presents to the user as a choice widget
 		self.MyTolRiskModel = Proj.CurrentTolRiskModel
@@ -3005,20 +3008,21 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			OldValue = getattr(ComponentHost, ComponentToUpdate) # get old value for saving in Undo record
 			setattr(ComponentHost, ComponentToUpdate, NewValue) # write new value to component
 			# store undo record
+			print("FT3008 adding undo record")
 			undo.AddToUndoList(Proj, Redoing=False, UndoObj=undo.UndoItem(UndoHandler=self.ChangeText_Undo,
 				RedoHandler=self.ChangeText_Redo, Chain='NoChain', ComponentHost=ComponentHost, ViewportID=Viewport.ID,
 				ElementID=ElementID, ComponentName=ComponentToUpdate, OldValue=OldValue, NewValue=NewValue,
-				HumanText=_('change %s' % ComponentHost.HumanName),
+				HumanText=_('change %s' % self.ComponentEnglishNames[TextComponentName]),
 				Zoom=Viewport.Zoom, PanX=Viewport.PanX, PanY=Viewport.PanY))
 		return vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
 
-	def ChangeText_Undo(self, UndoRecord, **Args): # handle undo for ChangeText%%%
+	def ChangeText_Undo(self, Proj, UndoRecord, **Args): # handle undo for ChangeText%%%
 		assert isinstance(Proj, projects.ProjectItem)
 		assert isinstance(UndoRecord, undo.UndoItem)
 		# find out which Control Frame sent the undo request (so that we know which one to reply to)
 		RequestingControlFrameID = Args['RequestingControlFrameID']
 		# undo the change to the text value
-		setattr(ComponentHost, ComponentToUpdate, UndoRecord.OldValue)
+		setattr(UndoRecord.ComponentHost, UndoRecord.ComponentName, UndoRecord.OldValue)
 		# instruct Control Frame to switch the requesting control frame to the Viewport that was visible when the original
 		# text change was made, with the original zoom and pan restored (so that the text field is on screen)
 		# and the changed component highlighted (so that the undo is visible to the user)
@@ -4103,7 +4107,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 					vizop_misc.SendRequest(Socket=self.C2DSocketREQ, Command='RQ_FT_ChangeText',
 						Proj=self.Proj.ID, PHAObj=self.PHAObj.ID, Viewport=self.ID,
 						Element=ElementID, TextComponent=EditComponentInternalName, NewValue=TextEntered)
-				else:  # no change made, or change rejected; destroy the textctrl widget
+				else: # no change made, or change rejected; destroy the textctrl widget
 					self.CurrentEditTextCtrl.Destroy()
 					self.CurrentEditElement = self.CurrentEditTextCtrl = None
 			elif CurrentEditBehaviour == 'Choice': # it was a choice editing operation
