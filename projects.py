@@ -46,6 +46,16 @@ class Collaborator(object): # object representing a remote computer collaboratin
 		self.ShortName = ShortName
 		self.LongName = LongName
 
+class TeamMemberItem(object): # object representing a person working on the PHA
+
+	def __init__(self, ID=None): # ID (int): unique ID to assign to ProjectItem instance
+		assert isinstance(ID, int)
+		object.__init__(self)
+		self.ID = str(ID)
+		self.Name = '' # name of person
+		self.Role = '' # person's role in the project
+		self.Affiliation = '' # organisation employing the person
+
 class ProjectFontItem(object): # virtual fonts for use with texts in PHA objects
 			# To get actual face name (str) of a wx.Font, use font.GetFaceName()
 
@@ -98,7 +108,7 @@ class ProjectItem(object): # class of PHA project instances
 		self.OutputFilename = '' # str; full pathname of last file last used to save project in this Vizop instance.
 			# If we are saving on fly, this contains the pathname of the project file to update
 		self.EditNumber = 0 # int; incremented every time the project's dataset is changed
-
+		self.TeamMembers = [] # list of TeamMemberItem instances
 
 
 	def GetFTColumnWidth(self, FT): # return preferred distance, in canvas units, between left edges of a Fault Tree's columns (if in columns)

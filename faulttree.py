@@ -1685,7 +1685,7 @@ class FTEventInCore(object): # FT event object used in DataCore by FTObjectInCor
 	DefaultRatioUnit = core_classes.DimensionlessUnit
 	MaxElementsConnectedToThis = 1
 
-	def __init__(self, Proj, FT, Column): # FT: which FTObjectInCore instance this object belongs to
+	def __init__(self, Proj, FT, Column, **Args): # FT: which FTObjectInCore instance this object belongs to
 		# Column: the FTColumnInCore hosting this object
 		assert isinstance(Proj, projects.ProjectItem)
 		assert isinstance(FT, FTObjectInCore)
@@ -1698,10 +1698,10 @@ class FTEventInCore(object): # FT event object used in DataCore by FTObjectInCor
 		self.Proj = Proj
 		self.FT = FT
 		self.Column = Column
-		# set which type of event this is allowed to be; also sets DefaultEventType
+		# set which type of event this is allowed to be; also sets DefaultEventType (str)
 		self.AvailEventTypes, self.DefaultEventType = self.SetAvailableEventTypes()
 		self.IsIPL = False # Marker for IPLs
-		self.EventType = self.DefaultEventType
+		self.EventType = self.DefaultEventType # str
 		self.SetupNumbering()
 		self.EventDescription = '' # rich text string
 		# set up 'user defined' number kind, for event types that support it,
@@ -1710,7 +1710,7 @@ class FTEventInCore(object): # FT event object used in DataCore by FTObjectInCor
 		# TODO replace above with call to ChangeValueKind()
 		self.OldFreqValue = core_classes.UserNumValueItem(HostObj=self) # for restoring after switching btw freq/prob
 		self.OldProbValue = core_classes.UserNumValueItem(HostObj=self)
-		# store the initial (and most recently user-selected) unit for each quantity kind
+		# store the initial (and most recently user-selected) unit for each quantity kind. Values are UnitKind instances
 		self.LastSelectedUnitPerQtyKind = {'Probability': FTEventInCore.DefaultProbUnit,
 			'Frequency': FTEventInCore.DefaultFreqUnit, 'Time': FTEventInCore.DefaultTimeUnit,
 			'Ratio': FTEventInCore.DefaultRatioUnit}
@@ -1741,8 +1741,8 @@ class FTEventInCore(object): # FT event object used in DataCore by FTObjectInCor
 		self.ShowActionItems = True
 		self.MakeTestComments()
 		self.ConnectTo = [] # FT object instances in next column to the right, to which this element is connected
-		self.LinkedTo = [] # list of LinkItem instances of which this item is a LinkMaster
-		self.LinkedFrom = [] # list of LinkItem instances of which this item is a LinkSlave
+#		self.LinkedTo = [] # list of LinkItem instances of which this item is a LinkMaster
+		self.LinkedFrom = [] # list of LinkItem instances for linking individual attribs to a master element elsewhere in the project
 		self.CollapseGroups = [] # CollapseGroup objects this object belongs to
 
 	def MakeTestComments(self):
@@ -2052,8 +2052,8 @@ class FTGateItemInCore(object): # logic gate in a Fault Tree, used in DataCore
 		self.ShowDescriptionComments = False # whether description comments are visible
 		self.ActionItems = [] # list of AssociatedTextItem instances
 		self.ShowActionItems = False
-		self.LinkedTo = [] # list of LinkItem instances of which this item is a LinkMaster
-		self.LinkedFrom = [] # list of LinkItem instances of which this item is a LinkSlave
+#		self.LinkedTo = [] # list of LinkItem instances of which this item is a LinkMaster
+		self.LinkedFrom = [] # list of LinkItem instances for linking individual attribs to a master element elsewhere in the project
 		# set up gate formatting based on ModelGate
 		if ModelGate:
 			assert isinstance(ModelGate, FTGateItemInCore)
@@ -2304,7 +2304,7 @@ class FTConnectorItemInCore(object):  # in- and out-connectors (CX's) to allow d
 		self.ID = str(FT.MaxElementID)
 		self.FT = FT
 		self.Out = True # True if this is an out-CX (else, it is an in-CX)
-		self.ConnectorDescription = '' # text shown in the CX, if it's an out-CX.
+		self.ConnectorDescription = '' # text shown in the CX, if it's an out-CX. Also shown in in-CX if RelatedCX is None.
 		# If it's an in-CX, this is ignored and the displayed text is derived from the connected out-CX
 		self.ConnectorDescriptionComments = [] # list of AssociatedTextItem instances
 		self.ShowDescriptionComments = False # whether description comments are visible
@@ -2314,8 +2314,10 @@ class FTConnectorItemInCore(object):  # in- and out-connectors (CX's) to allow d
 		self.ConnectTo = [] # FT object instances in next column to the right
 		self.CollapseGroups = [] # CollapseGroup objects this event belongs to
 		self.Numbering = core_classes.NumberingItem() # NumberingItem instance TODO use SetupNumbering() from FTEventInCore
+			# NB, in-CX should use numbering from any related out-CX; but if RelatedCX is None, it still needs its own Numbering
 		self.Style = FTConnector.ConnectorStyles[0]
 		self.ApplicableRiskReceptors = FT.MyTolRiskModel.RiskReceptors[:] # set which risk receptors apply to this connector
+			# NB, in-CX should use RR's from any related out-CX; but if RelatedCX is None, it still needs its own RR list
 
 	def GetMyValue(self, RiskReceptor=core_classes.DefaultRiskReceptor):
 		# calculate and return output value of the connector for specified risk receptor
@@ -2334,6 +2336,21 @@ class FTConnectorItemInCore(object):  # in- and out-connectors (CX's) to allow d
 			return self.RelatedCX.Value
 
 	Value = property(fget=GetMyValue) # returns (value, UnitItem, any NumProblemValue, ID of object yielding NumProb)
+
+class FTCollapseGroupInCore(object): # collapse group containing one or more FT elements that can be shown collapsed
+	# into a single object for more compact display
+
+	def __init__(self, FT): # FT is the FaultTree object this connector belongs to
+		object.__init__(self)
+		assert isinstance(FT, FTObjectInCore)
+		FT.MaxElementID += 1  # find next available ID
+		self.ID = str(FT.MaxElementID)
+		self.FT = FT
+		self.CollapseGroupDescription = '' # text shown in the collapse group, if collapsed
+		self.CollapsedInitially = False # whether the collapse group is shown collapsed when the FT is first displayed.
+			# Users can collapse/expand collapse groups in the Viewports without changing this attribute, so it doesn't
+			# necessarily reflect the current status of collapse groups - only the status when loaded from file.
+		self.BackgColour = '0,0,255' # blue
 
 class FTForDisplay(display_utilities.ViewportBaseClass): # forward definition to allow use in FTObjectInCore
 	InternalName = 'Forward'
@@ -2386,6 +2403,8 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		self.RefreshRiskReceptorGrouping(GroupingOption=self.RRGroupingOption, FirstTime=True)
 		self.AttribValueHash = {'OpMode': core_classes.OpModes, 'RR': self.RiskReceptorGroupOnDisplay,
 			'Severity': SeverityObjs}
+		self.ModelGate = None # (None or FTGateItemInCore instance in this FT) gate to use as model when creating a new gate
+		self.CollapseGroups = [] # list of instances of FTCollapseGroupInCore
 
 	def SetTolFreq(self): # set tolerable frequency for all risk receptors, by lookup in risk model according to severity
 		for RR in self.MyTolRiskModel.RiskReceptors:
@@ -2935,7 +2954,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		# insert new column if needed
 		if ThisColIndex == len(self.Columns): self.CreateColumn(NewColIndex=len(self.Columns))
 		# insert new event
-		NewEvent = NewEventClass(Proj=Proj, FT=self, Column=self.Columns[ThisColIndex])
+		NewEvent = NewEventClass(Proj=Proj, FT=self, Column=self.Columns[ThisColIndex], ModelGate=self.ModelGate)
 		self.Columns[ThisColIndex].FTElements.insert(ThisIndexInCol, NewEvent)
 		return vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
 

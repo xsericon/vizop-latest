@@ -23,7 +23,7 @@ PROG_SHORT_NAME = 'Vizop'
 HOME_PAGE = "http://VizopSoftware.com"
 SHORT_DESCRIPTION = _("")
 LONG_DESCRIPTION = _("")
-YEAR_LAST_RELEASED = '2018'
+YEAR_LAST_RELEASED = '2019'
 SRC_FILE_LICENSE_TEXT = _("# This file is part of %s. Copyright %s %s"%(PROG_SHORT_NAME, YEAR_LAST_RELEASED, OWNER))
 
 # definitions of where runtime files are expected

@@ -1089,6 +1089,19 @@ class NumberingItem(object):
 		self.ShowInDisplay = True  # whether number is displayed in Viewport
 		self.ShowInOutput = True  # whether number is displayed in PHA model export
 
+	def __eq__(self, other): # returns True if self and other (a NumberingItem instance) are considered identical
+		# this method allows comparison of NumberingItem instances simply by (Instance1 == Instance2)
+		assert isinstance(other, NumberingItem)
+		# compare NumberStructure contents of self and other
+		Match = len(self.NumberStructure) == len(other.NumberStructure)
+		ThisIndex = 0
+		while Match and (ThisIndex < len(self.NumberStructure)):
+			ThisItemInSelf = self.NumberStructure[ThisIndex]
+			ThisItemInOther = other.NumberStructure[ThisIndex]
+			# each item can be str, ParentNumberChunkItem or SerialNumberChunkItem. Check their types and contents match
+			Match = (ThisItemInSelf == ThisItemInOther) if isinstance(ThisItemInOther, type(ThisItemInSelf)) else False
+		return Match and (self.ShowInDisplay == other.ShowInDisplay) and (self.ShowInOutput == other.ShowInOutput)
+
 	def HumanValue(self, PHAItem, Host, Levels=999, PHAObjectsReferenced=[]):
 		# get the number for display for PHAItem.
 		# Host = iterable containing all similar PHA items to consider in serial numbering at lowest level
@@ -1149,17 +1162,21 @@ class ParentNumberChunkItem(object):
 	def __init__(self):
 		object.__init__(self)
 		self.Source = None  # PHA item instance to take numbering from
+		self.HierarchyLevels = 999 # how many levels of numbering to return. If <=1, only return the serial number of the Source item
 
-	#		self.HierarchyLevels = 999 # how many levels of numbering to return. If <=1, only return the serial number of the Source item
+	def __eq__(self, other):
+		assert isinstance(other, ParentNumberChunkItem)
+		return (self.Source == other.Source) and (self.HierarchyLevels == other.HierarchyLevels)
 
-	def GetMyNumber(self, Levels=999,
-					PHAObjectsReferenced=[]):  # Gets number of Source, up to a maximum <Levels> levels
+#	def GetMyNumber(self, Levels=999,
+#					PHAObjectsReferenced=[]):  # Gets number of Source, up to a maximum <Levels> levels
+	def GetMyNumber(self, PHAObjectsReferenced=[]):  # Gets number of Source, up to a maximum <Levels> levels
 		# returns tuple: (self.Source's number (limited to the last <Levels> numerical items), how many levels returned)
 		# PHAObjectsReferenced is for circular reference trapping
 		if self.Source:
-			if hasattr(self.Source, Number):
-				if self.Source not in PHAObjectsReferenced:  # circular reference checking
-					return self.Source.Number.HumanValue(PHAItem=self.Source, Levels=Levels,
+			if hasattr(self.Source, 'Number'):
+				if self.Source not in PHAObjectsReferenced: # circular reference checking
+					return self.Source.Number.HumanValue(PHAItem=self.Source, Levels=self.HierarchyLevels,
 														 PHAObjectsReferenced=PHAObjectsReferenced + [Source])
 				else:
 					return (_('<circular ref>'), Levels)
@@ -1184,6 +1201,11 @@ class SerialNumberChunkItem(object):  # a chunk in a NumberingItem instance, tha
 		self.IncludeInNumbering = True # whether to count this item in serial numbering
 			# (if False, GetMyNumber() returns NoValue string)
 		self.NoValue = '- -' # value returned if IncludeInNumbering is False
+
+	def __eq__(self, other):
+		assert isinstance(other, SerialNumberChunkItem)
+		AttribsToCompare = ['FieldWidth', 'PadChar', 'StartSequenceAt', 'SkipTo', 'GapBefore', 'IncludeInNumbering', 'NoValue']
+		return False not in [ (getattr(self, AttribName) == getattr(other, AttribName) for AttribName in AttribsToCompare) ]
 
 	def GetMyNumber(self, PHAItem=None, Host=None, NoValue='- -'):
 		# Returns serial number of PHAItem within Host (iterable), suitably padded
@@ -1400,14 +1422,13 @@ def FirstProblemValueIn(Values):  # return:
 	else:
 		return None, -1
 
-class TolRiskModel(object):  # superclass of tolerable risk model classes
+class TolRiskModel(object): # superclass of tolerable risk model classes. TODO add ID attrib
 
 	def __init__(self):
 		object.__init__(self)
 		self.RiskReceptors = [] # ordered list of RR's for this model
 		self.SeverityUnits = ['']  # ordered list of units mapping to RiskReceptors
-		self.MinSeverity = [
-			[]]  # list of (lists of severity values for each severity category), one list per RR, in same order as RiskReceptors
+		self.MinSeverity = [ [] ]  # list of (lists of severity values for each severity category), one list per RR, in same order as RiskReceptors
 		self.SeverityDescriptions = [[]]  # severity descriptions (human readable str), same structure as MinSeverity
 		self.TolFreqUnit = PerYearUnit  # tolerable risk unit, typically '/yr'
 		self.ShowSeverityValues = True  # whether severity values are visible to the user
