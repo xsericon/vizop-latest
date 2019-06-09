@@ -3046,23 +3046,22 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		# text change was made, with the original zoom and pan restored (so that the text field is on screen)
 		# and the changed component highlighted (so that the undo is visible to the user)
 		Notification = vizop_misc.MakeXMLMessage(RootName='NO_ShowViewport', RootText=RequestingControlFrameID,
-			Elements={info.ViewportTag: Args['ViewportID'],
-			info.ElementVisibleTag: Args['ElementID'], info.ComponentToHighlightTag: Args['ComponentName'],
-			info.ZoomTag: Args['Zoom'], info.PanXTag: Args['PanX'], info.PanYTag: Args['PanY']})
+			Elements={info.ViewportTag: UndoRecord.ViewportID,
+			info.ElementVisibleTag: UndoRecord.ElementID, info.ComponentToHighlightTag: UndoRecord.ComponentName,
+			info.ZoomTag: UndoRecord.Zoom, info.PanXTag: UndoRecord.PanX, info.PanYTag: UndoRecord.PanY})
 		vizop_misc.SendRequest(Socket=ControlFrameWithID(RequestingControlFrameID).C2FREQSocket.Socket,
 			Command='NO_ShowViewport', XMLRoot=Notification)
-		# instruct Control Frame to update any other visible Viewport (on other control frames)
-		pass # TODO
-		Notification = vizop_misc.MakeXMLMessage(RootName='NO_FT_ChangeText_Undo', RootText=self.ID,
-			Elements={info.MilestoneIDTag: UndoRecord.MilestoneID,
-			info.SkipRefreshTag: UndoRecord.Chain, info.UserMessageTag: UndoRecord.HumanText,
-			info.ComponentHostIDTag: UndoRecord.ComponentHost.ID, info.ViewportTag: UndoRecord.ViewportID,
-			info.ChainWaitingTag: utilities.Bool2Str(Args['ChainWaiting']),
-			info.ProjIDTag: Proj.ID})
+		# instruct Control Frame to update any other visible Viewport (on other control frames) TODO
+#		Notification = vizop_misc.MakeXMLMessage(RootName='NO_FT_ChangeText_Undo', RootText=self.ID,
+#			Elements={info.MilestoneIDTag: UndoRecord.MilestoneID,
+#			info.SkipRefreshTag: UndoRecord.Chain, info.UserMessageTag: UndoRecord.HumanText,
+#			info.ComponentHostIDTag: UndoRecord.ComponentHost.ID, info.ViewportTag: UndoRecord.ViewportID,
+#			info.ChainWaitingTag: utilities.Bool2Str(Args['ChainWaiting']),
+#			info.ProjIDTag: Proj.ID})
 		# %%% working here. Next, instead of sending "NO_Undo" message, send a "NO_Redraw" message to redraw the Viewport,
 		# with the affected element panned on screen, and with the needed data to update VizopTalks.
-		vizop_misc.SendRequest(Socket=ControlFrameWithID(RequestingControlFrameID).C2FREQSocket.Socket,
-			Command='NO_FT_ChangeText_Undo', XMLRoot=Notification)
+#		vizop_misc.SendRequest(Socket=ControlFrameWithID(RequestingControlFrameID).C2FREQSocket.Socket,
+#			Command='NO_FT_ChangeText_Undo', XMLRoot=Notification)
 		projects.SaveOnFly(Proj, UpdateData=vizop_misc.MakeXMLMessage(RootName=info.FTTag,
 			Elements={info.IDTag: self.ID, info.ComponentHostIDTag: UndoRecord.ComponentHost.ID}))
 			# TODO add data for the changed component to the Save On Fly data

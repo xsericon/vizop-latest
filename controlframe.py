@@ -1964,14 +1964,18 @@ class ControlFrame(wx.Frame):
 		KeyPressHash = vizop_misc.ClearKeyPressRegister(KeyPressHash)
 		# set up sockets for communication with datacore (no matter whether datacore is local or remote)
 		F2CREPSocket, C2FREQSocket = self.SetupSockets(vizop_misc.RegisterSocket.Register)
-		# if datacore is local, register this control frame with the datacore
+		# if datacore is local (i.e. on the same machine as control frame), register this control frame with the datacore
 		# (for remote control frames, the datacore has to do this by itself)
 		if DatacoreIsLocal:
 			ThisControlFrameShadow = ControlFrameShadow(ID=self.ID)
 			ThisControlFrameShadow.C2FREQSocket = C2FREQSocket
 			ThisControlFrameShadow.F2CREPSocket = F2CREPSocket
 			AllControlFrameShadows.append(ThisControlFrameShadow)
-		else: self.TryHandshake = True # inform OnIdle() to handshake with remote datacore
+			# get name of datacore socket to send messages to this control frame
+			self.SocketFromDatacore = info.ControlFrameOutSocketLabel + info.LocalSuffix
+		else: # remote datacore
+			self.TryHandshake = True # inform OnIdle() to handshake with remote datacore
+			print('CF1978 need to set up self.SocketFromDatacore')
 		screenx1, screeny1, screenx2, screeny2 = wx.Display().GetGeometry() # get max size of primary display device
 		TaskBarYAllowance = 0 # allows for window manager taskbar, assumed y axis only
 		# set Control Frame size on first run. On subsequent runs, layout_manager resets frame to its previous size
@@ -2059,9 +2063,9 @@ class ControlFrame(wx.Frame):
 		# if datacore is local, find the socket numbers already created by datacore
 		if DatacoreIsLocal:
 			F2CSkts = [SktObj for SktObj in SktRegister
-				if getattr(SktObj, 'SocketLabel', '') == 'F2CREP_Local']
+				if getattr(SktObj, 'SocketLabel', '') == info.ControlFrameInSocketLabel + info.LocalSuffix]
 			C2FSkts = [SktObj for SktObj in SktRegister
-				if getattr(SktObj, 'SocketLabel', '') == 'C2FREQ_Local']
+				if getattr(SktObj, 'SocketLabel', '') == info.ControlFrameOutSocketLabel + info.LocalSuffix]
 			assert len(F2CSkts) == 1 # must be exactly 1 socket in each direction
 			assert len(C2FSkts) == 1
 			F2CREPSocket = F2CSkts[0]

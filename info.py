@@ -117,6 +117,7 @@ CommandTag = 'Command'
 ControlFrameInSocketLabel = 'F2CREP' # label prefix for datacore end of control frame -> datacore socket
 ControlFrameOutSocketLabel = 'C2FREQ' # label prefix for datacore end of datacore -> control frame socket
 ViewportOutSocketLabel = 'C2VREQ' # label prefix for datacore end of datacore -> Viewport socket
+LocalSuffix = '_Local' # suffix for datacore sockets connecting to local control frame
 
 # Unicode symbols
 CommandSymbol = u'\u2318' # cloverleaf symbol used on Mac keyboard's Command key

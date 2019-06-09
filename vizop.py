@@ -299,11 +299,11 @@ ColourScheme = MakeColourSchemes()  # set up default colour scheme
 OpenProjects = []  # open project objects, in order of opening
 CurrentProject = None # which project is being edited in control frame
 # LaunchCommsThread()  # start thread for handling communication with Viewports
-# set up 2 sockets for communication with local ControlFrame: frame to core (F2C) and vice versa (C2F)
+# set up 2 sockets for communication with local ControlFrame: frame to core (Inward) and core to frame (Outward)
 ControlFrameInwardSocket, CFInSktObj, InwardSocketNumber = vizop_misc.SetupNewSocket(SocketType='REP',
-	SocketLabel=info.ControlFrameInSocketLabel + '_Local', BelongsToDatacore=True)
+	SocketLabel=info.ControlFrameInSocketLabel + info.LocalSuffix, BelongsToDatacore=True)
 ControlFrameOutwardSocket, CFOutSktObj, OutwardSocketNumber = vizop_misc.SetupNewSocket(SocketType='REQ',
-	SocketLabel=info.ControlFrameOutSocketLabel + '_Local', BelongsToDatacore=True)
+	SocketLabel=info.ControlFrameOutSocketLabel + info.LocalSuffix, BelongsToDatacore=True)
 
 # vizop's primary display shows either a welcome frame or a control frame, depending on whether any project is open
 RequestedToQuit = False  # whether user has requested to terminate vizop
