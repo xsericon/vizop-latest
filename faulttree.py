@@ -2563,9 +2563,10 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 
 	def GetFullRedrawData(self, Viewport=None, ViewportClass=None, **Args):
 		# return all data in FTObjectInCore as an XML tree, for sending to Viewport to fully draw the FT
-		# Viewport (instance of ViewportShadow): the Viewport to be displayed
+		# Viewport (instance of ViewportShadow): the Viewport to be displayed (not currently used)
 		# ViewportClass (subclass of ViewportBaseClass): the class of the displayable Viewport
-		# Args: any additional data to determine what data to return; depends on class of Viewport
+		# Args: can include ExtraXMLTagsAsDict (dict; keys: tags to be included in output XML data; values: tag texts)
+		# Args: can include ExtraXMLTagsAsTags (ElementTree XML element to append directly to XML tree)
 
 		def PopulateOverallData(El): # put data relating to FT as a whole into XML element El
 			# add FT object's ID as text of El, then OpMode as a tag
@@ -2936,6 +2937,17 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		# populate with data for each column
 		for Col in self.Columns:
 			ColEl = PopulateColumnData(FT=self, El=RootElement, Col=Col)
+		# populate any extra tags requested (currently used by undo for specifying display-specific tags)
+		if 'ExtraXMLTagsAsDict' in Args:
+			assert isinstance(Args['ExtraXMLTagsAsDict'], dict)
+			for (ThisTag, ThisText) in Args['ExtraXMLTagsAsDict'].items():
+				assert isinstance(ThisTag, str)
+				assert isinstance(ThisText, str)
+				ThisElement = ElementTree.SubElement(RootElement, ThisTag)
+				ThisElement.text = ThisText
+		if 'ExtraXMLTagsAsTags' in Args:
+			assert isinstance(Args['ExtraXMLTagsAsTags'], ElementTree.Element)
+			RootElement.append(Args['ExtraXMLTagsAsTags'])
 		return RootElement
 
 	def AddNewElement(self, Proj, ColNo=None, IndexInCol=None, ObjKindRequested=None):
@@ -3028,29 +3040,51 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			setattr(ComponentHost, ComponentToUpdate, NewValue) # write new value to component
 			# store undo record
 			print("FT3008 adding undo record")
+			# TODO remove redundant attribs from undo record, below
 			undo.AddToUndoList(Proj, Redoing=False, UndoObj=undo.UndoItem(UndoHandler=self.ChangeText_Undo,
 				RedoHandler=self.ChangeText_Redo, Chain='NoChain', ComponentHost=ComponentHost, ViewportID=Viewport.ID,
+				ViewportClass=type(Viewport),
 				ElementID=ElementID, ComponentName=ComponentToUpdate, OldValue=OldValue, NewValue=NewValue,
 				HumanText=_('change %s' % self.ComponentEnglishNames[TextComponentName]),
 				Zoom=Viewport.Zoom, PanX=Viewport.PanX, PanY=Viewport.PanY))
 		return vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
 
+	def FetchDisplayAttribsFromUndoRecord(self, UndoRecord):
+		# extract data about zoom, pan, highlight etc. from UndoRecord, build it into an XML tag FTDisplayAttribTag
+		# and return the tag
+		DisplaySpecificData = ElementTree.Element(info.FTDisplayAttribTag)
+		for (UndoRecordAttribName, TagName) in [ ('ElementID', info.FTElementContainingComponentToHighlight),
+			  ('ComponentName', info.FTComponentToHighlight),
+			  ('Zoom', info.ZoomTag), ('PanX', info.PanXTag), ('PanY', info.PanYTag)]:
+			if hasattr(UndoRecord, UndoRecordAttribName):
+				ThisAttribTag = ElementTree.SubElement(DisplaySpecificData, TagName)
+				ThisAttribTag.text = str(getattr(UndoRecord, UndoRecordAttribName))
+		print('FT3062 made display data:', ElementTree.tostring(DisplaySpecificData)	)
+		return DisplaySpecificData
+
 	def ChangeText_Undo(self, Proj, UndoRecord, **Args): # handle undo for ChangeText%%%
 		assert isinstance(Proj, projects.ProjectItem)
 		assert isinstance(UndoRecord, undo.UndoItem)
-		# find out which Control Frame sent the undo request (so that we know which one to reply to)
-		RequestingControlFrameID = Args['RequestingControlFrameID']
+		# find out which datacore socket to send messages on
+		SocketFromDatacore = vizop_misc.SocketWithName(TargetName=Args['SocketFromDatacoreName'])
 		# undo the change to the text value
 		setattr(UndoRecord.ComponentHost, UndoRecord.ComponentName, UndoRecord.OldValue)
 		# instruct Control Frame to switch the requesting control frame to the Viewport that was visible when the original
 		# text change was made, with the original zoom and pan restored (so that the text field is on screen)
 		# and the changed component highlighted (so that the undo is visible to the user)
-		Notification = vizop_misc.MakeXMLMessage(RootName='NO_ShowViewport', RootText=RequestingControlFrameID,
-			Elements={info.ViewportTag: UndoRecord.ViewportID,
-			info.ElementVisibleTag: UndoRecord.ElementID, info.ComponentToHighlightTag: UndoRecord.ComponentName,
-			info.ZoomTag: UndoRecord.Zoom, info.PanXTag: UndoRecord.PanX, info.PanYTag: UndoRecord.PanY})
-		vizop_misc.SendRequest(Socket=ControlFrameWithID(RequestingControlFrameID).C2FREQSocket.Socket,
-			Command='NO_ShowViewport', XMLRoot=Notification)
+		# prepare data about zoom, pan, highlight etc.
+		DisplayAttribTag = self.FetchDisplayAttribsFromUndoRecord(UndoRecord)
+		RedrawDataXML = self.GetFullRedrawData(ViewportClass=UndoRecord.ViewportClass,
+			ExtraXMLTagsAsTags=DisplayAttribTag)
+		MsgToControlFrame = ElementTree.Element(info.NO_ShowViewport)
+		# add a ViewportID tag to the message, so that Control Frame knows which Viewport to redraw
+		ViewportTag = ElementTree.Element(info.ViewportTag)
+		ViewportTag.text = UndoRecord.ViewportID
+		MsgToControlFrame.append(ViewportTag)
+		MsgToControlFrame.append(RedrawDataXML)
+		vizop_misc.SendRequest(Socket=SocketFromDatacore.Socket, Command=info.NO_ShowViewport, XMLRoot=MsgToControlFrame)
+#		vizop_misc.SendRequest(Socket=ControlFrameWithID(RequestingControlFrameID).C2FREQSocket.Socket,
+#			Command='NO_ShowViewport', XMLRoot=Notification) # old version with previous socket
 		# instruct Control Frame to update any other visible Viewport (on other control frames) TODO
 #		Notification = vizop_misc.MakeXMLMessage(RootName='NO_FT_ChangeText_Undo', RootText=self.ID,
 #			Elements={info.MilestoneIDTag: UndoRecord.MilestoneID,
@@ -3520,6 +3554,11 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 					['Level7', 'Level10'])
 			return NewGate
 
+		def PopulateDisplayAttribs(FT, DisplayAttribData):
+			# extract display-related attribs from DisplayAttribData (XML tag) and populate them into FT
+			# attribs can include zoom, pan, selection, collapse groups, and highlights
+			print('FT3541 PopulateDisplayAttribs not coded yet')
+
 		# main procedure for PrepareFullDisplay()
 		print('FT3441 starting PrepareFullDisplay using the following XML data:')
 		ElementTree.dump(XMLData)
@@ -3540,6 +3579,10 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		self.AddBuilderButtons()
 		# populate elements' ConnectTo attribs (must be done AFTER populating all elements)
 		self.PopulateConnectTo()
+		# populate display-related attributes specific to this Viewport, such as zoom, pan, selection, collapse groups,
+		# and highlights
+		DisplayAttribData = FTData.find(info.FTDisplayAttribTag)
+		if DisplayAttribData is not None: PopulateDisplayAttribs(self, DisplayAttribData)
 
 	def RenderInDC(self, TargetDC, FullRefresh=True, **Args):
 		# render all FT components into TargetDC provided by ControlFrame

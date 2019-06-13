@@ -308,6 +308,12 @@ def SetupNewSocket(SocketType='REQ', SocketLabel='', Viewport=None, PHAObj=None,
 		BelongsToDatacore=BelongsToDatacore, AddToVizopRegister=AddToRegister)
 	return NewSocket, NewSocketObj, ThisSocketNo
 
+def SocketWithName(TargetName): # return socket (SocketInRegister instance) in socket register with SocketLabel == TargetName.
+	# raises error if socket not found
+	Hits = [s for s in RegisterSocket.Register if s.SocketLabel == TargetName]
+	assert len(Hits) == 1
+	return Hits[0]
+
 def ListenToSocket(Socket, Handler=None, SendReply2=True, **Args):
 	# check if any message received on Socket (a zmq socket), call Handler (a callable or None) to handle it,
 	# get reply back from handler, and (if SendReply2 (bool) is True) send reply on Socket

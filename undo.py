@@ -129,12 +129,11 @@ def EndUndoOnCancel(Proj):
 def AddToRedoList(Proj, RedoObj): # similar to AddToUndoList()
 	Proj.RedoList.append(RedoObj)
 
-def HandleUndoRequest(Proj, RequestingControlFrameID=None, StoreRedoRecord=True, ContinuingPausedChain=False):
+def HandleUndoRequest(Proj, SocketFromDatacoreName=None, StoreRedoRecord=True, ContinuingPausedChain=False):
 	# process Undo command from user
 	# undo the last record in Proj's undo list. If the last record's Chain arg == 'Avalanche', undo preceding entries up to and
 	# including the last one with Chain != 'Avalanche'
-	# RequestingControlFrameID: ID of control frame from which undo request was issued (so that undo handler knows
-	# where to send reply messages to)
+	# SocketFromDatacoreName (str): name of socket for messaging from datacore to control frame that issued the undo request
 	# if StoreRedoRecord, undo information will be stored in Proj's Redo list.
 	# return: Success (bool), ReturnArgs (dict) from last undo handler run, UndoMsg (str) explaining the undo just done,
 	#   NextUndoMsg (str) explaining what would be undone on the next call of PerformUndo
@@ -162,7 +161,7 @@ def HandleUndoRequest(Proj, RequestingControlFrameID=None, StoreRedoRecord=True,
 				# (we can skip if this is not the last undo in the chain)
 				# ChainWaiting (bool): whether more chained undo items are waiting due to the previous item having Chain=='Stepwise'
 				ReturnArgs = ThisRec.UndoHandler(Proj, ThisRec, SkipRefresh=not (UndoLoopIndex == UndoHowManyMinus1),
-					RequestingControlFrameID=RequestingControlFrameID, ChainWaiting=ChainPaused)
+					SocketFromDatacoreName=SocketFromDatacoreName, ChainWaiting=ChainPaused)
 				if ReturnArgs is None: ReturnArgs = {}
 				UndoneCount += 1
 				# restore project's Edit number
@@ -213,19 +212,18 @@ def HandleUndoRequest(Proj, RequestingControlFrameID=None, StoreRedoRecord=True,
 	ReturnArgs['SkipRefresh'] = ChainPaused # tell calling procedure not to refresh menus, etc. if chaining is paused
 	return ReturnArgs
 
-def HandleRedoRequest(Proj, RedoingSandbox=False, RequestingControlFrameID=None):
+def HandleRedoRequest(Proj, RedoingSandbox=False, SocketFromDatacoreName=None):
 	# process Redo command from user
 	# redo the last record in Proj's redo list. If the last record's RedoChain arg == 'Avalanche', redo preceding entries up to and
 	# including the last one with RedoChain == 'NoChain', or up to and excluding the last one with RedoChain == 'Stepwise'
 	# Does not create an Undo record for the redone actions; this is the responsibility of individual Redo handlers
 	# (because we can't just recycle the previous Undo record - some item instances may have changed)
 	# RedoingSandbox (bool): whether we are redoing sandbox entries reverted during closing of project
-	# RequestingControlFrameID: ID of control frame from which redo request was issued (so that redo handler knows
-	# where to send reply messages to)
+	# SocketFromDatacoreName (str): name of socket for messaging from datacore to control frame that issued the redo request
 	# return: Success (bool), ReturnArgs (dict) from last redo handler run, RedoMsg (str) explaining the redo just done,
 	#   NextRedoMsg (str) explaining what would be redone on the next call of PerformRedo
 	assert isinstance(RedoingSandbox, bool)
-	assert isinstance(RequestingControlFrameID, str)
+	assert isinstance(SocketFromDatacoreName, str)
 	Success = True
 	RedoMsg = NextRedoMsg = ''
 	ReturnArgs = {}
@@ -252,7 +250,7 @@ def HandleRedoRequest(Proj, RedoingSandbox=False, RequestingControlFrameID=None)
 				SkipRefresh = (RedoLoopIndex != RedoHowManyMinus1)
 				ReturnArgs = ThisRec.RedoHandler(Proj, ThisRec, ChainWaiting=ChainPaused,
 					SkipRefresh=SkipRefresh,
-					ChainUndo=ThisRec.Chain, RequestingControlFrameID=RequestingControlFrameID)
+					ChainUndo=ThisRec.Chain, SocketFromDatacoreName=SocketFromDatacoreName)
 				if ReturnArgs is None: ReturnArgs = {}
 				assert isinstance(ReturnArgs, dict)
 				RedoneCount += 1

@@ -1299,7 +1299,6 @@ class ControlFrame(wx.Frame):
 			# find record that will be undone 'up to' (skipping over any chained records)
 			LastRecordToUndo = Proj.UndoList[undo.FindLastRecordToUndo(Proj.UndoList)]
 			UndoText = _(LastRecordToUndo.HumanText)
-			print('CF1302 last undo item: ', Proj.UndoList[-1].HumanText, '; found for display: ', UndoText)
 			self.UndoMenuItem.SetText((_('&Undo %s')) % UndoText)
 			self.MenuBar.Enable(self.UndoMenuItemID, True)
 		else: # nothing to undo
@@ -1321,7 +1320,7 @@ class ControlFrame(wx.Frame):
 		global UndoChainWaiting
 		ContinuePausedChain = UndoChainWaiting # store this; it means whether we are continuing an undo chain started before
 		UndoChainWaiting = False
-		ReturnArgs = undo.HandleUndoRequest(self.CurrentProj, RequestingControlFrameID=self.ID,
+		ReturnArgs = undo.HandleUndoRequest(self.CurrentProj, SocketFromDatacoreName=self.SocketFromDatacoreName,
 			ContinuingPausedChain=ContinuePausedChain)
 		if not ReturnArgs['SkipRefresh']: # update GUI
 			self.UpdateMenuStatus() # update menu status to show next un/redoable action
@@ -1700,21 +1699,23 @@ class ControlFrame(wx.Frame):
 		# switch PHA panel display (in local ControlFrame) to show TargetViewport
 		# TargetViewport is supplied directly as an arg, or (if it's None) via ViewportTag in XMLRoot
 		# first, find which Viewport to show
+		Proj = self.CurrentProj
+		print('CF1703 SwitchtoViewport with XMLRoot:', ElementTree.dump(XMLRoot))
 		if TargetViewport is None:
-			ViewportToShow = utilities.ObjectWithID(Objects=self.CurrentProj.ActiveViewports,
+			ViewportToShow = utilities.ObjectWithID(Objects=Proj.ActiveViewports,
 				TargetID=XMLRoot.find(info.ViewportTag).text)
 		else: ViewportToShow = TargetViewport
 		assert isinstance(ViewportToShow, display_utilities.ViewportBaseClass)
 		# release any existing Viewport from PHA panel
 		if self.CurrentViewport:
-			self.MyEditPanel.ReleaseViewportFromDisplDevice()
 			# remove old Viewport from ActiveViewports
 			print("CF1192 removing an active Viewport with ID: ", self.CurrentViewport.ID, type(self.CurrentViewport))
-			self.CurrentProj.ActiveViewports.remove(self.CurrentViewport)
+			Proj.ActiveViewports.remove(self.CurrentViewport)
+			self.MyEditPanel.ReleaseViewportFromDisplDevice()
 		# add target Viewport
-		self.CurrentProj.ActiveViewports.append(ViewportToShow)
+		Proj.ActiveViewports.append(ViewportToShow)
 		self.CurrentViewport = ViewportToShow
-		# restore zoom and pan, if provided in XMLRoot
+		# restore zoom and pan, if provided in XMLRoot%%%
 		if XMLRoot is not None:
 			ThisZoomTag = XMLRoot.find(info.ZoomTag)
 			TargetZoom = ThisZoomTag.text if ThisZoomTag else None
@@ -1725,12 +1726,13 @@ class ControlFrame(wx.Frame):
 			display_utilities.ChangeZoomAndPanValues(Viewport=self.CurrentViewport, Zoom=TargetZoom, PanX=TargetPanX,
 				PanY=TargetPanY)
 		# store history for backward navigation
-		self.StoreMilestone(self.CurrentProj, Backward=True)
+		self.StoreMilestone(Proj, Backward=True)
 		# draw the Viewport
 		self.ShowViewport(MessageAsXMLTree=XMLRoot)
 		# update other GUI elements
 		self.UpdateMenuStatus()
-		self.MyControlPanel.UpdateNavigationButtonStatus(Proj=self.CurrentProj)
+		self.MyControlPanel.UpdateNavigationButtonStatus(Proj=Proj)
+		return vizop_misc.MakeXMLMessage('Null', 'Null')
 
 	def DatacoreDoNewViewport_Undo(self, Proj, UndoRecord, **Args): # undo creation of new Viewport
 		global UndoChainWaiting
@@ -1972,10 +1974,10 @@ class ControlFrame(wx.Frame):
 			ThisControlFrameShadow.F2CREPSocket = F2CREPSocket
 			AllControlFrameShadows.append(ThisControlFrameShadow)
 			# get name of datacore socket to send messages to this control frame
-			self.SocketFromDatacore = info.ControlFrameOutSocketLabel + info.LocalSuffix
+			self.SocketFromDatacoreName = info.ControlFrameOutSocketLabel + info.LocalSuffix
 		else: # remote datacore
 			self.TryHandshake = True # inform OnIdle() to handshake with remote datacore
-			print('CF1978 need to set up self.SocketFromDatacore')
+			print('CF1978 need to set up self.SocketFromDatacoreName')
 		screenx1, screeny1, screenx2, screeny2 = wx.Display().GetGeometry() # get max size of primary display device
 		TaskBarYAllowance = 0 # allows for window manager taskbar, assumed y axis only
 		# set Control Frame size on first run. On subsequent runs, layout_manager resets frame to its previous size
