@@ -25,6 +25,8 @@ GateLabelBkgColour = ButtonBorderColour
 GateLabelFgColour = ButtonGraphicColour
 GateTextBkgColour = (0xb0, 0xb0, 0xff) # light grey
 GateTextFgColour = (0x00, 0x00, 0x00) # black
+HighlightColour = (0xfd, 0xf8, 0x47) # yellow
+HighlightColourStr = '253,248,71' # yellow
 ConnectingLineThicknessInCU = 4 # in canvas coords
 
 def SILTarget(Mode='', RiskRed=1.0):
@@ -397,10 +399,12 @@ class FTHeader(object): # FT header object. Rendered by drawing text into bitmap
 
 	def RenderIntoBitmap(self, Zoom): # draw header in self.Bitmap. Should be called after CalculateSize()
 
-		def DrawElements(DC, Elements, Zoom): # render header's elements in DC
+		def DrawElements(DC, Elements, Zoom, ComponentNameToHighlight=''): # render header's elements in DC
 			BackBoxRoundedness = 5 # for text elements, how rounded the background boxes' corners are
 			for El in Elements:
-				El.Draw(DC, Zoom, BackBoxRoundedness=BackBoxRoundedness) # render element, including any background box, in DC
+				# render element, including any background box with highlight, in DC
+				El.Draw(DC, Zoom, BackBoxRoundedness=BackBoxRoundedness,
+					Highlight=(El.InternalName == ComponentNameToHighlight))
 
 		# start of main procedure for RenderIntoBitmap()
 		# make bitmap
@@ -408,7 +412,7 @@ class FTHeader(object): # FT header object. Rendered by drawing text into bitmap
 		# make a DC for drawing
 		DC = wx.MemoryDC(self.Bitmap)
 		# draw elements into the bitmap
-		DrawElements(DC, self.Elements, Zoom)
+		DrawElements(DC, self.Elements, Zoom, self.ComponentNameToHighlight)
 
 	def AllClickableObjects(self, SelectedOnly=False, VisibleOnly=True):
 		# return list of all elements in header that should respond to mouse clicks
@@ -543,10 +547,13 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 	MinSizeInCU = property(fget=GetMinSizeInCU)
 
 	def Draw(self, DC, Zoom, **Args): # render text element, including background box, in DC
-		# Optional arg BackBoxRoundedness, which is radius of background box corner curvature, in canvas coords
+		# Optional arg BackBoxRoundedness: radius of background box corner curvature, in canvas coords
+		# Optional arg Highlight (bool): whether to highlight the background box
 		DefaultRound = 3 # default value of BackBoxRoundedness if not supplied
-		DC.SetPen(wx.Pen(self.BkgColour))
-		DC.SetBrush(wx.Brush(self.BkgColour))
+		# set background colour according to whether to highlight
+		BkgColour = HighlightColour if Args.get('Highlight', False) else self.BkgColour
+		DC.SetPen(wx.Pen(BkgColour))
+		DC.SetBrush(wx.Brush(BkgColour))
 		# find starting coords in pixels relative to the header/column bitmap (need not take Pan into account)
 		ThisStartX, ThisStartY = utilities.ScreenCoords(self.PosXInCU, self.PosYInCU, Zoom=Zoom, PanX=0, PanY=0)
 		DC.DrawRoundedRectangle(ThisStartX, ThisStartY, (self.EndXInCU - self.PosXInCU) * Zoom,
@@ -3059,10 +3066,9 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			if hasattr(UndoRecord, UndoRecordAttribName):
 				ThisAttribTag = ElementTree.SubElement(DisplaySpecificData, TagName)
 				ThisAttribTag.text = str(getattr(UndoRecord, UndoRecordAttribName))
-		print('FT3062 made display data:', ElementTree.tostring(DisplaySpecificData)	)
 		return DisplaySpecificData
 
-	def ChangeText_Undo(self, Proj, UndoRecord, **Args): # handle undo for ChangeText%%%
+	def ChangeText_Undo(self, Proj, UndoRecord, **Args): # handle undo for ChangeText
 		assert isinstance(Proj, projects.ProjectItem)
 		assert isinstance(UndoRecord, undo.UndoItem)
 		# find out which datacore socket to send messages on
@@ -3316,6 +3322,9 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		self.PanX = self.PanY = 0 # offset of drawing origin, in screen coords
 		self.OffsetX = self.OffsetY = 0 # offset of Viewport in display panel, in screen coords;
 			# referenced in utilities.CanvasCoordsViewport() but not currently used
+		self.ElementIDContainingComponentToHighlight = None # ID of element containing a highlighted component;
+			# if highlighted component is in FT header, value is same as self.ID
+		self.ComponentNameToHighlight = '' # Name of component to highlight in specified element
 		self.ParentWindow = Args.get('DisplDevice', None)
 		self.BaseLayerBitmap = None # a wx.Bitmap for holding the base layer of the FT, apart from floating objects such as the zoom widget
 		self.FloatingLayers = [] # a list of FloatLayer objects, for overlay onto the bitmap in self.Buffer, in arbitrary order
@@ -3386,8 +3395,9 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 					HumanName=self.RRGroupingNameHash[ThisRRGroupingTag.text],
 					Applicable=utilities.Bool2Str(ThisRRGroupingTag.get(info.ApplicableAttribName))))
 
-		def PopulateHeaderData(FT, HeaderEl, HeaderXMLRoot):
+		def PopulateHeaderData(FT, HeaderEl, HeaderXMLRoot, ComponentNameToHighlight=''):
 			# put header data from HeaderXMLRoot into attribs of HeaderEl (a FTHeader instance)
+			# ComponentNameToHighlight (str): apply highlight to specified component
 			# In DataInfo, each pair of items is: (FTHeader attrib name, XML tag)
 			assert isinstance(HeaderEl, FTHeader)
 			# set all header attribs except risk receptor (set in PopulateOverallData() )
@@ -3396,6 +3406,8 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 				('TextColour', 'TextColour'), ('Severity', 'Severity'), ('TolFreq', 'TolFreq'),
 				('UEL', 'UEL'), ('TargetRiskRed', 'RRF'),
 				('SIL', 'SIL'), ('TolFreqUnit', 'TolFreqUnit'), ('OutcomeUnit', 'OutcomeUnit') ]
+			print('ft3408 ComponentNameToHighlight: ', ComponentNameToHighlight)
+			assert ComponentNameToHighlight in [a for (a, b) in DataInfo] or (ComponentNameToHighlight == '')
 			for Attrib, XMLTag in DataInfo:
 				setattr(HeaderEl, Attrib, HeaderXMLRoot.findtext(XMLTag, default=''))
 			# populate choice boxes for OpMode, risk receptor, severity and RR grouping
@@ -3410,6 +3422,9 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 				if UsingThisOpMode: FT.OpMode = ThisOpMode # set OpMode attrib of FT
 			# populate content elements
 			for ThisEl in HeaderEl.ContentEls: ThisEl.Text.Content = getattr(HeaderEl, ThisEl.InternalName)
+			# store component name to highlight
+			self.Header.ComponentNameToHighlight = ComponentNameToHighlight
+			print('FT3419 storing header component name to highlight: ', ComponentNameToHighlight)
 
 		def PopulateColumnData(ColumnEl, Column):
 			# get data from ColumnEl (an XML FTColumnTag tree element) and populate into new objects in Column (a FTColumn instance).
@@ -3556,8 +3571,18 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 
 		def PopulateDisplayAttribs(FT, DisplayAttribData):
 			# extract display-related attribs from DisplayAttribData (XML tag) and populate them into FT
-			# attribs can include zoom, pan, selection, collapse groups, and highlights
-			print('FT3541 PopulateDisplayAttribs not coded yet')
+			# attribs can include zoom, pan, selection, collapse groups, and highlights%%%
+			print('FT3541 PopulateDisplayAttribs: component highlighting not implemented yet')
+			# the lambda below converts 'Header' to FT's ID, for cases where the component to highlight is in the header
+			for (AttribName, TagName, AttribType) in [
+				('ElementIDContainingComponentToHighlight', info.FTElementContainingComponentToHighlight,
+					lambda x: self.ID if x == 'Header' else x),
+				('ComponentNameToHighlight', info.FTComponentToHighlight, str),
+				('Zoom', info.ZoomTag, float), ('PanX', info.PanXTag, int),
+				('PanY', info.PanYTag, int)]:
+				ThisElement = DisplayAttribData.find(TagName)
+				if ThisElement is not None:
+					setattr(FT, AttribName, AttribType(ThisElement.text))
 
 		# main procedure for PrepareFullDisplay()
 		print('FT3441 starting PrepareFullDisplay using the following XML data:')
@@ -3565,10 +3590,19 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		self.Wipe() # start with a blank FT
 		# find the outer tag containing the FT data
 		FTData = [t for t in XMLData.iter(self.InternalName)][0]
-		PopulateOverallData(FTData, HeaderEl=self.Header) # extract data about the overall FT
+		# populate display-related attributes specific to this Viewport, such as zoom, pan, selection, collapse groups,
+		# and highlights
+		DisplayAttribData = FTData.find(info.FTDisplayAttribTag)
+		if DisplayAttribData is not None: PopulateDisplayAttribs(self, DisplayAttribData)
+		# extract data about the overall FT
+		PopulateOverallData(FTData, HeaderEl=self.Header)
 		# if header data was provided, use it to populate FT header
 		XMLHeaderData = FTData.find(info.FTHeaderTag)
-		if XMLHeaderData is not None: PopulateHeaderData(self, self.Header, XMLHeaderData)
+		if XMLHeaderData is not None:
+			# should we highlight a component in the header?
+			ComponentNameToHighlight = self.ComponentNameToHighlight if\
+				self.ElementIDContainingComponentToHighlight == self.ID else ''
+			PopulateHeaderData(self, self.Header, XMLHeaderData, ComponentNameToHighlight=ComponentNameToHighlight)
 		# get column data
 		ColumnElements = FTData.findall(info.FTColumnTag)
 		for ColNo, ColumnEl in enumerate(ColumnElements):
@@ -3579,10 +3613,6 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		self.AddBuilderButtons()
 		# populate elements' ConnectTo attribs (must be done AFTER populating all elements)
 		self.PopulateConnectTo()
-		# populate display-related attributes specific to this Viewport, such as zoom, pan, selection, collapse groups,
-		# and highlights
-		DisplayAttribData = FTData.find(info.FTDisplayAttribTag)
-		if DisplayAttribData is not None: PopulateDisplayAttribs(self, DisplayAttribData)
 
 	def RenderInDC(self, TargetDC, FullRefresh=True, **Args):
 		# render all FT components into TargetDC provided by ControlFrame
