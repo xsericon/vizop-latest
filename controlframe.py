@@ -1549,8 +1549,8 @@ class ControlFrame(wx.Frame):
 			NewViewport = Args['ViewportInRedoRecord']
 			RequestToDatacore = 'RQ_NewViewport_Redo'
 		else:
-			NewViewport, D2CSocketNo, C2DSocketNo = display_utilities.CreateViewport(Proj, Args['ViewportClass'],
-				DisplDevice=self.MyEditPanel, Fonts=self.Fonts)
+			NewViewport, D2CSocketNo, C2DSocketNo, VizopTalksArgs = display_utilities.CreateViewport(Proj,
+				Args['ViewportClass'], DisplDevice=self.MyEditPanel, Fonts=self.Fonts)
 			RequestToDatacore = 'RQ_NewViewport'
 		self.Viewports.append(NewViewport) # add it to the register for Control Frame
 		self.TrialViewport = NewViewport # set as temporary current viewport, confirmed after successful creation
@@ -1560,6 +1560,10 @@ class ControlFrame(wx.Frame):
 			info.PHAModelIDTag: Args['PHAModel'].ID, info.PHAModelTypeTag: Args['PHAModel'].InternalName,
 			info.MilestoneIDTag: NewMilestone.ID, info.D2CSocketNoTag: str(D2CSocketNo), info.C2DSocketNoTag: str(C2DSocketNo)}
 		vizop_misc.SendRequest(self.zmqOutwardSocket, Command=RequestToDatacore, **NewViewportAttribs)
+		# show VizopTalks confirmation message%%%
+		if not Redoing:
+			VizopTalksArgs.update( {'Priority': ConfirmationPriority} ) # set message priority
+			self.MyVTPanel.SubmitVizopTalksMessage(**VizopTalksArgs)
 		return vizop_misc.MakeXMLMessage('Null', 'Null')
 
 	def DoNewPHAModelCommand(self, Proj, PHAModelClass, **Args):

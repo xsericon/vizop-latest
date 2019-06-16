@@ -2670,8 +2670,10 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 					(FTEvent.BackgColour, str), (FTEvent.EventDescriptionComments, list),
 					(FTEvent.ValueComments, list), (FTEvent.ShowDescriptionComments, bool),
 					(FTEvent.ShowValueComments, bool), (FTEvent.ActionItems, list),
-					(FTEvent.ConnectTo, list), (FTEvent.LinkedTo, list), (FTEvent.CollapseGroups, list)]
-				IterableChecks = [(FTEvent.LinkedTo, core_classes.LinkItem), (FTEvent.LinkedFrom, core_classes.LinkItem),
+					(FTEvent.ConnectTo, list), (FTEvent.CollapseGroups, list)]
+#					(FTEvent.ConnectTo, list), (FTEvent.LinkedTo, list), (FTEvent.CollapseGroups, list)]
+#				IterableChecks = [(FTEvent.LinkedTo, core_classes.LinkItem), (FTEvent.LinkedFrom, core_classes.LinkItem),
+				IterableChecks = [(FTEvent.LinkedFrom, core_classes.LinkItem),
 					(FTEvent.CollapseGroups, FTCollapseGroup), (FTEvent.EventDescriptionComments, core_classes.AssociatedTextItem),
 					(FTEvent.ValueComments, core_classes.AssociatedTextItem),
 					(FTEvent.ActionItems, core_classes.AssociatedTextItem)]
@@ -2713,7 +2715,8 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 				info.ShowDescriptionCommentTag: FTEvent.ShowDescriptionComments,
 				info.ShowValueCommentTag: FTEvent.ShowValueComments,
 				'Unit': EventUnit.HumanName, 'ValueProblemObjectID': getattr(ProblemObj, 'ID', ''),
-				'FTEventLinked': bool(FTEvent.LinkedTo) or bool(FTEvent.LinkedFrom)}
+				'FTEventLinked': bool(FTEvent.LinkedFrom)}
+#				'FTEventLinked': bool(FTEvent.LinkedTo) or bool(FTEvent.LinkedFrom)}
 			for Tag, Attrib in FTEvent.TextComponentHash.items():
 				El = ElementTree.SubElement(EventEl, Tag)
 				El.text = str(Attrib)
@@ -2852,8 +2855,10 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 					(FTGate.GateDescription, str), (FTGate.ShowActionItems, bool),
 					(FTGate.BackgColour, str), (FTGate.GateDescriptionComments, list), (FTGate.Style, str),
 					(FTGate.ShowDescriptionComments, bool), (FTGate.ActionItems, list), (FTGate.LinkedFrom, list),
-					(FTGate.ConnectTo, list), (FTGate.LinkedTo, list), (FTGate.CollapseGroups, list) ]
-				IterableChecks = [(FTGate.LinkedTo, core_classes.LinkItem), (FTGate.LinkedFrom, core_classes.LinkItem),
+					(FTGate.ConnectTo, list), (FTGate.CollapseGroups, list) ]
+#					(FTGate.ConnectTo, list), (FTGate.LinkedTo, list), (FTGate.CollapseGroups, list) ]
+#				IterableChecks = [(FTGate.LinkedTo, core_classes.LinkItem), (FTGate.LinkedFrom, core_classes.LinkItem),
+				IterableChecks = [(FTGate.LinkedFrom, core_classes.LinkItem),
 					(FTGate.CollapseGroups, FTCollapseGroup), (FTGate.GateDescriptionComments, core_classes.AssociatedTextItem),
 					(FTGate.ActionItems, core_classes.AssociatedTextItem)]
 				MemberChecks = [ (FTGate.Algorithm, FTGateItemInCore.Algorithms) ]
@@ -2889,7 +2894,8 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 				('ValueProblem', ProblemValue.InternalName),
 				('ValueProblemID', getattr(ProblemValue, 'ID', '')),
 				('ValueProblemObjectID', getattr(ProblemObj, 'ID', '')),
-				('FTGateLinked', bool(FTGate.LinkedTo) or bool(FTGate.LinkedFrom)),
+				('FTGateLinked', bool(FTGate.LinkedFrom)),
+#				('FTGateLinked', bool(FTGate.LinkedTo) or bool(FTGate.LinkedFrom)),
 				('Numbering', FTGate.Numbering.HumanValue(FTGate, FTGate.Column.FTElements)[0]) ]
 			for Tag, Attrib in DataInfo:
 				El = ElementTree.SubElement(GateEl, Tag)
@@ -3280,6 +3286,9 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 	PreferredKbdShortcut = 'F'
 	NewPHAObjRequired = FTObjectInCore # which datacore PHA object class this Viewport spawns on creation.
 		# Should be None if the model shouldn't create a PHA object
+	# VizopTalks message when a new FT is created. NB don't set Priority here, as it is overridden in DoNewViewportCommand()
+	NewViewportVizopTalksArgs = {'Title': 'New Fault Tree created',
+		'MainText': 'Click on grey builder button to add first FT element'}
 	MinColumnLength = 100 # in canvas coords
 	MarginXInCU = 20 # margin between left edge of screen and left edge of first column, in canvas coords
 	ImageSizeNoZoom = (20, 20) # initial no-zoom size of all button images

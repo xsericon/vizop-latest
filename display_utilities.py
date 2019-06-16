@@ -51,6 +51,7 @@ def CreateViewport(Proj, ViewportClass, DisplDevice=None, PHAObj=None, DatacoreI
 	# DatacoreIsLocal (bool): whether datacore is in this instance of Vizop
 	# Fonts: (dict) keys are strings such as 'SmallHeadingFont'; values are wx.Font instances
 	# Return the Viewport instance, and D2C and C2D socket numbers (2 x int)
+	# Also returns VizopTalksArgs (dict of attrib: value; these are args to controlframe.SubmitVizopTalksMessage)
 	assert isinstance(DatacoreIsLocal, bool)
 	NewViewport = ViewportClass(Proj=Proj, DisplDevice=DisplDevice, PHAObj=PHAObj, Fonts=Fonts)
 	# append the Viewport to the project's list
@@ -78,7 +79,9 @@ def CreateViewport(Proj, ViewportClass, DisplDevice=None, PHAObj=None, DatacoreI
 	NewViewport.D2CSocketREP, NewViewport.D2CSocketREPObj, D2CSocketNoReturned = vizop_misc.SetupNewSocket(SocketType='REP',
 		SocketLabel='D2CREP_' + NewViewport.ID, PHAObj=PHAObj, Viewport=NewViewport,
 		SocketNo=D2CSocketNo, BelongsToDatacore=False, AddToRegister=True)
-	return NewViewport, D2CSocketNo, C2DSocketNo
+	# get args to send to SubmitVizopTalksMessage from Viewport, if available
+	VizopTalksArgs = getattr(NewViewport, 'NewViewportVizopTalksArgs', {'MainText': '<No info provided by Viewport>'})
+	return NewViewport, D2CSocketNo, C2DSocketNo, VizopTalksArgs
 
 def ViewportClassWithName(TargetName):
 	# returns the Viewport class with internal name = TargetName, or None if not found
