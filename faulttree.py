@@ -2418,7 +2418,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			TolFreqValueObj = self.MyTolRiskModel.TolFreqTable.Lookup(Categories=[self.Severity[RR]])
 			# copy value and unit from tol freq table (to avoid creating link between TolFreq and an item in the table)
 			self.TolFreq.SetMyValue(TolFreqValueObj.GetMyValue(RR=RR), RR=RR)
-			self.TolFreq.SetMyUnit(TolFreqValueObj.GetMyUnit())  # setting the same unit several times, never mind
+			self.TolFreq.SetMyUnit(TolFreqValueObj.GetMyUnit()) # setting the same unit several times, never mind
 
 	def RefreshRiskReceptorGrouping(self, GroupingOption, FirstTime=False):
 		# re-group risk receptors and select appropriate group to be displayed
@@ -2618,6 +2618,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 					assert isinstance(RR, core_classes.RiskReceptorItem), "FT1667 Invalid item '%s' in RiskReceptorItem" % str(RR)
 				assert len(self.RiskReceptorGroupOnDisplay) > 0, "FT1669 Fault Tree has empty list of RiskReceptorGroupOnDisplay"
 				assert isinstance(list(self.Severity.values())[0], core_classes.CategoryNameItem)
+				print('FT2621 TolFreq is: ', self.TolFreq, type(self.TolFreq))
 				assert isinstance(self.TolFreq, core_classes.NumValueItem),\
 					"FT1668 Fault Tree's TolFreq is not a NumValueItem"
 				assert isinstance(self.TargetRiskRedMeasure, str), "FT1671 Fault Tree's TargetRiskRedMeasure is not a string"
@@ -3043,11 +3044,15 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			ComponentToUpdate = TextComponentName
 			ComponentHost = HostElement
 		# update component's text
-		if ComponentToUpdate == 'EventValue': # updating Value attrib; try to extract number from user's input (TODO handle undo)
+		if ComponentToUpdate in ['EventValue', 'TolFreq']: # updating Value attrib; try to extract number from user's input
 			ValueReceived = utilities.str2real(NewValue, 'junk')
 			if ValueReceived != 'junk': # we got a recognisable number; update value in all applicable risk receptors
-				for ThisRR in self.RiskReceptorGroupOnDisplay:
-					ComponentHost.Value.SetMyValue(NewValue=ValueReceived, RR=ThisRR)
+				self.DoChangeTextInValueField(Proj, ComponentToUpdate=ComponentToUpdate, ComponentHost=ComponentHost,
+					TargetValue=ValueReceived, ViewportID=Viewport.ID,
+					ViewportClass=type(Viewport), Zoom=Viewport.Zoom, PanX=Viewport.PanX, PanY=Viewport.PanY,
+					HostElementID=ElementID, Redoing=False, RRGroup=self.RiskReceptorGroupOnDisplay)
+#				for ThisRR in self.RiskReceptorGroupOnDisplay:
+#					ComponentHost.Value.SetMyValue(NewValue=ValueReceived, RR=ThisRR)
 		else: # updating another field
 			self.DoChangeTextInTextField(Proj=Proj, ComponentToUpdate=ComponentToUpdate, ComponentHost=ComponentHost,
 				TargetValue=NewValue, ViewportID=Viewport.ID, ViewportClass=type(Viewport), Zoom=Viewport.Zoom,
@@ -3055,8 +3060,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 #			OldValue = getattr(ComponentHost, ComponentToUpdate) # get old value for saving in Undo record
 #			setattr(ComponentHost, ComponentToUpdate, NewValue) # write new value to component
 #			# store undo record
-#			# TODO remove redundant attribs from undo record, below
-#			undo.AddToUndoList(Proj, Redoing=False, UndoObj=undo.UndoItem(UndoHandler=self.ChangeText_Undo,
+#			undo.AddToUndoList(Proj, Redoing=False, UndoObj=undo.UndoItem(UndoHandler=self.ChangeTextInTextField_Undo,
 #				RedoHandler=self.ChangeTextInTextField_Redo, Chain='NoChain', ComponentHost=ComponentHost, ViewportID=Viewport.ID,
 #				ViewportClass=type(Viewport),
 #				ElementID=ElementID, ComponentName=ComponentToUpdate, OldValue=OldValue, NewValue=NewValue,
@@ -3072,10 +3076,32 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		OldValue = getattr(ComponentHost, ComponentToUpdate) # get old value for saving in Undo record
 		setattr(ComponentHost, ComponentToUpdate, TargetValue) # write new value to component
 		# store undo record
-		# TODO remove redundant attribs from undo record, below
-		undo.AddToUndoList(Proj, Redoing=Redoing, UndoObj=undo.UndoItem(UndoHandler=self.ChangeText_Undo,
+		undo.AddToUndoList(Proj, Redoing=Redoing, UndoObj=undo.UndoItem(UndoHandler=self.ChangeTextInTextField_Undo,
 			  RedoHandler=self.ChangeTextInTextField_Redo,
 			  Chain='NoChain', ComponentHost=ComponentHost,
+			  ViewportID=ViewportID,
+			  ViewportClass=ViewportClass,
+			  ElementID=HostElementID,
+			  ComponentName=ComponentToUpdate,
+			  OldValue=OldValue, NewValue=TargetValue,
+			  HumanText=_('change %s' % self.ComponentEnglishNames[ComponentToUpdate]),
+			  Zoom=Zoom, PanX=PanX, PanY=PanY))
+
+	def DoChangeTextInValueField(self, Proj, ComponentToUpdate, ComponentHost, TargetValue, ViewportID,
+			ViewportClass, Zoom, PanX, PanY, HostElementID, Redoing, RRGroup):
+		# execute change of text in a number field. New number value is in TargetValue (float)
+		# Redoing (bool): whether this is a redo action
+		# RRGroup (list): RR's currently displayed
+		assert isinstance(Redoing, bool)
+		assert isinstance(TargetValue, float)
+		OldValue = getattr(ComponentHost, ComponentToUpdate).GetMyValue(RR=RRGroup[0]) # get old value for saving in Undo record
+		# write new value to component
+		for ThisRR in RRGroup:
+			getattr(ComponentHost, ComponentToUpdate).SetMyValue(NewValue=TargetValue, RR=ThisRR)
+		# store undo record
+		undo.AddToUndoList(Proj, Redoing=Redoing, UndoObj=undo.UndoItem(UndoHandler=self.ChangeTextInValueField_Undo,
+			  RedoHandler=self.ChangeTextInValueField_Redo,
+			  Chain='NoChain', ComponentHost=ComponentHost, RR=RRGroup,
 			  ViewportID=ViewportID,
 			  ViewportClass=ViewportClass,
 			  ElementID=HostElementID,
@@ -3096,7 +3122,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 				ThisAttribTag.text = str(getattr(UndoRecord, UndoRecordAttribName))
 		return DisplaySpecificData
 
-	def ChangeText_Undo(self, Proj, UndoRecord, **Args): # handle undo for ChangeText
+	def ChangeTextInTextField_Undo(self, Proj, UndoRecord, **Args): # handle undo for ChangeTextInTextField
 		assert isinstance(Proj, projects.ProjectItem)
 		assert isinstance(UndoRecord, undo.UndoItem)
 		# find out which datacore socket to send messages on
@@ -3105,23 +3131,38 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		setattr(UndoRecord.ComponentHost, UndoRecord.ComponentName, UndoRecord.OldValue)
 		# request Control Frame to switch to the Viewport that was visible when the original edit was made
 		self.RedrawAfterUndoOrRedo(UndoRecord, SocketFromDatacore)
-#		# instruct Control Frame to switch the requesting control frame to the Viewport that was visible when the original
-#		# text change was made, with the original zoom and pan restored (so that the text field is on screen)
-#		# and the changed component highlighted (so that the undo is visible to the user)
-#		# prepare data about zoom, pan, highlight etc.
-#		DisplayAttribTag = self.FetchDisplayAttribsFromUndoRecord(UndoRecord)
-#		RedrawDataXML = self.GetFullRedrawData(ViewportClass=UndoRecord.ViewportClass,
-#			ExtraXMLTagsAsTags=DisplayAttribTag)
-#		MsgToControlFrame = ElementTree.Element(info.NO_ShowViewport)
-#		# add a ViewportID tag to the message, so that Control Frame knows which Viewport to redraw
-#		ViewportTag = ElementTree.Element(info.ViewportTag)
-#		ViewportTag.text = UndoRecord.ViewportID
-#		MsgToControlFrame.append(ViewportTag)
-#		MsgToControlFrame.append(RedrawDataXML)
-#		vizop_misc.SendRequest(Socket=SocketFromDatacore.Socket, Command=info.NO_ShowViewport, XMLRoot=MsgToControlFrame)
+		#		# instruct Control Frame to switch the requesting control frame to the Viewport that was visible when the original
+		#		# text change was made, with the original zoom and pan restored (so that the text field is on screen)
+		#		# and the changed component highlighted (so that the undo is visible to the user)
+		#		# prepare data about zoom, pan, highlight etc.
+		#		DisplayAttribTag = self.FetchDisplayAttribsFromUndoRecord(UndoRecord)
+		#		RedrawDataXML = self.GetFullRedrawData(ViewportClass=UndoRecord.ViewportClass,
+		#			ExtraXMLTagsAsTags=DisplayAttribTag)
+		#		MsgToControlFrame = ElementTree.Element(info.NO_ShowViewport)
+		#		# add a ViewportID tag to the message, so that Control Frame knows which Viewport to redraw
+		#		ViewportTag = ElementTree.Element(info.ViewportTag)
+		#		ViewportTag.text = UndoRecord.ViewportID
+		#		MsgToControlFrame.append(ViewportTag)
+		#		MsgToControlFrame.append(RedrawDataXML)
+		#		vizop_misc.SendRequest(Socket=SocketFromDatacore.Socket, Command=info.NO_ShowViewport, XMLRoot=MsgToControlFrame)
 		projects.SaveOnFly(Proj, UpdateData=vizop_misc.MakeXMLMessage(RootName=info.FTTag,
 			Elements={info.IDTag: self.ID, info.ComponentHostIDTag: UndoRecord.ComponentHost.ID}))
-			# TODO add data for the changed component to the Save On Fly data
+		# TODO add data for the changed component to the Save On Fly data
+		return {'Success': True}
+
+	def ChangeTextInValueField_Undo(self, Proj, UndoRecord, **Args): # handle undo for ChangeTextInValueField
+		assert isinstance(Proj, projects.ProjectItem)
+		assert isinstance(UndoRecord, undo.UndoItem)
+		# find out which datacore socket to send messages on
+		SocketFromDatacore = vizop_misc.SocketWithName(TargetName=Args['SocketFromDatacoreName'])
+		# undo the change to the value in all applicable RR's
+		for ThisRR in UndoRecord.RR:
+			getattr(UndoRecord.ComponentHost, UndoRecord.ComponentToUpdate).SetMyValue(NewValue=UndoRecord.OldValue, RR=ThisRR)
+		# request Control Frame to switch to the Viewport that was visible when the original edit was made
+		self.RedrawAfterUndoOrRedo(UndoRecord, SocketFromDatacore)
+		projects.SaveOnFly(Proj, UpdateData=vizop_misc.MakeXMLMessage(RootName=info.FTTag,
+			Elements={info.IDTag: self.ID, info.ComponentHostIDTag: UndoRecord.ComponentHost.ID}))
+			# TODO add data for the changed component to the Save On Fly data, including RR's
 		return {'Success': True}
 
 	def ChangeTextInTextField_Redo(self, Proj, RedoRecord, **Args):
@@ -3136,6 +3177,20 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			Elements={info.IDTag: self.ID, info.ComponentHostIDTag: RedoRecord.ComponentHost.ID}))
 			# TODO add data for the changed component to the Save On Fly data
 		return {'Success': True}
+
+	def ChangeTextInValueField_Redo(self, Proj, RedoRecord, **Args):
+		self.DoChangeTextInValueField(Proj=Proj, ComponentToUpdate=RedoRecord.ComponentName,
+			ComponentHost=RedoRecord.ComponentHost,
+			TargetValue=RedoRecord.NewValue, ViewportID=RedoRecord.ViewportID,
+			ViewportClass=RedoRecord.ViewportClass, Zoom=RedoRecord.Zoom, PanX=RedoRecord.PanX, PanY=RedoRecord.PanY,
+			HostElementID=RedoRecord.ElementID, Redoing=True, RRGroup=RedoRecord.RR)
+		self.RedrawAfterUndoOrRedo(RedoRecord, SocketFromDatacore=vizop_misc.SocketWithName(
+			TargetName=Args['SocketFromDatacoreName']))
+		projects.SaveOnFly(Proj, UpdateData=vizop_misc.MakeXMLMessage(RootName=info.FTTag,
+			Elements={info.IDTag: self.ID, info.ComponentHostIDTag: RedoRecord.ComponentHost.ID}))
+			# TODO add data for the changed component to the Save On Fly data, including RR's
+		return {'Success': True}
+
 
 	def RedrawAfterUndoOrRedo(self, UndoRecord, SocketFromDatacore):
 		# instruct Control Frame to switch the requesting control frame to the Viewport that was visible when the original
