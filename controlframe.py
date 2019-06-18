@@ -1330,7 +1330,8 @@ class ControlFrame(wx.Frame):
 		# first, clear RedoChainWaiting flag possibly left over from last redo action
 		global RedoChainWaiting
 		RedoChainWaiting = False
-		ReturnArgs = undo.HandleRedoRequest(self.CurrentProj, RequestingControlFrameID=self.ID)
+		ReturnArgs = undo.HandleRedoRequest(self.CurrentProj, RequestingControlFrameID=self.ID,
+			SocketFromDatacoreName=self.SocketFromDatacoreName)
 		if not ReturnArgs['SkipRefresh']: # update GUI
 			self.UpdateMenuStatus() # update menu status to show next un/redoable action
 			self.MyControlPanel.UpdateNavigationButtonStatus(Proj=self.CurrentProj)

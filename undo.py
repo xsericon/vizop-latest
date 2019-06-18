@@ -212,7 +212,7 @@ def HandleUndoRequest(Proj, SocketFromDatacoreName=None, StoreRedoRecord=True, C
 	ReturnArgs['SkipRefresh'] = ChainPaused # tell calling procedure not to refresh menus, etc. if chaining is paused
 	return ReturnArgs
 
-def HandleRedoRequest(Proj, RedoingSandbox=False, SocketFromDatacoreName=None):
+def HandleRedoRequest(Proj, RedoingSandbox=False, SocketFromDatacoreName=None, RequestingControlFrameID=None):
 	# process Redo command from user
 	# redo the last record in Proj's redo list. If the last record's RedoChain arg == 'Avalanche', redo preceding entries up to and
 	# including the last one with RedoChain == 'NoChain', or up to and excluding the last one with RedoChain == 'Stepwise'
@@ -249,7 +249,7 @@ def HandleRedoRequest(Proj, RedoingSandbox=False, SocketFromDatacoreName=None):
 				# Expecting Redohandler to return a dict (passed on in exit arg ReturnArgs) or None
 				SkipRefresh = (RedoLoopIndex != RedoHowManyMinus1)
 				ReturnArgs = ThisRec.RedoHandler(Proj, ThisRec, ChainWaiting=ChainPaused,
-					SkipRefresh=SkipRefresh,
+					SkipRefresh=SkipRefresh, RequestingControlFrameID=RequestingControlFrameID,
 					ChainUndo=ThisRec.Chain, SocketFromDatacoreName=SocketFromDatacoreName)
 				if ReturnArgs is None: ReturnArgs = {}
 				assert isinstance(ReturnArgs, dict)

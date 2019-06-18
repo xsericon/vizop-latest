@@ -272,6 +272,8 @@ class ZoomWidgetObj(object):
 	Mid2MaxAngleRange = (6.28 + AngleAtPointerMid) - AngleAtPointerMax # 2pi added, as angle range wraps
 	BestMousePointerForSelecting = 'Zoom' # should be a key of StockCursors
 	PosZ = 100 # z-coordinate of FloatLayer containing the zoom widget
+	MinZoomLimit = 1e-5 # absolute limits of zoom value
+	MaxZoomLimit = 1e5
 
 	def __init__(self, Viewport=None, PosXInPx=0, PosYInPx=0, InitialZoom=1.0, MaxZoom=5.0, MidZoom=1.0, MinZoom=0.2, SizeY=50):
 		# Viewport: instance of a subclass of ViewportBaseClass
@@ -284,7 +286,7 @@ class ZoomWidgetObj(object):
 		assert isinstance(InitialZoom, (int, float))
 		assert isinstance(MaxZoom, (int, float))
 		assert isinstance(MinZoom, (int, float))
-		assert 1e-5 < MinZoom < InitialZoom < MaxZoom < 1e5
+		assert ZoomWidgetObj.MinZoomLimit < MinZoom < InitialZoom < MaxZoom < ZoomWidgetObj.MaxZoomLimit
 		assert MinZoom < MidZoom < MaxZoom
 		assert isinstance(SizeY, int)
 		object.__init__(self)
@@ -333,6 +335,11 @@ class ZoomWidgetObj(object):
 		self.RingCentreY = PosYInPx
 		self.FloatLayer.PosXInPx = PosXInPx # set layer drawing position
 		self.FloatLayer.PosYInPx = PosYInPx
+
+	def SetZoom(self, TargetZoom): # set zoom value of widget (does not redraw it)
+		assert isinstance(TargetZoom, (int, float))
+		assert self.MinZoom < TargetZoom < self.MaxZoom
+		self.CurrentZoom = float(TargetZoom)
 
 	def DrawInBitmap(self): # draw zoom widget in own bitmap
 		# set StartX/Y, the position of the widget centre

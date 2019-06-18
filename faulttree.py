@@ -3043,24 +3043,46 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			ComponentToUpdate = TextComponentName
 			ComponentHost = HostElement
 		# update component's text
-		if ComponentToUpdate == 'EventValue': # updating Value attrib; try to extract number from user's input (TODO add undo)
+		if ComponentToUpdate == 'EventValue': # updating Value attrib; try to extract number from user's input (TODO handle undo)
 			ValueReceived = utilities.str2real(NewValue, 'junk')
 			if ValueReceived != 'junk': # we got a recognisable number; update value in all applicable risk receptors
 				for ThisRR in self.RiskReceptorGroupOnDisplay:
 					ComponentHost.Value.SetMyValue(NewValue=ValueReceived, RR=ThisRR)
 		else: # updating another field
-			OldValue = getattr(ComponentHost, ComponentToUpdate) # get old value for saving in Undo record
-			setattr(ComponentHost, ComponentToUpdate, NewValue) # write new value to component
-			# store undo record
-			print("FT3008 adding undo record")
-			# TODO remove redundant attribs from undo record, below
-			undo.AddToUndoList(Proj, Redoing=False, UndoObj=undo.UndoItem(UndoHandler=self.ChangeText_Undo,
-				RedoHandler=self.ChangeText_Redo, Chain='NoChain', ComponentHost=ComponentHost, ViewportID=Viewport.ID,
-				ViewportClass=type(Viewport),
-				ElementID=ElementID, ComponentName=ComponentToUpdate, OldValue=OldValue, NewValue=NewValue,
-				HumanText=_('change %s' % self.ComponentEnglishNames[TextComponentName]),
-				Zoom=Viewport.Zoom, PanX=Viewport.PanX, PanY=Viewport.PanY))
+			self.DoChangeTextInTextField(Proj=Proj, ComponentToUpdate=ComponentToUpdate, ComponentHost=ComponentHost,
+				TargetValue=NewValue, ViewportID=Viewport.ID, ViewportClass=type(Viewport), Zoom=Viewport.Zoom,
+				PanX=Viewport.PanX, PanY=Viewport.PanY, HostElementID=ElementID, Redoing=False)
+#			OldValue = getattr(ComponentHost, ComponentToUpdate) # get old value for saving in Undo record
+#			setattr(ComponentHost, ComponentToUpdate, NewValue) # write new value to component
+#			# store undo record
+#			# TODO remove redundant attribs from undo record, below
+#			undo.AddToUndoList(Proj, Redoing=False, UndoObj=undo.UndoItem(UndoHandler=self.ChangeText_Undo,
+#				RedoHandler=self.ChangeTextInTextField_Redo, Chain='NoChain', ComponentHost=ComponentHost, ViewportID=Viewport.ID,
+#				ViewportClass=type(Viewport),
+#				ElementID=ElementID, ComponentName=ComponentToUpdate, OldValue=OldValue, NewValue=NewValue,
+#				HumanText=_('change %s' % self.ComponentEnglishNames[TextComponentName]),
+#				Zoom=Viewport.Zoom, PanX=Viewport.PanX, PanY=Viewport.PanY))
 		return vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
+
+	def DoChangeTextInTextField(self, Proj, ComponentToUpdate, ComponentHost, TargetValue, ViewportID,
+			ViewportClass, Zoom, PanX, PanY, HostElementID, Redoing):
+		# execute change of text in a text (not number) field
+		# Redoing (bool): whether this is a redo action
+		assert isinstance(Redoing, bool)
+		OldValue = getattr(ComponentHost, ComponentToUpdate) # get old value for saving in Undo record
+		setattr(ComponentHost, ComponentToUpdate, TargetValue) # write new value to component
+		# store undo record
+		# TODO remove redundant attribs from undo record, below
+		undo.AddToUndoList(Proj, Redoing=Redoing, UndoObj=undo.UndoItem(UndoHandler=self.ChangeText_Undo,
+			  RedoHandler=self.ChangeTextInTextField_Redo,
+			  Chain='NoChain', ComponentHost=ComponentHost,
+			  ViewportID=ViewportID,
+			  ViewportClass=ViewportClass,
+			  ElementID=HostElementID,
+			  ComponentName=ComponentToUpdate,
+			  OldValue=OldValue, NewValue=TargetValue,
+			  HumanText=_('change %s' % self.ComponentEnglishNames[ComponentToUpdate]),
+			  Zoom=Zoom, PanX=PanX, PanY=PanY))
 
 	def FetchDisplayAttribsFromUndoRecord(self, UndoRecord):
 		# extract data about zoom, pan, highlight etc. from UndoRecord, build it into an XML tag FTDisplayAttribTag
@@ -3081,9 +3103,45 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		SocketFromDatacore = vizop_misc.SocketWithName(TargetName=Args['SocketFromDatacoreName'])
 		# undo the change to the text value
 		setattr(UndoRecord.ComponentHost, UndoRecord.ComponentName, UndoRecord.OldValue)
+		# request Control Frame to switch to the Viewport that was visible when the original edit was made
+		self.RedrawAfterUndoOrRedo(UndoRecord, SocketFromDatacore)
+#		# instruct Control Frame to switch the requesting control frame to the Viewport that was visible when the original
+#		# text change was made, with the original zoom and pan restored (so that the text field is on screen)
+#		# and the changed component highlighted (so that the undo is visible to the user)
+#		# prepare data about zoom, pan, highlight etc.
+#		DisplayAttribTag = self.FetchDisplayAttribsFromUndoRecord(UndoRecord)
+#		RedrawDataXML = self.GetFullRedrawData(ViewportClass=UndoRecord.ViewportClass,
+#			ExtraXMLTagsAsTags=DisplayAttribTag)
+#		MsgToControlFrame = ElementTree.Element(info.NO_ShowViewport)
+#		# add a ViewportID tag to the message, so that Control Frame knows which Viewport to redraw
+#		ViewportTag = ElementTree.Element(info.ViewportTag)
+#		ViewportTag.text = UndoRecord.ViewportID
+#		MsgToControlFrame.append(ViewportTag)
+#		MsgToControlFrame.append(RedrawDataXML)
+#		vizop_misc.SendRequest(Socket=SocketFromDatacore.Socket, Command=info.NO_ShowViewport, XMLRoot=MsgToControlFrame)
+		projects.SaveOnFly(Proj, UpdateData=vizop_misc.MakeXMLMessage(RootName=info.FTTag,
+			Elements={info.IDTag: self.ID, info.ComponentHostIDTag: UndoRecord.ComponentHost.ID}))
+			# TODO add data for the changed component to the Save On Fly data
+		return {'Success': True}
+
+	def ChangeTextInTextField_Redo(self, Proj, RedoRecord, **Args):
+		self.DoChangeTextInTextField(Proj=Proj, ComponentToUpdate=RedoRecord.ComponentName,
+			ComponentHost=RedoRecord.ComponentHost,
+			TargetValue=RedoRecord.NewValue, ViewportID=RedoRecord.ViewportID,
+			ViewportClass=RedoRecord.ViewportClass, Zoom=RedoRecord.Zoom, PanX=RedoRecord.PanX, PanY=RedoRecord.PanY,
+			HostElementID=RedoRecord.ElementID, Redoing=True)
+		self.RedrawAfterUndoOrRedo(RedoRecord, SocketFromDatacore=vizop_misc.SocketWithName(
+			TargetName=Args['SocketFromDatacoreName']))
+		projects.SaveOnFly(Proj, UpdateData=vizop_misc.MakeXMLMessage(RootName=info.FTTag,
+			Elements={info.IDTag: self.ID, info.ComponentHostIDTag: RedoRecord.ComponentHost.ID}))
+			# TODO add data for the changed component to the Save On Fly data
+		return {'Success': True}
+
+	def RedrawAfterUndoOrRedo(self, UndoRecord, SocketFromDatacore):
 		# instruct Control Frame to switch the requesting control frame to the Viewport that was visible when the original
 		# text change was made, with the original zoom and pan restored (so that the text field is on screen)
 		# and the changed component highlighted (so that the undo is visible to the user)
+		# SocketFromDatacore (socket object): socket to send redraw message from datacore to Control Frame
 		# prepare data about zoom, pan, highlight etc.
 		DisplayAttribTag = self.FetchDisplayAttribsFromUndoRecord(UndoRecord)
 		RedrawDataXML = self.GetFullRedrawData(ViewportClass=UndoRecord.ViewportClass,
@@ -3095,25 +3153,6 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		MsgToControlFrame.append(ViewportTag)
 		MsgToControlFrame.append(RedrawDataXML)
 		vizop_misc.SendRequest(Socket=SocketFromDatacore.Socket, Command=info.NO_ShowViewport, XMLRoot=MsgToControlFrame)
-#		vizop_misc.SendRequest(Socket=ControlFrameWithID(RequestingControlFrameID).C2FREQSocket.Socket,
-#			Command='NO_ShowViewport', XMLRoot=Notification) # old version with previous socket
-		# instruct Control Frame to update any other visible Viewport (on other control frames) TODO
-#		Notification = vizop_misc.MakeXMLMessage(RootName='NO_FT_ChangeText_Undo', RootText=self.ID,
-#			Elements={info.MilestoneIDTag: UndoRecord.MilestoneID,
-#			info.SkipRefreshTag: UndoRecord.Chain, info.UserMessageTag: UndoRecord.HumanText,
-#			info.ComponentHostIDTag: UndoRecord.ComponentHost.ID, info.ViewportTag: UndoRecord.ViewportID,
-#			info.ChainWaitingTag: utilities.Bool2Str(Args['ChainWaiting']),
-#			info.ProjIDTag: Proj.ID})
-		# %%% working here. Next, instead of sending "NO_Undo" message, send a "NO_Redraw" message to redraw the Viewport,
-		# with the affected element panned on screen, and with the needed data to update VizopTalks.
-#		vizop_misc.SendRequest(Socket=ControlFrameWithID(RequestingControlFrameID).C2FREQSocket.Socket,
-#			Command='NO_FT_ChangeText_Undo', XMLRoot=Notification)
-		projects.SaveOnFly(Proj, UpdateData=vizop_misc.MakeXMLMessage(RootName=info.FTTag,
-			Elements={info.IDTag: self.ID, info.ComponentHostIDTag: UndoRecord.ComponentHost.ID}))
-			# TODO add data for the changed component to the Save On Fly data
-		return {'Success': True}
-
-	def ChangeText_Redo(self, RedoRecord, **Args): pass
 
 	def ChangeChoice(self, Proj, ElementID, TextComponentName, NewValue, **Args):
 		# change content of choice component in ElementID (int as str, or 'Header')
@@ -3579,18 +3618,24 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			return NewGate
 
 		def PopulateDisplayAttribs(FT, DisplayAttribData):
-			# extract display-related attribs from DisplayAttribData (XML tag) and populate them into FT
-			# attribs can include zoom, pan, selection, collapse groups, and highlights%%%
+			# extract display-related attribs from DisplayAttribData (XML tag or None) and populate them into FT
+			# attribs can include zoom, pan, selection, collapse groups, and highlights
+			# Clears highlight-related attribs if not found in DisplayAttribData, to remove highlight when no longer required
 			print('FT3541 PopulateDisplayAttribs: component highlighting not implemented yet')
 			# the lambda below converts 'Header' to FT's ID, for cases where the component to highlight is in the header
-			for (AttribName, TagName, AttribType) in [
+			# In the tuple, ClearIfAbsent (bool) means whether to clear the attrib if not found in DisplayAttribData;
+			# ClearValue is the value to clear to
+			for (AttribName, TagName, AttribType, ClearIfAbsent, ClearValue) in [
 				('ElementIDContainingComponentToHighlight', info.FTElementContainingComponentToHighlight,
-					lambda x: self.ID if x == 'Header' else x),
-				('ComponentNameToHighlight', info.FTComponentToHighlight, str),
-				('Zoom', info.ZoomTag, float), ('PanX', info.PanXTag, int),
-				('PanY', info.PanYTag, int)]:
-				ThisElement = DisplayAttribData.find(TagName)
-				if ThisElement is not None:
+					lambda x: self.ID if x == 'Header' else x, True, None),
+				('ComponentNameToHighlight', info.FTComponentToHighlight, str, True, ''),
+				('Zoom', info.ZoomTag, float, False, None), ('PanX', info.PanXTag, int, False, None),
+				('PanY', info.PanYTag, int, False, None)]:
+				# try to get TagName from DisplayAttribData XML - which might have no root tag
+				ThisElement = None if DisplayAttribData is None else DisplayAttribData.find(TagName)
+				if ThisElement is None:
+					if ClearIfAbsent: setattr(FT, AttribName, ClearValue) # clear attrib if not found in DisplayAttribData
+				else: # value found; set the attrib value
 					setattr(FT, AttribName, AttribType(ThisElement.text))
 
 		# main procedure for PrepareFullDisplay()
@@ -3600,9 +3645,9 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		# find the outer tag containing the FT data
 		FTData = [t for t in XMLData.iter(self.InternalName)][0]
 		# populate display-related attributes specific to this Viewport, such as zoom, pan, selection, collapse groups,
-		# and highlights
+		# and highlights%%%
 		DisplayAttribData = FTData.find(info.FTDisplayAttribTag)
-		if DisplayAttribData is not None: PopulateDisplayAttribs(self, DisplayAttribData)
+		PopulateDisplayAttribs(self, DisplayAttribData)
 		# extract data about the overall FT
 		PopulateOverallData(FTData, HeaderEl=self.Header)
 		# if header data was provided, use it to populate FT header
@@ -3694,8 +3739,9 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 				BaseLayerDC.DrawBitmap(self.InterColumnStripBuffers[ColIndex], Column.PosXInPx + Column.SizeXInPx, Column.PosYInPx, useMask=False)
 			# set PosX/Y attribs of connect buttons in pixels (needed to detect mouse clicks)
 			SetConnectButtonPos()
-		# draw zoom widget. First, set its position: 90% across the panel, and slightly above the bottom of the panel
-		self.MyZoomWidget.SetPos(HostPanelSizeX * 0.9, HostPanelSizeY - self.MyZoomWidget.GetSize()[1] - 10)
+		# draw zoom widget. First, set its position: 50% across the panel, and slightly above the bottom of the panel
+		self.MyZoomWidget.SetPos(HostPanelSizeX * 0.5, HostPanelSizeY - self.MyZoomWidget.GetSize()[1] - 10)
+		self.MyZoomWidget.SetZoom(self.Zoom) # update zoom setting of zoom widget
 		self.MyZoomWidget.DrawInBitmap() # draw zoom widget in its own bitmap
 		BlitIntoDC(BaseLayerBitmap=self.BaseLayerBitmap, TargetDC=TargetDC)
 
