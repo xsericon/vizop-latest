@@ -1483,4 +1483,50 @@ def FontInstance(Size=12, Italics=False, Bold=False, Underlined=False, Font=''):
 	return wx.Font(Size, family=wx.DEFAULT, style={False: wx.NORMAL, True: wx.ITALIC}[Italics],
 		weight={False: wx.NORMAL, True: wx.BOLD}[Bold], underline=Underlined, faceName=Font)
 
+class TeamMember(object):
+
+	def __init__(self, iD = 0, name = '', role = '', affiliation = ''):
+		object.__init__(self)
+		assert type(iD) == int
+		assert type(name) == str
+		assert type(role) == str
+		assert type(affiliation) == str
+
+		self.iD = iD # team member ID
+		self.name = name # team member name
+		self.role = role # team member role
+		self.affiliation = affiliation # team member affiliation
+		pass
+	pass
+
+class Comment(object):
+	# implement a simple comment system for XML export
+	def __init__(self, iD = 0, content = '', isVisible = True, showInReport = True):
+		object.__init__(self)
+		assert type(iD) == int
+		assert type(content) == str
+		assert type(isVisible) == bool
+		assert type(showInReport) == bool
+
+		self.iD = iD # comment ID
+		self.content = content # content
+		self.isVisible = isVisible # flag if visible or not, initially always True. For potential future features
+		self.showInReport = showInReport # flag if shown in the report, initially always True. For potential future features
+
+		pass
+
+	pass
+
+class Bookmark(object):
+	# implement a simple bookmark system for XML export
+	def __init__(self, iD = '0', isDeleted = False):
+		assert type(iD) == str
+		assert type(isDeleted) == bool
+
+		self.iD = iD # bookmark ID
+		self.isDeleted = isDeleted # flag if bookmark is deleted
+
+		pass
+
+
 del _ # remove dummy definition

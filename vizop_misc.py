@@ -145,7 +145,6 @@ def OnAboutRequest(Parent=None, event=None):
 	# TODO add licensing info here: AboutInfo.SetLicense(str)
 	wx.adv.AboutBox(AboutInfo) # show the About box
 
-
 def GetFilenameForSave(DialogueParentFrame, DialogueTitle='', DefaultDir='', DefaultFile='', Wildcard='', DefaultExtension=''):
 	""" Open 'save' dialogue; get filename from user
 		Returns: (ProceedToSave, Full path name of target file)
