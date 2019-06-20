@@ -952,6 +952,27 @@ class ControlFrame(wx.Frame):
 			# enable navigation buttons if there are any items in current project's history lists
 			self.UpdateNavigationButtonStatus(Proj)
 
+		def MakeStandardWidgets(self, Scope, NotebookPage):
+			# make standard set of widgets, e.g. navigation buttons and undo/redo buttons, appearing on every aspect
+			# Scope (ControlPanelAspectItem instance): the aspect owning the widgets
+			# NotebookPage (wx.Panel instance): panel in the wxNotebook containing the aspect's widgets
+			assert isinstance(Scope, self.ControlPanelAspectItem)
+			Scope.NavigateBackButton = UIWidgetItem(wx.Button(NotebookPage,
+				size=self.StandardImageButtonSize), KeyStroke=[wx.WXK_CONTROL, wx.WXK_LEFT],
+				ColLoc=0, ColSpan=1, Events=[wx.EVT_BUTTON], Handler=self.OnNavigateBackButton, Flags=0)
+			Scope.NavigateBackButton.Widget.SetBitmap(self.TopLevelFrame.ButtonBitmap(wx.ART_GO_BACK))
+			Scope.NavigateBackButton.ToolTip = ToolTip.SuperToolTip(_("Go back"))
+			Scope.NavigateBackButton.ToolTip.SetTarget(self.PHAModelsAspect.NavigateBackButton.Widget)
+			Scope.NavigateForwardButton = UIWidgetItem(wx.Button(NotebookPage, size=self.StandardImageButtonSize), KeyStroke=[wx.WXK_CONTROL, wx.WXK_RIGHT],
+				ColLoc=1, ColSpan=1, Events=[wx.EVT_BUTTON], Handler=self.OnNavigateForwardButton, Flags=0)
+			Scope.NavigateForwardButton.Widget.SetBitmap(self.TopLevelFrame.ButtonBitmap(wx.ART_GO_FORWARD))
+			Scope.UndoButton = UIWidgetItem(wx.Button(NotebookPage, size=self.StandardImageButtonSize), KeyStroke=[wx.WXK_CONTROL, ord('z')],
+				ColLoc=0, ColSpan=1, Events=[wx.EVT_BUTTON], Handler=self.TopLevelFrame.OnUndoRequest, NewRow=True, Flags=0) # =0 keeps button at fixed size
+			Scope.UndoButton.Widget.SetBitmap(self.TopLevelFrame.ButtonBitmap(wx.ART_UNDO))
+			Scope.RedoButton = UIWidgetItem(wx.Button(NotebookPage, size=self.StandardImageButtonSize), KeyStroke=[wx.WXK_CONTROL, ord('y')],
+				ColLoc=1, ColSpan=1, Events=[wx.EVT_BUTTON], Handler=self.TopLevelFrame.OnRedoRequest, Flags=0)
+			Scope.RedoButton.Widget.SetBitmap(self.TopLevelFrame.ButtonBitmap(wx.ART_REDO))
+
 		def MakePHAModelsAspect(self): # make Control Panel aspect for PHAModel control
 			# make basic attribs needed for the aspect
 			MyNotebookPage = wx.Panel(parent=self.MyNotebook)
@@ -960,22 +981,24 @@ class ControlFrame(wx.Frame):
 				TopLevelFrame=self.TopLevelFrame, PrefillMethod=self.PrefillWidgetsForPHAModelsAspect,
 				NotebookPage=MyNotebookPage, TabText=MyTabText)
 			# make widgets
-			self.PHAModelsAspect.NavigateBackButton = UIWidgetItem(wx.Button(MyNotebookPage, size=self.StandardImageButtonSize), KeyStroke=[wx.WXK_CONTROL, wx.WXK_LEFT],
-				ColLoc=0, ColSpan=1, Events=[wx.EVT_BUTTON], Handler=self.OnNavigateBackButton, Flags=0)
-			self.PHAModelsAspect.NavigateBackButton.Widget.SetBitmap(self.TopLevelFrame.ButtonBitmap(wx.ART_GO_BACK))
-			self.PHAModelsAspect.NavigateBackButton.ToolTip = ToolTip.SuperToolTip(_("Go back"))
-			self.PHAModelsAspect.NavigateBackButton.ToolTip.SetTarget(self.PHAModelsAspect.NavigateBackButton.Widget)
-			self.PHAModelsAspect.NavigateForwardButton = UIWidgetItem(wx.Button(MyNotebookPage, size=self.StandardImageButtonSize), KeyStroke=[wx.WXK_CONTROL, wx.WXK_RIGHT],
-				ColLoc=1, ColSpan=1, Events=[wx.EVT_BUTTON], Handler=self.OnNavigateForwardButton, Flags=0)
-			self.PHAModelsAspect.NavigateForwardButton.Widget.SetBitmap(self.TopLevelFrame.ButtonBitmap(wx.ART_GO_FORWARD))
+			self.MakeStandardWidgets(Scope=self.PHAModelsAspect, NotebookPage=MyNotebookPage)
+#			self.PHAModelsAspect.NavigateBackButton = UIWidgetItem(wx.Button(MyNotebookPage,
+#				size=self.StandardImageButtonSize), KeyStroke=[wx.WXK_CONTROL, wx.WXK_LEFT],
+#				ColLoc=0, ColSpan=1, Events=[wx.EVT_BUTTON], Handler=self.OnNavigateBackButton, Flags=0)
+#			self.PHAModelsAspect.NavigateBackButton.Widget.SetBitmap(self.TopLevelFrame.ButtonBitmap(wx.ART_GO_BACK))
+#			self.PHAModelsAspect.NavigateBackButton.ToolTip = ToolTip.SuperToolTip(_("Go back"))
+#			self.PHAModelsAspect.NavigateBackButton.ToolTip.SetTarget(self.PHAModelsAspect.NavigateBackButton.Widget)
+#			self.PHAModelsAspect.NavigateForwardButton = UIWidgetItem(wx.Button(MyNotebookPage, size=self.StandardImageButtonSize), KeyStroke=[wx.WXK_CONTROL, wx.WXK_RIGHT],
+#				ColLoc=1, ColSpan=1, Events=[wx.EVT_BUTTON], Handler=self.OnNavigateForwardButton, Flags=0)
+#			self.PHAModelsAspect.NavigateForwardButton.Widget.SetBitmap(self.TopLevelFrame.ButtonBitmap(wx.ART_GO_FORWARD))
 			self.PHAModelsAspect.NewPHAModelTypesLabel = UIWidgetItem(wx.StaticText(MyNotebookPage, -1, _('Select a type of PHA model:')),
 				ColLoc=3, ColSpan=3, GapX=20)
-			self.PHAModelsAspect.UndoButton = UIWidgetItem(wx.Button(MyNotebookPage, size=self.StandardImageButtonSize), KeyStroke=[wx.WXK_CONTROL, ord('z')],
-				ColLoc=0, ColSpan=1, Events=[wx.EVT_BUTTON], Handler=self.TopLevelFrame.OnUndoRequest, NewRow=True, Flags=0) # =0 keeps button at fixed size
-			self.PHAModelsAspect.UndoButton.Widget.SetBitmap(self.TopLevelFrame.ButtonBitmap(wx.ART_UNDO))
-			self.PHAModelsAspect.RedoButton = UIWidgetItem(wx.Button(MyNotebookPage, size=self.StandardImageButtonSize), KeyStroke=[wx.WXK_CONTROL, ord('y')],
-				ColLoc=1, ColSpan=1, Events=[wx.EVT_BUTTON], Handler=self.TopLevelFrame.OnRedoRequest, Flags=0)
-			self.PHAModelsAspect.RedoButton.Widget.SetBitmap(self.TopLevelFrame.ButtonBitmap(wx.ART_REDO))
+#			self.PHAModelsAspect.UndoButton = UIWidgetItem(wx.Button(MyNotebookPage, size=self.StandardImageButtonSize), KeyStroke=[wx.WXK_CONTROL, ord('z')],
+#				ColLoc=0, ColSpan=1, Events=[wx.EVT_BUTTON], Handler=self.TopLevelFrame.OnUndoRequest, NewRow=True, Flags=0) # =0 keeps button at fixed size
+#			self.PHAModelsAspect.UndoButton.Widget.SetBitmap(self.TopLevelFrame.ButtonBitmap(wx.ART_UNDO))
+#			self.PHAModelsAspect.RedoButton = UIWidgetItem(wx.Button(MyNotebookPage, size=self.StandardImageButtonSize), KeyStroke=[wx.WXK_CONTROL, ord('y')],
+#				ColLoc=1, ColSpan=1, Events=[wx.EVT_BUTTON], Handler=self.TopLevelFrame.OnRedoRequest, Flags=0)
+#			self.PHAModelsAspect.RedoButton.Widget.SetBitmap(self.TopLevelFrame.ButtonBitmap(wx.ART_REDO))
 			self.PHAModelsAspect.NewPHAModelTypesList = UIWidgetItem(wx.ListBox(MyNotebookPage, -1,
 				choices=self.ViewportsCanBeCreatedManuallyWithShortcuts,
 				style=wx.LB_SINGLE), Handler=self.OnNewPHAModelListbox, Events=[wx.EVT_LISTBOX], ColLoc=3, ColSpan=4)
@@ -985,6 +1008,126 @@ class ControlFrame(wx.Frame):
 				self.PHAModelsAspect.UndoButton, self.PHAModelsAspect.RedoButton, self.PHAModelsAspect.NewPHAModelTypesList]
 			# do final setting up
 			self.PHAModelsAspect.Initialize(ParentNotebook=self.MyNotebook)
+
+		def MakeNumericalValueAspect(self): # make Control Panel aspect for numerical value editing
+			# make basic attribs needed for the aspect
+			MyNotebookPage = wx.Panel(parent=self.MyNotebook)
+			MyTabText = _('Value') # text appearing on notebook tab
+			self.NumericalValueAspect = self.ControlPanelAspectItem(InternalName='NumericalValue', ParentFrame=self,
+				TopLevelFrame=self.TopLevelFrame, PrefillMethod=self.PrefillWidgetsForNumericalValueAspect,
+				NotebookPage=MyNotebookPage, TabText=MyTabText)
+			# make widgets
+			self.MakeStandardWidgets(Scope=self.NumericalValueAspect, NotebookPage=MyNotebookPage)
+			self.NumericalValueAspect.HeaderLabel = UIWidgetItem(wx.StaticText(MyNotebookPage, -1, ''),
+				ColLoc=3, ColSpan=4, GapX=20)
+			self.NumericalValueAspect.CommentButton = UIWidgetItem(wx.Button(MyNotebookPage, -1, _('Comment')),
+				Handler=self.NumericalValueAspect_OnCommentButton,
+				Events=[wx.EVT_BUTTON],
+				ColLoc=7, ColSpan=1,
+				Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_LEFT | wx.EXPAND)
+			self.NumericalValueAspect.ValueLabel = UIWidgetItem(wx.StaticText(MyNotebookPage, -1, _('Current value:')),
+				ColLoc=3, ColSpan=1)
+			self.NumericalValueAspect.ValueText = UIWidgetItem(wx.TextCtrl(MyNotebookPage, -1), MinSizeY=25,
+				Events=[], Handler=self.NumericalValueAspect_OnValueTextWidget, IsNumber=True,
+				MinSizeX=100, ColLoc=4, ColSpan=1, DisplayMethod='StaticFromText')
+			self.NumericalValueAspect.UnitChoice = UIWidgetItem(wx.Choice(MyNotebookPage, -1, size=(100, 30), choices=[]),
+				  Handler=self.NumericalValueAspect_OnUnitWidget, Events=[wx.EVT_CHOICE], ColLoc=5, ColSpan=1)
+			self.NumericalValueAspect.ValueKindLabel = UIWidgetItem(wx.StaticText(MyNotebookPage, -1, _('Basis:')),
+				ColLoc=6, ColSpan=1)
+			self.NumericalValueAspect.ValueKindChoice = UIWidgetItem(wx.Choice(MyNotebookPage, -1, size=(100, 30), choices=[]),
+				  Handler=self.NumericalValueAspect_OnValueKindWidget, Events=[wx.EVT_CHOICE], ColLoc=7, ColSpan=1)
+			self.NumericalValueAspect.LinkedToLabel = UIWidgetItem(wx.StaticText(MyNotebookPage, -1, ''),
+				ColLoc=3, ColSpan=2, NewRow=True)
+			self.NumericalValueAspect.LinkFromButton = UIWidgetItem(wx.Button(MyNotebookPage, -1, _('Link from...')),
+				Handler=self.NumericalValueAspect_OnLinkFromButton,
+				Events=[wx.EVT_BUTTON],
+				ColLoc=4, ColSpan=1, NewRow=True,
+				Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_LEFT | wx.EXPAND)
+			self.NumericalValueAspect.ShowMeLinkFromButton = UIWidgetItem(wx.Button(MyNotebookPage, -1, _('Show me')),
+				Handler=self.NumericalValueAspect_OnShowMeLinkFromButton,
+				Events=[wx.EVT_BUTTON],
+				ColLoc=5, ColSpan=1,
+				Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_LEFT | wx.EXPAND)
+			self.NumericalValueAspect.CopyFromButton = UIWidgetItem(wx.Button(MyNotebookPage, -1, _('Copy from...')),
+				Handler=self.NumericalValueAspect_OnCopyFromButton,
+				Events=[wx.EVT_BUTTON],
+				ColLoc=4, ColSpan=1, NewRow=True,
+				Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_LEFT | wx.EXPAND)
+			self.NumericalValueAspect.ShowMeCopyFromButton = UIWidgetItem(wx.Button(MyNotebookPage, -1, _('Show me')),
+				Handler=self.NumericalValueAspect_OnShowMeCopyFromButton,
+				Events=[wx.EVT_BUTTON],
+				ColLoc=5, ColSpan=1,
+				Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_LEFT | wx.EXPAND)
+			self.NumericalValueAspect.ConstantLabel = UIWidgetItem(wx.StaticText(MyNotebookPage, -1, _('Constant:')),
+				ColLoc=4, ColSpan=1, NewRow=True)
+			self.NumericalValueAspect.ConstantChoice = UIWidgetItem(wx.Choice(MyNotebookPage, -1, size=(100, 30), choices=[]),
+				  Handler=self.NumericalValueAspect_OnConstantWidget, Events=[wx.EVT_CHOICE], ColLoc=5, ColSpan=1)
+			self.NumericalValueAspect.EditConstantsButton = UIWidgetItem(wx.Button(MyNotebookPage, -1, _('Edit constants')),
+				Handler=self.NumericalValueAspect_OnEditConstantsButton,
+				Events=[wx.EVT_BUTTON],
+				ColLoc=6, ColSpan=1,
+				Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_LEFT | wx.EXPAND)
+			self.NumericalValueAspect.MatrixLabel = UIWidgetItem(wx.StaticText(MyNotebookPage, -1, _('Matrix:')),
+				ColLoc=4, ColSpan=1, NewRow=True)
+			self.NumericalValueAspect.MatrixChoice = UIWidgetItem(wx.Choice(MyNotebookPage, -1, size=(100, 30), choices=[]),
+				Handler=self.NumericalValueAspect_OnMatrixWidget, Events=[wx.EVT_CHOICE], ColLoc=5, ColSpan=1)
+			self.NumericalValueAspect.EditMatricesButton = UIWidgetItem(wx.Button(MyNotebookPage, -1, _('Edit matrices')),
+				Handler=self.NumericalValueAspect_OnEditMatricesButton,
+				Events=[wx.EVT_BUTTON],
+				ColLoc=6, ColSpan=1,
+				Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_LEFT | wx.EXPAND)
+			# make list of all widgets in this aspect
+			self.PHAModelsAspect.WidgetList = [self.NumericalValueAspect.NavigateBackButton,
+				self.NumericalValueAspect.NavigateForwardButton, self.NumericalValueAspect.HeaderLabel,
+				self.NumericalValueAspect.CommentButton,
+				self.NumericalValueAspect.UndoButton, self.NumericalValueAspect.RedoButton,
+				self.NumericalValueAspect.ValueLabel, self.NumericalValueAspect.ValueText,
+				self.NumericalValueAspect.UnitChoice, self.NumericalValueAspect.ValueKindLabel,
+				self.NumericalValueAspect.ValueKindChoice,
+				self.NumericalValueAspect.LinkedToLabel,
+				self.NumericalValueAspect.LinkFromButton, self.NumericalValueAspect.ShowMeLinkFromButton,
+				self.NumericalValueAspect.CopyFromButton, self.NumericalValueAspect.ShowMeCopyFromButton,
+				self.NumericalValueAspect.ConstantLabel, self.NumericalValueAspect.ConstantChoice,
+				self.NumericalValueAspect.EditConstantsButton,
+				self.NumericalValueAspect.MatrixLabel, self.NumericalValueAspect.MatrixChoice,
+				self.NumericalValueAspect.EditMatricesButton]
+			# do final setting up
+			self.NumericalValueAspect.Initialize(ParentNotebook=self.MyNotebook)
+
+		# specific methods for NumericalValueAspect
+
+		def PrefillWidgetsForNumericalValueAspect(self): # set initial values for widgets in NumericalValueAspect
+			Proj = self.TopLevelFrame.CurrentProj
+			# enable navigation buttons if there are any items in current project's history lists
+			self.UpdateNavigationButtonStatus(Proj)
+			# set widget values %%% working here
+			self.NumericalValueAspect.ValueText.PHAObj = self.TopLevelFrame.PHAObjInControlPanel
+			self.NumericalValueAspect.ValueText.DataAttrib = self.TopLevelFrame.ComponentInControlPanel
+
+		def NumericalValueAspect_OnCommentButton(self, Event): pass
+
+		def NumericalValueAspect_OnValueTextWidget(self, Event): pass
+
+		def NumericalValueAspect_OnUnitWidget(self, Event): pass
+
+		def NumericalValueAspect_OnValueKindWidget(self, Event): pass
+
+		def NumericalValueAspect_OnLinkFromButton(self, Event): pass
+
+		def NumericalValueAspect_OnShowMeLinkFromButton(self, Event): pass
+
+		def NumericalValueAspect_OnCopyFromButton(self, Event): pass
+
+		def NumericalValueAspect_OnShowMeCopyFromButton(self, Event): pass
+
+		def NumericalValueAspect_OnConstantWidget(self, Event): pass
+
+		def NumericalValueAspect_OnEditConstantsButton(self, Event): pass
+
+		def NumericalValueAspect_OnMatrixWidget(self, Event): pass
+
+		def NumericalValueAspect_OnEditMatricesButton(self, Event): pass
+
 
 		class ControlPanelAspectItem(object): # class whose instances are aspects of the Control panel
 			# attribs:

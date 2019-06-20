@@ -543,11 +543,14 @@ class UIWidgetItem(object):
 		self.Lifespan = 'Permanent' # whether the widget is created on demand and should be destroyed when removed
 			# from the sizer. Can be 'Permanent', 'Destroy' (destroy when removed from sizer)
 		self.DisplayMethod = None # method name for displaying the data (str)
-		self.Number = False # whether to treat as a number when displaying (if False, treated as a string)
+		self.IsNumber = False # whether to treat as a number when displaying (if False, treated as a string)
 		self.PermissibleValues = [] # list of values that can be returned by a Choice widget. These must be the internal
 			# values, not the human names (because these might be translated)
 		self.ReadOnly = False # whether changes to the attrib value are disallowed
+		self.IsVisible = True # (bool) whether widget should be displayed on screen. If False, no empty placeholder is left
+			# Possible gotcha: if IsVisible is False and NewRow is True, the new row won't be started (FIXME)
 		self.NeedsHighlight = False # whether widget should have background highlight next time it is drawn
+		self.PHAObj = None # PHA object containing DataAttrib (below)
 		self.DataAttrib = None # (None or str) name of attrib in related PHA object whose data this widget displays
 		self.Font = None
 		self.Widget.Hide()
@@ -571,10 +574,10 @@ class UIWidgetItem(object):
 	def StaticFromText(self, DataObj, **Args): # put string or number value directly in StaticText or TextCtrl widgets
 		TargetValue = getattr(DataObj, self.DataAttrib, None)
 		if TargetValue is not None: # attrib exists
-			if self.Number: # treat as number
+			if self.IsNumber: # treat as number
 				if TargetValue.GetStatus() == 'ValueStatus_Unset': # number not defined because subsystem not included
 					StringToDisplay = _('Value not defined')
-				else: StringToDisplay = self.StringFromNum(TargetValue, SciThreshold=None)
+				else: StringToDisplay = StringFromNum(TargetValue, SciThreshold=None)
 			else: # convert directly to str (for attribs that aren't already strings, eg int)
 				StringToDisplay = str(TargetValue)
 		else: # attrib doesn't exist
@@ -730,7 +733,8 @@ def PopulateSizer(Sizer=None, Widgets=[], ActiveWidgetList=[], DefaultFont=None,
 	GapYAdded = False
 	for ThisWidget in Widgets:
 		# here, apply any conditions to determine if widget is shown
-		ShowThisWidget = True # placeholder for conditions that might be needed in future
+		assert isinstance(ThisWidget.IsVisible, bool)
+		ShowThisWidget = ThisWidget.IsVisible
 		if ShowThisWidget:
 			if ThisWidget.NewRow or GapYAdded: # start a new row (sizer also treats y-gap as a row)
 				RowBase += ThisRowSpan  # skip forward the required number of rows
