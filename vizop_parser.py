@@ -1,6 +1,5 @@
 """
-Name: vizop_Parser
-Last Modified: 20190607
+Name: vizop_parser
 Python version: 3.6.3
 """
 
@@ -330,6 +329,42 @@ def convertProjectToXml(Proj, ProjectFilename):
 
 			# J: TODO
 			#FTColumn
+
+	#Comment
+	if len(Proj.Comments) > 0:
+		MyXMLRoot_Comments = ET.SubElement(MyXMLRoot, 'Comments')
+
+		each_Comment: core_classes.Comment
+		for each_Comment in Proj.Comments:
+			assert type(each_Comment) == core_classes.Comment
+			MyXMLRoot_Comments_Comment = ET.SubElement(MyXMLRoot_Comments,'Comment')
+
+			MyXMLRoot_Comments_Comment_Id = ET.SubElement(MyXMLRoot_Comments_Comment, 'ID')
+			MyXMLRoot_Comments_Comment_Id.text = pS(str(each_Comment.iD))
+
+			MyXMLRoot_Comments_Comment_Content = ET.SubElement(MyXMLRoot_Comments_Comment, 'Content')
+			MyXMLRoot_Comments_Comment_Content.text = pS(str(each_Comment.content))
+
+			MyXMLRoot_Comments_Comment_isVisible = ET.SubElement(MyXMLRoot_Comments_Comment, 'isVisible')
+			MyXMLRoot_Comments_Comment_isVisible.text = pS(str(each_Comment.isVisible))
+
+			MyXMLRoot_Comments_Comment_showInReport = ET.SubElement(MyXMLRoot_Comments_Comment, 'showInReport')
+			MyXMLRoot_Comments_Comment_showInReport.text = pS(str(each_Comment.showInReport))
+
+	#Bookmark
+	if len(Proj.Bookmarks) > 0:
+		MyXMLRoot_Bookmarks = ET.SubElement(MyXMLRoot,'Bookmarks')
+
+		each_Bookmark: core_classes.Bookmark
+		for each_Bookmark in Proj.Bookmarks:
+			assert type(each_Bookmark) == core_classes.Bookmark
+			MyXMLRoot_Bookmarks_Bookmark = ET.SubElement(MyXMLRoot_Bookmarks,'Bookmark')
+
+			MyXMLRoot_Bookmarks_Bookmark_ID = ET.SubElement(MyXMLRoot_Bookmarks_Bookmark, 'ID')
+			MyXMLRoot_Bookmarks_Bookmark_ID.text = pS(str(each_Bookmark.iD))
+
+			MyXMLRoot_Bookmarks_Bookmark_isDeleted = ET.SubElement(MyXMLRoot_Bookmarks_Bookmark, 'isDeleted')
+			MyXMLRoot_Bookmarks_Bookmark_isDeleted.text = pS(str(each_Bookmark.isDeleted))
 
 	pass
 
