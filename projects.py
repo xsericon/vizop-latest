@@ -8,7 +8,7 @@ import xml.etree.ElementTree as ElementTree
 
 # vizop modules needed:
 from vizop_misc import IsReadableFile, IsWritableLocation, select_file_from_all
-import settings, core_classes, info
+import settings, core_classes, info, vizop_parser, faulttree
 
 """
 The projects module contains functions for handling entire Vizop projects, including project files.
@@ -46,16 +46,6 @@ class Collaborator(object): # object representing a remote computer collaboratin
 		self.ShortName = ShortName
 		self.LongName = LongName
 
-class TeamMemberItem(object): # object representing a person working on the PHA
-
-	def __init__(self, ID=None): # ID (int): unique ID to assign to ProjectItem instance
-		assert isinstance(ID, int)
-		object.__init__(self)
-		self.ID = str(ID)
-		self.Name = '' # name of person
-		self.Role = '' # person's role in the project
-		self.Affiliation = '' # organisation employing the person
-
 class ProjectFontItem(object): # virtual fonts for use with texts in PHA objects
 			# To get actual face name (str) of a wx.Font, use font.GetFaceName()
 
@@ -74,19 +64,16 @@ class ProjectItem(object): # class of PHA project instances
 		self.ID = str(ID)
 		self.EditAllowed = True # whether user can edit project in this Vizop instance. Eventually, this will be related to
 			# (1) whether license valid, and (2) whether this Vizop instance is in 'master' mode
-		self.ShortTitle = 'CHAZOP with chocolate sauce' # project short title for display
-		self.ProjNo = '141688' # user's project reference number
-		self.Description = 'A great excuse to spend 4 weeks in Seoul' # longer description of project
+
 		self.MaxIDInProj = 0 # (int) highest ID of all objects in the project that are not contained in PHA models
 		self.PHAObjs = [] # list of PHA objects, in order created
 		self.ActiveViewports = [] # list of all currently active Viewports, in order created
 		self.AllViewportShadows = [] # list of all Viewport shadows (belonging to datacore)
 		self.IPLKinds = []
 		self.CauseKinds = []
-		self.RiskReceptors = [] # instances of RiskReceptorItem defined for this project
-		self.NumberSystems = [] # instances of NumberSystemItem
+		self.RiskReceptors = [core_classes.RiskReceptorItem(XMLName='People', HumanName=_('People'))] # instances of RiskReceptorItem defined for this project
+		self.NumberSystems = [core_classes.SerialNumberChunkItem()] # instances of NumberSystemItem
 		self.TolRiskModels = [] # instances of TolRiskModel subclasses
-		self.Constants = [core_classes.ConstantItem()] # instances of ConstantItem. Dummy item here for testing purposes
 		self.CurrentTolRiskModel = None
 		self.ProcessUnits = [ProcessUnit(Proj=self, UnitNumber='120', ShortName='Wash', LongName='Plastic washing area'),
 							 ProcessUnit(Proj=self, UnitNumber='565', ShortName='Pyrolysis 1', LongName='Pyrolysis reactor no. 1')]
@@ -108,9 +95,17 @@ class ProjectItem(object): # class of PHA project instances
 		self.SandboxStatus = 'SandboxInactive' # str; whether sandbox is active
 		self.OutputFilename = '' # str; full pathname of last file last used to save project in this Vizop instance.
 			# If we are saving on fly, this contains the pathname of the project file to update
-		self.EditNumber = 0 # int; incremented every time the project's dataset is changed
-		self.TeamMembers = [] # list of TeamMemberItem instances
 
+		#Actual file
+		self.VizopVersion = CurrentProjDocType #str; Vizop Version
+		self.ShortTitle = 'CHAZOP with chocolate sauce'  # project short title for display
+		self.ProjNumber = 141688  # int; user's project reference number
+		self.Description = 'A great excuse to spend 4 weeks in Seoul'  # longer description of project
+		self.EditNumber = 0  # int; incremented every time the project's dataset is changed
+		self.TeamMembers = [core_classes.TeamMember(1, 'Amy Stone', 'Consultant','Amy'), core_classes.TeamMember(2, 'Ben Smith', 'Project Manager','Ben')] # list of team members
+		self.RiskMatrices = [core_classes.LookupTableItem()] # list of risk matrix
+		self.Constants = [] # list of constants
+		#self.FaultTree = []
 
 	def GetFTColumnWidth(self, FT): # return preferred distance, in canvas units, between left edges of a Fault Tree's columns (if in columns)
 		# or between top edges of rows (if in rows)
@@ -141,7 +136,6 @@ def TestProjectsOpenable(ProjectFilenames, ReadOnly=False):
 	for (FileIndex, ProjFile) in enumerate(ProjectFilenames):
 		ProjOpenData[FileIndex]['Openable'] = IsReadableFile(ProjFile)
 	return ProjOpenData
-
 
 def GetProjectFilenamesToOpen(parent_frame):
 	"""
@@ -179,230 +173,6 @@ XMLTreeSkeleton = """<?xml version="1.0" encoding="iso-8859-1"?>
 <vizop_version>"%s"</vizop_version>
 </vizop_project>
 """ % CurrentProjDocType
-
-#@Jack: TODO XML tree and rules work in progress
-XMLTreeFormat = """
-<xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema">
-			<xsd:element name="VizopProject">
-			<xsd:complexType>
-			<xsd:sequence>
-				<xsd:element name="VizopVersion" type="xsd:integer" minOccurs="0"/>
-				<xsd:element name="ProjectName" type="xsd:string" minOccurs="0"/>
-				<xsd:element name="Description" type="xsd:string" minOccurs="0"/>
-				<xsd:element name="TeamMembers" minOccurs="0">
-				<xsd:complexType>
-				<xsd:sequence>
-						<xsd:element name="TeamMember"  minOccurs="0">
-						<xsd:complexType>
-						<xsd:sequence>
-							<xsd:element name="ID" type="xsd:integer" />
-							<xsd:element name="Name" type="xsd:string" />
-							<xsd:element name="Role" type="xsd:string"/>
-							<xsd:element name="Affiliation" type="xsd:string" />
-						</xsd:sequence>
-						</xsd:complexType>
-						</xsd:element>
-				</xsd:sequence>
-				</xsd:complexType>
-				</xsd:element>
-				<xsd:element name="EditNumber" type="xsd:string" minOccurs="0"/>
-				<xsd:element name="ShortTitle" type="xsd:string" minOccurs="0"/>
-				<xsd:element name="ProjNumber" type="xsd:string" minOccurs="0"/>	
-				<xsd:element name="ProjectComponent" minOccurs="0">
-				<xsd:complexType>
-				<xsd:sequence>
-				
-					<xsd:element name="ProcessUnit">
-					<xsd:complexType>
-					<xsd:sequence>
-						<xsd:element name="ID" type="xsd:string"/>
-						<xsd:element name="UnitNumber" type="xsd:integer"/>
-						<xsd:element name="ShortName" type="xsd:string"/>
-						<xsd:element name="LongName" type="xsd:string"/>
-						<xsd:element name="PHA" type="xsd:string"/>
-					</xsd:sequence>
-					</xsd:complexType>
-					</xsd:element>
-					
-					<xsd:element name="RecommendationReport" type="xsd:string" minOccurs="0"/>
-					
-					<xsd:element name="RiskReceptor">
-						<xsd:complexType>
-						<xsd:sequence>
-						<xsd:element name="ID" type="xsd:integer"/>
-						<xsd:element name="Name" type="xsd:string"/>
-						</xsd:sequence>
-						</xsd:complexType>
-					</xsd:element>
-					
-					<xsd:element name="NumberingSystem">
-					<xsd:complexType>
-					<xsd:sequence>
-						<xsd:element name="ID" type="xsd:integer"/>
-						<xsd:element name="Chunk">
-						<xsd:complexType>
-						<xsd:sequence>
-							<xsd:element name="Type" type="xsd:string">/
-							<xsd:element name="Value" type="xsd:string"/>
-							<xsd:element name="ID" type="xsd:string"/>
-							<xsd:element name="Fieldwidth" type="xsd:string"/>
-							<xsd:element name="PadChar" type="xsd:string"/>
-							<xsd:element name="StartAt" type="xsd:string"/>
-							<xsd:element name="SkipTo" type="xsd:string"/>
-							<xsd:element name="GapBefore" type="xsd:string"/>
-							<xsd:element name="Include" type="xsd:string"/>
-							<xsd:element name="Include" type="xsd:string"/>
-							<xsd:element name="NoValue" type="xsd:string"/>
-						</xsd:sequence>
-						</xsd:complexType>
-						</xsd:element>
-					</xsd:sequence>
-					</xsd:complexType>
-					</xsd:element>
-					
-					<xsd:element name="RiskMatrix">
-					<xsd:complexType>
-					<xsd:sequence>
-						<xsd:element name="Category">
-						<xsd:complexType>
-						<xsd:sequence>
-							<xsd:element name="ID" type="xsd:string"/>
-							<xsd:element name="Name" type="xsd:string"/>
-							<xsd:element name="Description" type="xsd:integer"/>
-						</xsd:sequence>
-						</xsd:complexType>
-						</xsd:element>
-						<xsd:element name="SeverityDimension">
-						<xsd:complexType>
-						<xsd:sequence>
-							<xsd:element name="Dimension"/>
-							<xsd:complexType>
-							<xsd:sequence>
-								<xsd:element name="Name" type="xsd:string"/>
-								<xsd:element name="Key" type="xsd:string"/>
-							</xsd:complexType>
-							</xsd:element>
-						</xsd:sequence>
-						</xsd:complexType>
-						</xsd:element>
-					</xsd:sequence>
-					</xsd:complexType>
-					</xsd:element>
-					
-					<xsd:element name="FaultTree">
-					<xsd:complexType>
-					<xsd:sequence>
-						<xsd:element name="HeaderData" type="xsd:string"/>
-						<xsd:element name="FTColumn">
-						<xsd:complexType>
-						<xsd:sequence>
-						
-							<xsd:element name="FTElements">
-							<xsd:complexType>
-							<xsd:sequence>
-							
-								<xsd:element name="FTEvent">
-								<xsd:complexType>
-								<xsd:sequence>
-								
-									<xsd:element name="Value" type="xsd:string"/>
-									<xsd:element name="ActionItem" type="xsd:string"/>
-									<xsd:element name="CollapseGroup" type="xsd:integer"/>
-									<xsd:element name="ViewMode" type="xsd:integer"/>
-									
-								</xsd:sequence>
-								</xsd:complexType>
-								</xsd:element>
-								
-							</xsd:sequence>
-							</xsd:complexType>
-
-						</xsd:sequence>
-						</xsd:complexType>
-						</xsd:element>
-
-					</xsd:sequence>
-					</xsd:complexType>
-					</xsd:element>
-					
-					<xsd:element name="PHA">
-					<xsd:complexType>
-					<xsd:sequence>
-						<xsd:element name="ID" type="xsd:integer"/>
-						<xsd:element name="Node" type="xsd:string"/>
-					</xsd:sequence>
-					</xsd:complexType>
-					</xsd:element>
-					
-					<xsd:element name="PHA">
-					<xsd:complexType>
-					<xsd:sequence>
-						<xsd:element name="ID" type="xsd:integer"/>
-						<xsd:element name="Node" type="xsd:string"/>
-					</xsd:sequence>
-					</xsd:complexType>
-					</xsd:element>
-					
-					<xsd:element name="PHA">
-					<xsd:complexType>
-					<xsd:sequence>
-						<xsd:element name="ID" type="xsd:integer"/>
-						<xsd:element name="Node" type="xsd:string"/>
-					</xsd:sequence>
-					</xsd:complexType>
-					</xsd:element>
-					
-					<xsd:element name="Node">
-					<xsd:complexType>
-					<xsd:sequence>
-						<xsd:element name="ID" type="xsd:integer"/>
-					</xsd:sequence>
-					</xsd:complexType>
-					</xsd:element>
-					
-					<xsd:element name="Cause">
-					<xsd:complexType>
-					<xsd:sequence>
-						<xsd:element name="ID" type="xsd:integer"/>
-					</xsd:sequence>
-					</xsd:complexType>
-					</xsd:element>
-					
-					<xsd:element name="Alarm">
-					<xsd:complexType>
-					<xsd:sequence>
-						<xsd:element name="ID" type="xsd:integer"/>
-					</xsd:sequence>
-					</xsd:complexType>
-					</xsd:element>
-					
-					<xsd:element name="Constant">
-					<xsd:complexType>
-					<xsd:sequence>
-						<xsd:element name="ID" type="xsd:integer"/>
-						<xsd:element name="Name" type="xsd:integer"/>
-						<xsd:element name="LinkFrom" type="xsd:integer"/>
-						<xsd:element name="ConstValue" type="xsd:integer"/>
-					</xsd:sequence>
-					</xsd:complexType>
-					</xsd:element>
-					
-					<xsd:element name="Bookmark">
-					<xsd:complexType>
-					<xsd:sequence>
-						<xsd:element name="ID" type="xsd:integer"/>
-					</xsd:sequence>
-					</xsd:complexType>
-					</xsd:element>
-
-				</xsd:sequence>
-				</xsd:complexType>
-				</xsd:element>
-			</xsd:sequence>
-			</xsd:complexType>
-			</xsd:element>
-		 </xsd:schema>
-"""
 
 def OpenProjectFiles(ProjectFilesToOpen, UsingTemplates=False, SaveOnFly=True, ProjectFilesToCreate=[]):
 	# attempt to open project files in ProjectFilesToOpen (list). All files must already be checked as existent and readable.
@@ -468,13 +238,26 @@ def PopulateProjectFromFile(Proj, DocTreeTop):
 	ProblemReport = '' # this is just dummy code for now
 	return OpenedOK, ProblemReport
 
-def SaveEntireProject(Proj, OutputFilename, ProblemReport='', Close=False):
+def SaveEntireProjectRequest(Parent=None, event=None):
+	# save entire project
+	# variables and methods for testing purpose
+
+	test_OutputPath = './test_projectfile/'
+	test_OutputFileName = 'test_OutputXML.xml'
+
+	Proj = CreateProject()
+	SaveEntireProject(Proj, test_OutputPath + test_OutputFileName)
+	pass
+
+def SaveEntireProject(Proj: ProjectItem, OutputFilename, ProblemReport='', Close=False):
 	# Create a new file with OutputFilename (full path).
 	# Write the entire data from Proj into it.
 	# Append any problems to input arg ProblemReport.
 	# If Close, close the file after writing.
 	# Return: WriteOK (bool) - whether file written successfully;
 	#         ProblemReport (str) - human readable description of any problem encountered.
+	assert type(Proj) == ProjectItem
+	assert type(OutputFilename) == str
 
 	def AddToReport(ExistingReport, TextToAdd):
 		# append TextToAdd (str) to ExistingReport (str) in a human-readable way
@@ -501,17 +284,18 @@ def WriteEntireProjectToFile(Proj, ProjFilename):
 	# Return: WriteOK (bool) - whether data written successfully;
 	#         ProblemReport (str) - human readable description of any problem encountered.
 	# Make the XML tree, starting with the Document node.
-	MyXMLTree = ElementTree.ElementTree() # create new XML structure
-	MyXMLTree._setroot(ElementTree.fromstring(XMLTreeSkeleton)) # set the skeleton as the XML tree root element
-	# later, add more code here to write all PHA objects into the XML tree
-	# write the XML file
-	try:
-		MyXMLTree.write(ProjFilename, encoding="UTF-8", xml_declaration=True)
-	except:
-		return False, ''
+	assert type(Proj) == ProjectItem
+	assert type(ProjFilename) == str
 
-	return True, ''
-	# TODO items to include: Proj.Constants
+	try:
+		vizop_parser.convertProjectToXml(Proj, ProjFilename)
+		ProblemReport = ''
+	except Exception as e:
+		ProblemReport = e
+		return False, ProblemReport
+
+	return True, ProblemReport
+	# TODO items to include: core_classes.ConstantItem.AllConstants
 
 def SetupDefaultTolRiskModel(Proj):
 	# set up a default tolerable risk model (severity categories) in project instance Proj
@@ -628,3 +412,9 @@ def SaveChangesToProj(Proj, UpdateData=None, Task='Update'):
 			Success = False; ProblemReport = "Can'tOverwriteProjectFile"
 	return Success, ProblemReport
 
+"""[----------TESTING AREA---------- """
+
+def runUnitTest():
+	pass
+
+""" ----------TESTING AREA----------]"""

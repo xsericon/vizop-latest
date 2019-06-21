@@ -128,7 +128,7 @@ class ControlFrame(wx.Frame):
 			self.Bind(wx.EVT_TIMER, self.OnMinLifeTimer, self.MinLifeTimer)
 			self.Bind(wx.EVT_TIMER, self.OnTimeoutTimer, self.TimeoutTimer)
 			self.Bind(wx.EVT_PAINT, self.OnPaintVT)
-			
+
 		def OnPaintVT(self, evt): # called when the system is refreshing the VizopTalks panel
 			dc = wx.PaintDC(self) # this is needed even though not used; see Rappin p368
 			# redraw the current message
@@ -835,7 +835,7 @@ class ControlFrame(wx.Frame):
 			e = wx.FontEnumerator()
 			e.EnumerateFacenames()
 			SystemFonts = e.GetFacenames()
-			
+
 #				# widgets for edit-text screen
 #			self.ETheaderLabel = UIWidgetItem(wx.StaticText(self, -1, _('EDIT TEXT IN ELEMENT')), ColSpan=2)
 #			self.ETcontentText = UIWidgetItem(wx.TextCtrl(self, -1, size=(300, 150), \
@@ -1297,7 +1297,7 @@ class ControlFrame(wx.Frame):
 				print("CF1204 in OnMouseEntersViewportPanelBlocked")
 				wx.SetCursor(wx.Cursor(display_utilities.StockCursors['Stop']))
 				# 'blocked' mouse pointer when inside content window
-				
+
 			def OnMouseLeavesViewportPanel(event):
 				wx.SetCursor(wx.Cursor(display_utilities.StockCursors['Normal']))
 				# normal mouse pointer when outside content window
@@ -1416,7 +1416,7 @@ class ControlFrame(wx.Frame):
 		Openmitem = FileMenu.Append(-1, _('&Open Vizop project...'), '')
 #		self.Bind(wx.EVT_MENU, self.OnProjectOpenRequest, Openmitem)
 		Savemitem = FileMenu.Append(-1, _('&Save Vizop project'), '')
-#		self.Bind(wx.EVT_MENU, self.OnProjectSaveRequest, Savemitem)
+		self.Bind(wx.EVT_MENU, projects.SaveEntireProjectRequest, Savemitem)
 		FileMenu.AppendSeparator() # add a separating line in the menu
 		Aboutmitem = FileMenu.Append(-1, _('About &Vizop...'), '')
 		self.Bind(wx.EVT_MENU, vizop_misc.OnAboutRequest, Aboutmitem) # OnAboutRequest is shared with welcome frame
