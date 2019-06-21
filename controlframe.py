@@ -1097,12 +1097,16 @@ class ControlFrame(wx.Frame):
 		# specific methods for NumericalValueAspect
 
 		def PrefillWidgetsForNumericalValueAspect(self): # set initial values for widgets in NumericalValueAspect
+			# Assumes that the PHA element hosting the value is set in MyControlFrame.PHAObjInControlPanel
+			# and the specific number component's name is in MyControlFrame.ComponentInControlPanel
 			Proj = self.TopLevelFrame.CurrentProj
 			# enable navigation buttons if there are any items in current project's history lists
 			self.UpdateNavigationButtonStatus(Proj)
 			# set widget values %%% working here
+			# set up ValueText to display the value correctly when the display method is called
 			self.NumericalValueAspect.ValueText.PHAObj = self.TopLevelFrame.PHAObjInControlPanel
 			self.NumericalValueAspect.ValueText.DataAttrib = self.TopLevelFrame.ComponentInControlPanel
+			# set up UnitChoice
 
 		def NumericalValueAspect_OnCommentButton(self, Event): pass
 

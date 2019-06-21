@@ -359,7 +359,18 @@ DefaultOpMode = LowDemandMode
 
 ValueStati = ['ValueStatus_OK', 'ValueStatus_Unset'] # value status indicators for NumValueItem instances
 
-class NumValueItem(object):  # superclass of objects having a numerical value with units
+class NumValueItemForDisplay(object): # class of numerical values with associated attributes, used for display
+	# This class just acts as a wrapper to keep all the attributes together
+
+	def __init__(self):
+		object.__init__(self)
+		self.Value = '' # (str) value as currently displayed
+		self.Unit = NullUnit # (UnitItem instance) unit as currently displayed
+		self.UnitOptions = [] # list of UnitItem instances that can be offered to the user for this value
+		self.ValueKindOptions = [] # list of subclasses of NumValueItem that can be offered to the user for this value
+		self.ConstantOptions = [] # list of ConstantItem human names (str) that can be offered to the user for this value
+
+class NumValueItem(object): # superclass of objects in Datacore having a numerical value with units
 	UserSelectable = True  # whether user can manually select this class when assigning a value to a PHA object
 
 	def __init__(self, HostObj=None):
@@ -503,7 +514,7 @@ class NumValueItem(object):  # superclass of objects having a numerical value wi
 class UserNumValueItem(NumValueItem): # class of NumValues for which user supplies a numeric value
 	# Uses GetMyValue and GetMyUnit method from superclass
 	ClassHumanName = _('User defined')
-	ClassInternalName = 'User'
+	XMLName = 'User'
 
 	def __init__(self, **Args):
 		NumValueItem.__init__(self)
@@ -536,16 +547,19 @@ class UserNumValueItem(NumValueItem): # class of NumValues for which user suppli
 
 class ConstantItem(NumValueItem): # user-defined constants that can be attached to any number of ConstNumValueItems
 	# has values per RR, and a Unit
-	AllConstants = [] # register of all constants in use
-	def __init__(self, **Args):
+#	AllConstants = [] # register of all constants in use; not used, stored in Project instance instead
+	def __init__(self, HumanName='', **Args):
+		assert isinstance(HumanName, (bytes, unicode))
 		NumValueItem.__init__(self)
-		ConstantItem.AllConstants.append(self) # add self to register.
+		# TODO make ID
+		self.HumanName = HumanName
+#		ConstantItem.AllConstants.append(self) # add self to register.
 		# NB if a constant is deleted, we must delete from the register (to avoid problems when storing the project)
 
 
 class ConstNumValueItem(NumValueItem):  # class of constant NumValues. Refers to a ConstantItem instance
 	ClassHumanName = _('Constant')
-	ClassInternalName = 'Constant'
+	XMLName = 'Constant'
 	UserSelectable = True  # whether user can manually select this class when assigning a value to a PHA object
 
 	def __init__(self, ConstantToReferTo=None, **Args):
@@ -572,7 +586,7 @@ class ConstNumValueItem(NumValueItem):  # class of constant NumValues. Refers to
 
 class CalcNumValueItem(NumValueItem): # class of NumValues that are calculated from a formula
 	ClassHumanName = _('Calculated value')
-	ClassInternalName = 'Calc'
+	XMLName = 'Calc'
 	UserSelectable = True # whether user can manually select this class when assigning a value to a PHA object
 
 	def __init__(self, **Args):
@@ -618,7 +632,7 @@ class NumProblemValue(NumValueItem):  # class of 'values' that prevent completio
 	# Has several instances representing different kinds of problem
 	# PHA models can also define their own instances, e.g. Fault Tree uses one with InternalName = 'OutOfRange'
 	ClassHumanName = _('Problem message')
-	ClassInternalName = 'Problem'
+	XMLName = 'Problem'
 	AllNumProblemValues = [] # register of all instances
 	UserSelectable = False  # whether user can manually select this class when assigning a value to a PHA object
 
@@ -690,7 +704,7 @@ class ValueInfoItem(object): # defines an object used as a wrapper to pass value
 # class SwitchNumValueItem(NumValueItem): # class of values that are determined by checking against a series of yes/no conditions
 # deferred until later version of Vizop
 #	ClassHumanName = _('Switch')
-#	ClassInternalName = 'Switch'
+#	XMLName = 'Switch'
 #	UserSelectable = True # whether user can manually select this class when assigning a value to a PHA object
 #
 #	def __init__(self, **Args):
@@ -698,9 +712,9 @@ class ValueInfoItem(object): # defines an object used as a wrapper to pass value
 #		self.DefaultValue = None # value returned if all the Routes return False
 #		self.Routes = [] # list of tuples: (SwitchItem, NumValueItem). Each SwitchItem is tested in turn; if True, returns respective NumValueItem
 
-class LookupNumValueItem(NumValueItem):  # class of values found by reference to a lookup table
+class LookupNumValueItem(NumValueItem): # class of values found by reference to a lookup table
 	ClassHumanName = _('Matrix lookup')
-	ClassInternalName = 'Lookup'
+	XMLName = 'Lookup'
 	UserSelectable = True  # whether user can manually select this class when assigning a value to a PHA object
 
 	def __init__(self, **Args):
@@ -734,7 +748,7 @@ class LookupNumValueItem(NumValueItem):  # class of values found by reference to
 class CategoryNameItem(NumValueItem): # class of objects defining one of a list of categories
 	# Used for lookup in a matrix. Example: a severity value
 	ClassHumanName = _('Categories')
-	ClassInternalName = 'Category'
+	XMLName = 'Category'
 	UserSelectable = True  # whether user can manually select this class when assigning a value to a PHA object
 	InvalidIndicator = '!' # string passed to Viewport to indicate category is invalid
 
@@ -792,7 +806,7 @@ class CategoryNameItem(NumValueItem): # class of objects defining one of a list 
 
 class AutoNumValueItem(NumValueItem): # class of values that are calculated by a method in some other class
 	ClassHumanName = _('Calculated')
-	ClassInternalName = 'Calculated'
+	XMLName = 'Calculated'
 	UserSelectable = False  # whether user can manually select this class when assigning a value to a PHA object
 
 	def __init__(self, **Args):
@@ -828,7 +842,7 @@ class AutoNumValueItem(NumValueItem): # class of values that are calculated by a
 
 class ParentNumValueItem(NumValueItem):  # a NumValueItem whose value was copied from a parent, but is not linked to it
 	ClassHumanName = _('Copied value')
-	ClassInternalName = 'Copied'
+	XMLName = 'Copied'
 	UserSelectable = True  # whether user can manually select this class when assigning a value to a PHA object
 
 	def __init__(self, **Args):
@@ -862,7 +876,7 @@ class ParentNumValueItem(NumValueItem):  # a NumValueItem whose value was copied
 class UseParentValueItem(NumValueItem):
 	# class indicating values are to be linked from a parent PHA object, such as a cause or a calculated value
 	ClassHumanName = _('Linked from another value')
-	ClassInternalName = 'LinkedFrom'
+	XMLName = 'LinkedFrom'
 	UserSelectable = True  # whether user can manually select this class when assigning a value to a PHA object
 
 	def __init__(self, **Args):
@@ -1157,7 +1171,7 @@ class NumberingItem(object):
 
 class ParentNumberChunkItem(object):
 	# a chunk in a NumberingItem instance, that takes numbering from a PHA object (eg node, cause).
-	ClassInternalName = 'Parent'
+	XMLName = 'Parent'
 
 	def __init__(self):
 		object.__init__(self)
@@ -1188,7 +1202,7 @@ class ParentNumberChunkItem(object):
 	Result = property(fget=GetMyNumber)
 
 class SerialNumberChunkItem(object):  # a chunk in a NumberingItem instance, that provides a serial number for a PHA object
-	ClassInternalName = 'Serial'
+	XMLName = 'Serial'
 
 	def __init__(self):
 		object.__init__(self)

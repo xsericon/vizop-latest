@@ -86,6 +86,7 @@ class ProjectItem(object): # class of PHA project instances
 		self.RiskReceptors = [] # instances of RiskReceptorItem defined for this project
 		self.NumberSystems = [] # instances of NumberSystemItem
 		self.TolRiskModels = [] # instances of TolRiskModel subclasses
+		self.Constants = [core_classes.ConstantItem()] # instances of ConstantItem. Dummy item here for testing purposes
 		self.CurrentTolRiskModel = None
 		self.ProcessUnits = [ProcessUnit(Proj=self, UnitNumber='120', ShortName='Wash', LongName='Plastic washing area'),
 							 ProcessUnit(Proj=self, UnitNumber='565', ShortName='Pyrolysis 1', LongName='Pyrolysis reactor no. 1')]
@@ -510,7 +511,7 @@ def WriteEntireProjectToFile(Proj, ProjFilename):
 		return False, ''
 
 	return True, ''
-	# TODO items to include: core_classes.ConstantItem.AllConstants
+	# TODO items to include: Proj.Constants
 
 def SetupDefaultTolRiskModel(Proj):
 	# set up a default tolerable risk model (severity categories) in project instance Proj

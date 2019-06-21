@@ -261,13 +261,15 @@ class FTHeader(object): # FT header object. Rendered by drawing text into bitmap
 		self.Rev = ''
 		self.RR = _('<undefined>') # risk receptors
 		self.Severity = ''
-		self.TolFreq = '' # tolerable frequency (str)
-		self.TolFreqUnit = ''
+#		self.TolFreq = '' # tolerable frequency (str)
+		self.TolFreq = core_classes.NumValueItemForDisplay() # tolerable frequency, object including value, unit, possible units etc.
 		self.UEL = '' # unmitigated event likelihood (outcome frequency) of FT
-		self.OutcomeUnit = '' # ? not used ? assumed same as TolFreqUnit ?
+		self.OutcomeUnit = '' # ? not used ? assumed same as unit of TolFreq ?
 		self.TargetUnit = '' # 'RRF' or 'PFD' or 'PFH'
 		self.RRF = '' # required value of RRF, PFD or PFH to meet tol freq (str)
 		self.SIL = '' # calculated SIL target (str)
+		# make list of names of numerical values that need lists of unit options, ValueKind options etc.
+		self.NumericalValues = 'TolFreq'
 		self.BackgColour = '0,0,0'
 		self.TextColour = '0,0,0'
 		self.SizeXInCU = self.SizeYInCU = self.SizeXInPx = self.SizeYInPx = 10
@@ -364,8 +366,11 @@ class FTHeader(object): # FT header object. Rendered by drawing text into bitmap
 			# put the content into the elements
 			for (Attrib, Name) in AttribInfo:
 				ElementNamed(Elements, Name).Text.Content = self.__dict__[Attrib]
-			# populate values that have units. The list contains (value attrib, unit attrib, element's InternalName)
-			AttribInfoWithUnits = [('TolFreq', 'TolFreqUnit', 'TolFreq'), ('UEL', 'OutcomeUnit', 'UEL')]
+			# populate tolerable frequency, with value and unit
+			ElementNamed(Elements, 'TolFreq').Text.Content = self.TolFreq.Value + ' ' + self.TolFreq.Unit.HumanName
+			# populate other values that have units. The list contains (value attrib, unit attrib, element's InternalName)
+#			AttribInfoWithUnits = [('TolFreq', 'TolFreqUnit', 'TolFreq'), ('UEL', 'OutcomeUnit', 'UEL')]
+			AttribInfoWithUnits = [('UEL', 'OutcomeUnit', 'UEL')]
 			for (ValueAttrib, UnitAttrib, Name) in AttribInfoWithUnits:
 				ElementNamed(Elements, Name).Text.Content = self.__dict__[ValueAttrib] + ' ' + self.__dict__[UnitAttrib]
 
@@ -1834,7 +1839,7 @@ class FTEventInCore(object): # FT event object used in DataCore by FTObjectInCor
 		else: self.EventType = NewEventTypeToApply
 
 	def ChangeValueKind(self, NewValueKind=None):
-		# change this FTEvent's value kind to NewValueKind (ClassInternalName of a NumValueClass subclass).
+		# change this FTEvent's value kind to NewValueKind (XMLName of a NumValueClass subclass).
 		# TODO fully implement [VRM] - currently only sets up an Auto value
 		assert NewValueKind in core_classes.NumValueClasses
 		self.Value = NewValueKind()
@@ -2419,6 +2424,10 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			# copy value and unit from tol freq table (to avoid creating link between TolFreq and an item in the table)
 			self.TolFreq.SetMyValue(TolFreqValueObj.GetMyValue(RR=RR), RR=RR)
 			self.TolFreq.SetMyUnit(TolFreqValueObj.GetMyUnit()) # setting the same unit several times, never mind
+		# set lists of permissible units and ValueKinds; used elsewhere to offer options to user
+		self.TolFreq.UnitOptions = core_classes.FrequencyUnits
+		self.TolFreq.ValueKindOptions = [core_classes.UserNumValueItem, core_classes.ConstNumValueItem,
+			core_classes.LookupNumValueItem, core_classes.UseParentValueItem, core_classes.ParentNumValueItem]
 
 	def RefreshRiskReceptorGrouping(self, GroupingOption, FirstTime=False):
 		# re-group risk receptors and select appropriate group to be displayed
@@ -2644,16 +2653,29 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			# elements where the FT attribute is a NumValueItem (or subclass) instance
 			DataInfo = [ ('TolFreq', self.TolFreq) ]
 			for Tag, Attrib in DataInfo:
-				El = ElementTree.SubElement(HeaderEl, Tag)
-				El.text = str(Attrib.GetMyValue(RR=RRForCalc))
+				AttribEl = ElementTree.SubElement(HeaderEl, Tag)
+				AttribEl.text = str(Attrib.GetMyValue(RR=RRForCalc))
 				# TODO make it display nicely in scientific notation
+				# add unit, unit options, ValueKind options and Constant options
+				UnitEl = ElementTree.SubElement(AttribEl, info.UnitTag)
+				UnitEl.text = str(Attrib.GetMyUnit().XMLName)
+				for ThisUnitOption in Attrib.UnitOptions:
+					UnitOptionEl = ElementTree.SubElement(AttribEl, info.UnitOptionTag)
+					UnitOptionEl.text = str(ThisUnitOption.XMLName)
+				for ThisValueKindOption in Attrib.ValueKindOptions:
+					ValueKindOptionEl = ElementTree.SubElement(AttribEl, info.ValueKindOptionTag)
+					UnitOptionEl.text = str(ThisValueKindOption.XMLName)
+				for ThisConstantOption in Proj.Constants: # %%% working here
+					pass
+
 			# elements where the text is the same as the FT attribute
 			# Note, SILTargetValue must be interrogated AFTER TargetRiskRed() call, above
 			for Tag in self.TextComponentNames:
 				El = ElementTree.SubElement(HeaderEl, Tag)
 				El.text = getattr(self, Tag)
 			# elements where the text is the HumanName of the Unit of the FT attribute
-			DataInfo = [ ('TolFreqUnit', self.TolFreq), ('OutcomeUnit', self.Outcome) ]
+#			DataInfo = [ ('TolFreqUnit', self.TolFreq), ('OutcomeUnit', self.Outcome) ]
+			DataInfo = [ ('OutcomeUnit', self.Outcome) ]
 			for Tag, Attrib in DataInfo:
 				El = ElementTree.SubElement(HeaderEl, Tag)
 				El.text = str(Attrib.Unit.HumanName)
@@ -2773,7 +2795,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			for (ThisValueKindIndex, ThisValueKind) in enumerate(NumValueClassesToShow):
 				ValueKindEl = ElementTree.SubElement(EventEl, info.NumberKindTag)
 				# set human name for number kind option to internal name of option
-				ValueKindEl.text = ThisValueKind.ClassInternalName
+				ValueKindEl.text = ThisValueKind.XMLName
 				ValueKindEl.set(info.ApplicableAttribName, utilities.Bool2Str(ThisValueKind == type(FTEvent.Value)))
 				ValueKindEl.set(info.SerialTag, str(ThisValueKindIndex)) # add number kind option serial number
 			return EventEl
@@ -3474,6 +3496,25 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 	def PrepareFullDisplay(self, XMLData): # instruct FTForDisplay object to fetch and set up all data needed to display the FT
 		# extract all data from XML tree and use to build up FT data structure
 
+		def PopulateUnitOptions(XMLRoot, HostEl, ComponentName, ListAttrib):
+			# populate numerical value unit choice list. These units are offered to the user in a choice widget
+			# We need special handling for unit options because "convert to" options are offered
+			# HostEl: element containing the numerical value
+			# ComponentName (str): the numerical component name in HostEl
+			# ListAttrib (str): name of the list in Component to populate
+			ListToSet = getattr(getattr(HostEl, Component), ListAttrib)
+			ListToSet = []
+			for ThisTag in XMLRoot.findall(info.UnitOptionTag):
+				# find human name for this unit option (use startswith() to ignore convert marker suffix)
+				ThisUnitHumanName = [u.HumanName for u in core_classes.UnitItem.UserSelectableUnits
+					if ThisTag.text.startswith(u.XMLName)][0]
+				# set human name according to whether this is a value conversion option
+				if ThisTag.text.endswith(ConvertValueMarker): ThisHumanName = _('Convert value to %s') % ThisUnitHumanName
+				else: ThisHumanName = ThisUnitHumanName
+				ListToSet.append(ChoiceItem(XMLName=ThisTag.text,
+					HumanName=ThisHumanName,
+					Applicable=utilities.Bool2Str(ThisTag.get(info.ApplicableAttribName))))
+
 		def PopulateOverallData(XMLRoot, HeaderEl):
 			# extract data about the overall FT from XMLRoot
 			# get risk receptor names and whether they are applicable to this FT
@@ -3506,10 +3547,10 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			# set all header attribs except risk receptor (set in PopulateOverallData() )
 			DataInfo = [ ('SIFName', 'SIFName'), ('OpMode', 'OpMode'), ('Rev', 'Rev'),
 				('TargetRiskRedMeasure', 'TargetUnit'), ('BackgColour', 'BackgColour'),
-				('TextColour', 'TextColour'), ('Severity', 'Severity'), ('TolFreq', 'TolFreq'),
+				('TextColour', 'TextColour'), ('Severity', 'Severity'),
+#				('TolFreq', 'TolFreq'), ('TolFreqUnit', 'TolFreqUnit'),
 				('UEL', 'UEL'), ('TargetRiskRed', 'RRF'),
-				('SIL', 'SIL'), ('TolFreqUnit', 'TolFreqUnit'), ('OutcomeUnit', 'OutcomeUnit') ]
-			print('ft3408 ComponentNameToHighlight: ', ComponentNameToHighlight)
+				('SIL', 'SIL'), ('OutcomeUnit', 'OutcomeUnit') ]
 			assert ComponentNameToHighlight in [a for (a, b) in DataInfo] or (ComponentNameToHighlight == '')
 			for Attrib, XMLTag in DataInfo:
 				setattr(HeaderEl, Attrib, HeaderXMLRoot.findtext(XMLTag, default=''))
@@ -3523,11 +3564,18 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 				UsingThisOpMode = (ThisOpMode == self.PHAObj.OpMode)
 				self.Header.OpModeComponent.ObjectChoices[ThisOpModeIndex].Applicable = UsingThisOpMode
 				if UsingThisOpMode: FT.OpMode = ThisOpMode # set OpMode attrib of FT
+			# populate lists of options relating to numerical values%%%
+			for ThisNumValue in HeaderEl.NumericalValues:
+				PopulateUnitOptions(XMLRoot=HeaderXMLRoot, HostEl=HeaderEl, Component=ThisNumValue,
+									ListAttrib='UnitOptions')
+				for (ThisOptionTag, ThisOption) in [
+					(info. ValueKindOptionTag, 'ValueKindOptions'), (info.ConstantOptionTag, 'ConstantOptions'),
+					(info.MatrixOptionTag, 'MatrixOptions')]:
+					pass # working here
 			# populate content elements
 			for ThisEl in HeaderEl.ContentEls: ThisEl.Text.Content = getattr(HeaderEl, ThisEl.InternalName)
 			# store component name to highlight
 			self.Header.ComponentNameToHighlight = ComponentNameToHighlight
-			print('FT3419 storing header component name to highlight: ', ComponentNameToHighlight)
 
 		def PopulateColumnData(ColumnEl, Column):
 			# get data from ColumnEl (an XML FTColumnTag tree element) and populate into new objects in Column (a FTColumn instance).
@@ -3574,7 +3622,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 				HumanName=self.EventTypeNameHash[ThisTag.text],
 				Applicable=utilities.Bool2Str(ThisTag.get(info.ApplicableAttribName)))
 				for ThisTag in XMLObj.findall(info.EventTypeOptionTag)]
-			# populate event value unit choice
+			# populate event value unit choice; TODO use PopulateUnitOptions()
 			NewEvent.EventValueUnitComponent.ObjectChoices = []
 			for ThisTag in XMLObj.findall(info.UnitOptionTag):
 				# find human name for this unit option (use startswith() to ignore convert marker suffix)
@@ -3588,10 +3636,10 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 					Applicable=utilities.Bool2Str(ThisTag.get(info.ApplicableAttribName))))
 #			# populate value kind with HumanName of number kind class specified in incoming NumberKind tag
 #			NewEvent.ValueKind = ([c.ClassHumanName for c in core_classes.NumValueClasses
-#				if c.ClassInternalName == XMLObj.findtext(info.NumberKindTag, default='')] + ['???'])[0]
+#				if c.XMLName == XMLObj.findtext(info.NumberKindTag, default='')] + ['???'])[0]
 			# populate value kind choice
 			NewEvent.EventValueKindComponent.ObjectChoices = [ChoiceItem(XMLName=ThisTag.text,
-				HumanName=[c.ClassHumanName for c in core_classes.NumValueClasses if c.ClassInternalName == ThisTag.text][0],
+				HumanName=[c.ClassHumanName for c in core_classes.NumValueClasses if c.XMLName == ThisTag.text][0],
 				Applicable=utilities.Bool2Str(ThisTag.get(info.ApplicableAttribName)))
 				for ThisTag in XMLObj.findall(info.NumberKindTag)]
 			# populate value kind with HumanName of number kind marked as applicable
@@ -3700,7 +3748,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		# find the outer tag containing the FT data
 		FTData = [t for t in XMLData.iter(self.InternalName)][0]
 		# populate display-related attributes specific to this Viewport, such as zoom, pan, selection, collapse groups,
-		# and highlights%%%
+		# and highlights
 		DisplayAttribData = FTData.find(info.FTDisplayAttribTag)
 		PopulateDisplayAttribs(self, DisplayAttribData)
 		# extract data about the overall FT
