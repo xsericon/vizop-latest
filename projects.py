@@ -18,6 +18,13 @@ UsableProjDocTypes = ['VizopProject0.1'] # project doc types parsable by this ve
 CurrentProjDocType = 'VizopProject0.1' # doc type written by this version of Vizop
 HighestProjID = 0 # highest ID of all projects currently open (int)
 
+def GetNewID(Proj):
+	# get ID for new object in Proj (str)
+	assert isinstance(Proj, ProjectItem)
+	assert isinstance(Proj.MaxIDInProj, int)
+	Proj.MaxIDInProj += 1
+	return str(Proj.MaxIDInProj)
+
 class ProcessUnit(object): # object representing an area of the plant, e.g. "gas dryer"
 
 	def __init__(self, Proj=None, UnitNumber='', ShortName='', LongName=''):
@@ -77,7 +84,7 @@ class ProjectItem(object): # class of PHA project instances
 		self.CurrentTolRiskModel = None
 		self.Constants = [] # instances of ConstantItem
 		# the following is for testing
-		TestConstant = core_classes.ConstantItem(HumanName='Alarm failure')
+		TestConstant = core_classes.ConstantItem(HumanName='Alarm failure', ID=GetNewID(Proj=self))
 		TestConstant.SetMyValue(0.1)
 		TestConstant.SetMyUnit(core_classes.ProbabilityUnit)
 		self.Constants.append(TestConstant)

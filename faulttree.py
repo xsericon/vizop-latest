@@ -269,7 +269,7 @@ class FTHeader(object): # FT header object. Rendered by drawing text into bitmap
 		self.RRF = '' # required value of RRF, PFD or PFH to meet tol freq (str)
 		self.SIL = '' # calculated SIL target (str)
 		# make list of names of numerical values that need lists of unit options, ValueKind options etc.
-		self.NumericalValues = 'TolFreq'
+		self.NumericalValues = ['TolFreq']
 		self.BackgColour = '0,0,0'
 		self.TextColour = '0,0,0'
 		self.SizeXInCU = self.SizeYInCU = self.SizeXInPx = self.SizeYInPx = 10
@@ -2665,8 +2665,11 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 				for ThisValueKindOption in Attrib.ValueKindOptions:
 					ValueKindOptionEl = ElementTree.SubElement(AttribEl, info.ValueKindOptionTag)
 					UnitOptionEl.text = str(ThisValueKindOption.XMLName)
-				for ThisConstantOption in Proj.Constants: # %%% working here
-					pass
+				for ThisConstantOption in self.Proj.Constants: # %%% working here
+					ConstantOptionEl = ElementTree.SubElement(AttribEl, info.ConstantOptionTag)
+					ConstantOptionEl.text = str(ThisConstantOption.XMLName)
+					IDEl = ElementTree.SubElement(ConstantOptionEl, info.IDTag)
+					IDEl.text = ThisConstantOption.ID
 
 			# elements where the text is the same as the FT attribute
 			# Note, SILTargetValue must be interrogated AFTER TargetRiskRed() call, above
@@ -3502,7 +3505,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			# HostEl: element containing the numerical value
 			# ComponentName (str): the numerical component name in HostEl
 			# ListAttrib (str): name of the list in Component to populate
-			ListToSet = getattr(getattr(HostEl, Component), ListAttrib)
+			ListToSet = getattr(getattr(HostEl, ComponentName), ListAttrib)
 			ListToSet = []
 			for ThisTag in XMLRoot.findall(info.UnitOptionTag):
 				# find human name for this unit option (use startswith() to ignore convert marker suffix)
@@ -3566,11 +3569,14 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 				if UsingThisOpMode: FT.OpMode = ThisOpMode # set OpMode attrib of FT
 			# populate lists of options relating to numerical values%%%
 			for ThisNumValue in HeaderEl.NumericalValues:
-				PopulateUnitOptions(XMLRoot=HeaderXMLRoot, HostEl=HeaderEl, Component=ThisNumValue,
-									ListAttrib='UnitOptions')
+				PopulateUnitOptions(XMLRoot=HeaderXMLRoot, HostEl=HeaderEl, ComponentName=ThisNumValue,
+					ListAttrib='UnitOptions')
 				for (ThisOptionTag, ThisOption) in [
 					(info. ValueKindOptionTag, 'ValueKindOptions'), (info.ConstantOptionTag, 'ConstantOptions'),
 					(info.MatrixOptionTag, 'MatrixOptions')]:
+					# populate each option list in turn
+					ThisOptionList = getattr(getattr(HeaderEl, ThisNumValue), ThisOption)
+					ThisOptionList.clear()
 					pass # working here
 			# populate content elements
 			for ThisEl in HeaderEl.ContentEls: ThisEl.Text.Content = getattr(HeaderEl, ThisEl.InternalName)
