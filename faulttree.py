@@ -2286,7 +2286,7 @@ def NextCombination(Length, PassMark):
 			LastTrueIndex = [i for i in range(Length) if LastList[i]][-1]
 			LastList[LastTrueIndex] = False
 			LastList[LastTrueIndex + 1] = True
-			print("FT2086 yielding: ", LastList)
+			print("FT2289 yielding: ", LastList)
 			yield LastList
 		else: # find the rightmost [True, False] sequence in LastList, if any (if none found, all combinations exhausted)
 			LastTFIndexList = [i for i in range(Length - 2) if LastList[i] if not LastList[i + 1]]
@@ -2298,7 +2298,7 @@ def NextCombination(Length, PassMark):
 				LastList[LastTFIndex] = False
 				LastList = LastList[:LastTFIndex + 1] + [True] * (PassMark - LastList[:LastTFIndex].count(True))
 				LastList = LastList + [False] * (Length - len(LastList))
-				print("FT2086 yielding: ", LastList)
+				print("FT2301 yielding: ", LastList)
 				yield LastList
 	return # finished
 
@@ -2385,6 +2385,8 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 	# English names for components; keys are attrib names in this class. Values are translated at point of display
 	ComponentEnglishNames = {'SIFName': 'SIF name', 'Rev': 'Revision', 'OpMode': 'Operating mode',
 		'TolFreq': 'Tolerable frequency', 'SILTargetValue': 'SIL target'}
+	# element classes that have a number system, i.e. have a Numbering attrib. Must be tuple, not list
+	ElementsWithNumberSystem = (FTConnectorItemInCore, FTGateItemInCore, FTEventInCore)
 
 	def __init__(self, Proj, **Args):
 		core_classes.PHAModelBaseClass.__init__(self, Proj, **Args)
@@ -2392,6 +2394,11 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		# self.EditAllowed attrib is inherited from base class
 		FTObjectInCore.AllFTObjects.append(self) # add self to register; must do after assigning self.ID
 		self.MaxElementID = 0 # Highest ID (int) of all elements in this FT. Used only to determine next available ID
+		# set up numbering for the FT itself - to appear in a high-level list of all FTs in the project
+		self.Numbering = core_classes.NumberingItem()
+		# put a serial number into the numbering object
+		SerialObj = core_classes.SerialNumberChunkItem()
+		self.Numbering.NumberStructure = [SerialObj]
 		# define object-wide attributes. Many of these are displayed in the FT header
 		self.SIFName = ''
 		self.OpMode = core_classes.DefaultOpMode # instance of OpModeType
@@ -2439,6 +2446,19 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		# select RR group so that user can still see the same RR that was on display before
 		self.RiskReceptorGroupOnDisplay = [g for g in self.RiskReceptorGroups
 			if (FirstTime or (Old1stRROnDisplay in g))][0]
+
+	def GetAllObjsWithNumberSystems(self):
+		# a generator yielding FT components from FT that contain numbering systems
+		# This is a required method for all PHA object classes
+		# first, return the FT itself
+		yield self
+		# then, iterate over all elements in all columns
+		for Col in self.Columns:
+			assert isinstance(Col, FTColumnInCore)
+			for ThisElement in Col.FTElements:
+				if isinstance(ThisElement, self.ElementsWithNumberSystem):
+					yield ThisElement
+		return
 
 	def GetOutcome(self):
 		# Get FT outcome value. In Low Demand mode, this is the value of the top event; else, value of SIFFailureEvent object
@@ -3571,13 +3591,15 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			for ThisNumValue in HeaderEl.NumericalValues:
 				PopulateUnitOptions(XMLRoot=HeaderXMLRoot, HostEl=HeaderEl, ComponentName=ThisNumValue,
 					ListAttrib='UnitOptions')
+				ThisNumAttrib = getattr(HeaderEl, ThisNumValue)
 				for (ThisOptionTag, ThisOption) in [
-					(info. ValueKindOptionTag, 'ValueKindOptions'), (info.ConstantOptionTag, 'ConstantOptions'),
-					(info.MatrixOptionTag, 'MatrixOptions')]:
-					# populate each option list in turn
-					ThisOptionList = getattr(getattr(HeaderEl, ThisNumValue), ThisOption)
-					ThisOptionList.clear()
-					pass # working here
+						(info.ValueKindOptionTag, 'ValueKindOptions'), (info.ConstantOptionTag, 'ConstantOptions'),
+						(info.MatrixOptionTag, 'MatrixOptions')]:
+					# create and populate each option list in turn%%% working here; get specific data from each option tag, esp. constants
+					setattr(ThisNumAttrib, ThisOption, [])
+					ThisOptionList = getattr(ThisNumAttrib, ThisOption)
+					for ThisOptionTagFound in HeaderXMLRoot.findall(ThisOptionTag):
+						ThisOptionList.append(ThisOptionTagFound.text)
 			# populate content elements
 			for ThisEl in HeaderEl.ContentEls: ThisEl.Text.Content = getattr(HeaderEl, ThisEl.InternalName)
 			# store component name to highlight
