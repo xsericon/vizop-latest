@@ -79,7 +79,8 @@ class ProjectItem(object): # class of PHA project instances
 		self.IPLKinds = []
 		self.CauseKinds = []
 		self.RiskReceptors = [core_classes.RiskReceptorItem(XMLName='People', HumanName=_('People'))] # instances of RiskReceptorItem defined for this project
-		self.NumberSystems = [core_classes.SerialNumberChunkItem()] # instances of NumberSystemItem
+		self.NumberSystems = [core_classes.SerialNumberChunkItem()] # instances of NumberSystemItem. Not used;
+			# to get number systems, call GetAllNumberingSystems()
 		self.TolRiskModels = [] # instances of TolRiskModel subclasses
 		self.CurrentTolRiskModel = None
 		self.Constants = [] # instances of ConstantItem
@@ -424,6 +425,30 @@ def SaveChangesToProj(Proj, UpdateData=None, Task='Update'):
 		except (IOError, OSError):
 			Success = False; ProblemReport = "Can'tOverwriteProjectFile"
 	return Success, ProblemReport
+
+def GetAllNumberingSystems(Proj):
+	# returns list of lists. Each inner list represents one unique numbering system in the entire project.
+	# Each inner list contains all project objects using that numbering system.
+	# Example: NumberSystem1 is used by Gate1 and Gate2; Numbersystem2 is used by FTEvent1 and FTEvent2.
+	# The returned list will be: [ [Gate1, Gate2] , [FTEvent1, FTEvent2] ]
+	assert isinstance(Proj, ProjectItem)
+	NumSystems = [] # a list of all unique number systems found
+	NumSystemsUsageLists = [] # list of lists of PHA objects, for return
+	# iterate over all PHA objects that contain number systems
+	for ThisPHAObj in Proj.PHAObjs:
+		for ThisElement in ThisPHAObj.GetAllObjsWithNumberSystems():
+			ThisNumSystem = ThisElement.Numbering
+			# check for a matching number system in NumSystems (can't just use 'in' as they are different objects)
+			MatchFound = False
+			for (ThisIndex, ExistingNumSystem) in enumerate(NumSystems):
+				if ThisNumSystem == ExistingNumSystem: # found a match; add the PHA object to the usage list
+					NumSystemsUsageLists[ThisIndex].append(ThisElement)
+					MatchFound = True
+					break # don't search any more
+			if not MatchFound: # no match; add it as a new numbering system
+				NumSystems.append(ThisElement.Numbering)
+				NumSystemsUsageLists.append( [ThisElement] )
+	return NumSystemsUsageLists
 
 """[----------TESTING AREA---------- """
 
