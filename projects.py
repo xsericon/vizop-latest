@@ -75,6 +75,12 @@ class ProjectItem(object): # class of PHA project instances
 		self.NumberSystems = [core_classes.SerialNumberChunkItem()] # instances of NumberSystemItem
 		self.TolRiskModels = [] # instances of TolRiskModel subclasses
 		self.CurrentTolRiskModel = None
+		self.Constants = [] # instances of ConstantItem
+		# the following is for testing
+		TestConstant = core_classes.ConstantItem(HumanName='Alarm failure')
+		TestConstant.SetMyValue(0.1)
+		TestConstant.SetMyUnit(core_classes.ProbabilityUnit)
+		self.Constants.append(TestConstant)
 		self.ProcessUnits = [ProcessUnit(Proj=self, UnitNumber='120', ShortName='Wash', LongName='Plastic washing area'),
 							 ProcessUnit(Proj=self, UnitNumber='565', ShortName='Pyrolysis 1', LongName='Pyrolysis reactor no. 1')]
 		self.Collaborators = [Collaborator(Proj=self, ShortName='Mary', LongName='Mary Simmons'),
