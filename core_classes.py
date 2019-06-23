@@ -1108,6 +1108,7 @@ class NumberingItem(object):
 	def __eq__(self, other): # returns True if self and other (a NumberingItem instance) are considered identical
 		# this method allows comparison of NumberingItem instances simply by (Instance1 == Instance2)
 		assert isinstance(other, NumberingItem)
+		if self is other: return True # if comparing the same object, no further checks
 		# compare NumberStructure contents of self and other
 		Match = len(self.NumberStructure) == len(other.NumberStructure)
 		ThisIndex = 0
@@ -1116,6 +1117,7 @@ class NumberingItem(object):
 			ThisItemInOther = other.NumberStructure[ThisIndex]
 			# each item can be str, ParentNumberChunkItem or SerialNumberChunkItem. Check their types and contents match
 			Match = (ThisItemInSelf == ThisItemInOther) if isinstance(ThisItemInOther, type(ThisItemInSelf)) else False
+			ThisIndex += 1
 		return Match and (self.ShowInDisplay == other.ShowInDisplay) and (self.ShowInOutput == other.ShowInOutput)
 
 	def HumanValue(self, PHAItem, Host, Levels=999, PHAObjectsReferenced=[]):

@@ -2647,7 +2647,6 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 					assert isinstance(RR, core_classes.RiskReceptorItem), "FT1667 Invalid item '%s' in RiskReceptorItem" % str(RR)
 				assert len(self.RiskReceptorGroupOnDisplay) > 0, "FT1669 Fault Tree has empty list of RiskReceptorGroupOnDisplay"
 				assert isinstance(list(self.Severity.values())[0], core_classes.CategoryNameItem)
-				print('FT2621 TolFreq is: ', self.TolFreq, type(self.TolFreq))
 				assert isinstance(self.TolFreq, core_classes.NumValueItem),\
 					"FT1668 Fault Tree's TolFreq is not a NumValueItem"
 				assert isinstance(self.TargetRiskRedMeasure, str), "FT1671 Fault Tree's TargetRiskRedMeasure is not a string"
@@ -3752,7 +3751,6 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			# extract display-related attribs from DisplayAttribData (XML tag or None) and populate them into FT
 			# attribs can include zoom, pan, selection, collapse groups, and highlights
 			# Clears highlight-related attribs if not found in DisplayAttribData, to remove highlight when no longer required
-			print('FT3541 PopulateDisplayAttribs: component highlighting not implemented yet')
 			# the lambda below converts 'Header' to FT's ID, for cases where the component to highlight is in the header
 			# In the tuple, ClearIfAbsent (bool) means whether to clear the attrib if not found in DisplayAttribData;
 			# ClearValue is the value to clear to
@@ -3770,8 +3768,8 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 					setattr(FT, AttribName, AttribType(ThisElement.text))
 
 		# main procedure for PrepareFullDisplay()
-		print('FT3441 starting PrepareFullDisplay using the following XML data:')
-		ElementTree.dump(XMLData)
+#		print('FT3441 starting PrepareFullDisplay using the following XML data:')
+#		ElementTree.dump(XMLData)
 		self.Wipe() # start with a blank FT
 		# find the outer tag containing the FT data
 		FTData = [t for t in XMLData.iter(self.InternalName)][0]
@@ -4123,14 +4121,12 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		# ClickKind (str): 'XY' where X is Left, Centre or Right; Y is Single, Long, Double, Triple
 		# Args can include: CanStartDrag, CanSelect
 		# Find out which element(s), if any, are clicked
-		print('FT3778 in HandleMouseAnyClick')
 		assert ClickKind in [X + Y for X in ['Left', 'Centre', 'Right'] for Y in ['Single', 'Long', 'Double', 'Triple']]
 		Hits = [] # list of dict of elements/hotspots clicked
 		for ThisEl in self.AllClickableObjects():
 			HitHotspot = ThisEl.MouseHit(ClickXInPx, ClickYInPx, TolXInPx=TolXInPx, TolYInPx=TolYInPx)
 			if HitHotspot: Hits.append({'Element': ThisEl, 'Hotspot': HitHotspot})
 		if Hits: # any elements hit? Find the hit element with highest PosZ (z-coordinate)
-			print('FT3785 hits found')
 			HighestZ = max(ThisHit['Element'].PosZ for ThisHit in Hits)
 			HitWithHighestZ = [ThisHit for ThisHit in Hits if ThisHit['Element'].PosZ == HighestZ][0]
 			# capture which element and hotspot were clicked; needed for drag handler
@@ -4146,7 +4142,6 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 				if ClickKind == 'LeftSingle': Handler = 'HandleMouseLClickOnMe'
 				elif ClickKind == 'LeftDouble': Handler = 'HandleMouseLDClickOnMe'
 				# invoke handler, if clicked element has implemented it
-				print('FT3801 calling handler:', Handler)
 				if hasattr(ElToHandleLClick, Handler):
 					getattr(ElToHandleLClick, Handler)(HitHotspot=HitHotspot, HostViewport=self, MouseX=ClickXInPx, MouseY=ClickYInPx)
 				else: print("FT2105 %s handler not implemented" % ClickKind)

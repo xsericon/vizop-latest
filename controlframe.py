@@ -1604,7 +1604,7 @@ class ControlFrame(wx.Frame):
 				# (will not have happened yet if Viewport is newly created)
 				ViewportMessageReceivedThisTime = vizop_misc.ListenToSocket(Proj=self.CurrentProj, Socket=ThisSocketObj.Socket,
 					Handler=ThisSocketObj.Viewport.PHAObj.HandleIncomingRequest)
-				if ViewportMessageReceivedThisTime: print('CF1459 incoming viewport message received')
+#				if ViewportMessageReceivedThisTime: print('CF1459 incoming viewport message received')
 				ViewportMessageReceived |= bool(ViewportMessageReceivedThisTime)
 				MessageReceived |= bool(vizop_misc.ListenToSocket(Socket=[s.Socket for s in vizop_misc.RegisterSocket.Register
 						if s.SocketLabel == info.ViewportOutSocketLabel + '_' + ThisSocketObj.SocketLabel.split('_')[1]][0],
@@ -1852,7 +1852,6 @@ class ControlFrame(wx.Frame):
 		# TargetViewport is supplied directly as an arg, or (if it's None) via ViewportTag in XMLRoot
 		# first, find which Viewport to show
 		Proj = self.CurrentProj
-		print('CF1703 SwitchtoViewport with XMLRoot:', ElementTree.dump(XMLRoot))
 		if TargetViewport is None:
 			ViewportToShow = utilities.ObjectWithID(Objects=Proj.ActiveViewports,
 				TargetID=XMLRoot.find(info.ViewportTag).text)
@@ -1861,7 +1860,6 @@ class ControlFrame(wx.Frame):
 		# release any existing Viewport from PHA panel
 		if self.CurrentViewport:
 			# remove old Viewport from ActiveViewports
-			print("CF1192 removing an active Viewport with ID: ", self.CurrentViewport.ID, type(self.CurrentViewport))
 			Proj.ActiveViewports.remove(self.CurrentViewport)
 			self.MyEditPanel.ReleaseViewportFromDisplDevice()
 		# add target Viewport
@@ -2281,23 +2279,19 @@ class ControlFrame(wx.Frame):
 		# refresh Viewports after change to data in datacore. For now, we just redraw all Viewports.
 		# Message (str): XML message received requesting update to Viewports
 		# ignore Message if it's just 'OK'
-		print('CF2209 Message coming to UpdateAllViewports:', ElementTree.fromstring(Message).tag)
-		print('CF2209 latest undo: ', Proj.UndoList[-1].HumanText)
-	#	if ElementTree.fromstring(Message).tag != 'OK': # maybe not needed any longer
-		if True:
-			for ThisViewport in Proj.AllViewportShadows:
-				# get refresh data from corresponding PHA object
-				RedrawXMLData = ThisViewport.PHAObj.GetFullRedrawData(Viewport=ThisViewport, ViewportClass=ThisViewport.MyClass)
-				# make XML message with ID of PHA object, followed by full redraw data
-				FullXMLData = vizop_misc.MakeXMLMessage(RootName='RQ_RedrawViewport', RootText=ThisViewport.ID,
-					Elements={info.IDTag: ThisViewport.PHAObj.ID})
-				FullXMLData.append(RedrawXMLData)
-				# send it to Viewport
-				vizop_misc.SendRequest(Socket=ThisViewport.D2CSocketREQObj.Socket, Command='RQ_RedrawViewport',
-					XMLRoot=FullXMLData)
-			# refresh control frame GUI
-			self.UpdateMenuStatus()
-			self.MyControlPanel.UpdateNavigationButtonStatus(Proj=Proj)
+		for ThisViewport in Proj.AllViewportShadows:
+			# get refresh data from corresponding PHA object
+			RedrawXMLData = ThisViewport.PHAObj.GetFullRedrawData(Viewport=ThisViewport, ViewportClass=ThisViewport.MyClass)
+			# make XML message with ID of PHA object, followed by full redraw data
+			FullXMLData = vizop_misc.MakeXMLMessage(RootName='RQ_RedrawViewport', RootText=ThisViewport.ID,
+				Elements={info.IDTag: ThisViewport.PHAObj.ID})
+			FullXMLData.append(RedrawXMLData)
+			# send it to Viewport
+			vizop_misc.SendRequest(Socket=ThisViewport.D2CSocketREQObj.Socket, Command='RQ_RedrawViewport',
+				XMLRoot=FullXMLData)
+		# refresh control frame GUI
+		self.UpdateMenuStatus()
+		self.MyControlPanel.UpdateNavigationButtonStatus(Proj=Proj)
 
 class ControlFramePersistent(object):
 	# a persistent object used for returning data from control frame after it is Destroy()ed.
