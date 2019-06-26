@@ -2,7 +2,6 @@
 Name: vizop_parser
 Python version: 3.6.3
 """
-
 """[----------TEMPLATE---------- """
 """ ----------TEMPLATE----------]""" 
 
@@ -14,7 +13,7 @@ from lxml import etree as lxmletree
 import string
 import inspect
 from enum import Enum
-import projects, core_classes, faulttree
+import projects, core_classes, faulttree, info
 import logging
 """ ----------IMPORT----------]""" 
 
@@ -106,183 +105,183 @@ def convertProjectToXml(Proj, ProjectFilename):
 
 	# ShortTitle
 	if Proj.ShortTitle != '':
-		MyXMLRoot_ShortTitle = ET.SubElement(MyXMLRoot, 'ShortTitle')
+		MyXMLRoot_ShortTitle = ET.SubElement(MyXMLRoot, info.ShortTitleTag)
 		MyXMLRoot_ShortTitle.text = pS(str(Proj.ShortTitle))
 
 	# ProjNumber
 	if Proj.ProjNumber != '':
-		MyXMLRoot_ProjNumber = ET.SubElement(MyXMLRoot, 'ProjNumber')
+		MyXMLRoot_ProjNumber = ET.SubElement(MyXMLRoot, info.ProjNumberTag)
 		MyXMLRoot_ProjNumber.text = pS(str(Proj.ProjNumber))
 
 	# Description
 	if Proj.Description != '':
-		MyXMLRoot_Description = ET.SubElement(MyXMLRoot, 'Description')
+		MyXMLRoot_Description = ET.SubElement(MyXMLRoot, info.DescriptionTag)
 		MyXMLRoot_Description.text = pS(str(Proj.Description))
 
 	# EditNumber
 	if Proj.EditNumber != '':
-		MyXMLRoot_EditNumber = ET.SubElement(MyXMLRoot, 'EditNumber')
+		MyXMLRoot_EditNumber = ET.SubElement(MyXMLRoot, info.EditNumberTag)
 		MyXMLRoot_EditNumber.text = pS(str(Proj.EditNumber))
 
 	# TeamMembers
 	if len(Proj.TeamMembers) > 0 :
 		# create outer XML tag
-		MyXMLRoot_TeamMembers = ET.SubElement(MyXMLRoot, 'TeamMembers')
+		MyXMLRoot_TeamMembers = ET.SubElement(MyXMLRoot, info.TeamMembersTag)
 
 		# TeamMember
 		each_teamMember: core_classes.TeamMember
 		for each_teamMember in Proj.TeamMembers:
-			MyXMLRoot_TeamMembers_TeamMember = ET.SubElement(MyXMLRoot_TeamMembers, 'TeamMember')
+			MyXMLRoot_TeamMembers_TeamMember = ET.SubElement(MyXMLRoot_TeamMembers, info.TeamMemberTag)
 			assert type(each_teamMember) == core_classes.TeamMember
 
 			# <ID [ID int as str] />
-			MyXMLRoot_TeamMembers_TeamMember_ID = ET.SubElement(MyXMLRoot_TeamMembers_TeamMember, 'ID')
+			MyXMLRoot_TeamMembers_TeamMember_ID = ET.SubElement(MyXMLRoot_TeamMembers_TeamMember, info.IDTag)
 			MyXMLRoot_TeamMembers_TeamMember_ID.text =  pS(str(each_teamMember.iD))
 
 			# <Name [Name as str] />
-			MyXMLRoot_TeamMembers_TeamMember_Name = ET.SubElement(MyXMLRoot_TeamMembers_TeamMember, 'Name')
+			MyXMLRoot_TeamMembers_TeamMember_Name = ET.SubElement(MyXMLRoot_TeamMembers_TeamMember, info.NameTag)
 			MyXMLRoot_TeamMembers_TeamMember_Name.text = pS(each_teamMember.name)
 
 			# <Role [Role as str] />
-			MyXMLRoot_TeamMembers_TeamMember_Role = ET.SubElement(MyXMLRoot_TeamMembers_TeamMember, 'Role')
+			MyXMLRoot_TeamMembers_TeamMember_Role = ET.SubElement(MyXMLRoot_TeamMembers_TeamMember, info.RoleTag)
 			MyXMLRoot_TeamMembers_TeamMember_Role.text = pS(each_teamMember.role)
 
 			# < Affiliation[Affiliation as str] / >
-			MyXMLRoot_TeamMembers_TeamMember_Affiliation = ET.SubElement(MyXMLRoot_TeamMembers_TeamMember, 'Affiliation')
+			MyXMLRoot_TeamMembers_TeamMember_Affiliation = ET.SubElement(MyXMLRoot_TeamMembers_TeamMember, info.AffiliationTag)
 			MyXMLRoot_TeamMembers_TeamMember_Affiliation.text = pS(each_teamMember.affiliation)
 
 	#Process Units
 	if len(Proj.ProcessUnits) > 0:
 		# create outer XML tag
-		MyXMLRoot_ProcessUnits = ET.SubElement(MyXMLRoot, 'ProcessUnits')
+		MyXMLRoot_ProcessUnits = ET.SubElement(MyXMLRoot, info.ProcessUnitsTag)
 
 		for each_ProcessUnit in Proj.ProcessUnits:
-			MyXMLRoot_ProcessUnits_ProcessUnit = ET.SubElement(MyXMLRoot_ProcessUnits, 'ProcessUnit')
+			MyXMLRoot_ProcessUnits_ProcessUnit = ET.SubElement(MyXMLRoot_ProcessUnits, info.ProcessUnitTag)
 			assert type(each_ProcessUnit) == projects.ProcessUnit
 
 			# <ID [ID int as str] />
-			MyXMLRoot_ProcessUnits_ProcessUnit_ID = ET.SubElement(MyXMLRoot_ProcessUnits_ProcessUnit, 'ID')
+			MyXMLRoot_ProcessUnits_ProcessUnit_ID = ET.SubElement(MyXMLRoot_ProcessUnits_ProcessUnit, info.IDTag)
 			MyXMLRoot_ProcessUnits_ProcessUnit_ID.text = pS(str(each_ProcessUnit.ID))
 
 			# <UnitNumber [UnitNumber as str] />
-			MyXMLRoot_ProcessUnits_ProcessUnit_UnitNumber = ET.SubElement(MyXMLRoot_ProcessUnits_ProcessUnit, 'UnitNumber')
+			MyXMLRoot_ProcessUnits_ProcessUnit_UnitNumber = ET.SubElement(MyXMLRoot_ProcessUnits_ProcessUnit, info.UnitNumber)
 			MyXMLRoot_ProcessUnits_ProcessUnit_UnitNumber.text = pS(str(each_ProcessUnit.UnitNumber))
 
 			# <ShortName [ShortName as str] />
-			MyXMLRoot_ProcessUnits_ProcessUnit_ShortName = ET.SubElement(MyXMLRoot_ProcessUnits_ProcessUnit, 'ShortName')
+			MyXMLRoot_ProcessUnits_ProcessUnit_ShortName = ET.SubElement(MyXMLRoot_ProcessUnits_ProcessUnit, info.ShortNameTag)
 			MyXMLRoot_ProcessUnits_ProcessUnit_ShortName.text = pS(str(each_ProcessUnit.ShortName))
 
 			# <LongName [LongName as str] />
-			MyXMLRoot_ProcessUnits_ProcessUnit_LongName = ET.SubElement(MyXMLRoot_ProcessUnits_ProcessUnit, 'LongName')
+			MyXMLRoot_ProcessUnits_ProcessUnit_LongName = ET.SubElement(MyXMLRoot_ProcessUnits_ProcessUnit, info.LongNameTag)
 			MyXMLRoot_ProcessUnits_ProcessUnit_LongName.text = pS(str(each_ProcessUnit.LongName))
 
 	#Risk Receptors
 	if len(Proj.RiskReceptors) > 0:
 		# create outer XML tag
-		MyXMLRoot_RiskReceptors = ET.SubElement(MyXMLRoot, 'RiskReceptors')
+		MyXMLRoot_RiskReceptors = ET.SubElement(MyXMLRoot, info.RiskReceptorsTag)
 
 		for each_RiskReceptor in Proj.RiskReceptors:
 			assert type(each_RiskReceptor) == core_classes.RiskReceptorItem
-			MyXMLRoot_RiskReceptors_RiskReceptor = ET.SubElement(MyXMLRoot_RiskReceptors, 'RiskReceptor')
+			MyXMLRoot_RiskReceptors_RiskReceptor = ET.SubElement(MyXMLRoot_RiskReceptors, info.RiskReceptorTag)
 
 			# <ID [ID int as str] />
-			MyXMLRoot_RiskReceptors_RiskReceptor_ID = ET.SubElement(MyXMLRoot_RiskReceptors_RiskReceptor, 'ID')
+			MyXMLRoot_RiskReceptors_RiskReceptor_ID = ET.SubElement(MyXMLRoot_RiskReceptors_RiskReceptor, info.IDTag)
 			MyXMLRoot_RiskReceptors_RiskReceptor_ID.text = pS(str(each_RiskReceptor.ID))
 
 			#<Name [HumanName as str] />
-			MyXMLRoot_RiskReceptors_RiskReceptor_HumanName = ET.SubElement(MyXMLRoot_RiskReceptors_RiskReceptor, 'Name')
+			MyXMLRoot_RiskReceptors_RiskReceptor_HumanName = ET.SubElement(MyXMLRoot_RiskReceptors_RiskReceptor, info.NameTag)
 			MyXMLRoot_RiskReceptors_RiskReceptor_HumanName.text = pS(each_RiskReceptor.HumanName)
 
 	# Numbering Systems
 	if len(Proj.NumberSystems) > 0:
 		# create outer XML tag
-		MyXMLRoot_NumberSystems = ET.SubElement(MyXMLRoot, 'NumberSystems')
+		MyXMLRoot_NumberSystems = ET.SubElement(MyXMLRoot, info.NumberSystemsTag)
 
 		for each_NumberSystem in Proj.NumberSystems:
 			assert type(each_NumberSystem) == core_classes.SerialNumberChunkItem
-			MyXMLRoot_NumberSystems_NumberSystem = ET.SubElement(MyXMLRoot_NumberSystems, 'NumberSystem')
+			MyXMLRoot_NumberSystems_NumberSystem = ET.SubElement(MyXMLRoot_NumberSystems, info.NumberSystemTag)
 
 			#FieldWidth
-			MyXMLRoot_NumberSystems_NumberSystem_FieldWidth = ET.SubElement(MyXMLRoot_NumberSystems_NumberSystem, 'FieldWidth')
+			MyXMLRoot_NumberSystems_NumberSystem_FieldWidth = ET.SubElement(MyXMLRoot_NumberSystems_NumberSystem, info.FieldWidthTag)
 			MyXMLRoot_NumberSystems_NumberSystem_FieldWidth.text = pS(str(each_NumberSystem.FieldWidth))
 
 			#PadChar
-			MyXMLRoot_NumberSystems_NumberSystem_PadChar = ET.SubElement(MyXMLRoot_NumberSystems_NumberSystem, 'PadChar')
+			MyXMLRoot_NumberSystems_NumberSystem_PadChar = ET.SubElement(MyXMLRoot_NumberSystems_NumberSystem, info.PadCharTag)
 			MyXMLRoot_NumberSystems_NumberSystem_PadChar.text = pS(str(each_NumberSystem.PadChar))
 
 			#StartSequenceAt
-			MyXMLRoot_NumberSystems_NumberSystem_StartSequenceAt = ET.SubElement(MyXMLRoot_NumberSystems_NumberSystem, 'StartSequenceAt')
+			MyXMLRoot_NumberSystems_NumberSystem_StartSequenceAt = ET.SubElement(MyXMLRoot_NumberSystems_NumberSystem, info.StartSequenceAtTag)
 			MyXMLRoot_NumberSystems_NumberSystem_StartSequenceAt.text  = pS(str(each_NumberSystem.StartSequenceAt))
 
 			#SkipTo
 			if each_NumberSystem.SkipTo != None:
-				MyXMLRoot_NumberSystems_NumberSystem_SkipTo = ET.SubElement(MyXMLRoot_NumberSystems_NumberSystem, 'SkipTo')
+				MyXMLRoot_NumberSystems_NumberSystem_SkipTo = ET.SubElement(MyXMLRoot_NumberSystems_NumberSystem, info.SkipToTag)
 				MyXMLRoot_NumberSystems_NumberSystem_SkipTo.text = pS(str(each_NumberSystem.SkipTo))
 
 			#GapBefore
-			MyXMLRoot_NumberSystems_NumberSystem_GapBefore = ET.SubElement(MyXMLRoot_NumberSystems_NumberSystem, 'GapBefore')
+			MyXMLRoot_NumberSystems_NumberSystem_GapBefore = ET.SubElement(MyXMLRoot_NumberSystems_NumberSystem, info.GapBeforeTag)
 			MyXMLRoot_NumberSystems_NumberSystem_GapBefore.text = pS(str(each_NumberSystem.GapBefore))
 
 			#IncludeInNumbering
-			MyXMLRoot_NumberSystems_NumberSystem_IncludeInNumbering = ET.SubElement(MyXMLRoot_NumberSystems_NumberSystem, 'IncludeInNumbering')
+			MyXMLRoot_NumberSystems_NumberSystem_IncludeInNumbering = ET.SubElement(MyXMLRoot_NumberSystems_NumberSystem, info.IncludeInNumberingTag)
 			MyXMLRoot_NumberSystems_NumberSystem_IncludeInNumbering.text = pS(str(each_NumberSystem.IncludeInNumbering))
 
 			#NoValue
-			MyXMLRoot_NumberSystems_NumberSystem_NoValue = ET.SubElement(MyXMLRoot_NumberSystems_NumberSystem,'NoValue')
+			MyXMLRoot_NumberSystems_NumberSystem_NoValue = ET.SubElement(MyXMLRoot_NumberSystems_NumberSystem, info.NoValueTag)
 			MyXMLRoot_NumberSystems_NumberSystem_NoValue.text = pS(each_NumberSystem.NoValue)
 
 	# Risk Matrix
 	if len(Proj.RiskMatrices) > 0:
 		# create outer XML tag
-		MyXMLRoot_RiskMatrices = ET.SubElement(MyXMLRoot, 'RiskMatrices')
+		MyXMLRoot_RiskMatrices = ET.SubElement(MyXMLRoot, info.RiskMatricesTag)
 
 		# LookupTableItem
 		for each_RiskMatrix in Proj.RiskMatrices:
 			assert type(each_RiskMatrix) == core_classes.LookupTableItem
-			MyXMLRoot_RiskMatrices_RiskMatrix = ET.SubElement(MyXMLRoot_RiskMatrices, 'RiskMatrix')
+			MyXMLRoot_RiskMatrices_RiskMatrix = ET.SubElement(MyXMLRoot_RiskMatrices, info.RiskMatrixTag)
 
 			# <Category>
 			# J: TODO: could not map Category
 
 			# <SeverityDimension [SeverityDimensionIndex int as str] />
 			if each_RiskMatrix.SeverityDimensionIndex != None:
-				MyXMLRoot_RiskMatrices_RiskMatrix_SeverityDimension = ET.SubElement(MyXMLRoot_RiskMatrices_RiskMatrix, 'SeverityDimension')
+				MyXMLRoot_RiskMatrices_RiskMatrix_SeverityDimension = ET.SubElement(MyXMLRoot_RiskMatrices_RiskMatrix, info.SeverityDimensionTag)
 				MyXMLRoot_RiskMatrices_RiskMatrix_SeverityDimension.text = each_RiskMatrix.SeverityDimensionIndex
 
 			if len(each_RiskMatrix.DimensionUnits) > 0:
-				MyXMLRoot_RiskMatrices_RiskMatrix_DimensionUnits = ET.SubElement(MyXMLRoot_RiskMatrices_RiskMatrix,'Dimensions')
+				MyXMLRoot_RiskMatrices_RiskMatrix_DimensionUnits = ET.SubElement(MyXMLRoot_RiskMatrices_RiskMatrix,info.DimensionsTag)
 
 				for each_DimensionUnit in each_RiskMatrix.DimensionUnits:
 					assert type(each_DimensionUnit) == core_classes.UnitItem
-					MyXMLRoot_RiskMatrices_RiskMatrix_DimensionUnits_DimensionUnit = ET.SubElement(MyXMLRoot_RiskMatrices_RiskMatrix_DimensionUnits, 'Dimension')
+					MyXMLRoot_RiskMatrices_RiskMatrix_DimensionUnits_DimensionUnit = ET.SubElement(MyXMLRoot_RiskMatrices_RiskMatrix_DimensionUnits, info.DimensionTag)
 
 					#Name
-					MyXMLRoot_RiskMatrices_RiskMatrix_DimensionUnits_DimensionUnit_Name = ET.SubElement(MyXMLRoot_RiskMatrices_RiskMatrix_DimensionUnits_DimensionUnit, 'Name')
+					MyXMLRoot_RiskMatrices_RiskMatrix_DimensionUnits_DimensionUnit_Name = ET.SubElement(MyXMLRoot_RiskMatrices_RiskMatrix_DimensionUnits_DimensionUnit, info.NameTag)
 					MyXMLRoot_RiskMatrices_RiskMatrix_DimensionUnits_DimensionUnit_Name.text = pS(each_DimensionUnit.HumanName)
 
 			#Key
 			# J: TODO
 			if len(each_RiskMatrix.Keys) > 0:
-				MyXMLRoot_RiskMatrices_RiskMatrix_Key = ET.SubElement(MyXMLRoot_RiskMatrices_RiskMatrix, 'Key')
+				MyXMLRoot_RiskMatrices_RiskMatrix_Key = ET.SubElement(MyXMLRoot_RiskMatrices_RiskMatrix, info.KeyTag)
 				MyXMLRoot_RiskMatrices_RiskMatrix_Key.text = ''
 
 			#Entry
 			if len(each_RiskMatrix.Values) > 0:
-				MyXMLRoot_RiskMatrices_RiskMatrix_Entries = ET.SubElement(MyXMLRoot_RiskMatrices_RiskMatrix, 'Entries')
+				MyXMLRoot_RiskMatrices_RiskMatrix_Entries = ET.SubElement(MyXMLRoot_RiskMatrices_RiskMatrix, info.EntriesTag)
 
 				for each_Value in each_RiskMatrix.Values:
-					MyXMLRoot_RiskMatrices_RiskMatrix_Entries_Entry = ET.SubElement(MyXMLRoot_RiskMatrices_RiskMatrix_Entries, 'Entry')
+					MyXMLRoot_RiskMatrices_RiskMatrix_Entries_Entry = ET.SubElement(MyXMLRoot_RiskMatrices_RiskMatrix_Entries, info.EntryTag)
 					MyXMLRoot_RiskMatrices_RiskMatrix_Entries_Entry.text = pS(str(each_Value))
 
 	#Constants
 	# J: TODO
 	if len(Proj.Constants) > 0:
 		# create outer XML tag
-		MyXMLRoot_Constants = ET.SubElement(MyXMLRoot, 'Constants')
+		MyXMLRoot_Constants = ET.SubElement(MyXMLRoot, info.ConstantsTag)
 
 		for each_Constant in Proj.Constants:
 			assert type(each_Constant) == core_classes.ConstantItem
-			MyXMLRoot_Constants_Constant = ET.SubElement(MyXMLRoot_Constants, 'Constant')
+			MyXMLRoot_Constants_Constant = ET.SubElement(MyXMLRoot_Constants, info.ConstantTag)
 
 			# J: TODO cannot map id
 			#MyXMLRoot_Constants_Constant_Id = ET.SubElement(MyXMLRoot_Constants_Constant, 'ID')
@@ -302,11 +301,11 @@ def convertProjectToXml(Proj, ProjectFilename):
 	#FaultTree
 	if len(Proj.FaultTree) > 0:
 		# create outer XML tag
-		MyXMLRoot_FaultTrees = ET.SubElement(MyXMLRoot, 'FaultTrees')
+		MyXMLRoot_FaultTrees = ET.SubElement(MyXMLRoot, info.FaultTreesTag)
 
 		for each_FaultTree in Proj.FaultTrees:
 			assert type(each_FaultTree) == faulttree.FTObjectInCore
-			MyXMLRoot_FaultTrees_FaultTree = ET.SubElement(MyXMLRoot_FaultTrees, 'FaultTree')
+			MyXMLRoot_FaultTrees_FaultTree = ET.SubElement(MyXMLRoot_FaultTrees, info.FaultTreeTag)
 
 			# J: TODO
 			#GateStyle= (style of logic gates used throughout this FT)
@@ -319,8 +318,12 @@ def convertProjectToXml(Proj, ProjectFilename):
 				#MyXMLRoot_FaultTrees_FaultTree.set('OpMode', pS(faulttree.OpModeType.XMLName))
 
 			#ID
-			MyXMLRoot_FaultTrees_FaultTree_Id = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree, 'Id')
+			MyXMLRoot_FaultTrees_FaultTree_Id = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree, info.IDTag)
 			MyXMLRoot_FaultTrees_FaultTree_Id.text = pS(str(each_FaultTree.ID))
+
+			#SIFName
+			MyXMLRoot_FaultTrees_FaultTree_SIFName = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree, info.SIFNameTag)
+			MyXMLRoot_FaultTrees_FaultTree_SIFName.text = pS(str())
 
 			#J: TODO
 			#Header Data C
@@ -328,42 +331,42 @@ def convertProjectToXml(Proj, ProjectFilename):
 			#MyXMLRoot_FaultTrees_FaultTree_HeaderData.text = pS(str())
 
 			# J: TODO
-			#FTColumn
+			pass
 
 	#Comment
 	if len(Proj.Comments) > 0:
-		MyXMLRoot_Comments = ET.SubElement(MyXMLRoot, 'Comments')
+		MyXMLRoot_Comments = ET.SubElement(MyXMLRoot, info.CommentsTag)
 
 		each_Comment: core_classes.Comment
 		for each_Comment in Proj.Comments:
 			assert type(each_Comment) == core_classes.Comment
-			MyXMLRoot_Comments_Comment = ET.SubElement(MyXMLRoot_Comments,'Comment')
+			MyXMLRoot_Comments_Comment = ET.SubElement(MyXMLRoot_Comments,info.CommentTag)
 
-			MyXMLRoot_Comments_Comment_Id = ET.SubElement(MyXMLRoot_Comments_Comment, 'ID')
+			MyXMLRoot_Comments_Comment_Id = ET.SubElement(MyXMLRoot_Comments_Comment, info.IDTag)
 			MyXMLRoot_Comments_Comment_Id.text = pS(str(each_Comment.iD))
 
-			MyXMLRoot_Comments_Comment_Content = ET.SubElement(MyXMLRoot_Comments_Comment, 'Content')
+			MyXMLRoot_Comments_Comment_Content = ET.SubElement(MyXMLRoot_Comments_Comment, info.ContentTag)
 			MyXMLRoot_Comments_Comment_Content.text = pS(str(each_Comment.content))
 
-			MyXMLRoot_Comments_Comment_isVisible = ET.SubElement(MyXMLRoot_Comments_Comment, 'isVisible')
+			MyXMLRoot_Comments_Comment_isVisible = ET.SubElement(MyXMLRoot_Comments_Comment, info.isVisibleTag)
 			MyXMLRoot_Comments_Comment_isVisible.text = pS(str(each_Comment.isVisible))
 
-			MyXMLRoot_Comments_Comment_showInReport = ET.SubElement(MyXMLRoot_Comments_Comment, 'showInReport')
+			MyXMLRoot_Comments_Comment_showInReport = ET.SubElement(MyXMLRoot_Comments_Comment, info.showInReportTag)
 			MyXMLRoot_Comments_Comment_showInReport.text = pS(str(each_Comment.showInReport))
 
 	#Bookmark
 	if len(Proj.Bookmarks) > 0:
-		MyXMLRoot_Bookmarks = ET.SubElement(MyXMLRoot,'Bookmarks')
+		MyXMLRoot_Bookmarks = ET.SubElement(MyXMLRoot, info.BookmarksTag)
 
 		each_Bookmark: core_classes.Bookmark
 		for each_Bookmark in Proj.Bookmarks:
 			assert type(each_Bookmark) == core_classes.Bookmark
-			MyXMLRoot_Bookmarks_Bookmark = ET.SubElement(MyXMLRoot_Bookmarks,'Bookmark')
+			MyXMLRoot_Bookmarks_Bookmark = ET.SubElement(MyXMLRoot_Bookmarks,info.BookmarkTag)
 
-			MyXMLRoot_Bookmarks_Bookmark_ID = ET.SubElement(MyXMLRoot_Bookmarks_Bookmark, 'ID')
+			MyXMLRoot_Bookmarks_Bookmark_ID = ET.SubElement(MyXMLRoot_Bookmarks_Bookmark, info.IDTag)
 			MyXMLRoot_Bookmarks_Bookmark_ID.text = pS(str(each_Bookmark.iD))
 
-			MyXMLRoot_Bookmarks_Bookmark_isDeleted = ET.SubElement(MyXMLRoot_Bookmarks_Bookmark, 'isDeleted')
+			MyXMLRoot_Bookmarks_Bookmark_isDeleted = ET.SubElement(MyXMLRoot_Bookmarks_Bookmark, info.isDeletedTag)
 			MyXMLRoot_Bookmarks_Bookmark_isDeleted.text = pS(str(each_Bookmark.isDeleted))
 
 	pass
