@@ -320,6 +320,7 @@ def SetupDefaultTolRiskModel(Proj):
 	ReputationRiskReceptor = core_classes.RiskReceptorItem(XMLName='Reputation', HumanName=_('Reputation'))
 	# make a tolerable risk model object; populate it with risk receptors
 	TolRiskModel = core_classes.TolRiskFCatItem()
+	TolRiskModel.HumanName = 'Company X default risk matrix'
 	TolRiskModel.RiskReceptors = [PeopleRiskReceptor, EnvironmentRiskReceptor, AssetsRiskReceptor, ReputationRiskReceptor]
 	# make a tolerable risk matrix
 	Severity0 = core_classes.CategoryNameItem(XMLName='0', HumanName=_('Negligible'), HumanDescription=_('No significant impact'))

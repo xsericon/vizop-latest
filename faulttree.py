@@ -2684,11 +2684,16 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 				for ThisValueKindOption in Attrib.ValueKindOptions:
 					ValueKindOptionEl = ElementTree.SubElement(AttribEl, info.ValueKindOptionTag)
 					UnitOptionEl.text = str(ThisValueKindOption.XMLName)
-				for ThisConstantOption in self.Proj.Constants: # %%% working here
+				for ThisConstantOption in self.Proj.Constants:
 					ConstantOptionEl = ElementTree.SubElement(AttribEl, info.ConstantOptionTag)
-					ConstantOptionEl.text = str(ThisConstantOption.XMLName)
+					ConstantOptionEl.text = str(ThisConstantOption.HumanName)
 					IDEl = ElementTree.SubElement(ConstantOptionEl, info.IDTag)
 					IDEl.text = ThisConstantOption.ID
+				for ThisMatrixOption in self.Proj.TolRiskModels: # %%% working here
+					MatrixOptionEl = ElementTree.SubElement(AttribEl, info.MatrixOptionTag)
+					MatrixOptionEl.text = str(ThisMatrixOption.HumanName)
+					IDEl = ElementTree.SubElement(MatrixOptionEl, info.IDTag)
+					IDEl.text = ThisMatrixOption.ID
 
 			# elements where the text is the same as the FT attribute
 			# Note, SILTargetValue must be interrogated AFTER TargetRiskRed() call, above
