@@ -18,13 +18,6 @@ UsableProjDocTypes = ['VizopProject0.1'] # project doc types parsable by this ve
 CurrentProjDocType = 'VizopProject0.1' # doc type written by this version of Vizop
 HighestProjID = 0 # highest ID of all projects currently open (int)
 
-def GetNewID(Proj):
-	# get ID for new object in Proj (str)
-	assert isinstance(Proj, ProjectItem)
-	assert isinstance(Proj.MaxIDInProj, int)
-	Proj.MaxIDInProj += 1
-	return str(Proj.MaxIDInProj)
-
 class ProcessUnit(object): # object representing an area of the plant, e.g. "gas dryer"
 
 	def __init__(self, Proj=None, UnitNumber='', ShortName='', LongName=''):
@@ -72,7 +65,7 @@ class ProjectItem(object): # class of PHA project instances
 		self.EditAllowed = True # whether user can edit project in this Vizop instance. Eventually, this will be related to
 			# (1) whether license valid, and (2) whether this Vizop instance is in 'master' mode
 
-		self.MaxIDInProj = 0 # (int) highest ID of all objects in the project that are not contained in PHA models
+		self.MaxIDInProj = 0 # (int) highest ID of all objects in the project
 		self.PHAObjs = [] # list of PHA objects, in order created
 		self.ActiveViewports = [] # list of all currently active Viewports, in order created
 		self.AllViewportShadows = [] # list of all Viewport shadows (belonging to datacore)
@@ -85,7 +78,7 @@ class ProjectItem(object): # class of PHA project instances
 		self.CurrentTolRiskModel = None
 		self.Constants = [] # instances of ConstantItem
 		# the following is for testing
-		TestConstant = core_classes.ConstantItem(HumanName='Alarm failure', ID=GetNewID(Proj=self))
+		TestConstant = core_classes.ConstantItem(HumanName='Alarm failure', ID=self.GetNewID())
 		TestConstant.SetMyValue(0.1)
 		TestConstant.SetMyUnit(core_classes.ProbabilityUnit)
 		self.Constants.append(TestConstant)
@@ -120,6 +113,12 @@ class ProjectItem(object): # class of PHA project instances
 		self.RiskMatrices = [core_classes.LookupTableItem()] # list of risk matrix
 		self.Constants = [] # list of constants
 		#self.FaultTree = []
+
+	def GetNewID(self):
+		# get and return ID for new object in self (str)
+		assert isinstance(self.MaxIDInProj, int)
+		self.MaxIDInProj += 1
+		return str(self.MaxIDInProj)
 
 	def GetFTColumnWidth(self, FT): # return preferred distance, in canvas units, between left edges of a Fault Tree's columns (if in columns)
 		# or between top edges of rows (if in rows)
@@ -319,7 +318,7 @@ def SetupDefaultTolRiskModel(Proj):
 	AssetsRiskReceptor = core_classes.RiskReceptorItem(XMLName='Assets', HumanName=_('Assets'))
 	ReputationRiskReceptor = core_classes.RiskReceptorItem(XMLName='Reputation', HumanName=_('Reputation'))
 	# make a tolerable risk model object; populate it with risk receptors
-	TolRiskModel = core_classes.TolRiskFCatItem()
+	TolRiskModel = core_classes.TolRiskFCatItem(Proj)
 	TolRiskModel.HumanName = 'Company X default risk matrix'
 	TolRiskModel.RiskReceptors = [PeopleRiskReceptor, EnvironmentRiskReceptor, AssetsRiskReceptor, ReputationRiskReceptor]
 	# make a tolerable risk matrix

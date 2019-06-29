@@ -620,7 +620,7 @@ class ControlFrame(wx.Frame):
 
 		def GotoControlPanelAspect(self, NewAspect=None, Viewport=None, **Args):
 			# Display required widgets in ControlPanel according to requested NewAspect
-			# NewAspect (ControlPanelAspectItem instance): aspect to switch to
+			# NewAspect (ControlPanelAspectItem instance or name as str): aspect to switch to
 			# Viewport is current Viewport (currently only needed for mode 'Edit-Centre')
 
 			def GotoNewPHAModelAspect(PrevMode=None, PrevViewport=None):
@@ -718,24 +718,33 @@ class ControlFrame(wx.Frame):
 #				return (Usablewlist, HideList)
 
 			# main procedure for GotoControlPanelAspect
-			assert isinstance(NewAspect, self.ControlPanelAspectItem)
+			assert isinstance(NewAspect, (self.ControlPanelAspectItem, str))
 			global KeyPressHash
 			# deactivate previous aspect
 			if self.ControlPanelCurrentAspect: self.ControlPanelCurrentAspect.Deactivate()
-			self.ControlPanelCurrentAspect = NewAspect # store new aspect
-			NewAspect.CurrentArgs = Args # store for repeating on next call
-			# fetch UndoOnCancel value to store in undo record for any tasks that should be undone when Cancel pressed
-			self.UndoOnCancel = Args.get('UndoOnCancel', None)
-			# prefill widgets in new aspect and activate it
-			NewAspect.Prefill()
-			NewAspect.Activate()
-			# switch to tab for new aspect
-			if NewAspect.IsInNotebook: # is there a tab already?
-				self.MyNotebook.ChangeSelection(self.MyNotebook.FindPage(NewAspect.NotebookPage))
-			else: # no tab yet; make one, and insert it at the end
-				self.MyNotebook.InsertPage(index=self.MyNotebook.GetPageCount(), page=NewAspect.NotebookPage,
-					text=NewAspect.TabText)
-				self.MyNotebook.SetSelection(index=self.MyNotebook.GetPageCount()-1)
+			# get target aspect, if supplied as a string
+			if isinstance(NewAspect, str):
+				TargetAspect = {'CPAspect_NumValue': self.NumericalValueAspect}.get(NewAspect, None)
+			else: TargetAspect = NewAspect
+			if TargetAspect: # any recognised aspect supplied?
+				self.ControlPanelCurrentAspect = TargetAspect # store new aspect
+				TargetAspect.CurrentArgs = Args # store for repeating on next call
+				self.PHAObjInControlPanel = Args.get('PHAObjInControlPanel', None)
+				self.ComponentInControlPanel = Args.get('ComponentInControlPanel', None)
+				# fetch UndoOnCancel value to store in undo record for any tasks that should be undone when Cancel pressed
+				self.UndoOnCancel = Args.get('UndoOnCancel', None)
+				# prefill widgets in new aspect and activate it
+				print('CF737 activating aspect: ', TargetAspect.InternalName)
+				TargetAspect.Prefill()
+				TargetAspect.Activate()
+				# switch to tab for new aspect
+				if TargetAspect.IsInNotebook: # is there a tab already?
+					self.MyNotebook.ChangeSelection(self.MyNotebook.FindPage(TargetAspect.NotebookPage))
+				else: # no tab yet; make one, and insert it at the end
+					self.MyNotebook.InsertPage(index=self.MyNotebook.GetPageCount(), page=TargetAspect.NotebookPage,
+						text=TargetAspect.TabText)
+					self.MyNotebook.SetSelection(index=self.MyNotebook.GetPageCount()-1)
+			else: print('CF744 warning, unrecognised control panel aspect "%s" requested' % str(NewAspect))
 
 		def WidgetsInPosition(self, WidgList, StartingRow=1, ColOffset=0):
 			# set up widgets in WidgList (list of UIWidgetItems) for insertion into an overall widget list at StartingRow
@@ -755,7 +764,7 @@ class ControlFrame(wx.Frame):
 			return max(0, MaxRow - MinRow + 1) # the 0 handles empty WidgList case
 
 		def SetInitialControlPanelAspect(self):
-			# sets the initial display of control panel, when first created. Currently, this is empty.
+			# sets the initial display of control panel, when first created. Currently, this is empty.%%%
 			# It will be populated later by ControlFrame.__init__ calling SetProject()
 			pass # no content required at first
 #			if self.CurrentProj.ActiveViewports: # if any Viewports exist: go to Edit Centre mode
@@ -803,6 +812,7 @@ class ControlFrame(wx.Frame):
 
 			# Make and populate the tabbed panels. Add more aspects here as they are developed
 			self.MakePHAModelsAspect()
+			self.MakeNumericalValueAspect()
 			# Make sizer for notebook (this is required even though there's only one item in it, the notebook itself)
 			MySizer = wx.BoxSizer()
 			MySizer.Add(self.MyNotebook, 1, wx.EXPAND)
@@ -946,6 +956,13 @@ class ControlFrame(wx.Frame):
 			self.PHAModelsAspect.NavigateBackButton.Widget.Enable(True in [m.Displayable for m in Proj.BackwardHistory])
 			self.PHAModelsAspect.UndoButton.Widget.Enable(bool(Proj.UndoList))
 			self.PHAModelsAspect.RedoButton.Widget.Enable(bool(Proj.RedoList))
+
+#		def GotoAspect(self, NewAspect=''):
+#			# switch Control Panel to aspect named in NewAspect (str). Not used
+#			# Ignored if NewAspect is not a recognised aspect name%%%
+#			assert isinstance(NewAspect, str)
+#			if NewAspect == 'CPAspect_NumValue': # requested Numerical Values aspect
+#				self.MakeNumericalValueAspect()
 
 		def PrefillWidgetsForPHAModelsAspect(self): # set initial values for widgets in PHAModels aspect
 			Proj = self.TopLevelFrame.CurrentProj
@@ -1174,6 +1191,7 @@ class ControlFrame(wx.Frame):
 
 			def Activate(self, **Args): # activate widgets for this aspect
 				Proj = self.ParentFrame.CurrentProj
+				print('CF1194 activating aspect with WidgActive: ', self.ParentFrame.WidgActive)
 				self.TopLevelFrame.ActivateWidgetsInPanel(Widgets=self.WidgetList, Sizer=self.MySizer,
 					ActiveWidgetList=self.ParentFrame.WidgActive, **Args)
 
@@ -1405,6 +1423,11 @@ class ControlFrame(wx.Frame):
 			# switch on or off keystroke handling
 			assert isinstance(On, bool)
 			self.Parent.KeyPressEnabled = On
+
+		def GotoControlPanelAspect(self, AspectName, PHAObjInControlPanel, ComponentInControlPanel):
+			# handle request from Viewport to change the aspect in the Control Panel
+			self.TopLevelFrame.MyControlPanel.GotoControlPanelAspect(NewAspect=AspectName,
+				PHAObjInControlPanel=PHAObjInControlPanel, ComponentInControlPanel=ComponentInControlPanel)
 
 	def OnExitVizopRequest(self, event): # Handle 'Exit Vizop' request from File menu, button press or keyboard shortcut
 		ControlFrameData.Data['RequestToQuit'] = True # set return data for use by heart
@@ -2257,6 +2280,7 @@ class ControlFrame(wx.Frame):
 			# get the user to create a PHA model
 			self.InviteUserToCreatePHAModel(Proj=ThisProj)
 			# set control panel to PHAModels aspect
+			print('CF2281 going to PHA models aspect')
 			self.MyControlPanel.GotoControlPanelAspect(NewAspect=self.MyControlPanel.PHAModelsAspect)
 
 	def InviteUserToCreatePHAModel(self, Proj):

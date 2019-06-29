@@ -1440,10 +1440,12 @@ def FirstProblemValueIn(Values):  # return:
 	else:
 		return None, -1
 
-class TolRiskModel(object): # superclass of tolerable risk model classes. TODO add ID attrib
+class TolRiskModel(object): # superclass of tolerable risk model classes
 
-	def __init__(self):
+	def __init__(self, Proj):
 		object.__init__(self)
+		self.Proj = Proj
+		self.ID = Proj.GetNewID()
 		self.RiskReceptors = [] # ordered list of RR's for this model
 		self.SeverityUnits = ['']  # ordered list of units mapping to RiskReceptors
 		self.MinSeverity = [ [] ]  # list of (lists of severity values for each severity category), one list per RR, in same order as RiskReceptors
@@ -1458,10 +1460,10 @@ class TolRiskModel(object): # superclass of tolerable risk model classes. TODO a
 
 	TolFreq = property(fget=GetTolFreq)
 
-class TolRiskFCatItem(TolRiskModel):  # frequency categories model to determine tolerable risk
+class TolRiskFCatItem(TolRiskModel): # frequency categories model to determine tolerable risk
 
-	def __init__(self):
-		TolRiskModel.__init__(self)
+	def __init__(self, Proj):
+		TolRiskModel.__init__(self, Proj)
 
 	def GetTolFreq(self, RiskReceptor=DefaultRiskReceptor, SeverityValue=None, SeverityDescription=None):
 		# returns tolerable frequency (NumValueItem instance) corresponding to the SeverityValue (NumValueItem) if supplied,

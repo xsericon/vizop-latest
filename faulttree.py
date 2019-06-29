@@ -313,7 +313,7 @@ class FTHeader(object): # FT header object. Rendered by drawing text into bitmap
 		TolFreqLabel = TextElement(self.FT, Row=4, ColStart=0, ColSpan=1, StartX=0, EndX=Col1XStartInCU-1,
 			HostObject=self, InternalName='TolFreqLabel')
 		TolFreq = TextElement(self.FT, Row=4, ColStart=1, ColSpan=1, StartX=Col1XStartInCU, EndX=499,
-			HostObject=self, InternalName='TolFreq', EditBehaviour='Text')
+			HostObject=self, InternalName='TolFreq', EditBehaviour='Text', ControlPanelAspect='CPAspect_NumValue')
 		UELLabel = TextElement(self.FT, Row=4, ColStart=2, ColSpan=1, StartX=500, EndX=749,
 			HostObject=self, InternalName='UELLabel')
 		UEL = TextElement(self.FT, Row=4, ColStart=3, ColSpan=1, StartX=750, EndX=999,
@@ -475,6 +475,7 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 		# HostObject: the FTHeader or FTEvent instance containing this TextElement instance
 		# Args can include: HorizAlignment ('Left', 'Centre' or 'Right') (defaults to Centre if not specified)
 		#	MaxWidthInCU (int) max width of component containing the text (defaults to 999)
+		#	ControlPanelAspect (str) name of aspect to show in Control Panel when this element has focus
 		FTBoxyObject.__init__(self, **Args)
 		assert isinstance(FT, FTForDisplay)
 		assert isinstance(HostObject, (FTHeader, FTEvent, FTGate, FTConnector))
@@ -568,7 +569,11 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 			CanvZoomY=Zoom, PanX=0, PanY=0, VertAlignment='Top')
 
 	def HandleMouseLClickOnMe(self, **Args): # handle mouse left button single click on TextElement instance
-		if self.FT.PHAObj.EditAllowed: # proceed only if allowed to edit in this instance of vizop
+		# first, request control frame to show appropriate aspect in control panel%%% working here
+		if getattr(self, 'ControlPanelAspect', None):
+			self.FT.DisplDevice.GotoControlPanelAspect(AspectName=self.ControlPanelAspect,
+				PHAObjInControlPanel=self.HostObject, ComponentInControlPanel=self.InternalName)
+		if self.FT.PHAObj.EditAllowed: # proceed with editing only if allowed to edit in this instance of vizop
 			# get absolute position of textbox for editing: position within element + column + FT, then apply zoom and pan
 			Zoom = self.FT.Zoom
 			# check if HostObject of this element is in a column; if so, get PosX/Y within the column
