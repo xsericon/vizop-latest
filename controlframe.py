@@ -764,7 +764,7 @@ class ControlFrame(wx.Frame):
 			return max(0, MaxRow - MinRow + 1) # the 0 handles empty WidgList case
 
 		def SetInitialControlPanelAspect(self):
-			# sets the initial display of control panel, when first created. Currently, this is empty.%%%
+			# sets the initial display of control panel, when first created. Currently, this is empty.
 			# It will be populated later by ControlFrame.__init__ calling SetProject()
 			pass # no content required at first
 #			if self.CurrentProj.ActiveViewports: # if any Viewports exist: go to Edit Centre mode
@@ -959,7 +959,7 @@ class ControlFrame(wx.Frame):
 
 #		def GotoAspect(self, NewAspect=''):
 #			# switch Control Panel to aspect named in NewAspect (str). Not used
-#			# Ignored if NewAspect is not a recognised aspect name%%%
+#			# Ignored if NewAspect is not a recognised aspect name
 #			assert isinstance(NewAspect, str)
 #			if NewAspect == 'CPAspect_NumValue': # requested Numerical Values aspect
 #				self.MakeNumericalValueAspect()
@@ -968,6 +968,8 @@ class ControlFrame(wx.Frame):
 			Proj = self.TopLevelFrame.CurrentProj
 			# enable navigation buttons if there are any items in current project's history lists
 			self.UpdateNavigationButtonStatus(Proj)
+			# select widgets to be displayed%%%
+			self.WidgActive = self.PHAModelsAspect.WidgetList[:]
 
 		def MakeStandardWidgets(self, Scope, NotebookPage):
 			# make standard set of widgets, e.g. navigation buttons and undo/redo buttons, appearing on every aspect
@@ -1207,12 +1209,12 @@ class ControlFrame(wx.Frame):
 		assert isinstance(Sizer, wx.GridBagSizer)
 		assert isinstance(ActiveWidgetList, list)
 		# set up widgets in their sizer
+		print('CF1212 calling PopulateSizer with Widgets:', Widgets)
 		display_utilities.PopulateSizer(Sizer=Sizer, Widgets=Widgets, ActiveWidgetList=ActiveWidgetList,
 			DefaultFont=self.Fonts['NormalWidgetFont'], HighlightBkgColour=self.ColScheme.BackHighlight)
-		# set widget event handlers
-		assert isinstance(Widgets, list)
+		# set widget event handlers for active widgets
 		global KeyPressHash
-		for ThisWidget in Widgets:
+		for ThisWidget in ActiveWidgetList:
 			if ThisWidget.Handler:
 				for Event in ThisWidget.Events:
 					ThisWidget.Widget.Bind(Event, ThisWidget.Handler)
@@ -1252,7 +1254,7 @@ class ControlFrame(wx.Frame):
 				# 'NotAllowed' (L button held down, but can't drag this object), 'Dragging' (dragging in progress)
 			self.ActiveWidgets = [] # instances of UIWidgetItem
 
-		def RefreshViewPanel(self, Proj): # update view panel to reflect current display status%%%
+		def RefreshViewPanel(self, Proj): # update view panel to reflect current display status
 			print("CF1141 starting RefreshViewPanel, coding here")
 #			self.DestroyActiveWidgets() # remove all active widgets
 
@@ -1731,7 +1733,7 @@ class ControlFrame(wx.Frame):
 			info.PHAModelIDTag: Args['PHAModel'].ID, info.PHAModelTypeTag: Args['PHAModel'].InternalName,
 			info.MilestoneIDTag: NewMilestone.ID, info.D2CSocketNoTag: str(D2CSocketNo), info.C2DSocketNoTag: str(C2DSocketNo)}
 		vizop_misc.SendRequest(self.zmqOutwardSocket, Command=RequestToDatacore, **NewViewportAttribs)
-		# show VizopTalks confirmation message%%%
+		# show VizopTalks confirmation message
 		if not Redoing:
 			VizopTalksArgs.update( {'Priority': ConfirmationPriority} ) # set message priority
 			self.MyVTPanel.SubmitVizopTalksMessage(**VizopTalksArgs)
@@ -1888,7 +1890,7 @@ class ControlFrame(wx.Frame):
 		# add target Viewport
 		Proj.ActiveViewports.append(ViewportToShow)
 		self.CurrentViewport = ViewportToShow
-		# restore zoom and pan, if provided in XMLRoot%%%
+		# restore zoom and pan, if provided in XMLRoot
 		if XMLRoot is not None:
 			ThisZoomTag = XMLRoot.find(info.ZoomTag)
 			TargetZoom = ThisZoomTag.text if ThisZoomTag else None
@@ -2002,7 +2004,7 @@ class ControlFrame(wx.Frame):
 		return Reply
 
 	def UpdateAllViewportsAfterUndo(self, XMLRoot=None):
-		# handle request to update all Viewports after undo of a data change. %%%
+		# handle request to update all Viewports after undo of a data change
 		global UndoChainWaiting
 		Proj = utilities.ObjectWithID(self.Projects, XMLRoot.find(info.ProjIDTag).text)
 		# write undo confirmation message in Vizop Talks panel
@@ -2010,7 +2012,7 @@ class ControlFrame(wx.Frame):
 			Priority=ConfirmationPriority)
 		# update display in local Control Frame, if SkipRefresh tag in XMLRoot is False
 		if not utilities.Bool2Str(XMLRoot.find(info.SkipRefreshTag).text):
-			# request redraw of Viewport, with changed element visible%%% working here. Need to make RenderInDC force element to be visible
+			# request redraw of Viewport, with changed element visible TODO make RenderInDC force element to be visible
 			ThisViewport.RenderInDC(TargetDC, FullRefresh=True)
 		# set UndoChainWaiting flag to trigger any further undo items
 		UndoChainWaiting = utilities.Bool2Str(XMLRoot.find(info.ChainWaitingTag).text)
