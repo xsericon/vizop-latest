@@ -736,6 +736,8 @@ class ControlFrame(wx.Frame):
 				# prefill widgets in new aspect and activate it
 				print('CF737 activating aspect: ', TargetAspect.InternalName)
 				TargetAspect.Prefill()
+				# set up the notebook tab for the aspect
+				TargetAspect.Initialize(ParentNotebook=self.MyNotebook)
 				TargetAspect.Activate()
 				# switch to tab for new aspect
 				if TargetAspect.IsInNotebook: # is there a tab already?
@@ -969,7 +971,7 @@ class ControlFrame(wx.Frame):
 			# enable navigation buttons if there are any items in current project's history lists
 			self.UpdateNavigationButtonStatus(Proj)
 			# select widgets to be displayed%%%
-			self.WidgActive = self.PHAModelsAspect.WidgetList[:]
+#			self.WidgActive = self.PHAModelsAspect.WidgetList[:]
 
 		def MakeStandardWidgets(self, Scope, NotebookPage):
 			# make standard set of widgets, e.g. navigation buttons and undo/redo buttons, appearing on every aspect
@@ -1026,7 +1028,7 @@ class ControlFrame(wx.Frame):
 				self.PHAModelsAspect.NavigateForwardButton, self.PHAModelsAspect.NewPHAModelTypesLabel,
 				self.PHAModelsAspect.UndoButton, self.PHAModelsAspect.RedoButton, self.PHAModelsAspect.NewPHAModelTypesList]
 			# do final setting up
-			self.PHAModelsAspect.Initialize(ParentNotebook=self.MyNotebook)
+#			self.PHAModelsAspect.Initialize(ParentNotebook=self.MyNotebook)
 
 		def MakeNumericalValueAspect(self): # make Control Panel aspect for numerical value editing
 			# make basic attribs needed for the aspect
@@ -1096,7 +1098,7 @@ class ControlFrame(wx.Frame):
 				ColLoc=6, ColSpan=1,
 				Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_LEFT | wx.EXPAND)
 			# make list of all widgets in this aspect
-			self.PHAModelsAspect.WidgetList = [self.NumericalValueAspect.NavigateBackButton,
+			self.NumericalValueAspect.WidgetList = [self.NumericalValueAspect.NavigateBackButton,
 				self.NumericalValueAspect.NavigateForwardButton, self.NumericalValueAspect.HeaderLabel,
 				self.NumericalValueAspect.CommentButton,
 				self.NumericalValueAspect.UndoButton, self.NumericalValueAspect.RedoButton,
@@ -1110,8 +1112,8 @@ class ControlFrame(wx.Frame):
 				self.NumericalValueAspect.EditConstantsButton,
 				self.NumericalValueAspect.MatrixLabel, self.NumericalValueAspect.MatrixChoice,
 				self.NumericalValueAspect.EditMatricesButton]
-			# do final setting up
-			self.NumericalValueAspect.Initialize(ParentNotebook=self.MyNotebook)
+			# do final setting up. We don't call Initialize() yet - wait until we want to display the aspect
+#			self.NumericalValueAspect.Initialize(ParentNotebook=self.MyNotebook)
 
 		# specific methods for NumericalValueAspect
 
