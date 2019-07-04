@@ -165,6 +165,12 @@ showInReportTag = 'showInReport'
 BookmarksTag = 'Bookmarks'
 BookmarkTag = 'Bookmark'
 isDeletedTag = 'isDeleted'
+TypeTag = 'Type'
+ValueTag = 'Value'
+
+NumberSystemStringType = 'str'
+NumberSystemParentType = 'Parent'
+NumberSystemSerialType = 'Serial'
 
 FTImagePrefix = 'FT_' # filenames containing all images used in FT must begin with this
 ProjInfoImagePrefix = 'ProjInfo_'

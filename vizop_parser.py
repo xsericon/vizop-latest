@@ -198,37 +198,63 @@ def convertProjectToXml(Proj, ProjectFilename):
 		MyXMLRoot_NumberSystems = ET.SubElement(MyXMLRoot, info.NumberSystemsTag)
 
 		for each_NumberSystem in Proj.NumberSystems:
-			assert type(each_NumberSystem) == core_classes.SerialNumberChunkItem
-			MyXMLRoot_NumberSystems_NumberSystem = ET.SubElement(MyXMLRoot_NumberSystems, info.NumberSystemTag)
+			# create outer XML tag
+			MyXMLRoot_NumberSystems_NumberSystem = ET.SubElement(MyXMLRoot_NumberSystems, info.NumberSystemsTag)
 
-			#FieldWidth
-			MyXMLRoot_NumberSystems_NumberSystem_FieldWidth = ET.SubElement(MyXMLRoot_NumberSystems_NumberSystem, info.FieldWidthTag)
-			MyXMLRoot_NumberSystems_NumberSystem_FieldWidth.text = pS(str(each_NumberSystem.FieldWidth))
+			if type(each_NumberSystem) == str:
 
-			#PadChar
-			MyXMLRoot_NumberSystems_NumberSystem_PadChar = ET.SubElement(MyXMLRoot_NumberSystems_NumberSystem, info.PadCharTag)
-			MyXMLRoot_NumberSystems_NumberSystem_PadChar.text = pS(str(each_NumberSystem.PadChar))
+				MyXMLRoot_NumberSystems_NumberSystem_Type = ET.SubElement(MyXMLRoot_NumberSystems_NumberSystem, info.TypeTag)
+				MyXMLRoot_NumberSystems_NumberSystem_Type.text = pS(info.NumberSystemStringType)
 
-			#StartSequenceAt
-			MyXMLRoot_NumberSystems_NumberSystem_StartSequenceAt = ET.SubElement(MyXMLRoot_NumberSystems_NumberSystem, info.StartSequenceAtTag)
-			MyXMLRoot_NumberSystems_NumberSystem_StartSequenceAt.text  = pS(str(each_NumberSystem.StartSequenceAt))
+				MyXMLRoot_NumberSystems_NumberSystem_Value = ET.SubElement(MyXMLRoot_NumberSystems_NumberSystem, info.ValueTag)
+				MyXMLRoot_NumberSystems_NumberSystem_Value.text = pS(each_NumberSystem)
+				pass
 
-			#SkipTo
-			if each_NumberSystem.SkipTo != None:
-				MyXMLRoot_NumberSystems_NumberSystem_SkipTo = ET.SubElement(MyXMLRoot_NumberSystems_NumberSystem, info.SkipToTag)
-				MyXMLRoot_NumberSystems_NumberSystem_SkipTo.text = pS(str(each_NumberSystem.SkipTo))
+			elif type(each_NumberSystem) == core_classes.ParentNumberChunkItem:
+				#TODO need to map object ID
 
-			#GapBefore
-			MyXMLRoot_NumberSystems_NumberSystem_GapBefore = ET.SubElement(MyXMLRoot_NumberSystems_NumberSystem, info.GapBeforeTag)
-			MyXMLRoot_NumberSystems_NumberSystem_GapBefore.text = pS(str(each_NumberSystem.GapBefore))
+				#MyXMLRoot_NumberSystems_NumberSystem_Type = ET.SubElement(MyXMLRoot_NumberSystems_NumberSystem, info.TypeTag)
+				#MyXMLRoot_NumberSystems_NumberSystem_Type.text = pS(info.NumberSystemParentType)
 
-			#IncludeInNumbering
-			MyXMLRoot_NumberSystems_NumberSystem_IncludeInNumbering = ET.SubElement(MyXMLRoot_NumberSystems_NumberSystem, info.IncludeInNumberingTag)
-			MyXMLRoot_NumberSystems_NumberSystem_IncludeInNumbering.text = pS(str(each_NumberSystem.IncludeInNumbering))
+				#MyXMLRoot_NumberSystems_NumberSystem_ID = ET.SubElement(MyXMLRoot_NumberSystems_NumberSystem, info.IDTag)
+				#MyXMLRoot_NumberSystems_NumberSystem_ID.text = pS(str(each_NumberSystem.ID))
+				pass
 
-			#NoValue
-			MyXMLRoot_NumberSystems_NumberSystem_NoValue = ET.SubElement(MyXMLRoot_NumberSystems_NumberSystem, info.NoValueTag)
-			MyXMLRoot_NumberSystems_NumberSystem_NoValue.text = pS(each_NumberSystem.NoValue)
+			elif type(each_NumberSystem) == core_classes.SerialNumberChunkItem:
+				MyXMLRoot_NumberSystems_NumberSystem_Type = ET.SubElement(MyXMLRoot_NumberSystems_NumberSystem, info.NumberSystemSerialType)
+
+				#FieldWidth
+				MyXMLRoot_NumberSystems_NumberSystem_FieldWidth = ET.SubElement(MyXMLRoot_NumberSystems_NumberSystem, info.FieldWidthTag)
+				MyXMLRoot_NumberSystems_NumberSystem_FieldWidth.text = pS(str(each_NumberSystem.FieldWidth))
+
+				#PadChar
+				MyXMLRoot_NumberSystems_NumberSystem_PadChar = ET.SubElement(MyXMLRoot_NumberSystems_NumberSystem, info.PadCharTag)
+				MyXMLRoot_NumberSystems_NumberSystem_PadChar.text = pS(str(each_NumberSystem.PadChar))
+
+				#StartSequenceAt
+				MyXMLRoot_NumberSystems_NumberSystem_StartSequenceAt = ET.SubElement(MyXMLRoot_NumberSystems_NumberSystem, info.StartSequenceAtTag)
+				MyXMLRoot_NumberSystems_NumberSystem_StartSequenceAt.text  = pS(str(each_NumberSystem.StartSequenceAt))
+
+				#SkipTo
+				if each_NumberSystem.SkipTo != None:
+					MyXMLRoot_NumberSystems_NumberSystem_SkipTo = ET.SubElement(MyXMLRoot_NumberSystems_NumberSystem, info.SkipToTag)
+					MyXMLRoot_NumberSystems_NumberSystem_SkipTo.text = pS(str(each_NumberSystem.SkipTo))
+
+				#GapBefore
+				MyXMLRoot_NumberSystems_NumberSystem_GapBefore = ET.SubElement(MyXMLRoot_NumberSystems_NumberSystem, info.GapBeforeTag)
+				MyXMLRoot_NumberSystems_NumberSystem_GapBefore.text = pS(str(each_NumberSystem.GapBefore))
+
+				#IncludeInNumbering
+				MyXMLRoot_NumberSystems_NumberSystem_IncludeInNumbering = ET.SubElement(MyXMLRoot_NumberSystems_NumberSystem, info.IncludeInNumberingTag)
+				MyXMLRoot_NumberSystems_NumberSystem_IncludeInNumbering.text = pS(str(each_NumberSystem.IncludeInNumbering))
+
+				#NoValue
+				MyXMLRoot_NumberSystems_NumberSystem_NoValue = ET.SubElement(MyXMLRoot_NumberSystems_NumberSystem, info.NoValueTag)
+				MyXMLRoot_NumberSystems_NumberSystem_NoValue.text = pS(each_NumberSystem.NoValue)
+
+			elif:
+				raise Exception('NumberSystem type incorrect.')
+				pass
 
 	# Risk Matrix
 	if len(Proj.RiskMatrices) > 0:
@@ -242,6 +268,7 @@ def convertProjectToXml(Proj, ProjectFilename):
 
 			# <Category>
 			# J: TODO: could not map Category
+
 
 			# <SeverityDimension [SeverityDimensionIndex int as str] />
 			if each_RiskMatrix.SeverityDimensionIndex != None:
@@ -388,229 +415,7 @@ def convertProjectToXml(Proj, ProjectFilename):
 """ ----------Project > XML----------]""" 
 
 """[----------XML > Project---------- """
-# @Jack: TODO XML tree and rules work in progress
-XMLTreeFormat = """
-<xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema">
-			<xsd:element name="VizopProject">
-			<xsd:complexType>
-			<xsd:sequence>
-				<xsd:element name="VizopVersion" type="xsd:integer" minOccurs="0"/>
-				<xsd:element name="ProjectName" type="xsd:string" minOccurs="0"/>
-				<xsd:element name="Description" type="xsd:string" minOccurs="0"/>
-				<xsd:element name="TeamMembers" minOccurs="0">
-				<xsd:complexType>
-				<xsd:sequence>
-						<xsd:element name="TeamMember"  minOccurs="0">
-						<xsd:complexType>
-						<xsd:sequence>
-							<xsd:element name="ID" type="xsd:integer" />
-							<xsd:element name="Name" type="xsd:string" />
-							<xsd:element name="Role" type="xsd:string"/>
-							<xsd:element name="Affiliation" type="xsd:string" />
-						</xsd:sequence>
-						</xsd:complexType>
-						</xsd:element>
-				</xsd:sequence>
-				</xsd:complexType>
-				</xsd:element>
-				<xsd:element name="EditNumber" type="xsd:string" minOccurs="0"/>
-				<xsd:element name="ShortTitle" type="xsd:string" minOccurs="0"/>
-				<xsd:element name="ProjNumber" type="xsd:string" minOccurs="0"/>	
-				<xsd:element name="ProjectComponent" minOccurs="0">
-				<xsd:complexType>
-				<xsd:sequence>
 
-					<xsd:element name="ProcessUnit">
-					<xsd:complexType>
-					<xsd:sequence>
-						<xsd:element name="ID" type="xsd:string"/>
-						<xsd:element name="UnitNumber" type="xsd:integer"/>
-						<xsd:element name="ShortName" type="xsd:string"/>
-						<xsd:element name="LongName" type="xsd:string"/>
-						<xsd:element name="PHA" type="xsd:string"/>
-					</xsd:sequence>
-					</xsd:complexType>
-					</xsd:element>
-
-					<xsd:element name="RecommendationReport" type="xsd:string" minOccurs="0"/>
-
-					<xsd:element name="RiskReceptor">
-						<xsd:complexType>
-						<xsd:sequence>
-						<xsd:element name="ID" type="xsd:integer"/>
-						<xsd:element name="Name" type="xsd:string"/>
-						</xsd:sequence>
-						</xsd:complexType>
-					</xsd:element>
-
-					<xsd:element name="NumberingSystem">
-					<xsd:complexType>
-					<xsd:sequence>
-						<xsd:element name="ID" type="xsd:integer"/>
-						<xsd:element name="Chunk">
-						<xsd:complexType>
-						<xsd:sequence>
-							<xsd:element name="Type" type="xsd:string">/
-							<xsd:element name="Value" type="xsd:string"/>
-							<xsd:element name="ID" type="xsd:string"/>
-							<xsd:element name="Fieldwidth" type="xsd:string"/>
-							<xsd:element name="PadChar" type="xsd:string"/>
-							<xsd:element name="StartAt" type="xsd:string"/>
-							<xsd:element name="SkipTo" type="xsd:string"/>
-							<xsd:element name="GapBefore" type="xsd:string"/>
-							<xsd:element name="Include" type="xsd:string"/>
-							<xsd:element name="Include" type="xsd:string"/>
-							<xsd:element name="NoValue" type="xsd:string"/>
-						</xsd:sequence>
-						</xsd:complexType>
-						</xsd:element>
-					</xsd:sequence>
-					</xsd:complexType>
-					</xsd:element>
-
-					<xsd:element name="RiskMatrix">
-					<xsd:complexType>
-					<xsd:sequence>
-						<xsd:element name="Category">
-						<xsd:complexType>
-						<xsd:sequence>
-							<xsd:element name="ID" type="xsd:string"/>
-							<xsd:element name="Name" type="xsd:string"/>
-							<xsd:element name="Description" type="xsd:integer"/>
-						</xsd:sequence>
-						</xsd:complexType>
-						</xsd:element>
-						<xsd:element name="SeverityDimension">
-						<xsd:complexType>
-						<xsd:sequence>
-							<xsd:element name="Dimension"/>
-							<xsd:complexType>
-							<xsd:sequence>
-								<xsd:element name="Name" type="xsd:string"/>
-								<xsd:element name="Key" type="xsd:string"/>
-							</xsd:complexType>
-							</xsd:element>
-						</xsd:sequence>
-						</xsd:complexType>
-						</xsd:element>
-					</xsd:sequence>
-					</xsd:complexType>
-					</xsd:element>
-
-					<xsd:element name="FaultTree">
-					<xsd:complexType>
-					<xsd:sequence>
-						<xsd:element name="HeaderData" type="xsd:string"/>
-						<xsd:element name="FTColumn">
-						<xsd:complexType>
-						<xsd:sequence>
-
-							<xsd:element name="FTElements">
-							<xsd:complexType>
-							<xsd:sequence>
-
-								<xsd:element name="FTEvent">
-								<xsd:complexType>
-								<xsd:sequence>
-
-									<xsd:element name="Value" type="xsd:string"/>
-									<xsd:element name="ActionItem" type="xsd:string"/>
-									<xsd:element name="CollapseGroup" type="xsd:integer"/>
-									<xsd:element name="ViewMode" type="xsd:integer"/>
-
-								</xsd:sequence>
-								</xsd:complexType>
-								</xsd:element>
-
-							</xsd:sequence>
-							</xsd:complexType>
-
-						</xsd:sequence>
-						</xsd:complexType>
-						</xsd:element>
-
-					</xsd:sequence>
-					</xsd:complexType>
-					</xsd:element>
-
-					<xsd:element name="PHA">
-					<xsd:complexType>
-					<xsd:sequence>
-						<xsd:element name="ID" type="xsd:integer"/>
-						<xsd:element name="Node" type="xsd:string"/>
-					</xsd:sequence>
-					</xsd:complexType>
-					</xsd:element>
-
-					<xsd:element name="PHA">
-					<xsd:complexType>
-					<xsd:sequence>
-						<xsd:element name="ID" type="xsd:integer"/>
-						<xsd:element name="Node" type="xsd:string"/>
-					</xsd:sequence>
-					</xsd:complexType>
-					</xsd:element>
-
-					<xsd:element name="PHA">
-					<xsd:complexType>
-					<xsd:sequence>
-						<xsd:element name="ID" type="xsd:integer"/>
-						<xsd:element name="Node" type="xsd:string"/>
-					</xsd:sequence>
-					</xsd:complexType>
-					</xsd:element>
-
-					<xsd:element name="Node">
-					<xsd:complexType>
-					<xsd:sequence>
-						<xsd:element name="ID" type="xsd:integer"/>
-					</xsd:sequence>
-					</xsd:complexType>
-					</xsd:element>
-
-					<xsd:element name="Cause">
-					<xsd:complexType>
-					<xsd:sequence>
-						<xsd:element name="ID" type="xsd:integer"/>
-					</xsd:sequence>
-					</xsd:complexType>
-					</xsd:element>
-
-					<xsd:element name="Alarm">
-					<xsd:complexType>
-					<xsd:sequence>
-						<xsd:element name="ID" type="xsd:integer"/>
-					</xsd:sequence>
-					</xsd:complexType>
-					</xsd:element>
-
-					<xsd:element name="Constant">
-					<xsd:complexType>
-					<xsd:sequence>
-						<xsd:element name="ID" type="xsd:integer"/>
-						<xsd:element name="Name" type="xsd:integer"/>
-						<xsd:element name="LinkFrom" type="xsd:integer"/>
-						<xsd:element name="ConstValue" type="xsd:integer"/>
-					</xsd:sequence>
-					</xsd:complexType>
-					</xsd:element>
-
-					<xsd:element name="Bookmark">
-					<xsd:complexType>
-					<xsd:sequence>
-						<xsd:element name="ID" type="xsd:integer"/>
-					</xsd:sequence>
-					</xsd:complexType>
-					</xsd:element>
-
-				</xsd:sequence>
-				</xsd:complexType>
-				</xsd:element>
-			</xsd:sequence>
-			</xsd:complexType>
-			</xsd:element>
-		 </xsd:schema>
-"""
 
 """ ----------XML > Project----------]""" 
 
