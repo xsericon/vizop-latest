@@ -735,7 +735,7 @@ class ControlFrame(wx.Frame):
 				self.UndoOnCancel = Args.get('UndoOnCancel', None)
 				# prefill widgets in new aspect and activate it
 				print('CF737 activating aspect: ', TargetAspect.InternalName)
-				TargetAspect.Prefill()
+				TargetAspect.Prefill(**Args)
 				# set up the notebook tab for the aspect
 				TargetAspect.Initialize(ParentNotebook=self.MyNotebook)
 				TargetAspect.Activate()
@@ -1117,10 +1117,13 @@ class ControlFrame(wx.Frame):
 
 		# specific methods for NumericalValueAspect
 
-		def PrefillWidgetsForNumericalValueAspect(self): # set initial values for widgets in NumericalValueAspect
+		def PrefillWidgetsForNumericalValueAspect(self, **Args): # set initial values for widgets in NumericalValueAspect
 			# Assumes that the PHA element hosting the value is set in MyControlFrame.PHAObjInControlPanel
 			# and the specific number component's name is in MyControlFrame.ComponentInControlPanel
 			Proj = self.TopLevelFrame.CurrentProj
+			# capture the component containing the numerical value to display
+			self.TopLevelFrame.PHAObjInControlPanel = Args['PHAObjInControlPanel']
+			self.TopLevelFrame.ComponentInControlPanel = Args['ComponentInControlPanel']
 			# enable navigation buttons if there are any items in current project's history lists
 			self.UpdateNavigationButtonStatus(Proj)
 			# set widget values %%% working here
@@ -1195,7 +1198,6 @@ class ControlFrame(wx.Frame):
 
 			def Activate(self, **Args): # activate widgets for this aspect
 				Proj = self.ParentFrame.CurrentProj
-				print('CF1194 activating aspect with WidgActive: ', self.ParentFrame.WidgActive)
 				self.TopLevelFrame.ActivateWidgetsInPanel(Widgets=self.WidgetList, Sizer=self.MySizer,
 					ActiveWidgetList=self.ParentFrame.WidgActive, **Args)
 
@@ -1211,7 +1213,6 @@ class ControlFrame(wx.Frame):
 		assert isinstance(Sizer, wx.GridBagSizer)
 		assert isinstance(ActiveWidgetList, list)
 		# set up widgets in their sizer
-		print('CF1212 calling PopulateSizer with Widgets:', Widgets)
 		display_utilities.PopulateSizer(Sizer=Sizer, Widgets=Widgets, ActiveWidgetList=ActiveWidgetList,
 			DefaultFont=self.Fonts['NormalWidgetFont'], HighlightBkgColour=self.ColScheme.BackHighlight)
 		# set widget event handlers for active widgets

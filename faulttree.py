@@ -626,7 +626,6 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 				self.EditChoice.SetForegroundColour(self.Text.Colour)
 				self.EditChoice.SetBackgroundColour(self.BkgColour)
 				# pre-select the current selection in the choice box
-				print("FT594 applicable: ", [c.Applicable for c in self.ObjectChoices])
 				self.EditChoice.SetSelection([c.Applicable for c in self.ObjectChoices].index(True))
 				self.FT.CurrentEditChoice = self.EditChoice
 				self.FT.CurrentEditElement = self
@@ -734,7 +733,7 @@ class FTEvent(FTBoxyObject): # FT event object. Rendered by drawing text into bi
 		EventActionItemButton = ButtonElement(self.FT, Row=2, ColStart=3, ColSpan=1, StartX=350, EndX=399,
 			HostObject=self, InternalName='EventActionItemButton')
 		EventValue = TextElement(self.FT, RowBase=0, ColStart=0, ColSpan=1, EndX=99, EditBehaviour='Text',
-			HostObject=self, InternalName='EventValue')
+			HostObject=self, InternalName='Value') # internal name = 'Value' to match attrib name in Core object%%%
 		self.EventValueUnitComponent = TextElement(self.FT, RowBase=0, ColStart=1, ColSpan=2, EndX=199,
 			HostObject=self, InternalName='EventValueUnit', EditBehaviour='Choice', ObjectChoices=[],
 			DisplAttrib='HumanName')
@@ -1701,6 +1700,8 @@ class FTEventInCore(object): # FT event object used in DataCore by FTObjectInCor
 	DefaultTimeUnit = core_classes.YearUnit
 	DefaultRatioUnit = core_classes.DimensionlessUnit
 	MaxElementsConnectedToThis = 1
+	# hash for component names as they appear in Undo menu texts
+	ComponentEnglishNames = {'Value': 'event value'}
 
 	def __init__(self, Proj, FT, Column, **Args): # FT: which FTObjectInCore instance this object belongs to
 		# Column: the FTColumnInCore hosting this object
@@ -3098,7 +3099,8 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			ComponentToUpdate = TextComponentName
 			ComponentHost = HostElement
 		# update component's text
-		if ComponentToUpdate in ['EventValue', 'TolFreq']: # updating Value attrib; try to extract number from user's input
+		print('FT3100 ComponentToUpdate:', ComponentToUpdate)
+		if ComponentToUpdate in ['EventValue', 'TolFreq', 'Value']: # updating Value attrib; try to extract number from user's input
 			ValueReceived = utilities.str2real(NewValue, 'junk')
 			if ValueReceived != 'junk': # we got a recognisable number; update value in all applicable risk receptors
 				self.DoChangeTextInValueField(Proj, ComponentToUpdate=ComponentToUpdate, ComponentHost=ComponentHost,
@@ -3161,7 +3163,8 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			  ElementID=HostElementID,
 			  ComponentName=ComponentToUpdate,
 			  OldValue=OldValue, NewValue=TargetValue,
-			  HumanText=_('change %s' % self.ComponentEnglishNames[ComponentToUpdate]),
+#			  HumanText=_('change %s' % self.ComponentEnglishNames[ComponentToUpdate]),
+			  HumanText=_('change %s' % ComponentHost.ComponentEnglishNames[ComponentToUpdate]),
 			  Zoom=Zoom, PanX=PanX, PanY=PanY))
 
 	def FetchDisplayAttribsFromUndoRecord(self, UndoRecord):
