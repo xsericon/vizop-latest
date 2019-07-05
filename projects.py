@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Module: projects. This file is part of Vizop. Copyright xSeriCon, 2018
+# Module: projects. This file is part of Vizop. Copyright xSeriCon, 2019
 
 # standard modules needed:
 import os, shutil
@@ -9,6 +9,7 @@ import xml.etree.ElementTree as ElementTree
 # vizop modules needed:
 from vizop_misc import IsReadableFile, IsWritableLocation, select_file_from_all
 import settings, core_classes, info, vizop_parser, faulttree
+#import settings, core_classes, info, faulttree
 
 """
 The projects module contains functions for handling entire Vizop projects, including project files.

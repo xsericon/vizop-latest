@@ -2278,14 +2278,10 @@ class ControlFrame(wx.Frame):
 		if ThisProj.PHAObjs: # does the project have any PHA models?
 			pass # TODO call self.MyControlPanel.GotoControlPanelAspect
 		else: # no existing PHA models
-#			# store a navigation milestone to go back to, in case the user undoes creating a new PHA model
-			# (now done in DoNewViewport)
-#			ThisProj.BackwardHistory.append(core_classes.MilestoneItem(Proj=ThisProj, DisplDevice=self.MyEditPanel,
-#				Displayable=False))
+			# no need to store a navigation milestone here - done in DoNewViewport
 			# get the user to create a PHA model
 			self.InviteUserToCreatePHAModel(Proj=ThisProj)
 			# set control panel to PHAModels aspect
-			print('CF2281 going to PHA models aspect')
 			self.MyControlPanel.GotoControlPanelAspect(NewAspect=self.MyControlPanel.PHAModelsAspect)
 
 	def InviteUserToCreatePHAModel(self, Proj):

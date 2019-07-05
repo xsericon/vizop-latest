@@ -110,7 +110,8 @@ ComponentHostIDTag = 'ComponentHostID'
 FTDisplayAttribTag = 'DisplayAttribs'
 FTElementContainingComponentToHighlight = 'ElContainingCptToHighlight'
 FTComponentToHighlight = 'CptToHighlight'
-
+TolFreqTag = 'TolFreq'
+TolFreqUnitTag = 'TolFreqUnit'
 
 # XML tags for project files
 ProjectRootTag = 'vizop_project'
@@ -179,6 +180,7 @@ ControlFrameInSocketLabel = 'F2CREP' # label prefix for datacore end of control 
 ControlFrameOutSocketLabel = 'C2FREQ' # label prefix for datacore end of datacore -> control frame socket
 ViewportOutSocketLabel = 'C2VREQ' # label prefix for datacore end of datacore -> Viewport socket
 LocalSuffix = '_Local' # suffix for datacore sockets connecting to local control frame
+NullUnitInternalName = 'null'
 
 # NO_ commands to control frame
 NO_ShowViewport = 'NO_ShowViewport'

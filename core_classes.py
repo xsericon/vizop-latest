@@ -239,12 +239,12 @@ class FormulaItem(object):  # class of formulae used to calculate the value of a
 		else:
 			return self.Operator.Unit(OperandUnits)  # return the calculated unit
 
-
 class UnitItem(object):
 	# defines an engineering unit such as a time unit
 	# taken from SILability
 	QtyKinds = ['Probability', 'Frequency', 'Time', 'ShortTime', 'Ratio']
 	UserSelectableUnits = [] # list of all units that user can select from (excludes NullUnit)
+	UnitNameHash = {} # dict with keys = XMLNames, values = UnitItem instances with that XMLName
 
 	def __init__(self, HumanName='', XMLName='', QtyKind='', UserSelectable=True, SuppressInOutput=False):
 		# QtyKind must be in UnitItem.QtyKinds
@@ -253,6 +253,7 @@ class UnitItem(object):
 		# SuppressInOutput (bool): whether to hide unit's HumanName in final output
 		object.__init__(self)
 		assert isinstance(HumanName, str), "CC150 Non-string value for HumanName in UnitItem initialization"
+		assert isinstance(XMLName, str)
 		assert isinstance(QtyKind, str)
 		assert QtyKind in UnitItem.QtyKinds
 		assert isinstance(UserSelectable, bool)
@@ -262,12 +263,13 @@ class UnitItem(object):
 		self.QtyKind = QtyKind
 		if UserSelectable:
 			UnitItem.UserSelectableUnits.append(self) # add to register of units
+		UnitItem.UnitNameHash[XMLName] = self # add to name hash
 		self.SuppressInOutput = SuppressInOutput
 		self.Conversion = {self: 1.0} # keys: UnitItem instances;
 			# values: coefficient to convert from this unit to unit in key (float). The only compulsory key is self.
 
 # acceptable engineering units
-NullUnit = UnitItem('', '', 'Ratio', UserSelectable=False, SuppressInOutput=True) # used as problem indicator
+NullUnit = UnitItem('', info.NullUnitInternalName, 'Ratio', UserSelectable=False, SuppressInOutput=True) # used as problem indicator
 DimensionlessUnit = UnitItem(_('no unit'), 'None', 'Ratio', SuppressInOutput=True)
 ProbabilityUnit = UnitItem(_('probability'), 'Prob', 'Probability', SuppressInOutput=True)
 PercentageUnit = UnitItem(_('%'), '%', 'Probability')
@@ -340,6 +342,11 @@ FrequencyUnits = [u for u in UnitItem.UserSelectableUnits if u.QtyKind == 'Frequ
 TimeUnits = [u for u in UnitItem.UserSelectableUnits if u.QtyKind == 'Time']
 RatioUnits = [u for u in UnitItem.UserSelectableUnits if u.QtyKind == 'Ratio']
 DefaultBetaUnit = PercentageUnit
+
+def UnitWithName(TargetXMLName):
+	# find and return UnitItem instance with XMLName==TargetXMLName, or None if not found.
+	assert isinstance(TargetXMLName, str)
+	return UnitItem.UnitNameHash.get(TargetXMLName, None)
 
 class OpModeType(object): # class of SIF operating modes; consistent with implementation in SILability
 	DisplayName = _('Operating mode') # for display in comment header and Undo/Redo menu items

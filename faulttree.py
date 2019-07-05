@@ -799,7 +799,8 @@ class FTEvent(FTBoxyObject): # FT event object. Rendered by drawing text into bi
 			# (variable elements are populated in CreateVariableTextElements() )
 			# The following list contains (attribs of FTEvent, element's InternalName)
 			# It's a combined list for both DescriptionElements and ValueElements, hence the "if" below
-			AttribInfo = [ ('EventTypeHumanName', 'EventType'), ('Value', 'EventValue'),
+#			AttribInfo = [ ('EventTypeHumanName', 'EventType'), ('Value', 'EventValue'),
+			AttribInfo = [ ('EventTypeHumanName', 'EventType'), ('Value', 'Value'),
 				('ValueUnit', 'EventValueUnit'), ('ValueKind', 'EventValueKind') ]
 			# put the content into the elements
 			for (Attrib, Name) in AttribInfo:
@@ -2680,7 +2681,6 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			for Tag, Attrib in DataInfo:
 				AttribEl = ElementTree.SubElement(HeaderEl, Tag)
 				AttribEl.text = str(Attrib.GetMyValue(RR=RRForCalc))
-				# TODO make it display nicely in scientific notation
 				# add unit, unit options, ValueKind options and Constant options
 				UnitEl = ElementTree.SubElement(AttribEl, info.UnitTag)
 				UnitEl.text = str(Attrib.GetMyUnit().XMLName)
@@ -3599,6 +3599,11 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 				UsingThisOpMode = (ThisOpMode == self.PHAObj.OpMode)
 				self.Header.OpModeComponent.ObjectChoices[ThisOpModeIndex].Applicable = UsingThisOpMode
 				if UsingThisOpMode: FT.OpMode = ThisOpMode # set OpMode attrib of FT
+			# populate TolFreq value and unit
+			TolFreqTag = HeaderXMLRoot.find(info.TolFreqTag)
+			HeaderEl.TolFreq.Value = TolFreqTag.text
+			HeaderEl.TolFreq.Unit = core_classes.UnitWithName(TolFreqTag.findtext(info.UnitTag,
+				default=info.NullUnitInternalName))
 			# populate lists of options relating to numerical values%%%
 			for ThisNumValue in HeaderEl.NumericalValues:
 				PopulateUnitOptions(XMLRoot=HeaderXMLRoot, HostEl=HeaderEl, ComponentName=ThisNumValue,
