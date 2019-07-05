@@ -839,6 +839,7 @@ class AutoNumValueItem(NumValueItem): # class of values that are calculated by a
 		else: return self.UnitGetter(**Args)
 
 	def GetMyUserDefinedUnit(self, **Args): # return unit defined by user. This is intended as a "UnitGetter" method
+		# for AutoNumValueItem instances where the user is allowed to control the unit
 		return super(AutoNumValueItem, self).GetMyUnit(**Args)
 
 	def Status(self, RR=DefaultRiskReceptor, FormulaAntecedents=[], **args):

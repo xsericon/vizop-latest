@@ -1854,6 +1854,8 @@ class FTEventInCore(object): # FT event object used in DataCore by FTObjectInCor
 			self.Value.Calculator = self.GetEventValue  # provide method to get derived value (overridden by SetAsSIFFailureEvent())
 			self.Value.StatusGetter = self.GetEventValueStatus  # provide method to get status
 			self.Value.UnitGetter = self.Value.GetMyUserDefinedUnit # return current unit when requested
+			# we could set an initial unit here, but we don't know what the user wants. So we set it the first time
+			# the value is successfully calculated%%%
 
 	def SetAsSIFFailureEvent(self): # this function should be called when we want to mark this FT event as the
 		# "SIF failure" initiating event; only for High Demand and Continuous OpModes.
@@ -1968,25 +1970,34 @@ class FTEventInCore(object): # FT event object used in DataCore by FTObjectInCor
 		assert isinstance(ConnectFrom[0], (FTEventInCore, FTGateItemInCore, FTConnectorItemInCore))
 		return ConnectFrom[0].Value # where to get the value from
 
-	def GetEventValue(self, RR, **Args): # return event value if value kind is Auto
+	def GetEventValue(self, RR, **Args): # return event value (float) if value kind is Auto
 		# this gets called by the NumValue instance's Calculate() call
 		assert isinstance(self.Value, core_classes.AutoNumValueItem)
 		# find event connected to this one (should be only one; we find them all for bug trapping)
 		ValueOriginObject = self.GetValueOriginObject(RR, **Args)
 		if ValueOriginObject.Status(RR=RR) == core_classes.NumProblemValue_NoProblem:
-			# fetch value from connected object, and convert to required unit
+			# fetch value from connected object
+			ConnectedObjectValue = ValueOriginObject.GetMyValue(RR=RR)
+			# check if this element's unit has ever been set; if not, set to the same as the connected object
+			if self.Value.GetMyUnit() == core_classes.NullUnit:
+				self.SetEventUnit(TargetUnit=ValueOriginObject.GetMyUnit())
+			# convert value according to event's unit
 			return ValueOriginObject.GetMyValue(RR=RR) * ValueOriginObject.GetMyUnit().Conversion[self.Value.GetMyUnit()]
 		else: return None # can't get value
 
-	def GetEventUnit(self, RR, **Args): # return event unit if value kind is Auto
-		# this is intended as a UnitGetter method for the number kind class
-		assert isinstance(self.Value, core_classes.AutoNumValueItem)
-		# find event connected to this one (should be only one; we find them all for bug trapping)
-		ValueOriginObject = self.GetValueOriginObject(RR, **Args)
-		if ValueOriginObject.Status(RR=RR) == core_classes.NumProblemValue_NoProblem:
-			# fetch value from connected object, and convert to required unit
-			return ValueOriginObject.GetMyUnit()
-		else: return None # can't get value
+	def SetEventUnit(self, TargetUnit): # set unit of event
+		assert isinstance(TargetUnit, core_classes.UnitItem)
+		self.Value.SetMyUnit(TargetUnit)
+
+#	def GetEventUnit(self, RR, **Args): # return event unit if value kind is Auto
+#		# this is intended as a UnitGetter method for the number kind class. Not currently used
+#		assert isinstance(self.Value, core_classes.AutoNumValueItem)
+#		# find event connected to this one (should be only one; we find them all for bug trapping)
+#		ValueOriginObject = self.GetValueOriginObject(RR, **Args)
+#		if ValueOriginObject.Status(RR=RR) == core_classes.NumProblemValue_NoProblem:
+#			# fetch value from connected object, and convert to required unit
+#			return ValueOriginObject.GetMyUnit()
+#		else: return None # can't get value
 
 	def GetEventValueStatus(self, RR): # return event value status as a NumProblemValue instance, if value kind is Auto
 		# this gets called by the NumValue instance's StatusGetter() call
@@ -3099,7 +3110,6 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			ComponentToUpdate = TextComponentName
 			ComponentHost = HostElement
 		# update component's text
-		print('FT3100 ComponentToUpdate:', ComponentToUpdate)
 		if ComponentToUpdate in ['EventValue', 'TolFreq', 'Value']: # updating Value attrib; try to extract number from user's input
 			ValueReceived = utilities.str2real(NewValue, 'junk')
 			if ValueReceived != 'junk': # we got a recognisable number; update value in all applicable risk receptors
