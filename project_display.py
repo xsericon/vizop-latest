@@ -192,7 +192,7 @@ class CollaboratorForDisplay(object): # object representing a remote computer co
 		self.LongName = Args['LongName']
 
 class ProjectInfoModelForDisplay(display_utilities.ViewportBaseClass): # object containing all data needed to display project info
-	IsBaseClass = False # should be done for every subclass of ViewportBaseClass
+	IsBaseClass = False # should be False for every subclass of ViewportBaseClass
 	CanBeCreatedManually = False # whether the user should be able to create a Viewport of this class from scratch
 	InternalName = 'ProjectInfoViewport' # unique per class, used as XML tag in messaging
 	HumanName = _('Project information')
@@ -692,27 +692,6 @@ class ProjectInfoModelForDisplay(display_utilities.ViewportBaseClass): # object 
 				Instance=UnitEdited.ID, Attrib=AttribNameEdited, NewValue=NewValue)
 			# write new value back to the grid
 			Grid.SetCellValue(GridRow, GridCol, NewValue)
-
-	def CheckTextCtrlFocus(self):
-		# check which, if any, TextCtrl or ExpandoTextCtrl currently has focus, and call handler if a TextCtrl has
-		# lost focus. We were previously using wx.EVT_KILL_FOCUS for this purpose.
-		# This procedure is a workaround for Windows8.1 choking when wx.EVT_KILL_FOCUS is raised (no similar problem
-		# in OS X 10.10).
-		# first, find out which TextCtrl is focused
-		NowFocused = ([w for w in self.WidgActive if isinstance(w.Widget, (wx.TextCtrl, ExpandoTextCtrl))
-			if w.Widget.HasFocus()] + [None])[0]
-		# has a TextCtrl lost focus?
-		if hasattr(self, 'LastTextCtrlFocused'):
-			# get UIWidget item that had focus last time this procedure ran (only TextCtrl's)
-			LastWidget = self.LastTextCtrlFocused
-			if LastWidget: # a TextCtrl had focus before
-				if (LastWidget != NowFocused) and (LastWidget in self.WidgActive) and (LastWidget.Handler is not None)\
-						and not getattr(LastWidget, 'SkipLoseFocus', False):
-					# SkipLoseFocus means "ignore me when I lose focus"
-					# Focus has changed, and the previously focused widget is still onscreen: call its handler
-					LastWidget.Handler(Event=None, WidgetObj=LastWidget)
-		# save focused TextCtrl (if any) for next time
-		setattr(self, 'LastTextCtrlFocused', NowFocused)
 
 	def ReleaseDisplayDevice(self, DisplDevice, **Args): # wrap-up actions needed when display device is no longer
 		# showing this Viewport

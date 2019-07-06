@@ -313,7 +313,7 @@ class FTHeader(object): # FT header object. Rendered by drawing text into bitmap
 		TolFreqLabel = TextElement(self.FT, Row=4, ColStart=0, ColSpan=1, StartX=0, EndX=Col1XStartInCU-1,
 			HostObject=self, InternalName='TolFreqLabel')
 		TolFreq = TextElement(self.FT, Row=4, ColStart=1, ColSpan=1, StartX=Col1XStartInCU, EndX=499,
-			HostObject=self, InternalName='TolFreq', EditBehaviour='Text', ControlPanelAspect='CPAspect_NumValue')
+			HostObject=self, InternalName='TolFreq', EditBehaviour='EditInControlPanel', ControlPanelAspect='CPAspect_NumValue')
 		UELLabel = TextElement(self.FT, Row=4, ColStart=2, ColSpan=1, StartX=500, EndX=749,
 			HostObject=self, InternalName='UELLabel')
 		UEL = TextElement(self.FT, Row=4, ColStart=3, ColSpan=1, StartX=750, EndX=999,
@@ -473,9 +473,14 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 	def __init__(self, FT, Row=0, RowBase=0, ColStart=0, ColSpan=1, EndX=200, MinHeight=10, InternalName='',
 				 HostObject=None, **Args):
 		# HostObject: the FTHeader or FTEvent instance containing this TextElement instance
-		# Args can include: HorizAlignment ('Left', 'Centre' or 'Right') (defaults to Centre if not specified)
+		# Args can include:
+		# 	HorizAlignment ('Left', 'Centre' or 'Right') (defaults to Centre if not specified)
 		#	MaxWidthInCU (int) max width of component containing the text (defaults to 999)
 		#	ControlPanelAspect (str) name of aspect to show in Control Panel when this element has focus
+		#	EditBehaviour (str): indicates required behaviour for edit-in-place. Can be:
+		#		'Text': provide textbox prefilled with the component's display value
+		#		'Choice': provide choice widget
+		#		'EditInControlPanel': don't allow edit-in-place; editing allowed only in a control panel aspect
 		FTBoxyObject.__init__(self, **Args)
 		assert isinstance(FT, FTForDisplay)
 		assert isinstance(HostObject, (FTHeader, FTEvent, FTGate, FTConnector))
@@ -631,6 +636,8 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 				self.FT.CurrentEditElement = self
 				self.FT.DisplDevice.SetKeystrokeHandlerOnOff(On=False) # turn off keypress shortcut detection in control frame
 				self.EditChoice.Bind(wx.EVT_CHOICE, self.OnEditChoice) # bind handler for click in choice box
+			elif MyEditBehaviour == 'EditInControlPanel': # can't edit in place, editing in control panel only
+				pass
 
 	def OnEditChoice(self, Event): # handle click in choice box during editing
 		self.FT.EndEditingOperation()
@@ -733,7 +740,7 @@ class FTEvent(FTBoxyObject): # FT event object. Rendered by drawing text into bi
 		EventActionItemButton = ButtonElement(self.FT, Row=2, ColStart=3, ColSpan=1, StartX=350, EndX=399,
 			HostObject=self, InternalName='EventActionItemButton')
 		EventValue = TextElement(self.FT, RowBase=0, ColStart=0, ColSpan=1, EndX=99, EditBehaviour='Text',
-			HostObject=self, InternalName='Value') # internal name = 'Value' to match attrib name in Core object%%%
+			HostObject=self, InternalName='Value') # internal name = 'Value' to match attrib name in Core object
 		self.EventValueUnitComponent = TextElement(self.FT, RowBase=0, ColStart=1, ColSpan=2, EndX=199,
 			HostObject=self, InternalName='EventValueUnit', EditBehaviour='Choice', ObjectChoices=[],
 			DisplAttrib='HumanName')
@@ -1855,7 +1862,7 @@ class FTEventInCore(object): # FT event object used in DataCore by FTObjectInCor
 			self.Value.StatusGetter = self.GetEventValueStatus  # provide method to get status
 			self.Value.UnitGetter = self.Value.GetMyUserDefinedUnit # return current unit when requested
 			# we could set an initial unit here, but we don't know what the user wants. So we set it the first time
-			# the value is successfully calculated%%%
+			# the value is successfully calculated
 
 	def SetAsSIFFailureEvent(self): # this function should be called when we want to mark this FT event as the
 		# "SIF failure" initiating event; only for High Demand and Continuous OpModes.

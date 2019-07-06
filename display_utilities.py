@@ -4,6 +4,7 @@
 # library modules
 from __future__ import division # makes a/b yield exact, not truncated, result. Must be 1st import
 import wx, wx.grid, wx.lib.gridmovers, zmq, math # wx provides basic GUI functions
+from wx.lib.expando import ExpandoTextCtrl, EVT_ETC_LAYOUT_NEEDED
 import wx.lib.buttons as buttons
 from sys import stdout
 
@@ -521,6 +522,8 @@ class FloatLayer(object):  # floating layer objects containing parts of the View
 
 class UIWidgetItem(object):
 	# These objects contain widgets for display, with associated info needed for use in sizers
+	# Optional attributes for instances:
+	#	SkipLoseFocus (bool): (for TextCtrl and ExpandoTextCtrl widgets) Ignore me when I lose focus, i.e. don't call my handler
 
 	def __init__(self, Widget, **Attrs):
 		object.__init__(self)
@@ -797,4 +800,26 @@ def ChangeZoomAndPanValues(Viewport=None, Zoom=None, PanX=None, PanY=None):
 		assert isinstance(PanY, str)
 		TargetPanY = utilities.str2real(PanY, meaninglessvalue='?')
 		if TargetPanY != '?': Viewport.PanY = TargetPanY # TODO assert or wrap to within limits
+
+def CheckTextCtrlFocus(HostPanel):
+	# check which, if any, TextCtrl or ExpandoTextCtrl in HostPanel currently has focus, and call its handler if a TextCtrl has
+	# lost focus. We've tried using wx.EVT_KILL_FOCUS for this purpose, but Windows8.1 chokes
+	# when wx.EVT_KILL_FOCUS is raised (no similar problem in macOS since OS X 10.10).
+	# Uses HostPanel's iterable WidgActive containing UIWidget instances - no problem if WidgActive doesn't exist
+	# first, find out which TextCtrl or ExpandoTextCtrl is focused
+	ActiveWidgList = getattr(HostPanel, 'WidgActive', [])
+	NowFocused = ([w for w in ActiveWidgList if isinstance(w.Widget, (wx.TextCtrl, ExpandoTextCtrl))
+				   if w.Widget.HasFocus()] + [None])[0]
+	# has a TextCtrl lost focus?
+	if hasattr(HostPanel, 'LastTextCtrlFocused'):
+		# get UIWidget item that had focus last time this procedure ran (only TextCtrl's)
+		LastWidget = HostPanel.LastTextCtrlFocused
+		if LastWidget: # a TextCtrl had focus before
+			if (LastWidget != NowFocused) and (LastWidget in ActiveWidgList) and (LastWidget.Handler is not None)\
+					and not getattr(LastWidget, 'SkipLoseFocus', False):
+				# SkipLoseFocus means "ignore me when I lose focus"
+				# Focus has changed, and the previously focused widget is still onscreen: call its handler
+				LastWidget.Handler(Event=None, WidgetObj=LastWidget)
+	# save focused TextCtrl (if any) for next time
+	setattr(HostPanel, 'LastTextCtrlFocused', NowFocused)
 

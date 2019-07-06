@@ -1134,7 +1134,9 @@ class ControlFrame(wx.Frame):
 
 		def NumericalValueAspect_OnCommentButton(self, Event): pass
 
-		def NumericalValueAspect_OnValueTextWidget(self, Event): pass
+		def NumericalValueAspect_OnValueTextWidget(self, Event, WidgetObj=None):
+			# handle end-of-editing (loss of focus) on value text widget
+			print('CF1139 in text widget handler')
 
 		def NumericalValueAspect_OnUnitWidget(self, Event): pass
 
@@ -1558,9 +1560,11 @@ class ControlFrame(wx.Frame):
 			# check if any undo/redo records are waiting
 			if UndoChainWaiting: self.OnUndoRequest(Event=None)
 			if RedoChainWaiting: self.OnRedoRequest(Event=None)
-			# call CheckTextCtrlFocus routine of current Viewport, if any
-			Viewport = self.MyEditPanel.ViewportOwner.CurrentViewport
-			if hasattr(Viewport, 'CheckTextCtrlFocus'): Viewport.CheckTextCtrlFocus()
+			# call CheckTextCtrlFocus routine for Edit Panel and Control Panel, to handle loss of focus of TextCtrl's
+#			Viewport = self.MyEditPanel.ViewportOwner.CurrentViewport
+#			if hasattr(Viewport, 'CheckTextCtrlFocus'): Viewport.CheckTextCtrlFocus()
+			display_utilities.CheckTextCtrlFocus(HostPanel=self.MyEditPanel)
+			display_utilities.CheckTextCtrlFocus(HostPanel=self.MyControlPanel)
 
 	def ButtonBitmap(self, ImageName): # returns bitmap for button
 		# ImageName can be the filename stub of an icon file in the runtime icons folder, or wx.ART_something
