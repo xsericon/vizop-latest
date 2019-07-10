@@ -2,6 +2,8 @@
 Name: vizop_parser
 Python version: 3.6.3
 """
+from faulttree import FTColumnInCore
+
 """[----------TEMPLATE---------- """
 """ ----------TEMPLATE----------]""" 
 
@@ -330,19 +332,11 @@ def convertProjectToXml(Proj, ProjectFilename):
 		# create outer XML tag
 		MyXMLRoot_FaultTrees = ET.SubElement(MyXMLRoot, info.FaultTreesTag)
 
+		each_FaultTree: faulttree.FTObjectInCore
 		for each_FaultTree in Proj.FaultTrees:
 			assert type(each_FaultTree) == faulttree.FTObjectInCore
+
 			MyXMLRoot_FaultTrees_FaultTree = ET.SubElement(MyXMLRoot_FaultTrees, info.FaultTreeTag)
-
-			# J: TODO
-			#GateStyle= (style of logic gates used throughout this FT)
-			#if faulttree.FTGateItemInCore != None:
-				#MyXMLRoot_FaultTrees_FaultTree.set('GateStyle', faulttree.FTGateItemInCore)
-
-			# J: TODO
-			#Attribs: OpMode= (SIF operating mode)
-			#if faulttree.OpModeType.XMLName != None:
-				#MyXMLRoot_FaultTrees_FaultTree.set('OpMode', pS(faulttree.OpModeType.XMLName))
 
 			#ID
 			MyXMLRoot_FaultTrees_FaultTree_Id = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree, info.IDTag)
@@ -350,14 +344,78 @@ def convertProjectToXml(Proj, ProjectFilename):
 
 			#SIFName
 			MyXMLRoot_FaultTrees_FaultTree_SIFName = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree, info.SIFNameTag)
-			MyXMLRoot_FaultTrees_FaultTree_SIFName.text = pS(str())
+			MyXMLRoot_FaultTrees_FaultTree_SIFName.text = pS(str(each_FaultTree.SIFName))
 
-			#J: TODO
-			#Header Data C
-			#MyXMLRoot_FaultTrees_FaultTree_HeaderData = ET.SubElement()
-			#MyXMLRoot_FaultTrees_FaultTree_HeaderData.text = pS(str())
+			#OpMode
+			MyXMLRoot_FaultTrees_FaultTree_OpMode = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree, info.OpModeTag)
+			MyXMLRoot_FaultTrees_FaultTree_OpMode.text = pS(str(each_FaultTree.OpMode.XMLName))
 
-			# J: TODO
+			#Rev
+			MyXMLRoot_FaultTrees_FaultTree_Rev = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree, info.RevTag)
+			MyXMLRoot_FaultTrees_FaultTree_Rev.text = pS(each_FaultTree.Rev)
+
+			#TargetRiskRedMeasure
+			MyXMLRoot_FaultTrees_FaultTree_TargetRiskRedMeasure = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree, info.TargetRiskRedMeasureTag)
+			MyXMLRoot_FaultTrees_FaultTree_TargetRiskRedMeasure.text = pS(each_FaultTree.TargetRiskRedMeasure)
+
+			#SILTargetValue
+			MyXMLRoot_FaultTrees_FaultTree_SILTargetValue = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree, info.SILTargetValueTag)
+			MyXMLRoot_FaultTrees_FaultTree_SILTargetValue.text = pS(each_FaultTree.SILTargetValue)
+
+			#BackgColour
+			MyXMLRoot_FaultTrees_FaultTree_BackgColour = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree, info.BackgColour)
+			MyXMLRoot_FaultTrees_FaultTree_BackgColour.text = pS(each_FaultTree.BackgColour)
+
+			#TextColour
+			MyXMLRoot_FaultTrees_FaultTree_TextColour = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree, info.TextColour)
+			MyXMLRoot_FaultTrees_FaultTree_TextColour.text = pS(each_FaultTree.TextColour)
+
+			#Columns
+			MyXMLRoot_FaultTrees_FaultTree_Columns = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree, info.ColumnsTag)
+
+			each_Column: FTColumnInCore
+			for each_Column in each_FaultTree.Columns:
+				#Column
+				MyXMLRoot_FaultTrees_FaultTree_Columns_Column = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns,info.FTColumnTag)
+
+				#FTEvent
+				MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns, info.FTEventTag)
+
+				#FTGate
+				MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTGate = pS(each_Column.FTElements)
+
+				#FTConnectorIn
+				MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTConnectorIn
+
+				#FTConnectorOut
+				MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTConnectorOut
+
+				pass
+
+			#TolRiskModel
+			#TODO canot map TolRiskModel
+			MyXMLRoot_FaultTrees_FaultTree_TolRiskModel = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree, info)
+			MyXMLRoot_FaultTrees_FaultTree_TolRiskModel = pS(each_FaultTree.MyTolRiskModel)
+
+			#Severity
+			MyXMLRoot_FaultTrees_FaultTree_Severity = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree, info.SeverityTag)
+
+			#Name
+			each_Key: core_classes.RiskReceptorItem
+			for each_Key in each_FaultTree.Severity:
+				# RR
+				MyXMLRoot_FaultTrees_FaultTree_Severity_RR = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Severity, info.RRTag)
+				# Name
+				MyXMLRoot_FaultTrees_FaultTree_Severity_RR_Name = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Severity_RR, info.NameTag)
+				MyXMLRoot_FaultTrees_FaultTree_Severity_RR_Name.text = pS(each_Key.XMLName)
+				# SeverityValue
+				MyXMLRoot_FaultTrees_FaultTree_Severity_RR_SeverityValue = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Severity_RR, info.SeverityValueTag)
+				MyXMLRoot_FaultTrees_FaultTree_Severity_RR_SeverityValue.text = pS(each_FaultTree.Severity.get(each_Key))
+
+
+				pass
+
+
 			pass
 
 	#Comment

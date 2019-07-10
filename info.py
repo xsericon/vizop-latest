@@ -173,6 +173,17 @@ NumberSystemStringType = 'str'
 NumberSystemParentType = 'Parent'
 NumberSystemSerialType = 'Serial'
 
+OpModeTag = 'OpMode'
+RevTag = 'Rev'
+TargetRiskRedMeasureTag = 'TargetRiskRedMeasure'
+SILTargetValueTag = 'SILTargetValue'
+BackgColourTag = 'BackgColour'
+TextColourTag = 'TextColour'
+SeverityTag = 'Severity'
+RRTag = 'RR'
+SeverityValueTag = 'SeverityValue'
+ColumnsTag = 'Columns'
+
 FTImagePrefix = 'FT_' # filenames containing all images used in FT must begin with this
 ProjInfoImagePrefix = 'ProjInfo_'
 CommandTag = 'Command'
