@@ -378,17 +378,27 @@ def convertProjectToXml(Proj, ProjectFilename):
 				#Column
 				MyXMLRoot_FaultTrees_FaultTree_Columns_Column = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns,info.FTColumnTag)
 
-				#FTEvent
-				MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns, info.FTEventTag)
 
-				#FTGate
-				MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTGate = pS(each_Column.FTElements)
+				for each_FTEvent in each_Column:
 
-				#FTConnectorIn
-				MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTConnectorIn
+					if type(each_FTEvent) == faulttree.FTEventInCore:
+						#FTEvent
+						MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column, info.FTEventTag)
 
-				#FTConnectorOut
-				MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTConnectorOut
+
+					if type(each_FTEvent) == faulttree.FTGateItemInCore:
+						#FTGate
+						MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTGate = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column, info.FTGateTag)
+
+
+					if type(each_FTEvent) == faulttree.FTConnectorItemInCore:
+						#FTConnectorIn
+						MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTConnectorIn = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column, info.FTConnectorInTag)
+
+
+					if type(each_FTEvent) == faulttree.FTConnectorItemInCore:
+						#FTConnectorOut
+						MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTConnectorOut = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column, info.FTConnectorOutTag)
 
 				pass
 

@@ -183,6 +183,8 @@ SeverityTag = 'Severity'
 RRTag = 'RR'
 SeverityValueTag = 'SeverityValue'
 ColumnsTag = 'Columns'
+FTConnectorInTag = 'FTConnectorIn'
+FTConnectorOutTag = 'FTConnectorOut'
 
 FTImagePrefix = 'FT_' # filenames containing all images used in FT must begin with this
 ProjInfoImagePrefix = 'ProjInfo_'
