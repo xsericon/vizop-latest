@@ -11,10 +11,8 @@ from faulttree import FTColumnInCore
 """"""
 import xml.etree.ElementTree as ET
 import xml
-from lxml import etree as lxmletree
 import string
 import inspect
-from enum import Enum
 import projects, core_classes, faulttree, info
 import logging
 """ ----------IMPORT----------]""" 
@@ -46,7 +44,7 @@ def pS(inputString, trimString = True, filterForbiddenChar = True, noSpace = Fal
 	return formattedString
 
 def getNumberOfInstance(input_class):
-	#get the number of instance for a Class by using garbage collector
+	# get the number of instance for a Class by using garbage collector
 	import gc
 	return ('Number of {} in memory:{}'.format(input_class,len(list(filter(lambda x: isinstance(x, input_class), gc.get_objects())))))
 
@@ -103,7 +101,6 @@ def convertProjectToXml(Proj, ProjectFilename):
 	MyXMLRoot = MyXMLTree.getroot()
 
 	# create sub-elements according to project item file structure
-	# J: generic parser could be created for simple string parsing
 
 	# ShortTitle
 	if Proj.ShortTitle != '':
@@ -197,64 +194,68 @@ def convertProjectToXml(Proj, ProjectFilename):
 	# Numbering Systems
 	if len(Proj.NumberSystems) > 0:
 		# create outer XML tag
-		MyXMLRoot_NumberSystems = ET.SubElement(MyXMLRoot, info.NumberSystemsTag)
+		MyXMLRoot_NumberSystem = ET.SubElement(MyXMLRoot, info.NumberSystemTag)
+
+		MyXMLRoot_NumberSystem_ID = ET.SubElement(MyXMLRoot_NumberSystem, info.IDTag)
+		#TODO J: cannot map NumberSystem ID
+		#MyXMLRoot_NumberSystem_ID.text = Proj.NumberSystems.ID
 
 		for each_NumberSystem in Proj.NumberSystems:
 			# create outer XML tag
-			MyXMLRoot_NumberSystems_NumberSystem = ET.SubElement(MyXMLRoot_NumberSystems, info.NumberSystemsTag)
+			MyXMLRoot_NumberSystem_Chunk = ET.SubElement(MyXMLRoot_NumberSystem, info.NumberSystemTag)
 
 			if type(each_NumberSystem) == str:
+				MyXMLRoot_NumberSystem_Chunk_Type = ET.SubElement(MyXMLRoot_NumberSystem_Chunk, info.TypeTag)
+				MyXMLRoot_NumberSystem_Chunk_Type.text = pS(info.NumberSystemStringType)
 
-				MyXMLRoot_NumberSystems_NumberSystem_Type = ET.SubElement(MyXMLRoot_NumberSystems_NumberSystem, info.TypeTag)
-				MyXMLRoot_NumberSystems_NumberSystem_Type.text = pS(info.NumberSystemStringType)
-
-				MyXMLRoot_NumberSystems_NumberSystem_Value = ET.SubElement(MyXMLRoot_NumberSystems_NumberSystem, info.ValueTag)
-				MyXMLRoot_NumberSystems_NumberSystem_Value.text = pS(each_NumberSystem)
+				MyXMLRoot_NumberSystem_Chunk_Value = ET.SubElement(MyXMLRoot_NumberSystem_Chunk, info.ValueTag)
+				MyXMLRoot_NumberSystem_Chunk_Value.text = pS(each_NumberSystem)
 				pass
 
 			elif type(each_NumberSystem) == core_classes.ParentNumberChunkItem:
-				#TODO need to map object ID
+				#TODO J:need to map object ID
 
-				#MyXMLRoot_NumberSystems_NumberSystem_Type = ET.SubElement(MyXMLRoot_NumberSystems_NumberSystem, info.TypeTag)
-				#MyXMLRoot_NumberSystems_NumberSystem_Type.text = pS(info.NumberSystemParentType)
+				#MyXMLRoot_NumberSystem_Chunk_Type = ET.SubElement(MyXMLRoot_NumberSystem_Chunk, info.TypeTag)
+				#MyXMLRoot_NumberSystem_Chunk_Type.text = pS(info.NumberSystemParentType)
 
-				#MyXMLRoot_NumberSystems_NumberSystem_ID = ET.SubElement(MyXMLRoot_NumberSystems_NumberSystem, info.IDTag)
-				#MyXMLRoot_NumberSystems_NumberSystem_ID.text = pS(str(each_NumberSystem.ID))
+				#MyXMLRoot_NumberSystem_Chunk_ID = ET.SubElement(MyXMLRoot_NumberSystem_Chunk, info.IDTag)
+				#MyXMLRoot_NumberSystem_Chunk_ID.text = pS(str(each_NumberSystem.ID))
 				pass
 
 			elif type(each_NumberSystem) == core_classes.SerialNumberChunkItem:
-				MyXMLRoot_NumberSystems_NumberSystem_Type = ET.SubElement(MyXMLRoot_NumberSystems_NumberSystem, info.NumberSystemSerialType)
+				MyXMLRoot_NumberSystem_Chunk_Type = ET.SubElement(MyXMLRoot_NumberSystem_Chunk, info.NumberSystemSerialType)
+				MyXMLRoot_NumberSystem_Chunk_Type.text = pS(info.NumberSystemSerialType)
 
 				#FieldWidth
-				MyXMLRoot_NumberSystems_NumberSystem_FieldWidth = ET.SubElement(MyXMLRoot_NumberSystems_NumberSystem, info.FieldWidthTag)
-				MyXMLRoot_NumberSystems_NumberSystem_FieldWidth.text = pS(str(each_NumberSystem.FieldWidth))
+				MyXMLRoot_NumberSystem_Chunk_FieldWidth = ET.SubElement(MyXMLRoot_NumberSystem_Chunk, info.FieldWidthTag)
+				MyXMLRoot_NumberSystem_Chunk_FieldWidth.text = pS(str(each_NumberSystem.FieldWidth))
 
 				#PadChar
-				MyXMLRoot_NumberSystems_NumberSystem_PadChar = ET.SubElement(MyXMLRoot_NumberSystems_NumberSystem, info.PadCharTag)
-				MyXMLRoot_NumberSystems_NumberSystem_PadChar.text = pS(str(each_NumberSystem.PadChar))
+				MyXMLRoot_NumberSystem_Chunk_PadChar = ET.SubElement(MyXMLRoot_NumberSystem_Chunk, info.PadCharTag)
+				MyXMLRoot_NumberSystem_Chunk_PadChar.text = pS(str(each_NumberSystem.PadChar))
 
 				#StartSequenceAt
-				MyXMLRoot_NumberSystems_NumberSystem_StartSequenceAt = ET.SubElement(MyXMLRoot_NumberSystems_NumberSystem, info.StartSequenceAtTag)
-				MyXMLRoot_NumberSystems_NumberSystem_StartSequenceAt.text  = pS(str(each_NumberSystem.StartSequenceAt))
+				MyXMLRoot_NumberSystem_Chunk_StartSequenceAt = ET.SubElement(MyXMLRoot_NumberSystem_Chunk, info.StartSequenceAtTag)
+				MyXMLRoot_NumberSystem_Chunk_StartSequenceAt.text  = pS(str(each_NumberSystem.StartSequenceAt))
 
 				#SkipTo
 				if each_NumberSystem.SkipTo != None:
-					MyXMLRoot_NumberSystems_NumberSystem_SkipTo = ET.SubElement(MyXMLRoot_NumberSystems_NumberSystem, info.SkipToTag)
-					MyXMLRoot_NumberSystems_NumberSystem_SkipTo.text = pS(str(each_NumberSystem.SkipTo))
+					MyXMLRoot_NumberSystem_Chunk_SkipTo = ET.SubElement(MyXMLRoot_NumberSystem_Chunk, info.SkipToTag)
+					MyXMLRoot_NumberSystem_Chunk_SkipTo.text = pS(str(each_NumberSystem.SkipTo))
 
 				#GapBefore
-				MyXMLRoot_NumberSystems_NumberSystem_GapBefore = ET.SubElement(MyXMLRoot_NumberSystems_NumberSystem, info.GapBeforeTag)
-				MyXMLRoot_NumberSystems_NumberSystem_GapBefore.text = pS(str(each_NumberSystem.GapBefore))
+				MyXMLRoot_NumberSystem_Chunk_GapBefore = ET.SubElement(MyXMLRoot_NumberSystem_Chunk, info.GapBeforeTag)
+				MyXMLRoot_NumberSystem_Chunk_GapBefore.text = pS(str(each_NumberSystem.GapBefore))
 
 				#IncludeInNumbering
-				MyXMLRoot_NumberSystems_NumberSystem_IncludeInNumbering = ET.SubElement(MyXMLRoot_NumberSystems_NumberSystem, info.IncludeInNumberingTag)
-				MyXMLRoot_NumberSystems_NumberSystem_IncludeInNumbering.text = pS(str(each_NumberSystem.IncludeInNumbering))
+				MyXMLRoot_NumberSystem_Chunk_IncludeInNumbering = ET.SubElement(MyXMLRoot_NumberSystem_Chunk, info.IncludeInNumberingTag)
+				MyXMLRoot_NumberSystem_Chunk_IncludeInNumbering.text = pS(str(each_NumberSystem.IncludeInNumbering))
 
 				#NoValue
-				MyXMLRoot_NumberSystems_NumberSystem_NoValue = ET.SubElement(MyXMLRoot_NumberSystems_NumberSystem, info.NoValueTag)
-				MyXMLRoot_NumberSystems_NumberSystem_NoValue.text = pS(each_NumberSystem.NoValue)
+				MyXMLRoot_NumberSystem_Chunk_NoValue = ET.SubElement(MyXMLRoot_NumberSystem_Chunk, info.NoValueTag)
+				MyXMLRoot_NumberSystem_Chunk_NoValue.text = pS(each_NumberSystem.NoValue)
 
-			elif:
+			else:
 				raise Exception('NumberSystem type incorrect.')
 				pass
 
@@ -269,8 +270,20 @@ def convertProjectToXml(Proj, ProjectFilename):
 			MyXMLRoot_RiskMatrices_RiskMatrix = ET.SubElement(MyXMLRoot_RiskMatrices, info.RiskMatrixTag)
 
 			# <Category>
-			# J: TODO: could not map Category
+			# Map to Keys
+			if len(each_RiskMatrix.Keys) > 0:
+				#Categories
+				MyXMLRoot_RiskMatrices_RiskMatrix_Categories = ET.SubElement(MyXMLRoot_RiskMatrices, info.CategoriesTag)
 
+				each_Key: core_classes.CategoryNameItem
+				for each_Key in each_RiskMatrix.Keys:
+					#Category
+					MyXMLRoot_RiskMatrices_RiskMatrix_Categories_Category = ET.SubElement(MyXMLRoot_RiskMatrices_RiskMatrix_Categories, info.CategoryTag)
+
+					#TODO cannot map Description
+					#MyXMLRoot_RiskMatrices_RiskMatrix_Categories_Category.text =
+
+					pass
 
 			# <SeverityDimension [SeverityDimensionIndex int as str] />
 			if each_RiskMatrix.SeverityDimensionIndex != None:
@@ -310,22 +323,21 @@ def convertProjectToXml(Proj, ProjectFilename):
 
 		for each_Constant in Proj.Constants:
 			assert type(each_Constant) == core_classes.ConstantItem
+			each_Constant: core_classes.ConstantItem
 			MyXMLRoot_Constants_Constant = ET.SubElement(MyXMLRoot_Constants, info.ConstantTag)
 
-			# J: TODO cannot map id
-			#MyXMLRoot_Constants_Constant_Id = ET.SubElement(MyXMLRoot_Constants_Constant, 'ID')
-			#MyXMLRoot_Constants_Constant_Id.text = ''
+			#ID
+			MyXMLRoot_Constants_Constant_Id = ET.SubElement(MyXMLRoot_Constants_Constant, info.IDTag)
+			MyXMLRoot_Constants_Constant_Id.text = each_Constant.ID
 
-			# J: TODO cannot map LinkFrom
-			#MyXMLRoot_Constants_Constant_LinkFrom = ET.SubElement(MyXMLRoot_Constants_Constant, 'LinkFrom')
-			#MyXMLRoot_Constants_Constant_LinkFrom.text = ''
+			#Name
+			MyXMLRoot_Constants_Constant_Name = ET.SubElement(MyXMLRoot_Constants_Constant, info.NameTag)
+			MyXMLRoot_Constants_Constant_Name.text = each_Constant.HumanName
 
-			# J: TODO cannot map ConstValue
-			#MyXMLRoot_Constants_Constant_Value = ET.SubElement(MyXMLRoot_Constants_Constant, 'ConstValue')
-			#MyXMLRoot_Constants_Constant_Value.text = ''
+			#ConstValue
+			#MyXMLRoot_Constants_Constant_ConstValue = ET.SubElement(MyXMLRoot_Constants_Constant, info.ConstValueTag)
+			#MyXMLRoot_Constants_Constant_ConstValue.text = each_Constant.
 
-	# RecommendationReport
-	# J: TODO cannot map RecommendationReport
 
 	#FaultTree
 	if len(Proj.FaultTree) > 0:
@@ -378,39 +390,201 @@ def convertProjectToXml(Proj, ProjectFilename):
 				#Column
 				MyXMLRoot_FaultTrees_FaultTree_Columns_Column = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns,info.FTColumnTag)
 
-
 				for each_FTEvent in each_Column:
 
 					if type(each_FTEvent) == faulttree.FTEventInCore:
 						#FTEvent
 						MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column, info.FTEventTag)
 
+						#ID
+						MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent_ID =  ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent, info.IDTag)
+						MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent_ID.text = pS(str(each_FTEvent.ID))
+
+						#IsIPL
+						MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent_IsIPL = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent, info.IsIPLTag)
+						MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent_IsIPL.text = pS(str(each_FTEvent.IsIPL))
+
+						#EventType
+						MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent_EventType = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent, info.EventTypeTag)
+						MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent_EventType.text = pS(str(each_FTEvent.EventType))
+
+						#NumberingID
+						#TODO cannot map ID
+						MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent_Numbering = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent, info.NumberingTag)
+						MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent_Numbering.text = pS(str(each_FTEvent.NumberingID))
+
+						#EventDescription
+						MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent_EventDescription = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent, info.EventDescriptionTag)
+						MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent_EventDescription.text = pS(str(each_FTEvent.EventDescription))
+
+						#OldFreqValue
+						MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent_OldFreqValue = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent, info.OldFreqValueTag)
+						MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent_OldFreqValue.text = pS(each_FTEvent.OldFreqValue.XMLName)
+
+						#OldProbValue
+						MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent_OldProbValue = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent, info.OldProbValueTag)
+						MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent_OldProbValue.text = pS(each_FTEvent.OldProbValue.XMLName)
+
+						each_LastSelectedUnitPerQtyKind_Key: str
+						for each_LastSelectedUnitPerQtyKind_Key in each_FTEvent.LastSelectedUnitPerQtyKind:
+							# LastSelectedUnit
+							MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent_LastSelectedUnit = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent, info.LastSelectedUnitTag)
+
+							# QtyKind
+							MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent_LastSelectedUnit_QtyKind = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent_LastSelectedUnit, info.QtyKindTag)
+							MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent_LastSelectedUnit_QtyKind.text = pS(str(each_FTEvent.LastSelectedUnitPerQtyKind))
+
+							#Unit
+							MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent_LastSelectedUnit_Unit = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent_LastSelectedUnit, info.UnitTag)
+							MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent_LastSelectedUnit_Unit.text = pS(str(each_FTEvent.LastSelectedUnitPerQtyKind.get(each_LastSelectedUnitPerQtyKind_Key)))
+
+						#IsSIFFailureEventInRelevantOpmode
+						MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent_IsSIFFailureEventInRelevantOpmode = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent,info.IsSIFFailureEventInRelevantOpmodeTag)
+						MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent_IsSIFFailureEventInRelevantOpmode.text = pS(str(each_FTEvent.IsSIFFailureEventInRelevantOpMode))
+
+						#RiskReceptors
+						if len(each_FTEvent.ApplicableRiskReceptors) > 0:
+							'''
+							tempRiskReceptorList = []
+							for each_RiskReceptor in each_FTEvent.ApplicableRiskReceptors:
+								tempRiskReceptorList.append(each_RiskReceptor.ID)
+							'''
+							MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent_RiskReceptors = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent, info.RiskReceptorsTag)
+							each_RiskReceptor: core_classes.RiskReceptorItem
+							MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent_RiskReceptors.text = pS(','.join(list(map(lambda each_RiskReceptor: each_RiskReceptor.ID, each_FTEvent.ApplicableRiskReceptors))))
+
+						#BackgColour
+						MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent_BackgColour = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent, info.BackgColourTag)
+						MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent_BackgColour.text = pS(str(each_FTEvent.BackgColour))
+
+						#EventDescriptionComments
+						if len(each_FTEvent.EventDescriptionComments) > 0:
+							MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent_EventDescriptionComments = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent, info.EventDescriptionCommentsTag)
+							# J:since AssociatedTextItem does not have an ID, match core_classes.Comment instead
+							each_EventDescriptionComment: core_classes.Comment
+							MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent_EventDescriptionComments.text = pS(','.join(list(map(lambda each_EventDescriptionComment: each_EventDescriptionComment.ID, each_FTEvent.EventDescriptionComments))))
+
+						#ValueComments
+						if len(each_FTEvent.ValueComments) > 0:
+							MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent_ValueComments = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent, info.ValueCommentsTag)
+							# J:since AssociatedTextItem does not have an ID, match core_classes.Comment instead
+							each_ValueComment: core_classes.Comment
+							MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent_ValueComments.text = pS(','.join(list(map(lambda each_ValueComment: each_ValueComment.ID, each_FTEvent.ValueComments))))
+
+						#ShowDescriptionComments
+						MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent_ShowDescriptionComments = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent, info.ShowDescriptionCommentsTag)
+						MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent_ShowDescriptionComments.text = pS(str(each_FTEvent.ShowValueComments))
+
+						#ShowValueComments
+						MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent_ShowValueComments = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent, info.ShowValueCommentsTag)
+						MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent_ShowValueComments.text = pS(str(each_FTEvent.ShowValueComments))
+
+						#ConnectTo
+						if len(each_FTEvent.ConnectTo) > 0:
+							MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent_ConnectTo = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent, info.ConnectToTag)
+							each_FTEvent.ConnectTo: faulttree.FTEventInCore
+							MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent_ConnectTo.text = pS(','.join(list(map(lambda each_FTEvent: each_FTEvent.ID, each_FTEvent.ConnectTo))))
+
+						#LinkedFrom
+						#TODO J: what is the type of LinkedFrom item?
+						if len(each_FTEvent.LinkedFrom) > 0:
+							MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent_LinkedFrom = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent, info.LinkedFromTag)
+							each_LinkedFromItem:
+							MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent_LinkedFrom.text = pS(','.join(list(map(lambda each_FTEvent: each_FTEvent.ID, each_FTEvent.ConnectTo))))
 
 					if type(each_FTEvent) == faulttree.FTGateItemInCore:
 						#FTGate
+
 						MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTGate = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column, info.FTGateTag)
 
+						MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTGate_ID = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTGate, info.IDTag)
+						MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTGate_ID.text = pS(each_FTEvent.ID)
+
+						MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTGate_GateDescription = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTGate, info.GateDescriptionTag)
+						MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTGate_GateDescription.text = pS(str(each_FTEvent.GateDescription))
+
+						MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTGate_ShowDescriptionComments = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTGate, info.ShowDescriptionCommentsTag)
+						MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTGate_ShowDescriptionComments.text = pS(str(each_FTEvent.ShowDescriptionComments))
+
+						if len(each_FTEvent.ActionItems) > 0:
+							MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTGate_ActionItems = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTGate, info.ActionItemsTag)
+							# J:since AssociatedTextItem does not have an ID, match core_classes.Comment instead
+							each_ActionItem: core_classes.Comment
+							MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTGate_ActionItems.text = pS(','.join(list(map(lambda each_ActionItem: each_ActionItem.ID, each_FTEvent.ActionItems))))
+
+						MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTGate_ShowActionItems = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTGate, info.ShowActionItemsTag)
+						MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTGate_ShowActionItems.text = pS(str(each_FTEvent.ShowActionItems))
 
 					if type(each_FTEvent) == faulttree.FTConnectorItemInCore:
-						#FTConnectorIn
-						MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTConnectorIn = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column, info.FTConnectorInTag)
+						#TODO J: In Out should be determined by flag Out: faulttree.FTConnectorItemInCore.Out?
 
+						each_FTEvent: faulttree.FTConnectorItemInCore
+						if (each_FTEvent.Out):
+							# FTConnectorOut
+							MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTConnector = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column, info.FTConnectorOutTag)
+						else:
+							# FTConnectorIn
+							MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTConnector = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column, info.FTConnectorInTag)
 
-					if type(each_FTEvent) == faulttree.FTConnectorItemInCore:
-						#FTConnectorOut
-						MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTConnectorOut = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column, info.FTConnectorOutTag)
+						# ID
+						MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTConnector_ID = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTConnector, info.IDTag)
+						MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTConnector_ID.text = pS(str(each_FTEvent.ID))
 
-				pass
+						# ConnectorDescription
+						MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTConnector_ConnectorDescription = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTConnector, info.ConnectorDescriptionTag)
+						MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTConnector_ConnectorDescription.text = pS(str(each_FTEvent.ConnectorDescription))
+
+						# ConnectorDescriptionComments
+						if len(each_FTEvent.ConnectorDescriptionComments) > 0:
+							MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTConnector_ConnectorDescriptionComments = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTConnector,info.ConnectorDescriptionCommentsTag)
+							# J:since AssociatedTextItem does not have an ID, match core_classes.Comment instead
+							each_ConnectorDescriptionComment: core_classes.Comment
+							MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTGate_ActionItems.text = pS(','.join(list(map(lambda each_ConnectorDescriptionComment: each_ConnectorDescriptionComment.ID,each_FTEvent.ConnectorDescriptionComments))))
+
+						MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTConnector_ShowDescriptionComments = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTConnector, info.ShowDescriptionCommentsTag)
+						MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTConnector_ShowDescriptionComments.text = pS(str(each_FTEvent.ShowDescriptionComments))
+
+						# BackgColour
+						MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTConnector_BackgColour = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTConnector, info.BackgColourTag)
+						MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTConnector_BackgColour.text = pS(str(each_FTEvent.BackgColour))
+
+						if(each_FTEvent.Out):
+
+							pass
+
+						else:
+							#RelatedConnector
+							if each_FTEvent.RelatedCX != None:
+								each_FTEvent.RelatedCX: faulttree.FTConnectorItemInCore
+								MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTConnector_RelatedConnector = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTConnector, info.RelatedConnectorTag)
+								MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTConnector_RelatedConnector.text = pS(each_FTEvent.RelatedCX.ID)
+
+							#ConnectTo
+							MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTConnector_ConnectTo = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTConnector, info.ConnectToTag)
+							MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTConnector_ConnectTo.text = pS(str(each_FTEvent))
+
+						#Numbering
+						MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTConnectorIn_Numbering = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTConnectorIn, info.NumberingTag)
+						MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTConnectorIn_Numbering.text = pS(str(each_FTEvent))
+
+						#Style
+						MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTConnector_Style = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTConnector, info.StyleTag)
+						MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTConnector_Style.text = pS(str(each_FTEvent.Style))
+
+						#RiskReceptors
+						if len(each_FTEvent.ApplicableRiskReceptors) > 0:
+							MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTConnector_RiskReceptors = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTConnector, info.RiskReceptorsTag)
+							each_RiskReceptor: core_classes.RiskReceptorItem
+							MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTConnector_RiskReceptors.text = pS(','.join(list(map(lambda each_RiskReceptor: each_RiskReceptor.ID,each_FTEvent.ApplicableRiskReceptors))))
 
 			#TolRiskModel
-			#TODO canot map TolRiskModel
-			MyXMLRoot_FaultTrees_FaultTree_TolRiskModel = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree, info)
-			MyXMLRoot_FaultTrees_FaultTree_TolRiskModel = pS(each_FaultTree.MyTolRiskModel)
+			MyXMLRoot_FaultTrees_FaultTree_TolRiskModel = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree, info.TolRiskModelTag)
+			each_FaultTree.MyTolRiskModel: core_classes.TolRiskModel
+			MyXMLRoot_FaultTrees_FaultTree_TolRiskModel = pS(each_FaultTree.MyTolRiskModel.ID)
 
 			#Severity
 			MyXMLRoot_FaultTrees_FaultTree_Severity = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree, info.SeverityTag)
 
-			#Name
 			each_Key: core_classes.RiskReceptorItem
 			for each_Key in each_FaultTree.Severity:
 				# RR
@@ -422,9 +596,32 @@ def convertProjectToXml(Proj, ProjectFilename):
 				MyXMLRoot_FaultTrees_FaultTree_Severity_RR_SeverityValue = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Severity_RR, info.SeverityValueTag)
 				MyXMLRoot_FaultTrees_FaultTree_Severity_RR_SeverityValue.text = pS(each_FaultTree.Severity.get(each_Key))
 
-
 				pass
 
+			#TolFreq
+			#TODO
+			MyXMLRoot_FaultTrees_FaultTree_TolFreq = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree, info.TolFreqTag)
+			MyXMLRoot_FaultTrees_FaultTree_TolFreq.text = pS(str(each_FaultTree.TolFreq))
+
+			#RRGrouping
+			MyXMLRoot_FaultTrees_FaultTree_RRGrouping = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree, info.RRGroupingTag)
+			MyXMLRoot_FaultTrees_FaultTree_RRGrouping.text = pS(each_FaultTree.RRGroupingOption)
+
+			if len(each_FaultTree.CollapseGroups) > 0:
+				# CollapseGroups
+				MyXMLRoot_FaultTrees_FaultTree_CollapseGroups = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree,info.CollapseGroupsTag)
+				for each_CollapseGroup in CollapseGroups:
+					assert type(each_CollapseGroup) == faulttree.FTCollapseGroupInCore
+					# CollapseGroup
+					each_CollapseGroup: faulttree.FTCollapseGroupInCore
+					MyXMLRoot_FaultTrees_FaultTree_CollapseGroup = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_CollapseGroups, info.CollapseGroupTag)
+					MyXMLRoot_FaultTrees_FaultTree_CollapseGroup.text = pS(str(each_CollapseGroup.ID))
+
+			#ModelGate
+			if each_FaultTree.ModelGate != None:
+				MyXMLRoot_FaultTrees_FaultTree_ModelGate = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree, info.ModelGateTag)
+				each_FaultTree.ModelGate: faulttree.FTGateItemInCore
+				MyXMLRoot_FaultTrees_FaultTree_ModelGate.text = pS(str(each_FaultTree.ModelGate.ID))
 
 			pass
 
@@ -449,20 +646,7 @@ def convertProjectToXml(Proj, ProjectFilename):
 			MyXMLRoot_Comments_Comment_showInReport = ET.SubElement(MyXMLRoot_Comments_Comment, info.showInReportTag)
 			MyXMLRoot_Comments_Comment_showInReport.text = pS(str(each_Comment.showInReport))
 
-	#Bookmark
-	if len(Proj.Bookmarks) > 0:
-		MyXMLRoot_Bookmarks = ET.SubElement(MyXMLRoot, info.BookmarksTag)
 
-		each_Bookmark: core_classes.Bookmark
-		for each_Bookmark in Proj.Bookmarks:
-			assert type(each_Bookmark) == core_classes.Bookmark
-			MyXMLRoot_Bookmarks_Bookmark = ET.SubElement(MyXMLRoot_Bookmarks,info.BookmarkTag)
-
-			MyXMLRoot_Bookmarks_Bookmark_ID = ET.SubElement(MyXMLRoot_Bookmarks_Bookmark, info.IDTag)
-			MyXMLRoot_Bookmarks_Bookmark_ID.text = pS(str(each_Bookmark.iD))
-
-			MyXMLRoot_Bookmarks_Bookmark_isDeleted = ET.SubElement(MyXMLRoot_Bookmarks_Bookmark, info.isDeletedTag)
-			MyXMLRoot_Bookmarks_Bookmark_isDeleted.text = pS(str(each_Bookmark.isDeleted))
 
 	pass
 
