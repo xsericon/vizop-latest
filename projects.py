@@ -8,8 +8,8 @@ import xml.etree.ElementTree as ElementTree
 
 # vizop modules needed:
 from vizop_misc import IsReadableFile, IsWritableLocation, select_file_from_all
-import settings, core_classes, info, vizop_parser, faulttree
-#import settings, core_classes, info, faulttree
+#import settings, core_classes, info, vizop_parser, faulttree
+import settings, core_classes, info, faulttree
 
 """
 The projects module contains functions for handling entire Vizop projects, including project files.

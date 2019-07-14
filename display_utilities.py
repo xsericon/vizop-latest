@@ -815,6 +815,7 @@ def CheckTextCtrlFocus(HostPanel):
 		# get UIWidget item that had focus last time this procedure ran (only TextCtrl's)
 		LastWidget = HostPanel.LastTextCtrlFocused
 		if LastWidget: # a TextCtrl had focus before
+			print('DU818 LastWidget, NowFocused: ', LastWidget, NowFocused)
 			if (LastWidget != NowFocused) and (LastWidget in ActiveWidgList) and (LastWidget.Handler is not None)\
 					and not getattr(LastWidget, 'SkipLoseFocus', False):
 				# SkipLoseFocus means "ignore me when I lose focus"

@@ -313,7 +313,8 @@ class FTHeader(object): # FT header object. Rendered by drawing text into bitmap
 		TolFreqLabel = TextElement(self.FT, Row=4, ColStart=0, ColSpan=1, StartX=0, EndX=Col1XStartInCU-1,
 			HostObject=self, InternalName='TolFreqLabel')
 		TolFreq = TextElement(self.FT, Row=4, ColStart=1, ColSpan=1, StartX=Col1XStartInCU, EndX=499,
-			HostObject=self, InternalName='TolFreq', EditBehaviour='EditInControlPanel', ControlPanelAspect='CPAspect_NumValue')
+			HostObject=self, InternalName='TolFreq', EditBehaviour='EditInControlPanel',
+			ControlPanelAspect='CPAspect_NumValue', MaxValue=1e3, MinValue=1e-20, MaxMinUnit=core_classes.PerYearUnit)
 		UELLabel = TextElement(self.FT, Row=4, ColStart=2, ColSpan=1, StartX=500, EndX=749,
 			HostObject=self, InternalName='UELLabel')
 		UEL = TextElement(self.FT, Row=4, ColStart=3, ColSpan=1, StartX=750, EndX=999,
@@ -481,6 +482,7 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 		#		'Text': provide textbox prefilled with the component's display value
 		#		'Choice': provide choice widget
 		#		'EditInControlPanel': don't allow edit-in-place; editing allowed only in a control panel aspect
+		#		'MaxValue', 'MinValue', 'MaxMinUnit': for numerical values, max and min allowed value in MaxMinUnit
 		FTBoxyObject.__init__(self, **Args)
 		assert isinstance(FT, FTForDisplay)
 		assert isinstance(HostObject, (FTHeader, FTEvent, FTGate, FTConnector))
@@ -4410,10 +4412,11 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 					# refreshed by ControlFrame's OnPaint() afterwards)
 					self.CurrentEditTextCtrl.Destroy()
 					self.CurrentEditElement = self.CurrentEditTextCtrl = None
-					# request PHA object to update text attribute by sending message through zmq
-					vizop_misc.SendRequest(Socket=self.C2DSocketREQ, Command='RQ_FT_ChangeText',
-						Proj=self.Proj.ID, PHAObj=self.PHAObj.ID, Viewport=self.ID,
-						Element=ElementID, TextComponent=EditComponentInternalName, NewValue=TextEntered)
+					# request PHA object in datacore to update text attribute
+					self.RequestChangeText(ElementID, EditComponentInternalName, NewValue=TextEntered)
+#					vizop_misc.SendRequest(Socket=self.C2DSocketREQ, Command='RQ_FT_ChangeText',
+#						Proj=self.Proj.ID, PHAObj=self.PHAObj.ID, Viewport=self.ID,
+#						Element=ElementID, TextComponent=EditComponentInternalName, NewValue=TextEntered)
 				else: # no change made, or change rejected; destroy the textctrl widget
 					self.CurrentEditTextCtrl.Destroy()
 					self.CurrentEditElement = self.CurrentEditTextCtrl = None
@@ -4442,6 +4445,13 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 					self.CurrentEditChoice.Destroy()
 					self.CurrentEditElement = self.CurrentEditChoice = None
 				self.DisplDevice.SetKeystrokeHandlerOnOff(On=True) # turn on keypress shortcut detection in control frame
+
+	def RequestChangeText(self, ElementID, EditComponentInternalName, NewValue):
+		# send request to Datacore to update text attribute. Also used for updating value fields
+		# at this stage, NewValue has not been validated - could be unacceptable
+		vizop_misc.SendRequest(Socket=self.C2DSocketREQ, Command='RQ_FT_ChangeText',
+							   Proj=self.Proj.ID, PHAObj=self.PHAObj.ID, Viewport=self.ID,
+							   Element=ElementID, TextComponent=EditComponentInternalName, NewValue=NewValue)
 
 	def ConnectButtonsCanConnectTo(self, StartButton):
 		# find and return list of connect buttons that StartButton (a connect button object) can connect to.

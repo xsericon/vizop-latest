@@ -1137,6 +1137,26 @@ class ControlFrame(wx.Frame):
 		def NumericalValueAspect_OnValueTextWidget(self, Event, WidgetObj=None):
 			# handle end-of-editing (loss of focus) on value text widget
 			print('CF1139 in text widget handler')
+			# get value entered by user
+			UserEntry = WidgetObj.Widget.GetValue()
+			# get Viewport to request value change (no validation here; done in datacore)
+			self.TopLevelFrame.CurrentViewport.RequestChangeText(ElementID=WidgetObj.PHAObj.ID,
+				EditComponentInternalName=getattr(WidgetObj.PHAObj, WidgetObj.DataAttrib).InternalName,
+				NewValue=UserEntry)
+
+#			UserValue = utilities.str2real(UserEntry, meaninglessvalue='?')
+#			ValueOK = (UserValue != '?')
+#			if ValueOK:
+#				# get PHA element's component hosting this value
+#				ThisComponent = getattr(WidgetObj.PHAObj, WidgetObj.DataAttrib)
+#				# check value is within limits, applying unit conversion to match component's MaxMinUnit
+#				if hasattr(ThisComponent, 'MaxValue'):
+#					ValueOK &= (ThisComponent.Unit.Conversion[ThisComponent.MaxMinUnit] * UserValue <= ThisComponent.MaxValue)
+#				if hasattr(ThisComponent, 'MinValue'):
+#					ValueOK &= (ThisComponent.Unit.Conversion[ThisComponent.MaxMinUnit] * UserValue >= ThisComponent.MinValue)
+#			if ValueOK:
+#				# proceed to update value in PHA object
+#				pass
 
 		def NumericalValueAspect_OnUnitWidget(self, Event): pass
 
