@@ -75,15 +75,6 @@ def getTypeByValue(StringInput, EnumClass):
 			return t
 	return None
 
-def ic(StringInput, eNumAttr) -> bool:
-	# ignore case parser method
-	assert type(StringInput) == str
-	# TODO assert type(eNumAttr) ==
-	# assert
-
-	# compare string ignore case
-	return StringInput.lower() == eNumAttr.value.lower()
-
 """ ----------UTIL----------]"""
 
 """[----------Project > XML---------- """
