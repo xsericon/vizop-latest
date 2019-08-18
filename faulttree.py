@@ -251,6 +251,7 @@ class FTHeader(object): # FT header object. Rendered by drawing text into bitmap
 		assert isinstance(FT, FTForDisplay)
 		object.__init__(self)
 		self.FT = FT
+		self.ID = 'Header' # needed when calling datacore to request data changes; e.g. in RequestChangeText()
 		self.InitializeData()
 		# create Elements needed for drawing each text in the header
 		self.Elements = self.CreateTextElements()
@@ -261,8 +262,8 @@ class FTHeader(object): # FT header object. Rendered by drawing text into bitmap
 		self.Rev = ''
 		self.RR = _('<undefined>') # risk receptors
 		self.Severity = ''
-#		self.TolFreq = '' # tolerable frequency (str)
 		self.TolFreq = core_classes.NumValueItemForDisplay() # tolerable frequency, object including value, unit, possible units etc.
+		self.TolFreq.InternalName = 'TolFreq' # for cross-reference to datacore attrib during editing
 		self.UEL = '' # unmitigated event likelihood (outcome frequency) of FT
 		self.OutcomeUnit = '' # ? not used ? assumed same as unit of TolFreq ?
 		self.TargetUnit = '' # 'RRF' or 'PFD' or 'PFH'
@@ -576,8 +577,17 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 			CanvZoomY=Zoom, PanX=0, PanY=0, VertAlignment='Top')
 
 	def HandleMouseLClickOnMe(self, **Args): # handle mouse left button single click on TextElement instance
-		# first, request control frame to show appropriate aspect in control panel%%% working here
+		# first, request control frame to show appropriate aspect in control panel
+#		# find out which object contains the parameter to be edited, if any
+#		DataHostObj = self.FT if isinstance(self.HostObject, FTHeader) else self.HostObject
 		if getattr(self, 'ControlPanelAspect', None):
+#			if isinstance(self.CurrentEditElement.HostObject, FTHeader):
+#				ElementID = 'Header'
+#				DatacoreHostObj = self.FT
+#			else:
+#				ElementID = self.CurrentEditElement.HostObject.ID
+#				DatacoreHostObj = self.HostObject.FT
+#			EditComponentInternalName = self.CurrentEditElement.InternalName
 			self.FT.DisplDevice.GotoControlPanelAspect(AspectName=self.ControlPanelAspect,
 				PHAObjInControlPanel=self.HostObject, ComponentInControlPanel=self.InternalName)
 		if self.FT.PHAObj.EditAllowed: # proceed with editing only if allowed to edit in this instance of vizop
@@ -3623,7 +3633,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			HeaderEl.TolFreq.Value = TolFreqTag.text
 			HeaderEl.TolFreq.Unit = core_classes.UnitWithName(TolFreqTag.findtext(info.UnitTag,
 				default=info.NullUnitInternalName))
-			# populate lists of options relating to numerical values%%%
+			# populate lists of options relating to numerical values
 			for ThisNumValue in HeaderEl.NumericalValues:
 				PopulateUnitOptions(XMLRoot=HeaderXMLRoot, HostEl=HeaderEl, ComponentName=ThisNumValue,
 					ListAttrib='UnitOptions')
@@ -4403,7 +4413,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			if CurrentEditBehaviour == 'Text':
 				# get the text typed by the user
 				TextEntered = self.CurrentEditTextCtrl.GetValue().strip()
-				# check if any changes made
+				# check if any changes made%%%
 				if AcceptEditsThisTime and (TextEntered != self.CurrentEditElement.Text.Content):
 					if isinstance(self.CurrentEditElement.HostObject, FTHeader): ElementID = 'Header'
 					else: ElementID = self.CurrentEditElement.HostObject.ID

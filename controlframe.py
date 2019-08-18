@@ -1048,9 +1048,13 @@ class ControlFrame(wx.Frame):
 				Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_LEFT | wx.EXPAND)
 			self.NumericalValueAspect.ValueLabel = UIWidgetItem(wx.StaticText(MyNotebookPage, -1, _('Current value:')),
 				ColLoc=3, ColSpan=1)
-			self.NumericalValueAspect.ValueText = UIWidgetItem(wx.TextCtrl(MyNotebookPage, -1), MinSizeY=25,
-				Events=[], Handler=self.NumericalValueAspect_OnValueTextWidget, IsNumber=True,
+			self.NumericalValueAspect.ValueText = UIWidgetItem(wx.TextCtrl(MyNotebookPage, -1,
+				style=wx.TE_PROCESS_ENTER), MinSizeY=25,
+				Events=[wx.EVT_TEXT_ENTER], Handler=self.NumericalValueAspect_OnValueTextWidget, IsNumber=True,
+				Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_LEFT | wx.EXPAND,
 				MinSizeX=100, ColLoc=4, ColSpan=1, DisplayMethod='StaticFromText')
+				# this TextCtrl raises events in 2 ways: (1) <Enter> key raises wx.EVT_TEXT_ENTER, (2) loss of focus is
+				# caught by OnIdle().
 			self.NumericalValueAspect.UnitChoice = UIWidgetItem(wx.Choice(MyNotebookPage, -1, size=(100, 30), choices=[]),
 				  Handler=self.NumericalValueAspect_OnUnitWidget, Events=[wx.EVT_CHOICE], ColLoc=5, ColSpan=1)
 			self.NumericalValueAspect.ValueKindLabel = UIWidgetItem(wx.StaticText(MyNotebookPage, -1, _('Basis:')),
@@ -1135,13 +1139,19 @@ class ControlFrame(wx.Frame):
 		def NumericalValueAspect_OnCommentButton(self, Event): pass
 
 		def NumericalValueAspect_OnValueTextWidget(self, Event, WidgetObj=None):
-			# handle end-of-editing (loss of focus) on value text widget
+			# handle end-of-editing (loss of focus) or Enter key press on value text widget
 			print('CF1139 in text widget handler')
+			# if invoked from Enter keypress, find widget object containing text widget
+			if Event:
+				EventWidget = Event.GetEventObject()
+				ThisWidgetObj = [w for w in self.WidgActive if w.Widget == EventWidget][0]
+				EventWidget.SelectAll() # select all text in the widget, as visual indicator to user that <Enter> worked
+			else: ThisWidgetObj = WidgetObj
 			# get value entered by user
-			UserEntry = WidgetObj.Widget.GetValue()
+			UserEntry = ThisWidgetObj.Widget.GetValue()
 			# get Viewport to request value change (no validation here; done in datacore)
-			self.TopLevelFrame.CurrentViewport.RequestChangeText(ElementID=WidgetObj.PHAObj.ID,
-				EditComponentInternalName=getattr(WidgetObj.PHAObj, WidgetObj.DataAttrib).InternalName,
+			self.TopLevelFrame.CurrentViewport.RequestChangeText(ElementID=ThisWidgetObj.PHAObj.ID,
+				EditComponentInternalName=getattr(ThisWidgetObj.PHAObj, ThisWidgetObj.DataAttrib).InternalName,
 				NewValue=UserEntry)
 
 #			UserValue = utilities.str2real(UserEntry, meaninglessvalue='?')
@@ -1243,6 +1253,7 @@ class ControlFrame(wx.Frame):
 			if ThisWidget.Handler:
 				for Event in ThisWidget.Events:
 					ThisWidget.Widget.Bind(Event, ThisWidget.Handler)
+					if Event == wx.EVT_TEXT_ENTER: print('CF1249 bound Enter key')
 			# set keyboard shortcuts
 			if getattr(ThisWidget, 'KeyStroke', None):
 				KeyPressHash = vizop_misc.RegisterKeyPressHandler(
