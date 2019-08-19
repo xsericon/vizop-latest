@@ -1122,8 +1122,6 @@ class ControlFrame(wx.Frame):
 		# specific methods for NumericalValueAspect
 
 		def PrefillWidgetsForNumericalValueAspect(self, **Args): # set initial values for widgets in NumericalValueAspect
-			# Assumes that the PHA element hosting the value is set in MyControlFrame.PHAObjInControlPanel
-			# and the specific number component's name is in MyControlFrame.ComponentInControlPanel
 			Proj = self.TopLevelFrame.CurrentProj
 			# capture the component containing the numerical value to display
 			self.TopLevelFrame.PHAObjInControlPanel = Args['PHAObjInControlPanel']
@@ -1134,6 +1132,10 @@ class ControlFrame(wx.Frame):
 			# set up ValueText to display the value correctly when the display method is called
 			self.NumericalValueAspect.ValueText.PHAObj = self.TopLevelFrame.PHAObjInControlPanel
 			self.NumericalValueAspect.ValueText.DataAttrib = self.TopLevelFrame.ComponentInControlPanel
+			# populate ValueText with the current value
+			self.NumericalValueAspect.ValueText.Widget.SetValue(getattr(self.NumericalValueAspect.ValueText.PHAObj,
+				self.NumericalValueAspect.ValueText.DataAttrib).Value)
+#				RR=self.NumericalValueAspect.ValueText.PHAObj.RR, InvalidResult=''))
 			# set up UnitChoice
 
 		def NumericalValueAspect_OnCommentButton(self, Event): pass
