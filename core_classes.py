@@ -341,6 +341,7 @@ ProbabilityUnits = [u for u in UnitItem.UserSelectableUnits if u.QtyKind == 'Pro
 FrequencyUnits = [u for u in UnitItem.UserSelectableUnits if u.QtyKind == 'Frequency']
 TimeUnits = [u for u in UnitItem.UserSelectableUnits if u.QtyKind == 'Time']
 RatioUnits = [u for u in UnitItem.UserSelectableUnits if u.QtyKind == 'Ratio']
+AllSelectableUnits = ProbabilityUnits + FrequencyUnits + TimeUnits + RatioUnits
 DefaultBetaUnit = PercentageUnit
 
 def UnitWithName(TargetXMLName):

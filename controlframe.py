@@ -1131,12 +1131,19 @@ class ControlFrame(wx.Frame):
 			# set widget values %%% working here
 			# set up ValueText to display the value correctly when the display method is called
 			self.NumericalValueAspect.ValueText.PHAObj = self.TopLevelFrame.PHAObjInControlPanel
+			PHAObj = self.NumericalValueAspect.ValueText.PHAObj
 			self.NumericalValueAspect.ValueText.DataAttrib = self.TopLevelFrame.ComponentInControlPanel
+			DataAttrib = self.NumericalValueAspect.ValueText.DataAttrib
 			# populate ValueText with the current value
-			self.NumericalValueAspect.ValueText.Widget.SetValue(getattr(self.NumericalValueAspect.ValueText.PHAObj,
-				self.NumericalValueAspect.ValueText.DataAttrib).Value)
+			self.NumericalValueAspect.ValueText.Widget.SetValue(getattr(PHAObj, DataAttrib).Value)
 #				RR=self.NumericalValueAspect.ValueText.PHAObj.RR, InvalidResult=''))
 			# set up UnitChoice
+			UnitOptions = getattr(PHAObj, DataAttrib).AcceptableUnits # list of ChoiceItem instances
+			self.NumericalValueAspect.UnitChoice.Widget.Set([u.HumanName for u in UnitOptions])
+			# select the current unit in UnitChoice, if any
+			ApplicableOptionsList = [u.Applicable for u in UnitOptions]
+			self.NumericalValueAspect.UnitChoice.Widget.SetSelection(
+				ApplicableOptionsList.index(True) if True in ApplicableOptionsList else wx.NOT_FOUND)
 
 		def NumericalValueAspect_OnCommentButton(self, Event): pass
 
@@ -1255,7 +1262,6 @@ class ControlFrame(wx.Frame):
 			if ThisWidget.Handler:
 				for Event in ThisWidget.Events:
 					ThisWidget.Widget.Bind(Event, ThisWidget.Handler)
-					if Event == wx.EVT_TEXT_ENTER: print('CF1249 bound Enter key')
 			# set keyboard shortcuts
 			if getattr(ThisWidget, 'KeyStroke', None):
 				KeyPressHash = vizop_misc.RegisterKeyPressHandler(

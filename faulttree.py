@@ -264,6 +264,7 @@ class FTHeader(object): # FT header object. Rendered by drawing text into bitmap
 		self.Severity = ''
 		self.TolFreq = core_classes.NumValueItemForDisplay() # tolerable frequency, object including value, unit, possible units etc.
 		self.TolFreq.InternalName = 'TolFreq' # for cross-reference to datacore attrib during editing
+		self.TolFreq.AcceptableUnits = [] # populated in PopulateUnitOptions()
 		self.UEL = '' # unmitigated event likelihood (outcome frequency) of FT
 		self.OutcomeUnit = '' # ? not used ? assumed same as unit of TolFreq ?
 		self.TargetUnit = '' # 'RRF' or 'PFD' or 'PFH'
@@ -2469,7 +2470,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			self.TolFreq.SetMyValue(TolFreqValueObj.GetMyValue(RR=RR), RR=RR)
 			self.TolFreq.SetMyUnit(TolFreqValueObj.GetMyUnit()) # setting the same unit several times, never mind
 		# set lists of permissible units and ValueKinds; used elsewhere to offer options to user
-		self.TolFreq.UnitOptions = core_classes.FrequencyUnits
+		self.TolFreq.AcceptableUnits = core_classes.FrequencyUnits
 		self.TolFreq.ValueKindOptions = [core_classes.UserNumValueItem, core_classes.ConstNumValueItem,
 			core_classes.LookupNumValueItem, core_classes.UseParentValueItem, core_classes.ParentNumValueItem]
 
@@ -2714,12 +2715,16 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 				# add unit, unit options, ValueKind options and Constant options
 				UnitEl = ElementTree.SubElement(AttribEl, info.UnitTag)
 				UnitEl.text = str(Attrib.GetMyUnit().XMLName)
-				for ThisUnitOption in Attrib.UnitOptions:
-					UnitOptionEl = ElementTree.SubElement(AttribEl, info.UnitOptionTag)
-					UnitOptionEl.text = str(ThisUnitOption.XMLName)
+				print('FT2717 sending unit options: ', Attrib, Attrib.AcceptableUnits)
+				PopulateValueUnitField(CurrentUnit=Attrib.GetMyUnit(), AcceptableUnits=Attrib.AcceptableUnits,
+					EventEl=AttribEl, OfferConvertOptions=True)
+#				for ThisUnitOption in Attrib.AcceptableUnits:
+#					UnitOptionEl = ElementTree.SubElement(AttribEl, info.UnitOptionTag)
+#					UnitOptionEl.text = str(ThisUnitOption.XMLName)
+#					UnitOptionEl.set(info.ApplicableAttribName, 'True')
 				for ThisValueKindOption in Attrib.ValueKindOptions:
 					ValueKindOptionEl = ElementTree.SubElement(AttribEl, info.ValueKindOptionTag)
-					UnitOptionEl.text = str(ThisValueKindOption.XMLName)
+					ValueKindOptionEl.text = str(ThisValueKindOption.XMLName)
 				for ThisConstantOption in self.Proj.Constants:
 					ConstantOptionEl = ElementTree.SubElement(AttribEl, info.ConstantOptionTag)
 					ConstantOptionEl.text = str(ThisConstantOption.HumanName)
@@ -2728,8 +2733,8 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 				for ThisMatrixOption in self.Proj.TolRiskModels: # %%% working here
 					MatrixOptionEl = ElementTree.SubElement(AttribEl, info.MatrixOptionTag)
 					MatrixOptionEl.text = str(ThisMatrixOption.HumanName)
-					IDEl = ElementTree.SubElement(MatrixOptionEl, info.IDTag)
-					IDEl.text = ThisMatrixOption.ID
+					MatrixOptionIDEl = ElementTree.SubElement(MatrixOptionEl, info.IDTag)
+					MatrixOptionIDEl.text = ThisMatrixOption.ID
 
 			# elements where the text is the same as the FT attribute
 			# Note, SILTargetValue must be interrogated AFTER TargetRiskRed() call, above
@@ -2909,13 +2914,15 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 				El.Text = FTConnector.RelatedCX.ID
 			return ConnEl
 
-		def PopulateValueUnitField(FTEvent, EventEl, OfferConvertOptions=True):
+#		def PopulateValueUnitField(FTEvent, EventEl, OfferConvertOptions=True):
+		def PopulateValueUnitField(CurrentUnit, AcceptableUnits, EventEl, OfferConvertOptions=True):
 			# put options for value unit into element EventEl in FTEvent's XML representation
 			# add options for value unit: first, plain units,
 			# then (if OfferConvertOptions is True) options to convert value to new units
+			assert CurrentUnit in core_classes.AllSelectableUnits
 			assert isinstance(OfferConvertOptions, bool)
-			CurrentUnit = FTEvent.Value.GetMyUnit()
-			AcceptableUnits = FTEvent.AcceptableUnits()
+#			CurrentUnit = FTEvent.Value.GetMyUnit()
+#			AcceptableUnits = FTEvent.AcceptableUnits()
 			HowManyAcceptableUnits = len(AcceptableUnits)
 			for (ThisUnitIndex, ThisUnit) in enumerate(AcceptableUnits):
 				UnitEl = ElementTree.SubElement(EventEl, info.UnitOptionTag)
@@ -3005,7 +3012,9 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 				GateTypeEl.set(info.ApplicableAttribName, utilities.Bool2Str(ThisGateType == FTGate.Algorithm))
 				GateTypeEl.set(info.SerialTag, str(ThisGateTypeIndex)) # add type option serial number
 			# add options for gate unit
-			PopulateValueUnitField(FTEvent=FTGate, EventEl=GateEl, OfferConvertOptions=False)
+#			PopulateValueUnitField(FTEvent=FTGate, EventEl=GateEl, OfferConvertOptions=False)
+			PopulateValueUnitField(CurrentUnit=FTGate.Value.GetMyUnit(), AcceptableUnits=FTGate.AcceptableUnits(),
+				EventEl=GateEl, OfferConvertOptions=False)
 			return GateEl
 
 		def PopulateColumnData(FT, El, Col):
@@ -3566,8 +3575,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			# HostEl: element containing the numerical value
 			# ComponentName (str): the numerical component name in HostEl
 			# ListAttrib (str): name of the list in Component to populate
-			ListToSet = getattr(getattr(HostEl, ComponentName), ListAttrib)
-			ListToSet = []
+			UnitOptions = []
 			for ThisTag in XMLRoot.findall(info.UnitOptionTag):
 				# find human name for this unit option (use startswith() to ignore convert marker suffix)
 				ThisUnitHumanName = [u.HumanName for u in core_classes.UnitItem.UserSelectableUnits
@@ -3575,9 +3583,12 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 				# set human name according to whether this is a value conversion option
 				if ThisTag.text.endswith(ConvertValueMarker): ThisHumanName = _('Convert value to %s') % ThisUnitHumanName
 				else: ThisHumanName = ThisUnitHumanName
-				ListToSet.append(ChoiceItem(XMLName=ThisTag.text,
+				UnitOptions.append(ChoiceItem(XMLName=ThisTag.text,
 					HumanName=ThisHumanName,
 					Applicable=utilities.Bool2Str(ThisTag.get(info.ApplicableAttribName))))
+			print('FT3586 unit options set: ', UnitOptions)
+			# set unit options list in the FT component
+			setattr(getattr(HostEl, ComponentName), ListAttrib, UnitOptions)
 
 		def PopulateOverallData(XMLRoot, HeaderEl):
 			# extract data about the overall FT from XMLRoot
@@ -3634,9 +3645,11 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			HeaderEl.TolFreq.Unit = core_classes.UnitWithName(TolFreqTag.findtext(info.UnitTag,
 				default=info.NullUnitInternalName))
 			# populate lists of options relating to numerical values
-			for ThisNumValue in HeaderEl.NumericalValues:
-				PopulateUnitOptions(XMLRoot=HeaderXMLRoot, HostEl=HeaderEl, ComponentName=ThisNumValue,
-					ListAttrib='UnitOptions')
+			for ThisNumValue, ThisNumTag in [ ('TolFreq', TolFreqTag) ]:
+				PopulateUnitOptions(XMLRoot=ThisNumTag, HostEl=HeaderEl, ComponentName=ThisNumValue,
+					ListAttrib='AcceptableUnits')
+#				print('FT3640 unit options: ', ThisNumValue, getattr(HeaderEl, ThisNumValue).AcceptableUnits)
+				print('FT3641 unit options: ', HeaderEl.TolFreq.AcceptableUnits)
 				ThisNumAttrib = getattr(HeaderEl, ThisNumValue)
 				for (ThisOptionTag, ThisOption) in [
 						(info.ValueKindOptionTag, 'ValueKindOptions'), (info.ConstantOptionTag, 'ConstantOptions'),
