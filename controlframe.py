@@ -1129,7 +1129,7 @@ class ControlFrame(wx.Frame):
 			# enable navigation buttons if there are any items in current project's history lists
 			self.UpdateNavigationButtonStatus(Proj)
 			# set widget values %%% working here
-			# set up ValueText to display the value correctly when the display method is called
+			# set up ValueText
 			self.NumericalValueAspect.ValueText.PHAObj = self.TopLevelFrame.PHAObjInControlPanel
 			PHAObj = self.NumericalValueAspect.ValueText.PHAObj
 			self.NumericalValueAspect.ValueText.DataAttrib = self.TopLevelFrame.ComponentInControlPanel
@@ -1139,6 +1139,9 @@ class ControlFrame(wx.Frame):
 #				RR=self.NumericalValueAspect.ValueText.PHAObj.RR, InvalidResult=''))
 			# set up UnitChoice
 			UnitOptions = getattr(PHAObj, DataAttrib).AcceptableUnits # list of ChoiceItem instances
+			self.NumericalValueAspect.UnitChoice.PHAObj = self.TopLevelFrame.PHAObjInControlPanel
+			self.NumericalValueAspect.UnitChoice.DataAttrib = self.TopLevelFrame.ComponentInControlPanel
+			# populate UnitChoice with unit options
 			self.NumericalValueAspect.UnitChoice.Widget.Set([u.HumanName for u in UnitOptions])
 			# select the current unit in UnitChoice, if any
 			ApplicableOptionsList = [u.Applicable for u in UnitOptions]
@@ -1163,21 +1166,22 @@ class ControlFrame(wx.Frame):
 				EditComponentInternalName=getattr(ThisWidgetObj.PHAObj, ThisWidgetObj.DataAttrib).InternalName,
 				NewValue=UserEntry)
 
-#			UserValue = utilities.str2real(UserEntry, meaninglessvalue='?')
-#			ValueOK = (UserValue != '?')
-#			if ValueOK:
-#				# get PHA element's component hosting this value
-#				ThisComponent = getattr(WidgetObj.PHAObj, WidgetObj.DataAttrib)
-#				# check value is within limits, applying unit conversion to match component's MaxMinUnit
-#				if hasattr(ThisComponent, 'MaxValue'):
-#					ValueOK &= (ThisComponent.Unit.Conversion[ThisComponent.MaxMinUnit] * UserValue <= ThisComponent.MaxValue)
-#				if hasattr(ThisComponent, 'MinValue'):
-#					ValueOK &= (ThisComponent.Unit.Conversion[ThisComponent.MaxMinUnit] * UserValue >= ThisComponent.MinValue)
-#			if ValueOK:
-#				# proceed to update value in PHA object
-#				pass
-
-		def NumericalValueAspect_OnUnitWidget(self, Event): pass
+		def NumericalValueAspect_OnUnitWidget(self, Event):
+			# handle change of selection in unit Choice widget
+			print('CF1168 in unit Choice widget handler')
+			# get option selected by user
+			EventWidget = Event.GetEventObject()
+			UserSelection = Event.GetSelection()
+			if UserSelection != wx.NOT_FOUND: # is any item selected?
+				# find widget object
+				ThisWidgetObj = [w for w in self.WidgActive if w.Widget == EventWidget][0]
+				# find XML name of unit requested
+				TargetUnitName = getattr(ThisWidgetObj.PHAObj, ThisWidgetObj.DataAttrib).AcceptableUnits[
+					EventWidget.GetSelection()].XMLName
+				# get Viewport to request value change (no validation here; done in datacore)
+				self.TopLevelFrame.CurrentViewport.RequestChangeChoice(ElementID=ThisWidgetObj.PHAObj.ID,
+					EditComponentInternalName=getattr(ThisWidgetObj.PHAObj, ThisWidgetObj.DataAttrib).InternalName,
+					NewValue=TargetUnitName)
 
 		def NumericalValueAspect_OnValueKindWidget(self, Event): pass
 

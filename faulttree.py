@@ -2454,7 +2454,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		SeverityObjs = self.MyTolRiskModel.TolFreqTable.Keys[self.MyTolRiskModel.TolFreqTable.SeverityDimensionIndex]
 		self.Severity = dict([(RR, SeverityObjs[-1]) for RR in self.MyTolRiskModel.RiskReceptors])
 		# get initial tolerable frequency value (value object containing all RRs), based on defaults in tolerable risk model
-		self.TolFreq = core_classes.NumValueItem()
+		self.TolFreq = core_classes.UserNumValueItem()
 		self.SetTolFreq()
 		self.RRGroupingOption = FTObjectInCore.DefaultRRGroupingOption # whether risk receptors are shown grouped
 		self.RefreshRiskReceptorGrouping(GroupingOption=self.RRGroupingOption, FirstTime=True)
@@ -2473,6 +2473,9 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		self.TolFreq.AcceptableUnits = core_classes.FrequencyUnits
 		self.TolFreq.ValueKindOptions = [core_classes.UserNumValueItem, core_classes.ConstNumValueItem,
 			core_classes.LookupNumValueItem, core_classes.UseParentValueItem, core_classes.ParentNumValueItem]
+
+	def AcceptableUnits(self): # return list of units (UnitItem instances) for FT's TolFreq
+		return core_classes.FrequencyUnits
 
 	def RefreshRiskReceptorGrouping(self, GroupingOption, FirstTime=False):
 		# re-group risk receptors and select appropriate group to be displayed
@@ -3322,6 +3325,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			HostElement = [El for c in self.Columns for El in c.FTElements if El.ID == ElementID][0]
 			ComponentToUpdate = TextComponentName
 			ComponentHost = HostElement
+		print('FT3307 in ChangeChoice: ComponentToUpdate: ', ComponentToUpdate, type(ComponentToUpdate))
 		# update component's value (TODO add undo)
 		if ComponentToUpdate == 'Severity': # update severity in all currently displayed risk receptors
 			NewSeverityObj = [s for s in self.MyTolRiskModel.TolFreqTable.Keys[
@@ -3347,27 +3351,16 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			# find the FTEvent to update
 			ThisFTEvent = [e for e in WalkOverAllFTObjs(self) if e.ID == ElementID][0]
 			ThisFTEvent.ChangeEventType(NewEventType=NewValue) # update the event type
-		elif ComponentToUpdate in ('EventValueUnit', 'GateValueUnit'):  # update value unit of FTEvent or FTGate
+		elif ComponentToUpdate in ('EventValueUnit', 'GateValueUnit'):
+			# update value unit of FTEvent or FTGate
 			# find the FTEvent/FTGate to update
 			ThisFTEvent = [e for e in WalkOverAllFTObjs(self) if e.ID == ElementID][0]
-			# confirm the unit is a recognised frequency/probability unit
-			AcceptableUnits = ThisFTEvent.AcceptableUnits()
-			# check whether user requested to convert the value - signified by ConvertValueMarker suffix
-			if NewValue.endswith(ConvertValueMarker):
-				Convert = True
-				NewValue = NewValue[:-len(ConvertValueMarker)] # remove marker
-			else: Convert = False
-			if NewValue in [u.XMLName for u in AcceptableUnits]: # it's recognised
-				NewUnit = [u for u in AcceptableUnits if u.XMLName == NewValue][0]
-				# decide whether to convert the value
-				if Convert:
-					ThisFTEvent.Value.ConvertToUnit(NewUnit) # convert value and change unit
-				else:
-					# change the unit without changing the value
-					print("FT2963 setting unit to: ", NewUnit.HumanName, "number kind: ", type(ThisFTEvent.Value))
-					ThisFTEvent.Value.SetMyUnit(NewUnit)
-				# if this is an FTGate, set its "last selected unit" attribute
-				if ComponentToUpdate == 'GateValueUnit': ThisFTEvent.SetLastSelectedUnit(NewUnit)
+			UnitChanged, NewUnit = self.ChangeUnit(FTElement=ThisFTEvent, NewUnitXMLName=NewValue, ValueAttribName='Value')
+			# if this is an FTGate, set its "last selected unit" attribute
+			if UnitChanged and (ComponentToUpdate == 'GateValueUnit'): ThisFTEvent.SetLastSelectedUnit(NewUnit)
+		elif ComponentToUpdate == 'TolFreq':
+			# update unit of TolFreq in FT header
+			UnitChanged, NewUnit = self.ChangeUnit(FTElement=self, NewUnitXMLName=NewValue, ValueAttribName='TolFreq')
 		elif ComponentToUpdate == 'EventValueKind':  # update value kind
 			# find the FTEvent to update
 			ThisFTEvent = [e for e in WalkOverAllFTObjs(self) if e.ID == ElementID][0]
@@ -3381,6 +3374,34 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			NewValueObj = [v for v in self.AttribValueHash[ComponentToUpdate] if v.XMLName == NewValue][0]
 			setattr(ComponentHost, ComponentToUpdate, NewValueObj)
 		return vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
+
+	def ChangeUnit(self, FTElement, NewUnitXMLName, ValueAttribName): # change unit of numerical value
+		# FTElement: FT itself (for updating TolFreq value), or an FTEvent or FTGate instance (for updating value unit)
+		# NewUnitXMLName: (str) XML name of unit to change to, optionally with ConvertValueMarker suffix
+		# ValueAttribName: (str) Name of value attrib in FTElement to change; 'TolFreq' or 'Value'
+		# return:
+			# UnitChanged (bool): whether the unit was actually changed
+			# NewUnit (UnitItem or None): the unit changed to, or None if unit wasn't changed
+		AcceptableUnits = FTElement.AcceptableUnits()
+		ValueAttrib = getattr(FTElement, ValueAttribName) # find the applicable attrib in FTElement
+		# check whether user requested to convert the value - signified by ConvertValueMarker suffix
+		if NewUnitXMLName.endswith(ConvertValueMarker):
+			Convert = True
+			NewUnitXMLName = NewUnitXMLName[:-len(ConvertValueMarker)] # remove marker
+		else:
+			Convert = False
+		if NewUnitXMLName in [u.XMLName for u in AcceptableUnits]:  # it's recognised
+			NewUnit = [u for u in AcceptableUnits if u.XMLName == NewUnitXMLName][0]
+			# decide whether to convert the value
+			if Convert:
+				ValueAttrib.ConvertToUnit(NewUnit) # convert value and change unit
+			else:
+				# change the unit without changing the value
+				print("FT2963 setting unit to: ", NewUnit.HumanName, "number kind: ", type(ValueAttrib))
+				ValueAttrib.SetMyUnit(NewUnit)
+			UnitChanged = True
+		else: UnitChanged = False; NewUnit = None
+		return UnitChanged, NewUnit
 
 	def HandleIncomingRequest(self, MessageReceived=None, MessageAsXMLTree=None, **Args):
 		# handle request received by FT model in datacore from a Viewport. Request can be to edit data (eg add new element)
@@ -3411,9 +3432,14 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			Reply = self.ChangeText(Proj=Proj, ElementID=XMLRoot.findtext('Element'),
 				TextComponentName=XMLRoot.findtext('TextComponent'),
 				NewValue=XMLRoot.findtext('NewValue'), Viewport=SourceViewport)
-		elif Command == 'RQ_FT_ChangeChoice': Reply = self.ChangeChoice(Proj=Proj, ElementID=XMLRoot.findtext('Element'),
-			TextComponentName=XMLRoot.findtext('TextComponent'),
-			**dict([(ThisTag.tag, ThisTag.text) for ThisTag in XMLRoot.iter()]))
+#		elif Command == 'RQ_FT_ChangeUnit':
+#			Reply = self.ChangeUnit(Proj=Proj, ElementID=XMLRoot.findtext('Element'),
+#				NumericalComponentName=XMLRoot.findtext('NumericalComponent'),
+#				NewValue=XMLRoot.findtext('NewUnit'), Viewport=SourceViewport)
+		elif Command == 'RQ_FT_ChangeChoice':
+			Reply = self.ChangeChoice(Proj=Proj, ElementID=XMLRoot.findtext('Element'),
+				TextComponentName=XMLRoot.findtext('TextComponent'),
+				**dict([(ThisTag.tag, ThisTag.text) for ThisTag in XMLRoot.iter()]))
 			# The ** arg sends a dict of all tags and their texts, allowing ChangeChoice to pick up case-specific tags
 			# Attrib NewValue is already in the ** arg, so no need to include it explicitly
 		elif Command == 'RQ_FT_DescriptionCommentsVisible':  # make description comments in/visible in an FT element
@@ -3586,7 +3612,6 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 				UnitOptions.append(ChoiceItem(XMLName=ThisTag.text,
 					HumanName=ThisHumanName,
 					Applicable=utilities.Bool2Str(ThisTag.get(info.ApplicableAttribName))))
-			print('FT3586 unit options set: ', UnitOptions)
 			# set unit options list in the FT component
 			setattr(getattr(HostEl, ComponentName), ListAttrib, UnitOptions)
 
@@ -3648,8 +3673,6 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			for ThisNumValue, ThisNumTag in [ ('TolFreq', TolFreqTag) ]:
 				PopulateUnitOptions(XMLRoot=ThisNumTag, HostEl=HeaderEl, ComponentName=ThisNumValue,
 					ListAttrib='AcceptableUnits')
-#				print('FT3640 unit options: ', ThisNumValue, getattr(HeaderEl, ThisNumValue).AcceptableUnits)
-				print('FT3641 unit options: ', HeaderEl.TolFreq.AcceptableUnits)
 				ThisNumAttrib = getattr(HeaderEl, ThisNumValue)
 				for (ThisOptionTag, ThisOption) in [
 						(info.ValueKindOptionTag, 'ValueKindOptions'), (info.ConstantOptionTag, 'ConstantOptions'),
@@ -4475,6 +4498,15 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		vizop_misc.SendRequest(Socket=self.C2DSocketREQ, Command='RQ_FT_ChangeText',
 							   Proj=self.Proj.ID, PHAObj=self.PHAObj.ID, Viewport=self.ID,
 							   Element=ElementID, TextComponent=EditComponentInternalName, NewValue=NewValue)
+
+	def RequestChangeChoice(self, ElementID, EditComponentInternalName, NewValue):
+		# send request to Datacore to change value in a Choice widget
+		# at this stage, NewValue has not been validated - could be unacceptable
+		vizop_misc.SendRequest(Socket=self.C2DSocketREQ, Command='RQ_FT_ChangeChoice',
+#							   Proj=self.Proj.ID, PHAObj=self.PHAObj.ID, Viewport=self.ID,
+							   PHAObj=self.PHAObj.ID, Viewport=self.ID,
+							   Element=ElementID, TextComponent=EditComponentInternalName, NewValue=NewValue)
+
 
 	def ConnectButtonsCanConnectTo(self, StartButton):
 		# find and return list of connect buttons that StartButton (a connect button object) can connect to.
