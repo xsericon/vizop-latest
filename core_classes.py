@@ -1,18 +1,18 @@
 # -*- coding: utf-8 -*-
-# Module core_classes: part of Vizop, (c) 2018 xSeriCon
+# Module core_classes: part of Vizop, (c) 2019 xSeriCon
 # contains class definitions of basic objects used throughout Vizop
 
 # library modules
 from __future__ import division # makes a/b yield exact, not truncated, result. Must be 1st import
 import wx # provides basic GUI functions
 import copy
-import xml.etree.ElementTree as ElementTree  # XML handling
+import xml.etree.ElementTree as ElementTree # XML handling
 
 # other vizop modules required here
-import text, utilities
-from display_utilities import *
+import text, utilities, info
+# from display_utilities import * # hidden so we can find out where these functions are used; having circular import problems
 
-def _(DummyArg): return DummyArg # dummy
+def _(DummyArg): return DummyArg # dummy definition of _(); the real definition is elsewhere
 
 class RiskReceptorItem(object): # class of risk receptors
 	RRs = [] # list of all risk receptor instances defined in the open projects
@@ -392,12 +392,12 @@ class NumValueItem(object): # superclass of objects in Datacore having a numeric
 			# Kept for reversion if we switch to another type (eg constant), then back again
 		self.IsSetFlagFamily = {DefaultRiskReceptor: None} # ValueStatus (member of ValueStati) per risk receptor
 		self.InfinityFlagFamily = {DefaultRiskReceptor: False} # bool per risk receptor; whether value is infinite
-		self.SigFigs = {DefaultRiskReceptor: 2} # int per risk receptor; how many sig figs for display
+		self.SigFigs = {DefaultRiskReceptor: info.DefaultSigFigs} # int per risk receptor; how many sig figs for display
 		self.Sci = {DefaultRiskReceptor: False} # bool per risk receptor; whether to always use scientific notation
 		self.MyUnit = NullUnit
 		self.HostObj = HostObj
 
-	def GetMyValue(self, RR=DefaultRiskReceptor, FormulaAntecedents=[], InvalidResult=0.0):
+	def GetMyValue(self, RR=DefaultRiskReceptor, FormulaAntecedents=[], InvalidResult=0.0, **Args):
 		# return numerical value of object, appropriate to risk receptor RR
 		# This GetMyValue is used by classes that directly return a numerical value. Other classes override it
 		# FormulaAntecedents is a list of nested FormulaItems and CalcNumValueItems used in calculating a FormulaItem
@@ -410,7 +410,7 @@ class NumValueItem(object): # superclass of objects in Datacore having a numeric
 			if DefaultRiskReceptor in self.ValueFamily:
 				RR = DefaultRiskReceptor
 			else:  # DefaultRiskReceptor key is missing
-				print("Oops, missing 'Default' key in NumValueItem risk receptors (problem code: D28). This is a bug; please report it")
+				print("Oops, missing DefaultRiskReceptor key in NumValueItem risk receptors (problem code: D28). This is a bug; please report it")
 				return InvalidResult
 		# get the actual value
 		MyStatus = self.Status(RR)
@@ -464,16 +464,16 @@ class NumValueItem(object): # superclass of objects in Datacore having a numeric
 	def GetDisplayValue(self, RR=DefaultRiskReceptor, InvalidResult=_('<Undefined>'), InfiniteResult=info.InfinitySymbol,
 			**Args):
 		# returns value of this NumValueItem instance as formatted string, or InvalidResult if value can't be obtained
-		# Args can include SciThreshold (int, float or None). If it is int or float, and the absolute numerical value
-		# ≥ SciThreshold, scientific notation is forced.
+		# Args can include SciThresholdUpper and SciThresholdLower (int, float or None). If it is int or float, and
+		# the absolute numerical value ≥ SciThresholdUpper or ≤ SciThresholdLower, scientific notation is forced.
 		assert isinstance(self.SigFigs, dict)
-		assert 'Default' in self.SigFigs
+		assert DefaultRiskReceptor in self.SigFigs
 		assert not [s for s in self.SigFigs.values() if not isinstance(s, int)] # confirm all SigFig values are int
 		assert isinstance(self.Sci, dict)
-		assert 'Default' in self.Sci
+		assert DefaultRiskReceptor in self.Sci
 		assert not [s for s in self.Sci.values() if not isinstance(s, bool)] # confirm all Sci values are bool
 		assert isinstance(self.InfinityFlagFamily, dict)
-		assert 'Default' in self.InfinityFlagFamily
+		assert DefaultRiskReceptor in self.InfinityFlagFamily
 		assert not [s for s in self.InfinityFlagFamily.values() if not isinstance(s, bool)]
 			# confirm all InfinityFlagFamily values are bool
 		if self.Status(RR) == 'ValueStatus_Unset': return InvalidResult
@@ -483,16 +483,30 @@ class NumValueItem(object): # superclass of objects in Datacore having a numeric
 			if MyValue == InvalidResult:
 				return InvalidResult
 			else:
-				SigFigs = self.SigFigs.get(self.GetMyUnit(), self.SigFigs['Default'])
+				# the line below allows us to define number of sig figs per unit; not used anywhere in Vizop yet
+				SigFigs = self.SigFigs.get(self.GetMyUnit(), self.SigFigs[DefaultRiskReceptor])
 				# round MyValue to required number of sig figs
 				(TruncatedValue, Decimals) = utilities.RoundToSigFigs(MyValue, SigFigs)
-				# determine whether to force scientific notation
-				if Args.get('SciThreshold', None) is None: ForceSci = False
-				else:
-					assert isinstance(Args['SciThreshold'], (int, float))
-					ForceSci = (abs(MyValue) >= Args['SciThreshold'])
+				# determine whether to force scientific notation; algorithm 344.1 in spec
+				print('CC491 running 344.1 with input value: ', MyValue)
+				if Args.get('SciThresholdUpper', None) is None:
+					if Args.get('SciThresholdLower', None) is None:
+						ForceSci = False # neither Upper nor Lower is set; don't use sci notation
+					else:
+						assert isinstance(Args['SciThresholdLower'], (int, float))
+						ForceSci = (abs(MyValue) <= Args['SciThresholdLower'])
+				else: # upper threshold is set
+					assert isinstance(Args['SciThresholdUpper'], (int, float))
+					if (abs(MyValue) >= Args['SciThresholdUpper']):
+						ForceSci = True
+					else:
+						if Args.get('SciThresholdLower', None) is None:
+							ForceSci = False # Lower is not set; don't use sci notation
+						else:
+							assert isinstance(Args['SciThresholdLower'], (int, float))
+							ForceSci = (abs(MyValue) <= Args['SciThresholdLower'])
 				# apply string formatting to get scientific notation if required, and required number of decimal places
-				if self.Sci.get(self.GetMyUnit(), self.Sci['Default']) or ForceSci: # scientific notation required for this unit?
+				if self.Sci.get(self.GetMyUnit(), self.Sci[DefaultRiskReceptor]) or ForceSci: # scientific notation required for this unit?
 					return '%0.*e' % (SigFigs - 1, TruncatedValue) # change 'e' to 'E' if want 1.2E6 instead of 1.2e6
 				else: # non-scientific notation
 					return '%0.*f' % (Decimals, TruncatedValue)
@@ -503,7 +517,7 @@ class NumValueItem(object): # superclass of objects in Datacore having a numeric
 			if DefaultRiskReceptor in self.ValueFamily:
 				RR = DefaultRiskReceptor
 			else:  # DefaultRiskReceptor key is missing
-				print("Oops, missing 'Default' key in NumValueItem risk receptors (problem code: CC394). This is a bug; please report it")
+				print("Oops, missing DefaultRiskReceptor key in NumValueItem risk receptors (problem code: CC394). This is a bug; please report it")
 				return NumProblemValue_Bug
 		# check if value is set
 		if (self.ValueFamily[RR] is None) or (self.IsSetFlagFamily[RR] != 'ValueStatus_OK'):
@@ -512,6 +526,9 @@ class NumValueItem(object): # superclass of objects in Datacore having a numeric
 		else: # value set; check if it is valid by trying to call self.HostObj.CheckValue(self)
 			# (the lambda function is invoked if HostObj is None or CheckValue isn't defined
 			return getattr(self.HostObj, 'CheckValue', lambda v: NumProblemValue_NoProblem)(self)
+
+	def GetMyStatus(self, RR=DefaultRiskReceptor, **Args): # get status of value (NumProblemValue item)
+		return self.Status(RR=RR)
 
 	def SetMyStatus(self, NewStatus, RR=DefaultRiskReceptor, **Args): # set status indicator (in IsSetFlagFamily)
 		assert NewStatus in ValueStati
@@ -1342,8 +1359,7 @@ class TextItem(object):  # text forming part of a PHA object, such as a descript
 		self.ParaHorizAlignment = TextItem.DefaultTextHorizAlignment
 		self.ParaVertAlignment = TextItem.DefaultTextVertAlignment
 		self.InitialTextStyle = Proj.MostRecentInitialTextStyle.get(PHAObjClass,
-																	Proj.MostRecentInitialTextStyle['Default'])
-
+			Proj.MostRecentInitialTextStyle['Default'])
 
 class AssociatedTextItem(TextItem):  # 'smart text' used for comments and recommendations
 

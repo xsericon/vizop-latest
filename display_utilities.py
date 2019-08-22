@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Module display_utilities: part of Vizop, (c) 2018 xSeriCon. Contains common class definitions and functions for all Viewports
+# Module display_utilities: part of Vizop, (c) 2019 xSeriCon. Contains common class definitions and functions for all Viewports
 
 # library modules
 from __future__ import division # makes a/b yield exact, not truncated, result. Must be 1st import
@@ -8,9 +8,8 @@ from wx.lib.expando import ExpandoTextCtrl, EVT_ETC_LAYOUT_NEEDED
 import wx.lib.buttons as buttons
 from sys import stdout
 
-
 # other vizop modules required here
-import art, utilities, vizop_misc, info
+import art, utilities, vizop_misc, info, core_classes
 
 __author__ = 'peter'
 
@@ -575,12 +574,13 @@ class UIWidgetItem(object):
 		self.SetMyFont(DefaultFont=Args.get('Font', None))
 
 	def StaticFromText(self, DataObj, **Args): # put string or number value directly in StaticText or TextCtrl widgets
+		# Warning: this will break because StringFromNum() call is missing its RR arg; similar issue with GetMyStatus()
 		TargetValue = getattr(DataObj, self.DataAttrib, None)
 		if TargetValue is not None: # attrib exists
 			if self.IsNumber: # treat as number
-				if TargetValue.GetStatus() == 'ValueStatus_Unset': # number not defined because subsystem not included
+				if TargetValue.GetMyStatus(RR=RR) == 'ValueStatus_Unset': # number not defined
 					StringToDisplay = _('Value not defined')
-				else: StringToDisplay = StringFromNum(TargetValue, SciThreshold=None)
+				else: StringToDisplay = StringFromNum(TargetValue)
 			else: # convert directly to str (for attribs that aren't already strings, eg int)
 				StringToDisplay = str(TargetValue)
 		else: # attrib doesn't exist
@@ -591,16 +591,19 @@ class UIWidgetItem(object):
 		else: self.Widget.SetValue(StringToDisplay)
 		self.SetMyFont(DefaultFont=Args.get('Font', None))
 
-def StringFromNum(InputNumber, SciThreshold=None):
+def StringFromNum(InputNumber, RR):
 	# returns correctly formatted string representation of InputNumber
 	# (NumValueItem instance), taking the number object's attribs Sci and Decimals into account
 	# SciThreshold (int, float or None): if the absolute value of InputNumber ≥ SciThreshold, scientific notation will be used
 	# First, check if value is defined
-	ValueStatus = InputNumber.GetStatus()
-	assert ValueStatus in core_classes.ValueStati
-	if ValueStatus == 'ValueStatus_OK': # it's defined
-		return InputNumber.GetDisplayValue(SciThreshold=SciThreshold)
-	elif ValueStatus == 'ValueStatus_Unset': # it's not defined
+	print('DU600 StringFromNum: InputNumber, RR:', InputNumber.GetMyValue(RR=RR))
+	ValueStatus = InputNumber.GetMyStatus(RR=RR)
+	print('DU602 ValueStatus:', ValueStatus)
+#	if ValueStatus == 'ValueStatus_OK': # it's defined
+	if ValueStatus == core_classes.NumProblemValue_NoProblem: # it's defined
+		return InputNumber.GetDisplayValue(RR=RR, SciThresholdUpper=info.SciThresholdUpper,
+			SciThresholdLower=info.SciThresholdLower)
+	elif ValueStatus == core_classes.NumProblemValue_UndefNumValue: # it's not defined
 		return _('Not set')
 
 class SIFListGridTable(wx.grid.PyGridTableBase): # object containing data table for SIF list display

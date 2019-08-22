@@ -2714,11 +2714,15 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			DataInfo = [ ('TolFreq', self.TolFreq) ]
 			for Tag, Attrib in DataInfo:
 				AttribEl = ElementTree.SubElement(HeaderEl, Tag)
-				AttribEl.text = str(Attrib.GetMyValue(RR=RRForCalc))
+#				AttribEl.text = str(Attrib.GetMyValue(RR=RRForCalc))
+#				AttribEl.text = Attrib.GetDisplayValue(RR=RRForCalc, InvalidResult='- - -')
+				# get correctly formatted string representation of numerical value
+				AttribEl.text = display_utilities.StringFromNum(InputNumber=Attrib, RR=RRForCalc)
+				V = display_utilities.StringFromNum(InputNumber=Attrib, RR=RRForCalc)
+				print('FT2721 TolFreq string: ', V, type(V))
 				# add unit, unit options, ValueKind options and Constant options
 				UnitEl = ElementTree.SubElement(AttribEl, info.UnitTag)
 				UnitEl.text = str(Attrib.GetMyUnit().XMLName)
-				print('FT2717 sending unit options: ', Attrib, Attrib.AcceptableUnits)
 				PopulateValueUnitField(CurrentUnit=Attrib.GetMyUnit(), AcceptableUnits=Attrib.AcceptableUnits,
 					EventEl=AttribEl, OfferConvertOptions=True)
 #				for ThisUnitOption in Attrib.AcceptableUnits:

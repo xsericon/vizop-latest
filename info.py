@@ -39,6 +39,9 @@ if system() == 'Darwin': CtrlKey = u"\u2318" # 'command key' symbol on Mac
 else: CtrlKey = 'Ctrl + '
 ListSeparator = _(', ') # separator in human-readable lists like cat, dog, fish
 EventValueSigFigs = 3 # rounding for initiating event frequency values
+DefaultSigFigs = 2 # default number of sig figs for displaying all numbers
+SciThresholdUpper = 1e5 - 1 # thresholds for displaying numbers in scientific notation
+SciThresholdLower = 9.9999e-4
 
 # XML tags and attrib names for internal communication. Those marked #f are also used in project files
 IDTag = 'ID' #f
