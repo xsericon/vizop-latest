@@ -488,7 +488,6 @@ class NumValueItem(object): # superclass of objects in Datacore having a numeric
 				# round MyValue to required number of sig figs
 				(TruncatedValue, Decimals) = utilities.RoundToSigFigs(MyValue, SigFigs)
 				# determine whether to force scientific notation; algorithm 344.1 in spec
-				print('CC491 running 344.1 with input value: ', MyValue)
 				if Args.get('SciThresholdUpper', None) is None:
 					if Args.get('SciThresholdLower', None) is None:
 						ForceSci = False # neither Upper nor Lower is set; don't use sci notation

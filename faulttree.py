@@ -2719,7 +2719,6 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 				# get correctly formatted string representation of numerical value
 				AttribEl.text = display_utilities.StringFromNum(InputNumber=Attrib, RR=RRForCalc)
 				V = display_utilities.StringFromNum(InputNumber=Attrib, RR=RRForCalc)
-				print('FT2721 TolFreq string: ', V, type(V))
 				# add unit, unit options, ValueKind options and Constant options
 				UnitEl = ElementTree.SubElement(AttribEl, info.UnitTag)
 				UnitEl.text = str(Attrib.GetMyUnit().XMLName)

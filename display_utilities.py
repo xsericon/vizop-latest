@@ -575,6 +575,7 @@ class UIWidgetItem(object):
 
 	def StaticFromText(self, DataObj, **Args): # put string or number value directly in StaticText or TextCtrl widgets
 		# Warning: this will break because StringFromNum() call is missing its RR arg; similar issue with GetMyStatus()
+		# and values returned from GetMyStatus() are out of date (now NumProblemValue instances)
 		TargetValue = getattr(DataObj, self.DataAttrib, None)
 		if TargetValue is not None: # attrib exists
 			if self.IsNumber: # treat as number
@@ -596,10 +597,7 @@ def StringFromNum(InputNumber, RR):
 	# (NumValueItem instance), taking the number object's attribs Sci and Decimals into account
 	# SciThreshold (int, float or None): if the absolute value of InputNumber ≥ SciThreshold, scientific notation will be used
 	# First, check if value is defined
-	print('DU600 StringFromNum: InputNumber, RR:', InputNumber.GetMyValue(RR=RR))
 	ValueStatus = InputNumber.GetMyStatus(RR=RR)
-	print('DU602 ValueStatus:', ValueStatus)
-#	if ValueStatus == 'ValueStatus_OK': # it's defined
 	if ValueStatus == core_classes.NumProblemValue_NoProblem: # it's defined
 		return InputNumber.GetDisplayValue(RR=RR, SciThresholdUpper=info.SciThresholdUpper,
 			SciThresholdLower=info.SciThresholdLower)

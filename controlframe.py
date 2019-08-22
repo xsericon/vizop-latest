@@ -748,6 +748,11 @@ class ControlFrame(wx.Frame):
 					self.MyNotebook.SetSelection(index=self.MyNotebook.GetPageCount()-1)
 			else: print('CF744 warning, unrecognised control panel aspect "%s" requested' % str(NewAspect))
 
+		def RedrawControlPanelAspect(self):
+			# repopulates all widgets in the current control panel aspect%%%
+			self.ControlPanelCurrentAspect.Prefill(**self.ControlPanelCurrentAspect.CurrentArgs)
+			self.ControlPanelCurrentAspect.Activate(**self.ControlPanelCurrentAspect.CurrentArgs)
+
 		def WidgetsInPosition(self, WidgList, StartingRow=1, ColOffset=0):
 			# set up widgets in WidgList (list of UIWidgetItems) for insertion into an overall widget list at StartingRow
 			# and offset by ColOffset columns to the right
@@ -970,7 +975,7 @@ class ControlFrame(wx.Frame):
 			Proj = self.TopLevelFrame.CurrentProj
 			# enable navigation buttons if there are any items in current project's history lists
 			self.UpdateNavigationButtonStatus(Proj)
-			# select widgets to be displayed%%%
+			# select widgets to be displayed
 #			self.WidgActive = self.PHAModelsAspect.WidgetList[:]
 
 		def MakeStandardWidgets(self, Scope, NotebookPage):
@@ -1136,7 +1141,8 @@ class ControlFrame(wx.Frame):
 			DataAttrib = self.NumericalValueAspect.ValueText.DataAttrib
 			# populate ValueText with the current value
 			self.NumericalValueAspect.ValueText.Widget.SetValue(getattr(PHAObj, DataAttrib).Value)
-#				RR=self.NumericalValueAspect.ValueText.PHAObj.RR, InvalidResult=''))
+			# select all text in the value text widget - user intuitively expects this
+			self.NumericalValueAspect.ValueText.Widget.SelectAll()
 			# set up UnitChoice
 			UnitOptions = getattr(PHAObj, DataAttrib).AcceptableUnits # list of ChoiceItem instances
 			self.NumericalValueAspect.UnitChoice.PHAObj = self.TopLevelFrame.PHAObjInControlPanel
@@ -1246,7 +1252,7 @@ class ControlFrame(wx.Frame):
 				self.TopLevelFrame.ActivateWidgetsInPanel(Widgets=self.WidgetList, Sizer=self.MySizer,
 					ActiveWidgetList=self.ParentFrame.WidgActive, **Args)
 
-			def Deactivate(self, **Args):  # activate widgets for this aspect
+			def Deactivate(self, **Args): # deactivate widgets for this aspect
 				self.TopLevelFrame.DeactivateWidgetsInPanel(self.WidgetList, **Args)
 
 			def Prefill(self, **Args):
@@ -1686,7 +1692,8 @@ class ControlFrame(wx.Frame):
 						Handler=None, SendReply2=False))
 		MessageReceived |= ViewportMessageReceived
 		# update applicable Viewports, if any messages were received
-		if ViewportMessageReceived: self.UpdateAllViewports(Proj=self.CurrentProj, Message=ViewportMessageReceivedThisTime)
+		if ViewportMessageReceived:
+			self.UpdateAllViewports(Proj=self.CurrentProj, Message=ViewportMessageReceivedThisTime)
 		# 3. check sockets for any messages coming into the control frame, and process
 		MessageReceived |= bool(vizop_misc.ListenToSocket(Socket=self.zmqInwardSocket, Handler=self.HandleIncomingMessageToControlFrame))
 		MessageReceived |= bool(vizop_misc.ListenToSocket(Socket=self.zmqOutwardSocket, Handler=self.HandleIncomingReplyToControlFrame,
@@ -2106,7 +2113,14 @@ class ControlFrame(wx.Frame):
 		if MessageRoot == 'OK': return vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
 		else:
 			# draw complete Viewport
-			return self.ShowViewport(MessageReceived=MessageReceived, MessageAsXMLTree=XMLTreeToSend, **Args)
+			ReplyXML = self.ShowViewport(MessageReceived=MessageReceived, MessageAsXMLTree=XMLTreeToSend, **Args)
+			print('CF2117 update control panel here?')
+			# refresh control frame GUI
+			self.UpdateMenuStatus()
+			# refresh control panel
+			self.MyControlPanel.RedrawControlPanelAspect()
+			self.MyControlPanel.UpdateNavigationButtonStatus(Proj=self.CurrentProj)
+			return ReplyXML
 
 	def ShowViewport(self, MessageReceived=None, MessageAsXMLTree=None, **Args):
 		# show Viewport ViewportToShow in PHA panel, using data in MessageReceived (XML string) or, if None, in
@@ -2361,9 +2375,6 @@ class ControlFrame(wx.Frame):
 			# send it to Viewport
 			vizop_misc.SendRequest(Socket=ThisViewport.D2CSocketREQObj.Socket, Command='RQ_RedrawViewport',
 				XMLRoot=FullXMLData)
-		# refresh control frame GUI
-		self.UpdateMenuStatus()
-		self.MyControlPanel.UpdateNavigationButtonStatus(Proj=Proj)
 
 class ControlFramePersistent(object):
 	# a persistent object used for returning data from control frame after it is Destroy()ed.
