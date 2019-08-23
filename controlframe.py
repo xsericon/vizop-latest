@@ -749,7 +749,7 @@ class ControlFrame(wx.Frame):
 			else: print('CF744 warning, unrecognised control panel aspect "%s" requested' % str(NewAspect))
 
 		def RedrawControlPanelAspect(self):
-			# repopulates all widgets in the current control panel aspect%%%
+			# repopulates all widgets in the current control panel aspect
 			self.ControlPanelCurrentAspect.Prefill(**self.ControlPanelCurrentAspect.CurrentArgs)
 			self.ControlPanelCurrentAspect.Activate(**self.ControlPanelCurrentAspect.CurrentArgs)
 
@@ -1158,7 +1158,6 @@ class ControlFrame(wx.Frame):
 
 		def NumericalValueAspect_OnValueTextWidget(self, Event, WidgetObj=None):
 			# handle end-of-editing (loss of focus) or Enter key press on value text widget
-			print('CF1139 in text widget handler')
 			# if invoked from Enter keypress, find widget object containing text widget
 			if Event:
 				EventWidget = Event.GetEventObject()
@@ -1548,9 +1547,8 @@ class ControlFrame(wx.Frame):
 		UndoChainWaiting = False
 		ReturnArgs = undo.HandleUndoRequest(self.CurrentProj, SocketFromDatacoreName=self.SocketFromDatacoreName,
 			ContinuingPausedChain=ContinuePausedChain)
-		if not ReturnArgs['SkipRefresh']: # update GUI
-			self.UpdateMenuStatus() # update menu status to show next un/redoable action
-			self.MyControlPanel.UpdateNavigationButtonStatus(Proj=self.CurrentProj)
+		if not ReturnArgs['SkipRefresh']:
+			pass # we don't refresh the GUI here (it's too early) - do it in SwitchToViewport() instead
 
 	def OnRedoRequest(self, Event): # handle Redo request from user
 		# first, clear RedoChainWaiting flag possibly left over from last redo action
@@ -1962,8 +1960,7 @@ class ControlFrame(wx.Frame):
 		# draw the Viewport
 		self.ShowViewport(MessageAsXMLTree=XMLRoot)
 		# update other GUI elements
-		self.UpdateMenuStatus()
-		self.MyControlPanel.UpdateNavigationButtonStatus(Proj=Proj)
+		self.RefreshGUIAfterDataChange(Proj=Proj)
 		return vizop_misc.MakeXMLMessage('Null', 'Null')
 
 	def DatacoreDoNewViewport_Undo(self, Proj, UndoRecord, **Args): # undo creation of new Viewport
@@ -2114,13 +2111,17 @@ class ControlFrame(wx.Frame):
 		else:
 			# draw complete Viewport
 			ReplyXML = self.ShowViewport(MessageReceived=MessageReceived, MessageAsXMLTree=XMLTreeToSend, **Args)
-			print('CF2117 update control panel here?')
-			# refresh control frame GUI
-			self.UpdateMenuStatus()
-			# refresh control panel
-			self.MyControlPanel.RedrawControlPanelAspect()
-			self.MyControlPanel.UpdateNavigationButtonStatus(Proj=self.CurrentProj)
+			self.RefreshGUIAfterDataChange(Proj=self.CurrentProj)
 			return ReplyXML
+
+	def RefreshGUIAfterDataChange(self, Proj):
+		# perform specific refreshes (e.g. control panel, control frame menus) after a change to the data on display
+		print('CF2127 updating control panel')
+		# refresh control frame GUI
+		self.UpdateMenuStatus()
+		# refresh control panel
+		self.MyControlPanel.RedrawControlPanelAspect()
+		self.MyControlPanel.UpdateNavigationButtonStatus(Proj=Proj)
 
 	def ShowViewport(self, MessageReceived=None, MessageAsXMLTree=None, **Args):
 		# show Viewport ViewportToShow in PHA panel, using data in MessageReceived (XML string) or, if None, in

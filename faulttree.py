@@ -3258,7 +3258,8 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		SocketFromDatacore = vizop_misc.SocketWithName(TargetName=Args['SocketFromDatacoreName'])
 		# undo the change to the value in all applicable RR's
 		for ThisRR in UndoRecord.RR:
-			getattr(UndoRecord.ComponentHost, UndoRecord.ComponentToUpdate).SetMyValue(NewValue=UndoRecord.OldValue, RR=ThisRR)
+			getattr(UndoRecord.ComponentHost, UndoRecord.ComponentName).SetMyValue(NewValue=UndoRecord.OldValue, RR=ThisRR)
+#			getattr(UndoRecord.ComponentHost, UndoRecord.ComponentToUpdate).SetMyValue(NewValue=UndoRecord.OldValue, RR=ThisRR)
 		# request Control Frame to switch to the Viewport that was visible when the original edit was made
 		self.RedrawAfterUndoOrRedo(UndoRecord, SocketFromDatacore)
 		projects.SaveOnFly(Proj, UpdateData=vizop_misc.MakeXMLMessage(RootName=info.FTTag,
@@ -3291,7 +3292,6 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			Elements={info.IDTag: self.ID, info.ComponentHostIDTag: RedoRecord.ComponentHost.ID}))
 			# TODO add data for the changed component to the Save On Fly data, including RR's
 		return {'Success': True}
-
 
 	def RedrawAfterUndoOrRedo(self, UndoRecord, SocketFromDatacore):
 		# instruct Control Frame to switch the requesting control frame to the Viewport that was visible when the original
@@ -3654,7 +3654,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 #				('TolFreq', 'TolFreq'), ('TolFreqUnit', 'TolFreqUnit'),
 				('UEL', 'UEL'), ('TargetRiskRed', 'RRF'),
 				('SIL', 'SIL'), ('OutcomeUnit', 'OutcomeUnit') ]
-			assert ComponentNameToHighlight in [a for (a, b) in DataInfo] or (ComponentNameToHighlight == '')
+			assert ComponentNameToHighlight in [a for (a, b) in DataInfo] + ['TolFreq'] or (ComponentNameToHighlight == '')
 			for Attrib, XMLTag in DataInfo:
 				setattr(HeaderEl, Attrib, HeaderXMLRoot.findtext(XMLTag, default=''))
 			# populate choice boxes for OpMode, risk receptor, severity and RR grouping
