@@ -3125,6 +3125,31 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		assert 0 <= NewColIndex <= len(self.Columns)
 		self.Columns.insert(NewColIndex, FTColumnInCore(FT=self, ColNo=NewColIndex))
 
+	def ValidateValue(self, ComponentHost, ComponentName, ProposedValue, Unit):
+		# check ProposedValue (int or float) in Unit (a UnitItem instance) is valid for ComponentName (str) in
+		# ComponentHost (an FT element object)
+		# Assumes that if the component has either a MaxValue or a MinValue attrib, it also has a MaxMinUnit attrib
+		# return ValueIsValid (bool)%%%
+		assert isinstance(ProposedValue, (int, float))
+		assert isinstance(Unit, core_classes.UnitItem)
+		# first, find component containing the value
+		TargetComponent = getattr(ComponentHost, ComponentName)
+		ValueIsValid = True
+		# check Unit is compatible with component's MaxMinUnit, if any
+		if hasattr(TargetComponent, 'MaxMinUnit'):
+			ValueIsValid = (TargetComponent.MaxMinUnit.QtyKind == Unit.QtyKind)
+			# convert the proposed value to MaxMinUnit for comparison
+			ConvertedProposedValue = ProposedValue * Unit.Conversion[TargetComponent.MaxMinUnit]
+		if ValueIsValid:
+			# check max value, converting to match Unit with MaxMinUnit
+			if hasattr(TargetComponent, 'MaxValue'):
+				ValueIsValid = (ConvertedProposedValue <= TargetComponent.MaxValue)
+		if ValueIsValid:
+			# check min value, converting to match Unit with MaxMinUnit
+			if hasattr(TargetComponent, 'MinValue'):
+				ValueIsValid = (ConvertedProposedValue >= TargetComponent.MinValue)
+		return ValueIsValid
+
 	def ChangeText(self, Proj, ElementID, TextComponentName, NewValue, Viewport):
 		# change content of text component in ElementID (int as str, or 'Header') identified by
 		# InternalName=TextComponentName (str) to NewValue (str)
@@ -3135,6 +3160,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		assert isinstance(TextComponentName, str)
 		assert isinstance(NewValue, str)
 		assert isinstance(Viewport, FTForDisplay)
+		ChangeAccepted = True
 		# find relevant element containing the component
 		if ElementID == 'Header':
 			ComponentToUpdate = TextComponentName
@@ -3147,12 +3173,10 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		if ComponentToUpdate in ['EventValue', 'TolFreq', 'Value']: # updating Value attrib; try to extract number from user's input
 			ValueReceived = utilities.str2real(NewValue, 'junk')
 			if ValueReceived != 'junk': # we got a recognisable number; update value in all applicable risk receptors
-				self.DoChangeTextInValueField(Proj, ComponentToUpdate=ComponentToUpdate, ComponentHost=ComponentHost,
+				ChangeAccepted = self.DoChangeTextInValueField(Proj, ComponentToUpdate=ComponentToUpdate, ComponentHost=ComponentHost,
 					TargetValue=ValueReceived, ViewportID=Viewport.ID,
 					ViewportClass=type(Viewport), Zoom=Viewport.Zoom, PanX=Viewport.PanX, PanY=Viewport.PanY,
 					HostElementID=ElementID, Redoing=False, RRGroup=self.RiskReceptorGroupOnDisplay)
-#				for ThisRR in self.RiskReceptorGroupOnDisplay:
-#					ComponentHost.Value.SetMyValue(NewValue=ValueReceived, RR=ThisRR)
 		else: # updating another field
 			self.DoChangeTextInTextField(Proj=Proj, ComponentToUpdate=ComponentToUpdate, ComponentHost=ComponentHost,
 				TargetValue=NewValue, ViewportID=Viewport.ID, ViewportClass=type(Viewport), Zoom=Viewport.Zoom,
@@ -3166,7 +3190,12 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 #				ElementID=ElementID, ComponentName=ComponentToUpdate, OldValue=OldValue, NewValue=NewValue,
 #				HumanText=_('change %s' % self.ComponentEnglishNames[TextComponentName]),
 #				Zoom=Viewport.Zoom, PanX=Viewport.PanX, PanY=Viewport.PanY))
-		return vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
+		# prepare appropriate XML message to return
+		if ChangeAccepted:
+			RootName = 'OK'; RootText = 'OK'
+		else:
+			RootName = 'Fail'; RootText = 'OutOfRange'
+		return vizop_misc.MakeXMLMessage(RootName=RootName, RootText=RootText)
 
 	def DoChangeTextInTextField(self, Proj, ComponentToUpdate, ComponentHost, TargetValue, ViewportID,
 			ViewportClass, Zoom, PanX, PanY, HostElementID, Redoing):
@@ -3194,22 +3223,27 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		# RRGroup (list): RR's currently displayed
 		assert isinstance(Redoing, bool)
 		assert isinstance(TargetValue, float)
-		OldValue = getattr(ComponentHost, ComponentToUpdate).GetMyValue(RR=RRGroup[0]) # get old value for saving in Undo record
-		# write new value to component
-		for ThisRR in RRGroup:
-			getattr(ComponentHost, ComponentToUpdate).SetMyValue(NewValue=TargetValue, RR=ThisRR)
-		# store undo record
-		undo.AddToUndoList(Proj, Redoing=Redoing, UndoObj=undo.UndoItem(UndoHandler=self.ChangeTextInValueField_Undo,
-			  RedoHandler=self.ChangeTextInValueField_Redo,
-			  Chain='NoChain', ComponentHost=ComponentHost, RR=RRGroup,
-			  ViewportID=ViewportID,
-			  ViewportClass=ViewportClass,
-			  ElementID=HostElementID,
-			  ComponentName=ComponentToUpdate,
-			  OldValue=OldValue, NewValue=TargetValue,
-#			  HumanText=_('change %s' % self.ComponentEnglishNames[ComponentToUpdate]),
-			  HumanText=_('change %s' % ComponentHost.ComponentEnglishNames[ComponentToUpdate]),
-			  Zoom=Zoom, PanX=PanX, PanY=PanY))
+		# check new value is acceptable
+		TargetValueIsValid = self.ValidateValue(ComponentHost, ComponentToUpdate, ProposedValue=TargetValue,
+			Unit=getattr(ComponentHost, ComponentToUpdate).GetMyUnit())
+		if TargetValueIsValid:
+			# get old value for saving in Undo record
+			OldValue = getattr(ComponentHost, ComponentToUpdate).GetMyValue(RR=RRGroup[0])
+			# write new value to component
+			for ThisRR in RRGroup:
+				getattr(ComponentHost, ComponentToUpdate).SetMyValue(NewValue=TargetValue, RR=ThisRR)
+			# store undo record
+			undo.AddToUndoList(Proj, Redoing=Redoing, UndoObj=undo.UndoItem(UndoHandler=self.ChangeTextInValueField_Undo,
+				  RedoHandler=self.ChangeTextInValueField_Redo,
+				  Chain='NoChain', ComponentHost=ComponentHost, RR=RRGroup,
+				  ViewportID=ViewportID,
+				  ViewportClass=ViewportClass,
+				  ElementID=HostElementID,
+				  ComponentName=ComponentToUpdate,
+				  OldValue=OldValue, NewValue=TargetValue,
+				  HumanText=_('change %s' % ComponentHost.ComponentEnglishNames[ComponentToUpdate]),
+				  Zoom=Zoom, PanX=PanX, PanY=PanY))
+		return TargetValueIsValid
 
 	def FetchDisplayAttribsFromUndoRecord(self, UndoRecord):
 		# extract data about zoom, pan, highlight etc. from UndoRecord, build it into an XML tag FTDisplayAttribTag

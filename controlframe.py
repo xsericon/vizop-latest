@@ -1166,10 +1166,12 @@ class ControlFrame(wx.Frame):
 			else: ThisWidgetObj = WidgetObj
 			# get value entered by user
 			UserEntry = ThisWidgetObj.Widget.GetValue()
-			# get Viewport to request value change (no validation here; done in datacore)
-			self.TopLevelFrame.CurrentViewport.RequestChangeText(ElementID=ThisWidgetObj.PHAObj.ID,
-				EditComponentInternalName=getattr(ThisWidgetObj.PHAObj, ThisWidgetObj.DataAttrib).InternalName,
-				NewValue=UserEntry)
+			if self.TopLevelFrame.CurrentViewport: # Confirm that Viewport still exists; it might have been destroyed
+				# if we just did undo of viewport creation
+				# get Viewport to request value change (no validation here; done in datacore)
+				self.TopLevelFrame.CurrentViewport.RequestChangeText(ElementID=ThisWidgetObj.PHAObj.ID,
+					EditComponentInternalName=getattr(ThisWidgetObj.PHAObj, ThisWidgetObj.DataAttrib).InternalName,
+					NewValue=UserEntry)
 
 		def NumericalValueAspect_OnUnitWidget(self, Event):
 			# handle change of selection in unit Choice widget
@@ -1530,6 +1532,7 @@ class ControlFrame(wx.Frame):
 			self.UndoMenuItem.SetText(_('(Nothing to undo)'))
 			self.MenuBar.Enable(self.UndoMenuItemID, False)
 		# Redo menu item
+		print('CF1533 length of redolist: ', len(Proj.RedoList))
 		if Proj.RedoList:
 			# find record that will be undone 'up to' (skipping over any chained records)
 			LastRecordToRedo = Proj.RedoList[undo.FindLastRecordToUndo(Proj.RedoList)]
@@ -1967,8 +1970,10 @@ class ControlFrame(wx.Frame):
 		global UndoChainWaiting
 		assert isinstance(Proj, projects.ProjectItem)
 		assert isinstance(UndoRecord, undo.UndoItem)
-		# find out which Control Frame sent the undo request (so that we know which one to reply to)
-		RequestingControlFrameID = Args['RequestingControlFrameID']
+#		# find out which Control Frame sent the undo request (so that we know which one to reply to)
+#		RequestingControlFrameID = Args['RequestingControlFrameID']
+		# find out which datacore socket to send messages on
+		SocketFromDatacore = vizop_misc.SocketWithName(TargetName=Args['SocketFromDatacoreName'])
 		# find and remove the new Viewport object
 		ViewportToRemove = UndoRecord.ViewportShadow
 		Proj.AllViewportShadows.remove(ViewportToRemove)
@@ -1978,8 +1983,10 @@ class ControlFrame(wx.Frame):
 			info.ViewportTypeTag: ViewportToRemove.MyClass.InternalName,
 			info.ChainWaitingTag: utilities.Bool2Str(Args['ChainWaiting']),
 			info.ProjIDTag: Proj.ID})
-		vizop_misc.SendRequest(Socket=ControlFrameWithID(RequestingControlFrameID).C2FREQSocket.Socket,
+		vizop_misc.SendRequest(Socket=SocketFromDatacore.Socket,
 			Command='NO_NewViewport_Undo', XMLRoot=Notification)
+#		vizop_misc.SendRequest(Socket=ControlFrameWithID(RequestingControlFrameID).C2FREQSocket.Socket,
+#			Command='NO_NewViewport_Undo', XMLRoot=Notification)
 		projects.SaveOnFly(Proj, UpdateData=vizop_misc.MakeXMLMessage(RootName=info.ViewportTag,
 			Elements={info.IDTag: ViewportToRemove.ID, info.DeleteTag: ''}))
 		UndoChainWaiting = Args.get('ChainWaiting', False)
@@ -2389,8 +2396,10 @@ ControlFrameData = ControlFramePersistent() # make an instance of the data retur
 def DatacoreDoNewPHAObj_Undo(Proj, UndoRecord, **Args): # undo creation of new PHA object
 	assert isinstance(Proj, projects.ProjectItem)
 	assert isinstance(UndoRecord, undo.UndoItem)
-	# find out which Control Frame sent the undo request (so that we know which one to reply to)
-	RequestingControlFrameID = Args['RequestingControlFrameID']
+#	# find out which Control Frame sent the undo request (so that we know which one to reply to)
+#	RequestingControlFrameID = Args['RequestingControlFrameID']
+	# find out which datacore socket to send messages on
+	SocketFromDatacore = vizop_misc.SocketWithName(TargetName=Args['SocketFromDatacoreName'])
 	# find and remove the new PHA object from Proj
 	PHAObjToRemove = UndoRecord.PHAObj
 	Proj.PHAObjs.remove(PHAObjToRemove)
@@ -2399,7 +2408,9 @@ def DatacoreDoNewPHAObj_Undo(Proj, UndoRecord, **Args): # undo creation of new P
 		Elements={info.PHAModelTypeTag: type(PHAObjToRemove).InternalName,
 		info.ChainWaitingTag: utilities.Bool2Str(Args['ChainWaiting']),
 		info.ProjIDTag: Proj.ID, info.SkipRefreshTag: utilities.Bool2Str(Args['SkipRefresh'])})
-	vizop_misc.SendRequest(Socket=ControlFrameWithID(RequestingControlFrameID).C2FREQSocket.Socket,
+#	vizop_misc.SendRequest(Socket=ControlFrameWithID(RequestingControlFrameID).C2FREQSocket.Socket,
+#		Command='NO_NewPHAModel_Undo', XMLRoot=Reply)
+	vizop_misc.SendRequest(Socket=SocketFromDatacore.Socket,
 		Command='NO_NewPHAModel_Undo', XMLRoot=Reply)
 	projects.SaveOnFly(Proj, UpdateData=vizop_misc.MakeXMLMessage(RootName=info.PHAModelTag,
 		Elements={info.IDTag: PHAObjToRemove.ID, info.DeleteTag: ''}))
