@@ -20,7 +20,7 @@ import startup_vizop, settings, projects, controlframe, core_classes, display_ut
 
 # global variables for this module
 sm = settings.SettingsManager()
-MinDivisor = 1e-20  # smallest absolute value treated as nonzero
+# MinDivisor = 1e-20  # smallest absolute value treated as nonzero; superseded by info.ZeroThreshold
 
 RiskReceptors = [core_classes.DefaultRiskReceptor]
 

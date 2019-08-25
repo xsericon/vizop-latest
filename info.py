@@ -42,6 +42,7 @@ EventValueSigFigs = 3 # rounding for initiating event frequency values
 DefaultSigFigs = 2 # default number of sig figs for displaying all numbers
 SciThresholdUpper = 1e5 - 1 # thresholds for displaying numbers in scientific notation
 SciThresholdLower = 9.9999e-4
+ZeroThreshold = 1e-20 # numbers with absolute value less than this are treated as zero
 
 # XML tags and attrib names for internal communication. Those marked #f are also used in project files
 IDTag = 'ID' #f
@@ -227,6 +228,7 @@ ControlFrameOutSocketLabel = 'C2FREQ' # label prefix for datacore end of datacor
 ViewportOutSocketLabel = 'C2VREQ' # label prefix for datacore end of datacore -> Viewport socket
 LocalSuffix = '_Local' # suffix for datacore sockets connecting to local control frame
 NullUnitInternalName = 'null'
+ValueOutOfRangeMsg = 'ValueOutOfRange'
 
 # NO_ commands to control frame
 NO_ShowViewport = 'NO_ShowViewport'

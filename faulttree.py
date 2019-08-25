@@ -316,7 +316,7 @@ class FTHeader(object): # FT header object. Rendered by drawing text into bitmap
 			HostObject=self, InternalName='TolFreqLabel')
 		TolFreq = TextElement(self.FT, Row=4, ColStart=1, ColSpan=1, StartX=Col1XStartInCU, EndX=499,
 			HostObject=self, InternalName='TolFreq', EditBehaviour='EditInControlPanel',
-			ControlPanelAspect='CPAspect_NumValue', MaxValue=1e3, MinValue=1e-20, MaxMinUnit=core_classes.PerYearUnit)
+			ControlPanelAspect='CPAspect_NumValue')
 		UELLabel = TextElement(self.FT, Row=4, ColStart=2, ColSpan=1, StartX=500, EndX=749,
 			HostObject=self, InternalName='UELLabel')
 		UEL = TextElement(self.FT, Row=4, ColStart=3, ColSpan=1, StartX=750, EndX=999,
@@ -484,7 +484,6 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 		#		'Text': provide textbox prefilled with the component's display value
 		#		'Choice': provide choice widget
 		#		'EditInControlPanel': don't allow edit-in-place; editing allowed only in a control panel aspect
-		#		'MaxValue', 'MinValue', 'MaxMinUnit': for numerical values, max and min allowed value in MaxMinUnit
 		FTBoxyObject.__init__(self, **Args)
 		assert isinstance(FT, FTForDisplay)
 		assert isinstance(HostObject, (FTHeader, FTEvent, FTGate, FTConnector))
@@ -1866,16 +1865,22 @@ class FTEventInCore(object): # FT event object used in DataCore by FTObjectInCor
 		else: self.EventType = NewEventTypeToApply
 
 	def ChangeValueKind(self, NewValueKind=None):
-		# change this FTEvent's value kind to NewValueKind (XMLName of a NumValueClass subclass).
+		# change this FTEvent's value kind to NewValueKind (a NumValueItem subclass).
 		# TODO fully implement [VRM] - currently only sets up an Auto value
 		assert NewValueKind in core_classes.NumValueClasses
-		self.Value = NewValueKind()
+		# make a new instance of the target subclass of NumValueItem
+		NewValueObj = NewValueKind()
+		# copy any persistent attribs from the old to the new number object
+		for ThisAttrib in core_classes.NumValueClasses.PersistentAttribs:
+			if hasattr(self.Value, ThisAttrib): setattr(NewValueObj, ThisAttrib, getattr(self.Value, ThisAttrib))
 		if NewValueKind == core_classes.AutoNumValueItem: # set up for 'derived value'
-			self.Value.Calculator = self.GetEventValue  # provide method to get derived value (overridden by SetAsSIFFailureEvent())
-			self.Value.StatusGetter = self.GetEventValueStatus  # provide method to get status
-			self.Value.UnitGetter = self.Value.GetMyUserDefinedUnit # return current unit when requested
+			NewValueObj.Calculator = self.GetEventValue  # provide method to get derived value (overridden by SetAsSIFFailureEvent())
+			NewValueObj.StatusGetter = self.GetEventValueStatus  # provide method to get status
+			NewValueObj.UnitGetter = NewValueObj.GetMyUserDefinedUnit # return current unit when requested
 			# we could set an initial unit here, but we don't know what the user wants. So we set it the first time
 			# the value is successfully calculated
+		# overwrite the old Value with the new number object
+		self.Value = NewValueObj
 
 	def SetAsSIFFailureEvent(self): # this function should be called when we want to mark this FT event as the
 		# "SIF failure" initiating event; only for High Demand and Continuous OpModes.
@@ -2454,7 +2459,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		SeverityObjs = self.MyTolRiskModel.TolFreqTable.Keys[self.MyTolRiskModel.TolFreqTable.SeverityDimensionIndex]
 		self.Severity = dict([(RR, SeverityObjs[-1]) for RR in self.MyTolRiskModel.RiskReceptors])
 		# get initial tolerable frequency value (value object containing all RRs), based on defaults in tolerable risk model
-		self.TolFreq = core_classes.UserNumValueItem()
+		self.TolFreq = core_classes.UserNumValueItem(MaxValue=1e3, MinValue=1e-20, MaxMinUnit=core_classes.PerYearUnit)
 		self.SetTolFreq()
 		self.RRGroupingOption = FTObjectInCore.DefaultRRGroupingOption # whether risk receptors are shown grouped
 		self.RefreshRiskReceptorGrouping(GroupingOption=self.RRGroupingOption, FirstTime=True)
@@ -3129,7 +3134,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		# check ProposedValue (int or float) in Unit (a UnitItem instance) is valid for ComponentName (str) in
 		# ComponentHost (an FT element object)
 		# Assumes that if the component has either a MaxValue or a MinValue attrib, it also has a MaxMinUnit attrib
-		# return ValueIsValid (bool)%%%
+		# return ValueIsValid (bool)
 		assert isinstance(ProposedValue, (int, float))
 		assert isinstance(Unit, core_classes.UnitItem)
 		# first, find component containing the value
@@ -3194,7 +3199,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		if ChangeAccepted:
 			RootName = 'OK'; RootText = 'OK'
 		else:
-			RootName = 'Fail'; RootText = 'OutOfRange'
+			RootName = 'OK'; RootText = info.ValueOutOfRangeMsg
 		return vizop_misc.MakeXMLMessage(RootName=RootName, RootText=RootText)
 
 	def DoChangeTextInTextField(self, Proj, ComponentToUpdate, ComponentHost, TargetValue, ViewportID,

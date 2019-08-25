@@ -122,7 +122,7 @@ class Operator_Divide(OperatorItem):  # class to implement 'divide' operator
 		# Operands: list of floats
 		if (len(Operands) < MinOperands) or (len(Operands) > MaxOperands): return NumProblemValue_WrongNoOperands
 		# check if any divisor is near zero
-		if True in [(abs(Op) < MinDivisor) for Op in Operands[1:]]: return NumProblemValue_DivisionByZero
+		if True in [(abs(Op) < info.ZeroThreshold) for Op in Operands[1:]]: return NumProblemValue_DivisionByZero
 		Result = (Operands + [1.0])[0] # start with first operand
 		for ThisOperand in Operands[1:]: Result /= ThisOperand # can't use reduce() any more, boo
 		return Result
@@ -380,6 +380,12 @@ class NumValueItemForDisplay(object): # class of numerical values with associate
 
 class NumValueItem(object): # superclass of objects in Datacore having a numerical value with units
 	UserSelectable = True  # whether user can manually select this class when assigning a value to a PHA object
+	# special attribs that may exist in an instance, and which should be preserved if the instance is converted to
+	# another subclass (e.g. in faulttree.ChangeValueKind()). Caution:
+	# 1. abs(MinValue) should not be < info.ZeroThreshold,
+	# otherwise small valid values may be displayed as zero
+	# 2. If an instance has a MaxValue and/or a MinValue, it must also have a MaxMinUnit
+	PersistentAttribs = ['MaxValue', 'MinValue', 'MaxMinUnit']
 
 	def __init__(self, HostObj=None):
 		# HostObj: None, or the object containing this NumValueItem instance,
@@ -540,8 +546,10 @@ class UserNumValueItem(NumValueItem): # class of NumValues for which user suppli
 	ClassHumanName = _('User defined')
 	XMLName = 'User'
 
-	def __init__(self, **Args):
+	def __init__(self, **Args): # Args can contain any special attribs with initial values. These will be preserved on
+		# conversion to another NumValueItem subclass only if listed in NumValueItem.PersistentAttribs
 		NumValueItem.__init__(self)
+		self.__dict__.update(Args)
 
 	def ConvertToUnit(self, NewUnit):
 		# set engineering unit of the NumValueItem instance, and try to convert the value.
@@ -965,10 +973,9 @@ class LookupTableItem(object):
 		self.MatchPrecisionMax = 1.01
 		self.SeverityDimensionIndex = None # which dimension contains severity values, counting from 0
 
-	def Matched(self, x,
-				y):  # return bool - whether x and y (numerical values) are considered equal (TODO move to top level so it can also be used by SwitchItem)
+	def Matched(self, x, y):  # return bool - whether x and y (numerical values) are considered equal (TODO move to top level so it can also be used by SwitchItem)
 		# handle case where y is zero, so ratio can't be calculated
-		if abs(y) < MinDivisor: return (abs(x) < MinDivisor)  # true if x is also zero
+		if abs(y) < info.ZeroThreshold: return (abs(x) < info.ZeroThreshold)  # true if x is also zero
 		return (x / y < self.MatchPrecisionMax) and (x / y > self.MatchPrecisionMin)
 
 	def Lookup(self, Categories=[]):

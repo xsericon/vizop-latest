@@ -1532,7 +1532,6 @@ class ControlFrame(wx.Frame):
 			self.UndoMenuItem.SetText(_('(Nothing to undo)'))
 			self.MenuBar.Enable(self.UndoMenuItemID, False)
 		# Redo menu item
-		print('CF1533 length of redolist: ', len(Proj.RedoList))
 		if Proj.RedoList:
 			# find record that will be undone 'up to' (skipping over any chained records)
 			LastRecordToRedo = Proj.RedoList[undo.FindLastRecordToUndo(Proj.RedoList)]
@@ -2111,10 +2110,15 @@ class ControlFrame(wx.Frame):
 			XMLTreeToSend = ElementTree.fromstring(MessageReceived)
 		# get message root
 		MessageRoot = XMLTreeToSend.tag
-#		print('CF1840 MessageRoot: ', MessageRoot)
+		print('CF1840 MessageRoot: ', MessageRoot)
 		# if message is 'OK', it's just an acknowledgement with no action required
 #		if MessageRoot == 'OK': return None # no reply message needed to CheckForIncoming Messages()
-		if MessageRoot == 'OK': return vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
+		if MessageRoot == 'OK':
+			# check whether the incoming message includes information requiring a VizopTalks message
+			if XMLTreeToSend.text == info.ValueOutOfRangeMsg:
+				self.MyVTPanel.SubmitVizopTalksMessage(Title=_('Sorry'), MainText=_('That value is out of range'),
+					Buttons=[], Priority=InstructionPriority)
+			return vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
 		else:
 			# draw complete Viewport
 			ReplyXML = self.ShowViewport(MessageReceived=MessageReceived, MessageAsXMLTree=XMLTreeToSend, **Args)
@@ -2123,7 +2127,6 @@ class ControlFrame(wx.Frame):
 
 	def RefreshGUIAfterDataChange(self, Proj):
 		# perform specific refreshes (e.g. control panel, control frame menus) after a change to the data on display
-		print('CF2127 updating control panel')
 		# refresh control frame GUI
 		self.UpdateMenuStatus()
 		# refresh control panel

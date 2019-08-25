@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# This file is part of Vizop. Copyright Peter Clarke, 2017
+# This file is part of Vizop. Copyright Peter Clarke, 2019
 
 """vizop utilities module
 This module contains utility functions (not Vizop-specific) that are used throughout Vizop.
@@ -9,8 +9,7 @@ This module contains utility functions (not Vizop-specific) that are used throug
 from __future__ import division # makes a/b yield exact, not truncated, result. Must be 1st import
 import re
 from math import ceil, log10
-
-MinDivisor = 1e-12
+from info import ZeroThreshold # numbers whose absolute value < this are treated as effectively zero
 
 def Pad(InStr, FieldWidth=4, PadChar=' '):
 	# return InStr (str) padded to length of FieldWidth by adding PadChar's to the left
@@ -202,7 +201,7 @@ def ObjectWithID(Objects, TargetID): # return object instance among Objects (lis
 def IsEffectivelyZero(TestVal=0.0):
 	# returns True if TestVal (int or float) is close to zero, ie unsuitable as a dividend
 	assert isinstance(TestVal, (int, float))
-	return (abs(TestVal) < MinDivisor)
+	return (abs(TestVal) < ZeroThreshold)
 
 def EffectivelyEqual(Val1, Val2, Precision=0.0001):
 	# returns True if Val1 and Val2 (int or float) are equal to within a factor of Precision (float).
