@@ -84,7 +84,7 @@ StatusPriority = VizopTalksPriority()
 Tip_GeneralPriority = VizopTalksPriority(Timeout=VTTipTimeout, HasTipList=True)
 Tip_Context_GeneralPriority = VizopTalksPriority(Timeout=VTTipTimeout, HasTipList=True)
 Tip_Context_SpecificPriority = VizopTalksPriority(HasTipList=True)
-ConfirmationPriority = VizopTalksPriority(MinLife=VTMinLife, Timeout=VTTipTimeout)
+ConfirmationPriority = VizopTalksPriority(Timeout=VTTipTimeout)
 InstructionPriority = VizopTalksPriority(Timeout=VTTipTimeout, ColScheme='Moderate')
 CautionPriority = VizopTalksPriority(MinLife=VTMinLife, ColScheme='Moderate')
 OptionPriority = VizopTalksPriority(MinLife=VTMinLife, ColScheme='Moderate')
@@ -140,6 +140,7 @@ class ControlFrame(wx.Frame):
 		def RenderMessage(self, Title='', MainText='', Buttons=[], Priority=LowestPriority):
 			# draw message in VizopTalks panel. Draws texts and background, but not buttons. Starts timers if required.
 			# set up drawing environment
+			print('CF143 starting RenderMessage')
 			w, h = self.GetClientSize()
 			dc = wx.BufferedDC(wx.ClientDC(self))
 			BackgColour = ControlFrame.VTPanel.BackgColourTable[Priority.ColScheme]
@@ -151,6 +152,7 @@ class ControlFrame(wx.Frame):
 				(titlew, titleh) = dc.GetTextExtent('M')  # dummy to leave gap if title empty
 			else:
 				(titlew, titleh) = dc.GetTextExtent(Title)
+			print('CF155: rendering title with title: ', Title, len(Title))
 			dc.DrawText(Title, 0, 0)
 			# draw main text
 			MainTextFont = wx.Font(12, wx.SWISS, wx.NORMAL, wx.NORMAL)  # sets the font
@@ -216,6 +218,7 @@ class ControlFrame(wx.Frame):
 					self.UnlockButton = wx.Button(self, -1, _('Centred'), pos=(10, h - 30))
 					self.UnlockButton.Bind(wx.EVT_LEFT_UP, frame1.OnUnlockButton)
 					# use 'left button up' event because the button persists if normal wx.EVT_BUTTON used
+			print('CF219 minlife timer running: ', self.MinLifeTimer.IsRunning())
 
 		def OnMinLifeTimer(self, Event): # handle timeout of VizopTalks MinLife timer. Implements flowscheme method 2
 			# in specification
@@ -282,6 +285,7 @@ class ControlFrame(wx.Frame):
 										   Buttons=TipToDisplay.Buttons, Priority=TipToDisplay.Priority)
 						TipToDisplay.Shown = True
 					else: # step 3 "no" branch: clear currently displayed message
+						print('CF286 clearing message')
 						self.RenderMessage(Title='', MainText='', Buttons=[], Priority=LowestPriority)
 
 		def ChangeUserContext(self): # call this method when the user context changes. It sets all context tips to
@@ -296,6 +300,14 @@ class ControlFrame(wx.Frame):
 				if self.TimeoutTimer.IsRunning(): self.TimeoutTimer.Stop()
 				if self.MinLifeTimer.IsRunning(): self.MinLifeTimer.Stop()
 				# step 5: go to Method 3
+				self.OnTimeoutTimer(Event=None)
+
+		def FinishedWithCurrentMessage(self): # call this method to clear a message with no MinLife set
+			# (e.g. an InstructionPriority message) when it's no longer required. Implements flowscheme 5 in specification
+			print('CF304 minlife timer running: ', self.MinLifeTimer.IsRunning())
+			if not self.MinLifeTimer.IsRunning():
+				print('CF304 calling OnTimeoutTimer')
+				if self.TimeoutTimer.IsRunning(): self.TimeoutTimer.Stop()
 				self.OnTimeoutTimer(Event=None)
 
 	class ControlPanel(wx.Panel):
@@ -2110,7 +2122,6 @@ class ControlFrame(wx.Frame):
 			XMLTreeToSend = ElementTree.fromstring(MessageReceived)
 		# get message root
 		MessageRoot = XMLTreeToSend.tag
-		print('CF1840 MessageRoot: ', MessageRoot)
 		# if message is 'OK', it's just an acknowledgement with no action required
 #		if MessageRoot == 'OK': return None # no reply message needed to CheckForIncoming Messages()
 		if MessageRoot == 'OK':
@@ -2118,6 +2129,9 @@ class ControlFrame(wx.Frame):
 			if XMLTreeToSend.text == info.ValueOutOfRangeMsg:
 				self.MyVTPanel.SubmitVizopTalksMessage(Title=_('Sorry'), MainText=_('That value is out of range'),
 					Buttons=[], Priority=InstructionPriority)
+			else: # clear any existing VizopTalks message
+				print('CF2127 calling FinishedWithCurrentMessage')
+				self.MyVTPanel.FinishedWithCurrentMessage()
 			return vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
 		else:
 			# draw complete Viewport
