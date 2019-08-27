@@ -3130,15 +3130,16 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		assert 0 <= NewColIndex <= len(self.Columns)
 		self.Columns.insert(NewColIndex, FTColumnInCore(FT=self, ColNo=NewColIndex))
 
-	def ValidateValue(self, ComponentHost, ComponentName, ProposedValue, Unit):
-		# check ProposedValue (int or float) in Unit (a UnitItem instance) is valid for ComponentName (str) in
-		# ComponentHost (an FT element object)
+	def ValidateValue(self, TargetComponent, ProposedValue, Unit):
+		# check ProposedValue (int or float) in Unit (a UnitItem instance) is valid for TargetComponent (a
+		# NumValueItem subclass instance containing the value of an FT element)
 		# Assumes that if the component has either a MaxValue or a MinValue attrib, it also has a MaxMinUnit attrib
 		# return ValueIsValid (bool)
 		assert isinstance(ProposedValue, (int, float))
+		assert isinstance(TargetComponent, core_classes.NumValueItem)
 		assert isinstance(Unit, core_classes.UnitItem)
-		# first, find component containing the value
-		TargetComponent = getattr(ComponentHost, ComponentName)
+#		# first, find component containing the value
+#		TargetComponent = getattr(ComponentHost, ComponentName)
 		ValueIsValid = True
 		# check Unit is compatible with component's MaxMinUnit, if any
 		if hasattr(TargetComponent, 'MaxMinUnit'):
@@ -3228,15 +3229,17 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		# RRGroup (list): RR's currently displayed
 		assert isinstance(Redoing, bool)
 		assert isinstance(TargetValue, float)
+		# find component to update (a NumValueItem subclass instance)
+		TargetComponent = getattr(ComponentHost, ComponentToUpdate)
 		# check new value is acceptable
-		TargetValueIsValid = self.ValidateValue(ComponentHost, ComponentToUpdate, ProposedValue=TargetValue,
-			Unit=getattr(ComponentHost, ComponentToUpdate).GetMyUnit())
+		TargetValueIsValid = self.ValidateValue(TargetComponent, ProposedValue=TargetValue,
+			Unit=TargetComponent.GetMyUnit())
 		if TargetValueIsValid:
 			# get old value for saving in Undo record
-			OldValue = getattr(ComponentHost, ComponentToUpdate).GetMyValue(RR=RRGroup[0])
+			OldValue = TargetComponent.GetMyValue(RR=RRGroup[0])
 			# write new value to component
 			for ThisRR in RRGroup:
-				getattr(ComponentHost, ComponentToUpdate).SetMyValue(NewValue=TargetValue, RR=ThisRR)
+				TargetComponent.SetMyValue(NewValue=TargetValue, RR=ThisRR)
 			# store undo record
 			undo.AddToUndoList(Proj, Redoing=Redoing, UndoObj=undo.UndoItem(UndoHandler=self.ChangeTextInValueField_Undo,
 				  RedoHandler=self.ChangeTextInValueField_Redo,
@@ -3359,6 +3362,8 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		assert isinstance(ElementID, str)
 		assert isinstance(TextComponentName, str)
 		assert isinstance(NewValue, str)
+		ValueAcceptable = True # if a value would be updated as a result of unit change, whether the unit change
+			# would lead to an acceptable value
 		# find relevant element containing the component
 		if ElementID == 'Header':
 			ComponentToUpdate = TextComponentName
@@ -3397,12 +3402,12 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			# update value unit of FTEvent or FTGate
 			# find the FTEvent/FTGate to update
 			ThisFTEvent = [e for e in WalkOverAllFTObjs(self) if e.ID == ElementID][0]
-			UnitChanged, NewUnit = self.ChangeUnit(FTElement=ThisFTEvent, NewUnitXMLName=NewValue, ValueAttribName='Value')
+			UnitChanged, NewUnit, ValueAcceptable = self.ChangeUnit(FTElement=ThisFTEvent, NewUnitXMLName=NewValue, ValueAttribName='Value')
 			# if this is an FTGate, set its "last selected unit" attribute
 			if UnitChanged and (ComponentToUpdate == 'GateValueUnit'): ThisFTEvent.SetLastSelectedUnit(NewUnit)
 		elif ComponentToUpdate == 'TolFreq':
 			# update unit of TolFreq in FT header
-			UnitChanged, NewUnit = self.ChangeUnit(FTElement=self, NewUnitXMLName=NewValue, ValueAttribName='TolFreq')
+			UnitChanged, NewUnit, ValueAcceptable = self.ChangeUnit(FTElement=self, NewUnitXMLName=NewValue, ValueAttribName='TolFreq')
 		elif ComponentToUpdate == 'EventValueKind':  # update value kind
 			# find the FTEvent to update
 			ThisFTEvent = [e for e in WalkOverAllFTObjs(self) if e.ID == ElementID][0]
@@ -3415,7 +3420,12 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			# find the corresponding value object (e.g. LowDemandMode) from the list of values in AttribValueHash
 			NewValueObj = [v for v in self.AttribValueHash[ComponentToUpdate] if v.XMLName == NewValue][0]
 			setattr(ComponentHost, ComponentToUpdate, NewValueObj)
-		return vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
+		# prepare appropriate XML message to return
+		if ValueAcceptable:
+			RootName = 'OK'; RootText = 'OK'
+		else:
+			RootName = 'OK'; RootText = info.ValueOutOfRangeMsg
+		return vizop_misc.MakeXMLMessage(RootName=RootName, RootText=RootText)
 
 	def ChangeUnit(self, FTElement, NewUnitXMLName, ValueAttribName): # change unit of numerical value
 		# FTElement: FT itself (for updating TolFreq value), or an FTEvent or FTGate instance (for updating value unit)
@@ -3424,6 +3434,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		# return:
 			# UnitChanged (bool): whether the unit was actually changed
 			# NewUnit (UnitItem or None): the unit changed to, or None if unit wasn't changed
+			# ValueAcceptable (bool): if the unit was suitable, but the value would be out of range, this is False; else True
 		AcceptableUnits = FTElement.AcceptableUnits()
 		ValueAttrib = getattr(FTElement, ValueAttribName) # find the applicable attrib in FTElement
 		# check whether user requested to convert the value - signified by ConvertValueMarker suffix
@@ -3432,18 +3443,40 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			NewUnitXMLName = NewUnitXMLName[:-len(ConvertValueMarker)] # remove marker
 		else:
 			Convert = False
-		if NewUnitXMLName in [u.XMLName for u in AcceptableUnits]:  # it's recognised
+		if NewUnitXMLName in [u.XMLName for u in AcceptableUnits]: # it's recognised
 			NewUnit = [u for u in AcceptableUnits if u.XMLName == NewUnitXMLName][0]
 			# decide whether to convert the value
 			if Convert:
-				ValueAttrib.ConvertToUnit(NewUnit) # convert value and change unit
+				# check whether the value is in acceptable range in the old unit, for all risk receptors
+				# (in principle, this check is redundant, as the value
+				# in MaxMinUnit isn't changing, but we check anyway in case the value got messed up somehow)%%%
+				ValueAcceptable = True
+				for ThisRR in ValueAttrib.ValueFamily.keys():
+					# check value for each RR, if the value is defined for that RR
+					if ValueAttrib.GetMyStatus(RR=ThisRR) == core_classes.NumProblemValue_NoProblem:
+						ValueAcceptable &= self.ValidateValue(ValueAttrib, ProposedValue=ValueAttrib.GetMyValue(RR=ThisRR),
+							Unit=ValueAttrib.GetMyUnit())
+				UnitChanged = ValueAcceptable
+				if ValueAcceptable:
+					ValueAttrib.ConvertToUnit(NewUnit) # convert value and change unit
 			else:
 				# change the unit without changing the value
-				print("FT2963 setting unit to: ", NewUnit.HumanName, "number kind: ", type(ValueAttrib))
-				ValueAttrib.SetMyUnit(NewUnit)
-			UnitChanged = True
-		else: UnitChanged = False; NewUnit = None
-		return UnitChanged, NewUnit
+				# check whether the value is in acceptable range in the new unit, for all risk receptors
+				ValueAcceptable = True
+				for ThisRR in ValueAttrib.ValueFamily.keys():
+					# check value for each RR, if the value is defined for that RR
+					if ValueAttrib.GetMyStatus(RR=ThisRR) == core_classes.NumProblemValue_NoProblem:
+						ValueAcceptable &= self.ValidateValue(ValueAttrib, ProposedValue=ValueAttrib.GetMyValue(RR=ThisRR),
+							Unit=NewUnit)
+					print('FT3463 RR, ValueAcceptable:', ThisRR.HumanName, ValueAcceptable)
+				UnitChanged = ValueAcceptable
+				if ValueAcceptable:
+					ValueAttrib.SetMyUnit(NewUnit)
+		else: # new unit not valid for this element
+			UnitChanged = False
+			ValueAcceptable = True
+			NewUnit = None
+		return UnitChanged, NewUnit, ValueAcceptable
 
 	def HandleIncomingRequest(self, MessageReceived=None, MessageAsXMLTree=None, **Args):
 		# handle request received by FT model in datacore from a Viewport. Request can be to edit data (eg add new element)

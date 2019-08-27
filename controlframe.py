@@ -133,6 +133,7 @@ class ControlFrame(wx.Frame):
 			dc = wx.PaintDC(self) # this is needed even though not used; see Rappin p368
 			# redraw the current message
 			if self.CurrentMessage:
+				print('FT136 painting VizopTalks panel with title: ', self.CurrentMessage.Title)
 				self.RenderMessage(Title=self.CurrentMessage.Title,
 					MainText=self.CurrentMessage.MainText, Buttons=self.CurrentMessage.Buttons,
 					Priority=self.CurrentMessage.Priority)
@@ -140,7 +141,6 @@ class ControlFrame(wx.Frame):
 		def RenderMessage(self, Title='', MainText='', Buttons=[], Priority=LowestPriority):
 			# draw message in VizopTalks panel. Draws texts and background, but not buttons. Starts timers if required.
 			# set up drawing environment
-			print('CF143 starting RenderMessage')
 			w, h = self.GetClientSize()
 			dc = wx.BufferedDC(wx.ClientDC(self))
 			BackgColour = ControlFrame.VTPanel.BackgColourTable[Priority.ColScheme]
@@ -152,7 +152,6 @@ class ControlFrame(wx.Frame):
 				(titlew, titleh) = dc.GetTextExtent('M')  # dummy to leave gap if title empty
 			else:
 				(titlew, titleh) = dc.GetTextExtent(Title)
-			print('CF155: rendering title with title: ', Title, len(Title))
 			dc.DrawText(Title, 0, 0)
 			# draw main text
 			MainTextFont = wx.Font(12, wx.SWISS, wx.NORMAL, wx.NORMAL)  # sets the font
@@ -218,7 +217,6 @@ class ControlFrame(wx.Frame):
 					self.UnlockButton = wx.Button(self, -1, _('Centred'), pos=(10, h - 30))
 					self.UnlockButton.Bind(wx.EVT_LEFT_UP, frame1.OnUnlockButton)
 					# use 'left button up' event because the button persists if normal wx.EVT_BUTTON used
-			print('CF219 minlife timer running: ', self.MinLifeTimer.IsRunning())
 
 		def OnMinLifeTimer(self, Event): # handle timeout of VizopTalks MinLife timer. Implements flowscheme method 2
 			# in specification
@@ -304,9 +302,7 @@ class ControlFrame(wx.Frame):
 
 		def FinishedWithCurrentMessage(self): # call this method to clear a message with no MinLife set
 			# (e.g. an InstructionPriority message) when it's no longer required. Implements flowscheme 5 in specification
-			print('CF304 minlife timer running: ', self.MinLifeTimer.IsRunning())
 			if not self.MinLifeTimer.IsRunning():
-				print('CF304 calling OnTimeoutTimer')
 				if self.TimeoutTimer.IsRunning(): self.TimeoutTimer.Stop()
 				self.OnTimeoutTimer(Event=None)
 
