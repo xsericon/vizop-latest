@@ -246,6 +246,9 @@ class ButtonObjectNotInElement(ButtonElement):
 
 class FTHeader(object): # FT header object. Rendered by drawing text into bitmap (doesn't use native widgets or sizer)
 	# This class is used by FTForDisplay but not by FTObjectInCore (keeps header data in itself, not in sub-object)
+	# ComponentEnglishNames: used for display in Control Panel
+	ComponentEnglishNames = {'SIFName': 'SIF name', 'Rev': 'Revision', 'OpMode': 'Operating mode',
+		'TolFreq': 'Tolerable frequency', 'SILTargetValue': 'SIL target'}
 
 	def __init__(self, FT):
 		assert isinstance(FT, FTForDisplay)

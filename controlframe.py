@@ -133,7 +133,6 @@ class ControlFrame(wx.Frame):
 			dc = wx.PaintDC(self) # this is needed even though not used; see Rappin p368
 			# redraw the current message
 			if self.CurrentMessage:
-				print('FT136 painting VizopTalks panel with title: ', self.CurrentMessage.Title)
 				self.RenderMessage(Title=self.CurrentMessage.Title,
 					MainText=self.CurrentMessage.MainText, Buttons=self.CurrentMessage.Buttons,
 					Priority=self.CurrentMessage.Priority)
@@ -240,6 +239,7 @@ class ControlFrame(wx.Frame):
 						if (t.AppliesToCurrentContext and not t.Shown)]
 					if AvailContextGeneralTips: # tips are available; choose one at random
 						TipToDisplay = random.choice(AvailContextGeneralTips)
+						self.CurrentMessage = TipToDisplay
 						self.RenderMessage(Title=TipToDisplay.Title, MainText=TipToDisplay.MainText,
 							Buttons=TipToDisplay.Buttons, Priority=TipToDisplay.Priority)
 						TipToDisplay.Shown = True
@@ -248,11 +248,13 @@ class ControlFrame(wx.Frame):
 						AvailGeneralTips = [t for t in Tip_GeneralPriority.TipList if not t.Shown]
 						if AvailGeneralTips: # tips are available; choose one at random
 							TipToDisplay = random.choice(AvailGeneralTips)
+							self.CurrentMessage = TipToDisplay
 							self.RenderMessage(Title=TipToDisplay.Title, MainText=TipToDisplay.MainText,
 								Buttons=TipToDisplay.Buttons, Priority=TipToDisplay.Priority)
 							TipToDisplay.Shown = True
 			# step 20: display the buffered message
 			if ShowBufferedMessage:
+				self.CurrentMessage = copy.copy(self.MessageBuffer)
 				self.RenderMessage(Title=self.MessageBuffer.Title, MainText=self.MessageBuffer.MainText,
 					Buttons=self.MessageBuffer.Buttons, Priority=self.MessageBuffer.Priority)
 				self.MessageBuffer = None # clear buffer
@@ -262,6 +264,7 @@ class ControlFrame(wx.Frame):
 			ShowBufferedMessage = False
 			# step 1: any message in message buffer?
 			if self.MessageBuffer: # show the message
+				self.CurrentMessage = copy.copy(self.MessageBuffer)
 				self.RenderMessage(Title=self.MessageBuffer.Title, MainText=self.MessageBuffer.MainText,
 								   Buttons=self.MessageBuffer.Buttons, Priority=self.MessageBuffer.Priority)
 				self.MessageBuffer = None # clear buffer
@@ -271,6 +274,7 @@ class ControlFrame(wx.Frame):
 										   if (t.AppliesToCurrentContext and not t.Shown)]
 				if AvailContextGeneralTips: # tips are available; choose one at random
 					TipToDisplay = random.choice(AvailContextGeneralTips)
+					self.CurrentMessage = TipToDisplay
 					self.RenderMessage(Title=TipToDisplay.Title, MainText=TipToDisplay.MainText,
 									   Buttons=TipToDisplay.Buttons, Priority=TipToDisplay.Priority)
 					TipToDisplay.Shown = True
@@ -279,11 +283,12 @@ class ControlFrame(wx.Frame):
 					AvailGeneralTips = [t for t in Tip_GeneralPriority.TipList if not t.Shown]
 					if AvailGeneralTips:  # tips are available; choose one at random
 						TipToDisplay = random.choice(AvailGeneralTips)
+						self.CurrentMessage = TipToDisplay
 						self.RenderMessage(Title=TipToDisplay.Title, MainText=TipToDisplay.MainText,
 										   Buttons=TipToDisplay.Buttons, Priority=TipToDisplay.Priority)
 						TipToDisplay.Shown = True
 					else: # step 3 "no" branch: clear currently displayed message
-						print('CF286 clearing message')
+						self.CurrentMessage = VizopTalksMessage()
 						self.RenderMessage(Title='', MainText='', Buttons=[], Priority=LowestPriority)
 
 		def ChangeUserContext(self): # call this method when the user context changes. It sets all context tips to
@@ -293,6 +298,7 @@ class ControlFrame(wx.Frame):
 			# step 2: delete all context_specific tips
 			Tip_Context_SpecificPriority.TipList = []
 			# step 3: are we currently showing a Tip_Context_General or Tip_Context_Specific?
+			if getattr(self.CurrentMessage, Priority, LowestPriority) in [Tip_Context_GeneralPriority, Tip_Context_SpecificPriority]:
 			if getattr(self.CurrentMessage, Priority, LowestPriority) in [Tip_Context_GeneralPriority, Tip_Context_SpecificPriority]:
 				# step 4: stop timers
 				if self.TimeoutTimer.IsRunning(): self.TimeoutTimer.Stop()
@@ -813,7 +819,6 @@ class ControlFrame(wx.Frame):
 			# make lists for creation of Viewports and PHAModels
 			SetupObjectLists(self)
 			self.CurrentProj = FirstProject # which project is currently 'focused'
-#			self.CurrentViewport = Viewport # which Viewport is currently in use. Shouldn't be in ControlPanel scope, use ControlFrame's instead
 			self.ColScheme = ColScheme
 			self.SetBackgroundColour(self.ColScheme.BackBright)
 			self.SetMinSize(size)
@@ -1053,7 +1058,7 @@ class ControlFrame(wx.Frame):
 			# make widgets
 			self.MakeStandardWidgets(Scope=self.NumericalValueAspect, NotebookPage=MyNotebookPage)
 			self.NumericalValueAspect.HeaderLabel = UIWidgetItem(wx.StaticText(MyNotebookPage, -1, ''),
-				ColLoc=3, ColSpan=4, GapX=20)
+				ColLoc=3, ColSpan=4, GapX=20, Font=self.TopLevelFrame.Fonts['SmallHeadingFont'])
 			self.NumericalValueAspect.CommentButton = UIWidgetItem(wx.Button(MyNotebookPage, -1, _('Comment')),
 				Handler=self.NumericalValueAspect_OnCommentButton,
 				Events=[wx.EVT_BUTTON],
@@ -1142,6 +1147,9 @@ class ControlFrame(wx.Frame):
 			# enable navigation buttons if there are any items in current project's history lists
 			self.UpdateNavigationButtonStatus(Proj)
 			# set widget values %%% working here
+			# set up HeaderLabel
+			self.NumericalValueAspect.HeaderLabel.Widget.SetLabel(_('Value: %s' % self.TopLevelFrame.PHAObjInControlPanel.
+				ComponentEnglishNames[self.TopLevelFrame.ComponentInControlPanel]))
 			# set up ValueText
 			self.NumericalValueAspect.ValueText.PHAObj = self.TopLevelFrame.PHAObjInControlPanel
 			PHAObj = self.NumericalValueAspect.ValueText.PHAObj
@@ -2126,7 +2134,6 @@ class ControlFrame(wx.Frame):
 				self.MyVTPanel.SubmitVizopTalksMessage(Title=_('Sorry'), MainText=_('That value is out of range'),
 					Buttons=[], Priority=InstructionPriority)
 			else: # clear any existing VizopTalks message
-				print('CF2127 calling FinishedWithCurrentMessage')
 				self.MyVTPanel.FinishedWithCurrentMessage()
 			return vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
 		else:
@@ -2213,6 +2220,7 @@ class ControlFrame(wx.Frame):
 			NormalWidgetFont = core_classes.FontInstance(Size=11, Bold=False)
 			BoldWidgetFont = core_classes.FontInstance(Size=11, Bold=True)
 			self.SmallHeadingFont = core_classes.FontInstance(Size=13, Bold=True)
+		self.Fonts = self.SetupFonts() # must call before making MyControlPanel
 
 		# set up list of existing Viewports in this instance of Vizop
 		if Viewport:
@@ -2285,8 +2293,8 @@ class ControlFrame(wx.Frame):
 			ColScheme=self.ColScheme)
 		self.MyEditPanel.EditPanelMode(self.CurrentViewport, 'Select') # set up mouse pointer and bindings (needs OffsetX/Y)
 		self.MyVTPanel = self.VTPanel(self, size=VTPanelSize)
-		self.MyControlPanel = self.ControlPanel(self, size=ControlPanelSize, VTWindow=self.MyVTPanel, FirstProject=FirstProject,
-			ColScheme=ColScheme)
+		self.MyControlPanel = self.ControlPanel(self, size=ControlPanelSize, VTWindow=self.MyVTPanel,
+			FirstProject=FirstProject, ColScheme=ColScheme)
 		self.MyViewPanel = self.ViewPanel(self, size=ViewPanelSize, VTPanel=self.MyVTPanel, ColScheme=ColScheme)
 		self.AddDisplayDevice(NewDisplayDevice=self.MyViewPanel)
 		# put panels under layout management. Order of AddPane calls is important
@@ -2308,8 +2316,6 @@ class ControlFrame(wx.Frame):
 		self.Bind(wx.EVT_IDLE, self.OnIdle)
 
 		self.SetupMenus()
-		# set up fonts
-		self.Fonts = self.SetupFonts()
 		self.Show(True)
 		self.SetProject(FirstProject) # also sets self.CurrentProj
 
