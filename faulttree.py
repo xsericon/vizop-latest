@@ -13,7 +13,6 @@ import text, utilities, core_classes, info, vizop_misc, projects, art, display_u
 # constants applicable to fault tree
 TextElementTopBufferInCU = 2 # y-gap in canvas units between top of a text element and top of its contained text
 DefaultFontFamily = wx.FONTFAMILY_SWISS
-ConvertValueMarker = '_Convert' # indicates user has requested to convert value when changing unit
 ConnectingLineColour = (0xf6, 0xff, 0x2a) # golden yellow, for lines connecting FT elements
 ButtonBaseColour = (0x64, 0x64, 0x80) # mid grey, background colour for graphical buttons
 ButtonBorderColour = (0x20, 0x20, 0x30) # deep grey, border colour for graphical buttons
@@ -268,6 +267,7 @@ class FTHeader(object): # FT header object. Rendered by drawing text into bitmap
 		self.TolFreq = core_classes.NumValueItemForDisplay() # tolerable frequency, object including value, unit, possible units etc.
 		self.TolFreq.InternalName = 'TolFreq' # for cross-reference to datacore attrib during editing
 		self.TolFreq.AcceptableUnits = [] # populated in PopulateUnitOptions()
+		# TolFreq.ValueKindOptions is set in PopulateHeaderData() from values set in SetTolFreq()
 		self.UEL = '' # unmitigated event likelihood (outcome frequency) of FT
 		self.OutcomeUnit = '' # ? not used ? assumed same as unit of TolFreq ?
 		self.TargetUnit = '' # 'RRF' or 'PFD' or 'PFH'
@@ -2485,6 +2485,10 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 	def AcceptableUnits(self): # return list of units (UnitItem instances) for FT's TolFreq
 		return core_classes.FrequencyUnits
 
+	def AcceptableValueKinds(self): # return list of value kinds (subclasses of NumValueItem) for FT's TolFreq
+		return [core_classes.UserNumValueItem, core_classes.ConstNumValueItem, core_classes.LookupNumValueItem,
+			core_classes.ParentNumValueItem, core_classes.UseParentValueItem]
+
 	def RefreshRiskReceptorGrouping(self, GroupingOption, FirstTime=False):
 		# re-group risk receptors and select appropriate group to be displayed
 		# FirstTime (bool): whether this is the first grouping of RR's (for newly created FTObjectInCore instance)
@@ -2730,15 +2734,13 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 				# add unit, unit options, ValueKind options and Constant options
 				UnitEl = ElementTree.SubElement(AttribEl, info.UnitTag)
 				UnitEl.text = str(Attrib.GetMyUnit().XMLName)
-				PopulateValueUnitField(CurrentUnit=Attrib.GetMyUnit(), AcceptableUnits=Attrib.AcceptableUnits,
-					EventEl=AttribEl, OfferConvertOptions=True)
-#				for ThisUnitOption in Attrib.AcceptableUnits:
-#					UnitOptionEl = ElementTree.SubElement(AttribEl, info.UnitOptionTag)
-#					UnitOptionEl.text = str(ThisUnitOption.XMLName)
-#					UnitOptionEl.set(info.ApplicableAttribName, 'True')
-				for ThisValueKindOption in Attrib.ValueKindOptions:
-					ValueKindOptionEl = ElementTree.SubElement(AttribEl, info.ValueKindOptionTag)
-					ValueKindOptionEl.text = str(ThisValueKindOption.XMLName)
+				PopulateValueOptionField(CurrentOption=Attrib.GetMyUnit(), AcceptableOptions=Attrib.AcceptableUnits,
+					EventEl=AttribEl, OptionXMLTagName=info.UnitOptionTag, OfferConvertOptions=True)
+				PopulateValueOptionField(CurrentOption=type(Attrib), AcceptableOptions=Attrib.ValueKindOptions,
+					EventEl=AttribEl, OptionXMLTagName=info.ValueKindOptionTag, OfferConvertOptions=False)
+#				for ThisValueKindOption in Attrib.ValueKindOptions:
+#					ValueKindOptionEl = ElementTree.SubElement(AttribEl, info.ValueKindOptionTag)
+#					ValueKindOptionEl.text = str(ThisValueKindOption.XMLName)
 				for ThisConstantOption in self.Proj.Constants:
 					ConstantOptionEl = ElementTree.SubElement(AttribEl, info.ConstantOptionTag)
 					ConstantOptionEl.text = str(ThisConstantOption.HumanName)
@@ -2849,9 +2851,10 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 				ObjTypeEl.text = ThisObjType
 				ObjTypeEl.set(info.ApplicableAttribName, utilities.Bool2Str(ThisObjType == FTEvent.EventType))
 				ObjTypeEl.set(info.SerialTag, str(ThisObjTypeIndex)) # add type option serial number
-			# add options for value unit: first, plain units, then options to convert value to new units TODO use PopulateValueUnitField()
+			# add options for value unit: first, plain units, then options to convert value to new units TODO use PopulateValueOptionField()
 			CurrentUnit = FTEvent.Value.GetMyUnit()
-			AcceptableUnits = FTEvent.AcceptableUnits()
+			AcceptableUnits = FTEvent.AcceptableUnits() # keep this line when switching to PopulateValueOptionField()
+			AcceptableValueKinds = FTEvent.AcceptableValueKinds() # keep this line when switching to PopulateValueOptionField()
 			HowManyAcceptableUnits = len(AcceptableUnits)
 			for (ThisUnitIndex, ThisUnit) in enumerate(AcceptableUnits):
 				UnitEl = ElementTree.SubElement(EventEl, info.UnitOptionTag)
@@ -2861,7 +2864,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			for (ThisUnitIndex, ThisUnit) in enumerate(AcceptableUnits):
 				if ThisUnit != CurrentUnit: # don't offer option to convert to existing unit
 					UnitEl = ElementTree.SubElement(EventEl, info.UnitOptionTag)
-					UnitEl.text = ThisUnit.XMLName + ConvertValueMarker
+					UnitEl.text = ThisUnit.XMLName + info.ConvertValueMarker
 					UnitEl.set(info.ApplicableAttribName, utilities.Bool2Str(False)) # each item in this list isn't current
 					# add unit option serial number, noting that we already have options from the 1st list
 					UnitEl.set(info.SerialTag, str(HowManyAcceptableUnits + ThisUnitIndex))
@@ -2928,31 +2931,30 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 				El.Text = FTConnector.RelatedCX.ID
 			return ConnEl
 
-#		def PopulateValueUnitField(FTEvent, EventEl, OfferConvertOptions=True):
-		def PopulateValueUnitField(CurrentUnit, AcceptableUnits, EventEl, OfferConvertOptions=True):
-			# put options for value unit into element EventEl in FTEvent's XML representation
-			# add options for value unit: first, plain units,
-			# then (if OfferConvertOptions is True) options to convert value to new units
-			assert CurrentUnit in core_classes.AllSelectableUnits
+#		def PopulateValueOptionField(FTEvent, EventEl, OfferConvertOptions=True):
+		def PopulateValueOptionField(CurrentOption, AcceptableOptions, EventEl, OptionXMLTagName, OfferConvertOptions=True):
+			# put options for value attrib (e.g. unit, value kind) into element EventEl in FTEvent's XML representation
+			# OptionXMLTagName (str): XML tag for option (e.g. info.UnitOptionTag)
+			# If OfferConvertOptions is True, append options to convert value to new units (special for units)
+#			assert CurrentOption in core_classes.AllSelectableUnits
+			assert CurrentOption in AcceptableOptions
 			assert isinstance(OfferConvertOptions, bool)
-#			CurrentUnit = FTEvent.Value.GetMyUnit()
-#			AcceptableUnits = FTEvent.AcceptableUnits()
-			HowManyAcceptableUnits = len(AcceptableUnits)
-			for (ThisUnitIndex, ThisUnit) in enumerate(AcceptableUnits):
-				UnitEl = ElementTree.SubElement(EventEl, info.UnitOptionTag)
-				UnitEl.text = ThisUnit.XMLName
-				UnitEl.set(info.ApplicableAttribName, utilities.Bool2Str(ThisUnit == CurrentUnit))
-				UnitEl.set(info.SerialTag, str(ThisUnitIndex))  # add unit option serial number
+			HowManyAcceptableOptions = len(AcceptableOptions)
+			for (ThisOptionIndex, ThisOption) in enumerate(AcceptableOptions):
+				OptionEl = ElementTree.SubElement(EventEl, OptionXMLTagName)
+				OptionEl.text = ThisOption.XMLName
+				OptionEl.set(info.ApplicableAttribName, utilities.Bool2Str(ThisOption == CurrentOption))
+				OptionEl.set(info.SerialTag, str(ThisOptionIndex)) # add option serial number
 			# add 'convert unit' options
 			if OfferConvertOptions:
-				for (ThisUnitIndex, ThisUnit) in enumerate(AcceptableUnits):
-					if ThisUnit != CurrentUnit: # don't offer option to convert to existing unit
-						UnitEl = ElementTree.SubElement(EventEl, info.UnitOptionTag)
-						UnitEl.text = ThisUnit.XMLName + ConvertValueMarker
-						UnitEl.set(info.ApplicableAttribName, utilities.Bool2Str(False))
-						# False because each item in this list isn't the current unit
+				for (ThisOptionIndex, ThisOption) in enumerate(AcceptableOptions):
+					if ThisOption != CurrentOption: # don't offer option to convert to existing unit
+						OptionEl = ElementTree.SubElement(EventEl, OptionXMLTagName)
+						OptionEl.text = ThisOption.XMLName + info.ConvertValueMarker
+						OptionEl.set(info.ApplicableAttribName, utilities.Bool2Str(False))
+						# above line: False because each item in this list isn't the current unit
 						# add unit option serial number, noting that we already have options from the 1st list
-						UnitEl.set(info.SerialTag, str(HowManyAcceptableUnits + ThisUnitIndex))
+						OptionEl.set(info.SerialTag, str(HowManyAcceptableOptions + ThisOptionIndex))
 
 		def PopulateFTGateData(El, FTGate):
 			# put FT gate data into XML element El
@@ -3026,9 +3028,8 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 				GateTypeEl.set(info.ApplicableAttribName, utilities.Bool2Str(ThisGateType == FTGate.Algorithm))
 				GateTypeEl.set(info.SerialTag, str(ThisGateTypeIndex)) # add type option serial number
 			# add options for gate unit
-#			PopulateValueUnitField(FTEvent=FTGate, EventEl=GateEl, OfferConvertOptions=False)
-			PopulateValueUnitField(CurrentUnit=FTGate.Value.GetMyUnit(), AcceptableUnits=FTGate.AcceptableUnits(),
-				EventEl=GateEl, OfferConvertOptions=False)
+			PopulateValueOptionField(CurrentOption=FTGate.Value.GetMyUnit(), AcceptableOptions=FTGate.AcceptableUnits(),
+				EventEl=GateEl, OptionXMLTagName=info.UnitOptionTag, OfferConvertOptions=False)
 			return GateEl
 
 		def PopulateColumnData(FT, El, Col):
@@ -3441,9 +3442,9 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		AcceptableUnits = FTElement.AcceptableUnits()
 		ValueAttrib = getattr(FTElement, ValueAttribName) # find the applicable attrib in FTElement
 		# check whether user requested to convert the value - signified by ConvertValueMarker suffix
-		if NewUnitXMLName.endswith(ConvertValueMarker):
+		if NewUnitXMLName.endswith(info.ConvertValueMarker):
 			Convert = True
-			NewUnitXMLName = NewUnitXMLName[:-len(ConvertValueMarker)] # remove marker
+			NewUnitXMLName = NewUnitXMLName[:-len(info.ConvertValueMarker)] # remove marker
 		else:
 			Convert = False
 		if NewUnitXMLName in [u.XMLName for u in AcceptableUnits]: # it's recognised
@@ -3673,25 +3674,28 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 	def PrepareFullDisplay(self, XMLData): # instruct FTForDisplay object to fetch and set up all data needed to display the FT
 		# extract all data from XML tree and use to build up FT data structure
 
-		def PopulateUnitOptions(XMLRoot, HostEl, ComponentName, ListAttrib):
-			# populate numerical value unit choice list. These units are offered to the user in a choice widget
-			# We need special handling for unit options because "convert to" options are offered
+		def PopulateValueOptions(XMLRoot, HostEl, ComponentName, ListAttrib, OptionTagName, MasterOptionsList):
+			# populate choice list for attribs of a numerical value.
+			# Used for unit choice, value kind choice etc.
+			# These choices are offered to the user in a choice widget
 			# HostEl: element containing the numerical value
 			# ComponentName (str): the numerical component name in HostEl
 			# ListAttrib (str): name of the list in Component to populate
-			UnitOptions = []
-			for ThisTag in XMLRoot.findall(info.UnitOptionTag):
-				# find human name for this unit option (use startswith() to ignore convert marker suffix)
-				ThisUnitHumanName = [u.HumanName for u in core_classes.UnitItem.UserSelectableUnits
+			# OptionTagName (str): the XML tag containing an option
+			# MasterOptionsList (list): list of subclasses with XMLName attribs to match against options in XMLRoot
+			Options = []
+			for ThisTag in XMLRoot.findall(OptionTagName):
+				# find human name for this option (use startswith() to ignore convert unit marker suffix)
+				ThisOptionHumanName = [u.HumanName for u in MasterOptionsList
 					if ThisTag.text.startswith(u.XMLName)][0]
-				# set human name according to whether this is a value conversion option
-				if ThisTag.text.endswith(ConvertValueMarker): ThisHumanName = _('Convert value to %s') % ThisUnitHumanName
-				else: ThisHumanName = ThisUnitHumanName
-				UnitOptions.append(ChoiceItem(XMLName=ThisTag.text,
+				# set human name according to whether this is a value conversion option (special case for unit options)
+				if ThisTag.text.endswith(info.ConvertValueMarker): ThisHumanName = _('Convert value to %s') % ThisOptionHumanName
+				else: ThisHumanName = ThisOptionHumanName
+				Options.append(ChoiceItem(XMLName=ThisTag.text,
 					HumanName=ThisHumanName,
 					Applicable=utilities.Bool2Str(ThisTag.get(info.ApplicableAttribName))))
-			# set unit options list in the FT component
-			setattr(getattr(HostEl, ComponentName), ListAttrib, UnitOptions)
+			# set options list in the FT component
+			setattr(getattr(HostEl, ComponentName), ListAttrib, Options)
 
 		def PopulateOverallData(XMLRoot, HeaderEl):
 			# extract data about the overall FT from XMLRoot
@@ -3749,17 +3753,24 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 				default=info.NullUnitInternalName))
 			# populate lists of options relating to numerical values
 			for ThisNumValue, ThisNumTag in [ ('TolFreq', TolFreqTag) ]:
-				PopulateUnitOptions(XMLRoot=ThisNumTag, HostEl=HeaderEl, ComponentName=ThisNumValue,
-					ListAttrib='AcceptableUnits')
+				PopulateValueOptions(XMLRoot=ThisNumTag, HostEl=HeaderEl, ComponentName=ThisNumValue,
+					ListAttrib='AcceptableUnits', OptionTagName=info.UnitOptionTag,
+					MasterOptionsList=core_classes.UnitItem.UserSelectableUnits)
 				ThisNumAttrib = getattr(HeaderEl, ThisNumValue)
 				for (ThisOptionTag, ThisOption) in [
-						(info.ValueKindOptionTag, 'ValueKindOptions'), (info.ConstantOptionTag, 'ConstantOptions'),
+#						(info.ValueKindOptionTag, 'ValueKindOptions'), (info.ConstantOptionTag, 'ConstantOptions'),
+						(info.ConstantOptionTag, 'ConstantOptions'),
 						(info.MatrixOptionTag, 'MatrixOptions')]:
 					# create and populate each option list in turn%%% working here; get specific data from each option tag, esp. constants
 					setattr(ThisNumAttrib, ThisOption, [])
 					ThisOptionList = getattr(ThisNumAttrib, ThisOption)
 					for ThisOptionTagFound in HeaderXMLRoot.findall(ThisOptionTag):
 						ThisOptionList.append(ThisOptionTagFound.text)
+				# populate value kind options
+				PopulateValueOptions(XMLRoot=ThisNumTag, HostEl=HeaderEl, ComponentName=ThisNumValue,
+						ListAttrib='ValueKindOptions', OptionTagName=info.ValueKindOptionTag,
+						MasterOptionsList=core_classes.NumValueClasses)
+			print('FT3764 set TolFreq.ValueKindOptions to: ', HeaderEl.TolFreq.ValueKindOptions)
 			# populate content elements
 			for ThisEl in HeaderEl.ContentEls: ThisEl.Text.Content = getattr(HeaderEl, ThisEl.InternalName)
 			# store component name to highlight
@@ -3810,24 +3821,24 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 				HumanName=self.EventTypeNameHash[ThisTag.text],
 				Applicable=utilities.Bool2Str(ThisTag.get(info.ApplicableAttribName)))
 				for ThisTag in XMLObj.findall(info.EventTypeOptionTag)]
-			# populate event value unit choice; TODO use PopulateUnitOptions()
+			# populate event value unit choice; TODO use PopulateValueOptions()
 			NewEvent.EventValueUnitComponent.ObjectChoices = []
 			for ThisTag in XMLObj.findall(info.UnitOptionTag):
 				# find human name for this unit option (use startswith() to ignore convert marker suffix)
 				ThisUnitHumanName = [u.HumanName for u in core_classes.UnitItem.UserSelectableUnits
 					if ThisTag.text.startswith(u.XMLName)][0]
 				# set human name according to whether this is a value conversion option
-				if ThisTag.text.endswith(ConvertValueMarker): ThisHumanName = _('Convert value to %s') % ThisUnitHumanName
+				if ThisTag.text.endswith(info.ConvertValueMarker): ThisHumanName = _('Convert value to %s') % ThisUnitHumanName
 				else: ThisHumanName = ThisUnitHumanName
 				NewEvent.EventValueUnitComponent.ObjectChoices.append(ChoiceItem(XMLName=ThisTag.text,
 					HumanName=ThisHumanName,
 					Applicable=utilities.Bool2Str(ThisTag.get(info.ApplicableAttribName))))
 #			# populate value kind with HumanName of number kind class specified in incoming NumberKind tag
-#			NewEvent.ValueKind = ([c.ClassHumanName for c in core_classes.NumValueClasses
+#			NewEvent.ValueKind = ([c.HumanName for c in core_classes.NumValueClasses
 #				if c.XMLName == XMLObj.findtext(info.NumberKindTag, default='')] + ['???'])[0]
 			# populate value kind choice
 			NewEvent.EventValueKindComponent.ObjectChoices = [ChoiceItem(XMLName=ThisTag.text,
-				HumanName=[c.ClassHumanName for c in core_classes.NumValueClasses if c.XMLName == ThisTag.text][0],
+				HumanName=[c.HumanName for c in core_classes.NumValueClasses if c.XMLName == ThisTag.text][0],
 				Applicable=utilities.Bool2Str(ThisTag.get(info.ApplicableAttribName)))
 				for ThisTag in XMLObj.findall(info.NumberKindTag)]
 			# populate value kind with HumanName of number kind marked as applicable

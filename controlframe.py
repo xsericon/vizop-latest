@@ -299,7 +299,6 @@ class ControlFrame(wx.Frame):
 			Tip_Context_SpecificPriority.TipList = []
 			# step 3: are we currently showing a Tip_Context_General or Tip_Context_Specific?
 			if getattr(self.CurrentMessage, Priority, LowestPriority) in [Tip_Context_GeneralPriority, Tip_Context_SpecificPriority]:
-			if getattr(self.CurrentMessage, Priority, LowestPriority) in [Tip_Context_GeneralPriority, Tip_Context_SpecificPriority]:
 				# step 4: stop timers
 				if self.TimeoutTimer.IsRunning(): self.TimeoutTimer.Stop()
 				if self.MinLifeTimer.IsRunning(): self.MinLifeTimer.Stop()
@@ -1169,6 +1168,13 @@ class ControlFrame(wx.Frame):
 			ApplicableOptionsList = [u.Applicable for u in UnitOptions]
 			self.NumericalValueAspect.UnitChoice.Widget.SetSelection(
 				ApplicableOptionsList.index(True) if True in ApplicableOptionsList else wx.NOT_FOUND)
+			# set up ValueKindChoice
+			ValueKindOptions = getattr(PHAObj, DataAttrib).ValueKindOptions # list of ChoiceItem instances
+			self.NumericalValueAspect.ValueKindChoice.PHAObj = self.TopLevelFrame.PHAObjInControlPanel
+			self.NumericalValueAspect.ValueKindChoice.DataAttrib = self.TopLevelFrame.ComponentInControlPanel
+			# populate ValueKindChoice with value kind options
+			self.NumericalValueAspect.ValueKindChoice.Widget.Set([u.HumanName for u in ValueKindOptions])
+			# select the current value kind in ValueKindOptions TODO
 
 		def NumericalValueAspect_OnCommentButton(self, Event): pass
 

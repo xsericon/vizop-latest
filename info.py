@@ -228,6 +228,7 @@ ControlFrameOutSocketLabel = 'C2FREQ' # label prefix for datacore end of datacor
 ViewportOutSocketLabel = 'C2VREQ' # label prefix for datacore end of datacore -> Viewport socket
 LocalSuffix = '_Local' # suffix for datacore sockets connecting to local control frame
 NullUnitInternalName = 'null'
+ConvertValueMarker = '_Convert' # indicates user has requested to convert value when changing unit
 ValueOutOfRangeMsg = 'ValueOutOfRange'
 
 # NO_ commands to control frame

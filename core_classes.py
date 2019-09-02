@@ -543,7 +543,7 @@ class NumValueItem(object): # superclass of objects in Datacore having a numeric
 
 class UserNumValueItem(NumValueItem): # class of NumValues for which user supplies a numeric value
 	# Uses GetMyValue and GetMyUnit method from superclass
-	ClassHumanName = _('User defined')
+	HumanName = _('User defined')
 	XMLName = 'User'
 
 	def __init__(self, **Args): # Args can contain any special attribs with initial values. These will be preserved on
@@ -592,7 +592,7 @@ class ConstantItem(NumValueItem): # user-defined constants that can be attached 
 
 
 class ConstNumValueItem(NumValueItem):  # class of constant NumValues. Refers to a ConstantItem instance
-	ClassHumanName = _('Constant')
+	HumanName = _('Constant')
 	XMLName = 'Constant'
 	UserSelectable = True  # whether user can manually select this class when assigning a value to a PHA object
 
@@ -619,7 +619,7 @@ class ConstNumValueItem(NumValueItem):  # class of constant NumValues. Refers to
 
 
 class CalcNumValueItem(NumValueItem): # class of NumValues that are calculated from a formula
-	ClassHumanName = _('Calculated value')
+	HumanName = _('Calculated value')
 	XMLName = 'Calc'
 	UserSelectable = True # whether user can manually select this class when assigning a value to a PHA object
 
@@ -665,7 +665,7 @@ class CalcNumValueItem(NumValueItem): # class of NumValues that are calculated f
 class NumProblemValue(NumValueItem):  # class of 'values' that prevent completion of a calculation
 	# Has several instances representing different kinds of problem
 	# PHA models can also define their own instances, e.g. Fault Tree uses one with InternalName = 'OutOfRange'
-	ClassHumanName = _('Problem message')
+	HumanName = _('Problem message')
 	XMLName = 'Problem'
 	AllNumProblemValues = [] # register of all instances
 	UserSelectable = False  # whether user can manually select this class when assigning a value to a PHA object
@@ -737,7 +737,7 @@ class ValueInfoItem(object): # defines an object used as a wrapper to pass value
 
 # class SwitchNumValueItem(NumValueItem): # class of values that are determined by checking against a series of yes/no conditions
 # deferred until later version of Vizop
-#	ClassHumanName = _('Switch')
+#	HumanName = _('Switch')
 #	XMLName = 'Switch'
 #	UserSelectable = True # whether user can manually select this class when assigning a value to a PHA object
 #
@@ -747,7 +747,7 @@ class ValueInfoItem(object): # defines an object used as a wrapper to pass value
 #		self.Routes = [] # list of tuples: (SwitchItem, NumValueItem). Each SwitchItem is tested in turn; if True, returns respective NumValueItem
 
 class LookupNumValueItem(NumValueItem): # class of values found by reference to a lookup table
-	ClassHumanName = _('Matrix lookup')
+	HumanName = _('Matrix lookup')
 	XMLName = 'Lookup'
 	UserSelectable = True  # whether user can manually select this class when assigning a value to a PHA object
 
@@ -781,7 +781,7 @@ class LookupNumValueItem(NumValueItem): # class of values found by reference to 
 
 class CategoryNameItem(NumValueItem): # class of objects defining one of a list of categories
 	# Used for lookup in a matrix. Example: a severity value
-	ClassHumanName = _('Categories')
+	HumanName = _('Categories')
 	XMLName = 'Category'
 	UserSelectable = True  # whether user can manually select this class when assigning a value to a PHA object
 	InvalidIndicator = '!' # string passed to Viewport to indicate category is invalid
@@ -839,7 +839,7 @@ class CategoryNameItem(NumValueItem): # class of objects defining one of a list 
 #	Unit = property(fget=GetMyUnit, fset=SetMyUnit)
 
 class AutoNumValueItem(NumValueItem): # class of values that are calculated by a method in some other class
-	ClassHumanName = _('Calculated')
+	HumanName = _('Calculated')
 	XMLName = 'Calculated'
 	UserSelectable = False  # whether user can manually select this class when assigning a value to a PHA object
 
@@ -875,8 +875,8 @@ class AutoNumValueItem(NumValueItem): # class of values that are calculated by a
 #		if isinstance(Value, NumProblemValue): return Value # if we got a problem report, return the report
 #		else: return NumProblemValue_NoProblem # value obtained successfully
 
-class ParentNumValueItem(NumValueItem):  # a NumValueItem whose value was copied from a parent, but is not linked to it
-	ClassHumanName = _('Copied value')
+class ParentNumValueItem(NumValueItem): # a NumValueItem whose value was copied from a parent, but is not linked to it
+	HumanName = _('Copied from another value')
 	XMLName = 'Copied'
 	UserSelectable = True  # whether user can manually select this class when assigning a value to a PHA object
 
@@ -910,7 +910,7 @@ class ParentNumValueItem(NumValueItem):  # a NumValueItem whose value was copied
 
 class UseParentValueItem(NumValueItem):
 	# class indicating values are to be linked from a parent PHA object, such as a cause or a calculated value
-	ClassHumanName = _('Linked from another value')
+	HumanName = _('Linked from another value')
 	XMLName = 'LinkedFrom'
 	UserSelectable = True  # whether user can manually select this class when assigning a value to a PHA object
 
@@ -943,7 +943,7 @@ NumValueClasses = [UserNumValueItem, ConstNumValueItem, CalcNumValueItem, NumPro
 NumValueClassesToCheckValid = (UserNumValueItem, ConstNumValueItem, LookupNumValueItem,
 	ParentNumValueItem, UseParentValueItem) # only these classes are checked in CheckValue() methods
 	# this is a tuple, not a list, so it can be used directly in isinstance()
-NumValueClassHumanNames = [c.ClassHumanName for c in NumValueClasses]  # list of names used in choice box
+NumValueClassHumanNames = [c.HumanName for c in NumValueClasses]  # list of names used in choice box
 
 
 class LookupTableItem(object):
