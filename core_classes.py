@@ -381,11 +381,19 @@ class NumValueItemForDisplay(object): # class of numerical values with associate
 class NumValueItem(object): # superclass of objects in Datacore having a numerical value with units
 	UserSelectable = True  # whether user can manually select this class when assigning a value to a PHA object
 	# special attribs that may exist in an instance, and which should be preserved if the instance is converted to
-	# another subclass (e.g. in faulttree.ChangeValueKind()). Caution:
+	# another subclass (e.g. in faulttree.ChangeNumberKind()). Caution:
 	# 1. abs(MinValue) should not be < info.ZeroThreshold,
 	# otherwise small valid values may be displayed as zero
 	# 2. If an instance has a MaxValue and/or a MinValue, it must also have a MaxMinUnit
-	PersistentAttribs = ['MaxValue', 'MinValue', 'MaxMinUnit']
+	# UserValue (dict): value family defined when this item was a UserNumValueItem; keys are RR's
+	# UserUnit (UnitItem instance): unit defined when this item was a UserNumValueItem
+	# UserIsSet (dict): flag family defined when this item was a UserNumValueItem; keys are RR's
+	# ConstConst (ConstantItem instance): a constant this item was previously assigned to
+	# LookupX: attribs belonging to LookupItem
+	# ParentX: attribs belonging to ParentNumValueItem
+	# UseParentX: attribs belonging to UseParentNumValueItem
+	PersistentAttribs = ['MaxValue', 'MinValue', 'MaxMinUnit', 'UserValue', 'UserUnit', 'UserIsSet', 'ConstConst',
+		'LookupLookupTable', 'LookupInputValue', 'ParentValue', 'ParentParentPHAObj', 'UseParentParentPHAObj']
 
 	def __init__(self, HostObj=None):
 		# HostObj: None, or the object containing this NumValueItem instance,
@@ -396,6 +404,7 @@ class NumValueItem(object): # superclass of objects in Datacore having a numeric
 		self.ValueFamily = {DefaultRiskReceptor: None} # current numerical values of instance per risk receptor
 		self.UserValueFamily = {DefaultRiskReceptor: None} # values provided by user.
 			# Kept for reversion if we switch to another type (eg constant), then back again
+			# TODO superseded by PersistentAttribs?
 		self.IsSetFlagFamily = {DefaultRiskReceptor: None} # ValueStatus (member of ValueStati) per risk receptor
 		self.InfinityFlagFamily = {DefaultRiskReceptor: False} # bool per risk receptor; whether value is infinite
 		self.SigFigs = {DefaultRiskReceptor: info.DefaultSigFigs} # int per risk receptor; how many sig figs for display
@@ -518,7 +527,7 @@ class NumValueItem(object): # superclass of objects in Datacore having a numeric
 
 	def Status(self, RR=DefaultRiskReceptor): # return NumProblemValue item indicating status of value
 		if not (RR in self.ValueFamily):  # requested risk receptor not defined for this value object
-			print("Warning, missing '%s' key in NumValueItem risk receptors (problem code: CC390)" % RR)
+			print("Warning, missing '%s' key in NumValueItem risk receptors (problem code: CC390)" % RR.HumanName)
 			if DefaultRiskReceptor in self.ValueFamily:
 				RR = DefaultRiskReceptor
 			else:  # DefaultRiskReceptor key is missing
@@ -541,14 +550,26 @@ class NumValueItem(object): # superclass of objects in Datacore having a numeric
 		self.IsSetFlagFamily[RR] = NewStatus
 		return True # indicates successful
 
+	def GetMyAcceptableUnits(self): # return list of UnitItems permitted for display of this value.
+		# Each subclass should override this method. Needed here due to property() below.
+		return [NullUnit]
+
+	def SetMyAcceptableUnits(self, NewAcceptableUnits, **Args): # set acceptable units for display of this value.
+		# Subclasses can optionally override this method. Needed here due to property() below.
+		return False # nothing to do in the superclass
+
+	AcceptableUnits = property(fget=lambda self: self.GetMyAcceptableUnits(), fset=lambda self, x: self.SetMyAcceptableUnits(x))
+	# we use lambda in the property() args so that it will call the overridden methods in subclasses
+
 class UserNumValueItem(NumValueItem): # class of NumValues for which user supplies a numeric value
 	# Uses GetMyValue and GetMyUnit method from superclass
 	HumanName = _('User defined')
 	XMLName = 'User'
 
 	def __init__(self, **Args): # Args can contain any special attribs with initial values. These will be preserved on
-		# conversion to another NumValueItem subclass only if listed in NumValueItem.PersistentAttribs
+		# save only if listed in NumValueItem.PersistentAttribs
 		NumValueItem.__init__(self)
+		self.MyAcceptableUnits = []
 		self.__dict__.update(Args)
 
 	def ConvertToUnit(self, NewUnit):
@@ -577,6 +598,18 @@ class UserNumValueItem(NumValueItem): # class of NumValues for which user suppli
 		self.Unit = NewUnit # set new unit (regardless of whether conversion factor found and new values set)
 		return Message
 
+	def GetMyAcceptableUnits(self): # return list of UnitItems permitted for display of this value.
+		# Access this function through self.AcceptableUnits, via the property() statement in the superclass.
+		return self.MyAcceptableUnits
+
+	def SetMyAcceptableUnits(self, NewAcceptableUnits, **Args): # set acceptable units for display of this value.
+		# Access this function through self.AcceptableUnits, via the property() statement in the superclass.
+		print('CC606 setting acceptable units with %d items' % len(NewAcceptableUnits))
+		assert isinstance(NewAcceptableUnits, list)
+		assert False not in [isinstance(u, UnitItem) for u in NewAcceptableUnits] # confirm it's a list of UnitItem's
+		self.MyAcceptableUnits = NewAcceptableUnits
+		return True
+
 class ConstantItem(NumValueItem): # user-defined constants that can be attached to any number of ConstNumValueItems
 	# has values per RR, and a Unit
 #	AllConstants = [] # register of all constants in use; not used, stored in Project instance instead
@@ -590,8 +623,7 @@ class ConstantItem(NumValueItem): # user-defined constants that can be attached 
 #		ConstantItem.AllConstants.append(self) # add self to register.
 		# NB if a constant is deleted, we must delete from the register (to avoid problems when storing the project)
 
-
-class ConstNumValueItem(NumValueItem):  # class of constant NumValues. Refers to a ConstantItem instance
+class ConstNumValueItem(NumValueItem): # class of constant NumValues. Refers to a ConstantItem instance
 	HumanName = _('Constant')
 	XMLName = 'Constant'
 	UserSelectable = True  # whether user can manually select this class when assigning a value to a PHA object
@@ -608,8 +640,10 @@ class ConstNumValueItem(NumValueItem):  # class of constant NumValues. Refers to
 		raise TypeError("Not allowed to set value of a ConstNumValueItem directly")
 
 	def GetMyUnit(self):  # returns human-readable unit name (rich str)
-		assert isinstance(self.Constant.Unit, UnitItem)
-		return self.Constant.Unit.HumanName
+		if self.Constant is None: return NullUnit
+		else:
+			assert isinstance(self.Constant.Unit, UnitItem)
+			return self.Constant.Unit
 
 	def SetMyUnit(self, NewUnit): # attempting to set unit of this class directly is evil
 		raise TypeError("Not allowed to set unit of a ConstNumValueItem directly")
@@ -617,6 +651,15 @@ class ConstNumValueItem(NumValueItem):  # class of constant NumValues. Refers to
 	Value = property(fget=GetMyValue, fset=SetMyValue)
 	Unit = property(fget=GetMyUnit, fset=SetMyUnit)
 
+	def GetMyAcceptableUnits(self): # return list of UnitItems permitted for display of this value.
+		# Access this function through self.AcceptableUnits, via the property() statement in the superclass.
+		if self.Constant is None: return []
+		else: return self.Constant.MyUnitKind.AcceptableUnits
+
+	def SetMyAcceptableUnits(self, NewAcceptableUnits, **Args): # set acceptable units for display of this value.
+		# Access this function through self.AcceptableUnits, via the property() statement in the superclass.
+		raise TypeError('CC659 Not allowed to set units of ConstantItem')
+		return False
 
 class CalcNumValueItem(NumValueItem): # class of NumValues that are calculated from a formula
 	HumanName = _('Calculated value')
@@ -878,7 +921,7 @@ class AutoNumValueItem(NumValueItem): # class of values that are calculated by a
 class ParentNumValueItem(NumValueItem): # a NumValueItem whose value was copied from a parent, but is not linked to it
 	HumanName = _('Copied from another value')
 	XMLName = 'Copied'
-	UserSelectable = True  # whether user can manually select this class when assigning a value to a PHA object
+	UserSelectable = True # whether user can manually select this class when assigning a value to a PHA object
 
 	def __init__(self, **Args):
 		NumValueItem.__init__(self)
@@ -906,7 +949,6 @@ class ParentNumValueItem(NumValueItem): # a NumValueItem whose value was copied 
 
 	Value = property(fget=GetMyValue, fset=SetMyValue)
 	Unit = property(fget=GetMyUnit, fset=SetMyUnit)
-
 
 class UseParentValueItem(NumValueItem):
 	# class indicating values are to be linked from a parent PHA object, such as a cause or a calculated value

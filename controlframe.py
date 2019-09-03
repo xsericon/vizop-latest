@@ -1197,7 +1197,6 @@ class ControlFrame(wx.Frame):
 
 		def NumericalValueAspect_OnUnitWidget(self, Event):
 			# handle change of selection in unit Choice widget
-			print('CF1168 in unit Choice widget handler')
 			# get option selected by user
 			EventWidget = Event.GetEventObject()
 			UserSelection = Event.GetSelection()
@@ -1207,12 +1206,27 @@ class ControlFrame(wx.Frame):
 				# find XML name of unit requested
 				TargetUnitName = getattr(ThisWidgetObj.PHAObj, ThisWidgetObj.DataAttrib).AcceptableUnits[
 					EventWidget.GetSelection()].XMLName
-				# get Viewport to request value change (no validation here; done in datacore)
+				# get Viewport to request unit change (no validation here; done in datacore)
 				self.TopLevelFrame.CurrentViewport.RequestChangeChoice(ElementID=ThisWidgetObj.PHAObj.ID,
 					EditComponentInternalName=getattr(ThisWidgetObj.PHAObj, ThisWidgetObj.DataAttrib).InternalName,
-					NewValue=TargetUnitName)
+					AttribName='Unit', NewValue=TargetUnitName)
 
-		def NumericalValueAspect_OnValueKindWidget(self, Event): pass
+		def NumericalValueAspect_OnValueKindWidget(self, Event):
+			# handle change of selection in number kind Choice widget
+			print('CF1217 in unit Choice widget handler')
+			# get option selected by user
+			EventWidget = Event.GetEventObject()
+			UserSelection = Event.GetSelection()
+			if UserSelection != wx.NOT_FOUND: # is any item selected?
+				# find widget object
+				ThisWidgetObj = [w for w in self.WidgActive if w.Widget == EventWidget][0]
+				# find XML name of number kind requested
+				TargetUnitName = getattr(ThisWidgetObj.PHAObj, ThisWidgetObj.DataAttrib).ValueKindOptions[
+					EventWidget.GetSelection()].XMLName
+				# get Viewport to request number kind change (no validation here; done in datacore)
+				self.TopLevelFrame.CurrentViewport.RequestChangeChoice(ElementID=ThisWidgetObj.PHAObj.ID,
+					EditComponentInternalName=getattr(ThisWidgetObj.PHAObj, ThisWidgetObj.DataAttrib).InternalName,
+					AttribName='NumberKind', NewValue=TargetUnitName)
 
 		def NumericalValueAspect_OnLinkFromButton(self, Event): pass
 

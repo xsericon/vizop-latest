@@ -266,7 +266,7 @@ class FTHeader(object): # FT header object. Rendered by drawing text into bitmap
 		self.Severity = ''
 		self.TolFreq = core_classes.NumValueItemForDisplay() # tolerable frequency, object including value, unit, possible units etc.
 		self.TolFreq.InternalName = 'TolFreq' # for cross-reference to datacore attrib during editing
-		self.TolFreq.AcceptableUnits = [] # populated in PopulateUnitOptions()
+#		self.TolFreq.AcceptableUnits = core_classes.FrequencyUnits # populated in PopulateUnitOptions()
 		# TolFreq.ValueKindOptions is set in PopulateHeaderData() from values set in SetTolFreq()
 		self.UEL = '' # unmitigated event likelihood (outcome frequency) of FT
 		self.OutcomeUnit = '' # ? not used ? assumed same as unit of TolFreq ?
@@ -1869,7 +1869,7 @@ class FTEventInCore(object): # FT event object used in DataCore by FTObjectInCor
 
 	def ChangeValueKind(self, NewValueKind=None):
 		# change this FTEvent's value kind to NewValueKind (a NumValueItem subclass).
-		# TODO fully implement [VRM] - currently only sets up an Auto value
+		# TODO use ChangeNumberKind() instead
 		assert NewValueKind in core_classes.NumValueClasses
 		# make a new instance of the target subclass of NumValueItem
 		NewValueObj = NewValueKind()
@@ -2478,12 +2478,18 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			self.TolFreq.SetMyValue(TolFreqValueObj.GetMyValue(RR=RR), RR=RR)
 			self.TolFreq.SetMyUnit(TolFreqValueObj.GetMyUnit()) # setting the same unit several times, never mind
 		# set lists of permissible units and ValueKinds; used elsewhere to offer options to user
+		print('FT2481 setting TolFreq.AcceptableUnits')
 		self.TolFreq.AcceptableUnits = core_classes.FrequencyUnits
 		self.TolFreq.ValueKindOptions = [core_classes.UserNumValueItem, core_classes.ConstNumValueItem,
 			core_classes.LookupNumValueItem, core_classes.UseParentValueItem, core_classes.ParentNumValueItem]
 
-	def AcceptableUnits(self): # return list of units (UnitItem instances) for FT's TolFreq
-		return core_classes.FrequencyUnits
+#	def MyAcceptableUnits(self): # return list of units (UnitItem instances) for FT's TolFreq
+#		if type(self.TolFreq) is core_classes.UserNumValueItem:
+#			return core_classes.FrequencyUnits
+#		else: # any type other than UserNumValueItem can only take the unit imposed by the "parent" type
+#			return [self.TolFreq.Unit]
+#
+#	AcceptableUnits = property(fget=MyAcceptableUnits)
 
 	def AcceptableValueKinds(self): # return list of value kinds (subclasses of NumValueItem) for FT's TolFreq
 		return [core_classes.UserNumValueItem, core_classes.ConstNumValueItem, core_classes.LookupNumValueItem,
@@ -2937,6 +2943,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			# OptionXMLTagName (str): XML tag for option (e.g. info.UnitOptionTag)
 			# If OfferConvertOptions is True, append options to convert value to new units (special for units)
 #			assert CurrentOption in core_classes.AllSelectableUnits
+			print('FT2945 CurrentOption, AcceptableOptions:', CurrentOption.HumanName, AcceptableOptions[0].HumanName)
 			assert CurrentOption in AcceptableOptions
 			assert isinstance(OfferConvertOptions, bool)
 			HowManyAcceptableOptions = len(AcceptableOptions)
@@ -3410,8 +3417,15 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			# if this is an FTGate, set its "last selected unit" attribute
 			if UnitChanged and (ComponentToUpdate == 'GateValueUnit'): ThisFTEvent.SetLastSelectedUnit(NewUnit)
 		elif ComponentToUpdate == 'TolFreq':
-			# update unit of TolFreq in FT header
-			UnitChanged, NewUnit, ValueAcceptable = self.ChangeUnit(FTElement=self, NewUnitXMLName=NewValue, ValueAttribName='TolFreq')
+			# update unit or number kind of TolFreq in FT header%%%
+			AttribToChange = Args['Attrib']
+			if AttribToChange == 'Unit':
+				UnitChanged, NewUnit, ValueAcceptable = self.ChangeUnit(FTElement=self, NewUnitXMLName=NewValue,
+					ValueAttribName='TolFreq')
+			elif AttribToChange == 'NumberKind':
+				ValueAcceptable = self.ChangeNumberKind(FTElement=self, NewNumberKindXMLName=NewValue,
+					ValueAttribName='TolFreq')
+			else: raise ValueError('FT3421 Unrecognised AttribName')
 		elif ComponentToUpdate == 'EventValueKind':  # update value kind
 			# find the FTEvent to update
 			ThisFTEvent = [e for e in WalkOverAllFTObjs(self) if e.ID == ElementID][0]
@@ -3472,7 +3486,6 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 					if ValueAttrib.GetMyStatus(RR=ThisRR) == core_classes.NumProblemValue_NoProblem:
 						ValueAcceptable &= self.ValidateValue(ValueAttrib, ProposedValue=ValueAttrib.GetMyValue(RR=ThisRR),
 							Unit=NewUnit)
-					print('FT3463 RR, ValueAcceptable:', ThisRR.HumanName, ValueAcceptable)
 				UnitChanged = ValueAcceptable
 				if ValueAcceptable:
 					ValueAttrib.SetMyUnit(NewUnit)
@@ -3481,6 +3494,79 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			ValueAcceptable = True
 			NewUnit = None
 		return UnitChanged, NewUnit, ValueAcceptable
+
+	def ChangeNumberKind(self, FTElement, NewNumberKindXMLName, ValueAttribName): # change number kind of numerical value
+		# FTElement: FT itself (for updating TolFreq value), or an FTEvent or FTGate instance (for updating event value)
+		# NewNumberKindXMLName: (str) XML name of number kind to change to
+		# ValueAttribName: (str) Name of value attrib in FTElement to change; 'TolFreq' or 'Value'%%%
+		# return:
+			# NumberKindChanged (bool): whether the number kind was actually changed
+			# NewNumberKind (NumValueItem subclass or None): the number kind changed to, or None if number kind wasn't changed
+		# TODO the bulk of this code should be in core_classes, as it will apply to all applications
+		AcceptableNumberKinds = FTElement.AcceptableValueKinds() # TODO maybe we have 2 separate lists of number kinds, should consolidate
+		ValueAttrib = getattr(FTElement, ValueAttribName) # find the applicable attrib in FTElement
+		# check if requested number kind is acceptable
+		if NewNumberKindXMLName in [NK.XMLName for NK in AcceptableNumberKinds]: # it's recognised
+			NewNumberKind = [NK for NK in AcceptableNumberKinds if NK.XMLName == NewNumberKindXMLName][0]
+			NumberKindChanged = True
+		else: # requested number kind is not acceptable
+			NewNumberKind = None
+			NumberKindChanged = False
+		if NumberKindChanged: # proceed to change number kind
+			# find the existing number kind
+			OldNumberKind = type(ValueAttrib)
+			# store persistent attribs for the old number kind
+			if OldNumberKind == core_classes.UserNumValueItem:
+				ValueAttrib.UserValue = copy.copy(ValueAttrib.ValueFamily)
+				ValueAttrib.UserIsSet = copy.copy(ValueAttrib.IsSetFlagFamily)
+				ValueAttrib.UserUnit = ValueAttrib.GetMyUnit()
+			elif OldNumberKind == core_classes.ConstNumValueItem:
+				ValueAttrib.ConstConst = ValueAttrib.Constant
+			elif OldNumberKind == core_classes.LookupNumValueItem:
+				ValueAttrib.LookupLookupTable = ValueAttrib.LookupTable
+				ValueAttrib.LookupInputValue = ValueAttrib.InputValue
+			elif OldNumberKind == core_classes.ParentNumValueItem:
+				ValueAttrib.ParentValue = copy.copy(ValueAttrib.ValueFamily)
+				ValueAttrib.ParentParentPHAObj = ValueAttrib.ParentPHAObj
+			elif OldNumberKind == core_classes.UseParentValueItem:
+				ValueAttrib.UseParentParentPHAObj = ValueAttrib.ParentPHAObj
+			# create new number object in the new kind
+			NewValueObj = NewNumberKind()
+	#		for ThisAttrib in core_classes.NumValueClasses.PersistentAttribs:
+	#			if hasattr(FTElement.Value, ThisAttrib): setattr(NewValueObj, ThisAttrib, getattr(FTElement.Value, ThisAttrib))
+			if NewNumberKind == core_classes.AutoNumValueItem: # set up for 'derived value'
+				NewValueObj.Calculator = FTElement.GetEventValue  # provide method to get derived value (overridden by SetAsSIFFailureEvent())
+				NewValueObj.StatusGetter = FTElement.GetEventValueStatus  # provide method to get status
+				NewValueObj.UnitGetter = NewValueObj.GetMyUserDefinedUnit # return current unit when requested
+				# we could set an initial unit here, but we don't know what the user wants. So we set it the first time
+				# the value is successfully calculated
+			# copy any persistent attribs from the old to the new number object
+			elif NewNumberKind == core_classes.UserNumValueItem: # set up for 'user defined value'
+				# restore any previous values
+				for (RestoreAttrib, OriginalAttrib) in [('UserValue', 'ValueFamily'), ('UserIsSet', 'IsSetFlagFamily')]:
+					if hasattr(ValueAttrib, RestoreAttrib): setattr(NewValueObj, OriginalAttrib,
+						copy.copy(getattr(ValueAttrib, RestoreAttrib)))
+				if hasattr(ValueAttrib, 'UserUnit'): NewValueObj.SetMyUnit(ValueAttrib.UserUnit)
+			elif NewNumberKind == core_classes.ConstNumValueItem:
+				if hasattr(ValueAttrib, 'ConstConst'): NewValueObj.Constant = ValueAttrib.ConstConst
+			elif NewNumberKind == core_classes.LookupNumValueItem:
+				for (RestoreAttrib, OriginalAttrib) in [('LookupLookupTable', 'LookupTable'),
+						('LookupInputValue', 'InputValue')]:
+					if hasattr(ValueAttrib, RestoreAttrib): setattr(NewValueObj, OriginalAttrib,
+						getattr(ValueAttrib, RestoreAttrib))
+			elif NewNumberKind == core_classes.ParentNumValueItem:
+				if hasattr(ValueAttrib, 'ParentParentValue'):
+					NewValueObj.ParentValue = copy.copy(ValueAttrib.ParentParentValue)
+				for (RestoreAttrib, OriginalAttrib) in [('ParentParentPHAObj', 'ParentPHAObj')]:
+					if hasattr(ValueAttrib, RestoreAttrib):
+						setattr(NewValueObj, OriginalAttrib, getattr(ValueAttrib, RestoreAttrib))
+			elif NewNumberKind == core_classes.UseParentValueItem:
+				for (RestoreAttrib, OriginalAttrib) in [('UseParentParentPHAObj', 'ParentPHAObj')]:
+					if hasattr(ValueAttrib, RestoreAttrib):
+						setattr(NewValueObj, OriginalAttrib, getattr(ValueAttrib, RestoreAttrib))
+			# overwrite the old Value with the new number object
+			setattr(FTElement, ValueAttribName, NewValueObj)
+		return NumberKindChanged, NewNumberKind
 
 	def HandleIncomingRequest(self, MessageReceived=None, MessageAsXMLTree=None, **Args):
 		# handle request received by FT model in datacore from a Viewport. Request can be to edit data (eg add new element)
@@ -3511,10 +3597,6 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			Reply = self.ChangeText(Proj=Proj, ElementID=XMLRoot.findtext('Element'),
 				TextComponentName=XMLRoot.findtext('TextComponent'),
 				NewValue=XMLRoot.findtext('NewValue'), Viewport=SourceViewport)
-#		elif Command == 'RQ_FT_ChangeUnit':
-#			Reply = self.ChangeUnit(Proj=Proj, ElementID=XMLRoot.findtext('Element'),
-#				NumericalComponentName=XMLRoot.findtext('NumericalComponent'),
-#				NewValue=XMLRoot.findtext('NewUnit'), Viewport=SourceViewport)
 		elif Command == 'RQ_FT_ChangeChoice':
 			Reply = self.ChangeChoice(Proj=Proj, ElementID=XMLRoot.findtext('Element'),
 				TextComponentName=XMLRoot.findtext('TextComponent'),
@@ -3836,7 +3918,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 #			# populate value kind with HumanName of number kind class specified in incoming NumberKind tag
 #			NewEvent.ValueKind = ([c.HumanName for c in core_classes.NumValueClasses
 #				if c.XMLName == XMLObj.findtext(info.NumberKindTag, default='')] + ['???'])[0]
-			# populate value kind choice
+			# populate value kind choice%%%
 			NewEvent.EventValueKindComponent.ObjectChoices = [ChoiceItem(XMLName=ThisTag.text,
 				HumanName=[c.HumanName for c in core_classes.NumValueClasses if c.XMLName == ThisTag.text][0],
 				Applicable=utilities.Bool2Str(ThisTag.get(info.ApplicableAttribName)))
@@ -4588,10 +4670,12 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 							   Proj=self.Proj.ID, PHAObj=self.PHAObj.ID, Viewport=self.ID,
 							   Element=ElementID, TextComponent=EditComponentInternalName, NewValue=NewValue)
 
-	def RequestChangeChoice(self, ElementID, EditComponentInternalName, NewValue):
+	def RequestChangeChoice(self, ElementID, EditComponentInternalName, AttribName, NewValue):
 		# send request to Datacore to change value in a Choice widget
+		# AttribName (str): which attrib of the component is being changed; can be 'Unit' or 'NumberKind'
 		# at this stage, NewValue has not been validated - could be unacceptable
-		vizop_misc.SendRequest(Socket=self.C2DSocketREQ, Command='RQ_FT_ChangeChoice',
+		assert AttribName in ['Unit', 'NumberKind']
+		vizop_misc.SendRequest(Socket=self.C2DSocketREQ, Command='RQ_FT_ChangeChoice', Attrib=AttribName,
 #							   Proj=self.Proj.ID, PHAObj=self.PHAObj.ID, Viewport=self.ID,
 							   PHAObj=self.PHAObj.ID, Viewport=self.ID,
 							   Element=ElementID, TextComponent=EditComponentInternalName, NewValue=NewValue)
