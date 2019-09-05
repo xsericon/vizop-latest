@@ -1165,9 +1165,9 @@ class ControlFrame(wx.Frame):
 			# populate UnitChoice with unit options
 			self.NumericalValueAspect.UnitChoice.Widget.Set([u.HumanName for u in UnitOptions])
 			# select the current unit in UnitChoice, if any
-			ApplicableOptionsList = [u.Applicable for u in UnitOptions]
+			ApplicableUnitOptionsList = [u.Applicable for u in UnitOptions]
 			self.NumericalValueAspect.UnitChoice.Widget.SetSelection(
-				ApplicableOptionsList.index(True) if True in ApplicableOptionsList else wx.NOT_FOUND)
+				ApplicableUnitOptionsList.index(True) if True in ApplicableUnitOptionsList else wx.NOT_FOUND)
 			# set up ValueKindChoice
 			ValueKindOptions = getattr(PHAObj, DataAttrib).ValueKindOptions # list of ChoiceItem instances
 			self.NumericalValueAspect.ValueKindChoice.PHAObj = self.TopLevelFrame.PHAObjInControlPanel
@@ -1175,6 +1175,10 @@ class ControlFrame(wx.Frame):
 			# populate ValueKindChoice with value kind options
 			self.NumericalValueAspect.ValueKindChoice.Widget.Set([u.HumanName for u in ValueKindOptions])
 			# select the current value kind in ValueKindOptions TODO
+			print('CF1176 setting current value kind: ')
+			ApplicableValueKindOptionsList = [u.Applicable for u in ValueKindOptions]
+			self.NumericalValueAspect.ValueKindChoice.Widget.SetSelection(
+				ApplicableValueKindOptionsList.index(True) if True in ApplicableValueKindOptionsList else wx.NOT_FOUND)
 
 		def NumericalValueAspect_OnCommentButton(self, Event): pass
 

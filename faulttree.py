@@ -2940,11 +2940,12 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 #		def PopulateValueOptionField(FTEvent, EventEl, OfferConvertOptions=True):
 		def PopulateValueOptionField(CurrentOption, AcceptableOptions, EventEl, OptionXMLTagName, OfferConvertOptions=True):
 			# put options for value attrib (e.g. unit, value kind) into element EventEl in FTEvent's XML representation
+			# CurrentOption: the item in AcceptableOptions that's currently active; ignored if AcceptableOptions is empty
 			# OptionXMLTagName (str): XML tag for option (e.g. info.UnitOptionTag)
 			# If OfferConvertOptions is True, append options to convert value to new units (special for units)
 #			assert CurrentOption in core_classes.AllSelectableUnits
-			print('FT2945 CurrentOption, AcceptableOptions:', CurrentOption.HumanName, AcceptableOptions[0].HumanName)
-			assert CurrentOption in AcceptableOptions
+			print('FT2945 CurrentOption, AcceptableOptions:', CurrentOption.HumanName, len(AcceptableOptions))
+			assert (CurrentOption in AcceptableOptions) or not AcceptableOptions
 			assert isinstance(OfferConvertOptions, bool)
 			HowManyAcceptableOptions = len(AcceptableOptions)
 			for (ThisOptionIndex, ThisOption) in enumerate(AcceptableOptions):
@@ -3502,7 +3503,6 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		# return:
 			# NumberKindChanged (bool): whether the number kind was actually changed
 			# NewNumberKind (NumValueItem subclass or None): the number kind changed to, or None if number kind wasn't changed
-		# TODO the bulk of this code should be in core_classes, as it will apply to all applications
 		AcceptableNumberKinds = FTElement.AcceptableValueKinds() # TODO maybe we have 2 separate lists of number kinds, should consolidate
 		ValueAttrib = getattr(FTElement, ValueAttribName) # find the applicable attrib in FTElement
 		# check if requested number kind is acceptable
@@ -3513,57 +3513,74 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			NewNumberKind = None
 			NumberKindChanged = False
 		if NumberKindChanged: # proceed to change number kind
-			# find the existing number kind
-			OldNumberKind = type(ValueAttrib)
-			# store persistent attribs for the old number kind
-			if OldNumberKind == core_classes.UserNumValueItem:
-				ValueAttrib.UserValue = copy.copy(ValueAttrib.ValueFamily)
-				ValueAttrib.UserIsSet = copy.copy(ValueAttrib.IsSetFlagFamily)
-				ValueAttrib.UserUnit = ValueAttrib.GetMyUnit()
-			elif OldNumberKind == core_classes.ConstNumValueItem:
-				ValueAttrib.ConstConst = ValueAttrib.Constant
-			elif OldNumberKind == core_classes.LookupNumValueItem:
-				ValueAttrib.LookupLookupTable = ValueAttrib.LookupTable
-				ValueAttrib.LookupInputValue = ValueAttrib.InputValue
-			elif OldNumberKind == core_classes.ParentNumValueItem:
-				ValueAttrib.ParentValue = copy.copy(ValueAttrib.ValueFamily)
-				ValueAttrib.ParentParentPHAObj = ValueAttrib.ParentPHAObj
-			elif OldNumberKind == core_classes.UseParentValueItem:
-				ValueAttrib.UseParentParentPHAObj = ValueAttrib.ParentPHAObj
-			# create new number object in the new kind
-			NewValueObj = NewNumberKind()
+			# fetch args for MakeNewNumberKind call, to set methods for AutoNumValueItem, if appropriate
+			if NewNumberKind == core_classes.AutoNumValueItem:
+				Args = {'AutoCalculator': FTElement.GetEventValue, 'AutoStatusGetter': FTElement.GetEventValueStatus}
+			else: Args = {}
+			# make the new number object, and transfer attribs across
+			NewValueObj = ValueAttrib.MakeNewNumberKind(NewNumberKind=NewNumberKind,
+				AttribsToPreserve=['ValueKindOptions'], **Args)
+#			# copy across acceptable units list
+#			NewValueObj.AcceptableUnits = copy.copy(ValueAttrib.AcceptableUnits)
+			# set the unit getter for AutoNumValueItem
+			if NewNumberKind == core_classes.AutoNumValueItem:
+				NewValueObj.UnitGetter = NewValueObj.GetMyUserDefinedUnit
+#			# find the existing number kind
+#			OldNumberKind = type(ValueAttrib)
+#			# store persistent attribs for the old number kind
+#			if OldNumberKind == core_classes.UserNumValueItem:
+#				ValueAttrib.UserValue = copy.copy(ValueAttrib.ValueFamily)
+#				ValueAttrib.UserIsSet = copy.copy(ValueAttrib.IsSetFlagFamily)
+#				ValueAttrib.UserUnit = ValueAttrib.GetMyUnit()
+#			elif OldNumberKind == core_classes.ConstNumValueItem:
+#				ValueAttrib.ConstConst = ValueAttrib.Constant
+#			elif OldNumberKind == core_classes.LookupNumValueItem:
+#				ValueAttrib.LookupLookupTable = ValueAttrib.LookupTable
+#				ValueAttrib.LookupInputValue = ValueAttrib.InputValue
+#			elif OldNumberKind == core_classes.ParentNumValueItem:
+#				ValueAttrib.ParentValue = copy.copy(ValueAttrib.ValueFamily)
+#				ValueAttrib.ParentParentPHAObj = ValueAttrib.ParentPHAObj
+#			elif OldNumberKind == core_classes.UseParentValueItem:
+#				ValueAttrib.UseParentParentPHAObj = ValueAttrib.ParentPHAObj
+#			# create new number object in the new kind
+#			NewValueObj = NewNumberKind()
 	#		for ThisAttrib in core_classes.NumValueClasses.PersistentAttribs:
 	#			if hasattr(FTElement.Value, ThisAttrib): setattr(NewValueObj, ThisAttrib, getattr(FTElement.Value, ThisAttrib))
-			if NewNumberKind == core_classes.AutoNumValueItem: # set up for 'derived value'
-				NewValueObj.Calculator = FTElement.GetEventValue  # provide method to get derived value (overridden by SetAsSIFFailureEvent())
-				NewValueObj.StatusGetter = FTElement.GetEventValueStatus  # provide method to get status
-				NewValueObj.UnitGetter = NewValueObj.GetMyUserDefinedUnit # return current unit when requested
-				# we could set an initial unit here, but we don't know what the user wants. So we set it the first time
-				# the value is successfully calculated
-			# copy any persistent attribs from the old to the new number object
-			elif NewNumberKind == core_classes.UserNumValueItem: # set up for 'user defined value'
-				# restore any previous values
-				for (RestoreAttrib, OriginalAttrib) in [('UserValue', 'ValueFamily'), ('UserIsSet', 'IsSetFlagFamily')]:
-					if hasattr(ValueAttrib, RestoreAttrib): setattr(NewValueObj, OriginalAttrib,
-						copy.copy(getattr(ValueAttrib, RestoreAttrib)))
-				if hasattr(ValueAttrib, 'UserUnit'): NewValueObj.SetMyUnit(ValueAttrib.UserUnit)
-			elif NewNumberKind == core_classes.ConstNumValueItem:
-				if hasattr(ValueAttrib, 'ConstConst'): NewValueObj.Constant = ValueAttrib.ConstConst
-			elif NewNumberKind == core_classes.LookupNumValueItem:
-				for (RestoreAttrib, OriginalAttrib) in [('LookupLookupTable', 'LookupTable'),
-						('LookupInputValue', 'InputValue')]:
-					if hasattr(ValueAttrib, RestoreAttrib): setattr(NewValueObj, OriginalAttrib,
-						getattr(ValueAttrib, RestoreAttrib))
-			elif NewNumberKind == core_classes.ParentNumValueItem:
-				if hasattr(ValueAttrib, 'ParentParentValue'):
-					NewValueObj.ParentValue = copy.copy(ValueAttrib.ParentParentValue)
-				for (RestoreAttrib, OriginalAttrib) in [('ParentParentPHAObj', 'ParentPHAObj')]:
-					if hasattr(ValueAttrib, RestoreAttrib):
-						setattr(NewValueObj, OriginalAttrib, getattr(ValueAttrib, RestoreAttrib))
-			elif NewNumberKind == core_classes.UseParentValueItem:
-				for (RestoreAttrib, OriginalAttrib) in [('UseParentParentPHAObj', 'ParentPHAObj')]:
-					if hasattr(ValueAttrib, RestoreAttrib):
-						setattr(NewValueObj, OriginalAttrib, getattr(ValueAttrib, RestoreAttrib))
+#			# make risk receptor keys in lists in the new number object
+#			for (ThisListAttribName, DefaultValue) in core_classes.NumValueItem.AttribsWithRRKeys:
+#				getattr(NewValueObj, ThisListAttribName).update(dict(
+#					[(ThisRR, DefaultValue) for ThisRR in ValueAttrib.ValueFamily.keys()]))
+#			# set up methods for AutoNumValueItem
+#			if NewNumberKind == core_classes.AutoNumValueItem:
+#				NewValueObj.Calculator = FTElement.GetEventValue  # provide method to get derived value (overridden by SetAsSIFFailureEvent())
+#				NewValueObj.StatusGetter = FTElement.GetEventValueStatus  # provide method to get status
+#				NewValueObj.UnitGetter = NewValueObj.GetMyUserDefinedUnit # return current unit when requested
+#				# we could set an initial unit here, but we don't know what the user wants. So we set it the first time
+#				# the value is successfully calculated
+#			# copy any persistent attribs from the old to the new number object
+#			elif NewNumberKind == core_classes.UserNumValueItem: # set up for 'user defined value'
+#				# restore any previous values
+#				for (RestoreAttrib, OriginalAttrib) in [('UserValue', 'ValueFamily'), ('UserIsSet', 'IsSetFlagFamily')]:
+#					if hasattr(ValueAttrib, RestoreAttrib): setattr(NewValueObj, OriginalAttrib,
+#						copy.copy(getattr(ValueAttrib, RestoreAttrib)))
+#				if hasattr(ValueAttrib, 'UserUnit'): NewValueObj.SetMyUnit(ValueAttrib.UserUnit)
+#			elif NewNumberKind == core_classes.ConstNumValueItem:
+#				if hasattr(ValueAttrib, 'ConstConst'): NewValueObj.Constant = ValueAttrib.ConstConst
+#			elif NewNumberKind == core_classes.LookupNumValueItem:
+#				for (RestoreAttrib, OriginalAttrib) in [('LookupLookupTable', 'LookupTable'),
+#						('LookupInputValue', 'InputValue')]:
+#					if hasattr(ValueAttrib, RestoreAttrib): setattr(NewValueObj, OriginalAttrib,
+#						getattr(ValueAttrib, RestoreAttrib))
+#			elif NewNumberKind == core_classes.ParentNumValueItem:
+#				if hasattr(ValueAttrib, 'ParentParentValue'):
+#					NewValueObj.ParentValue = copy.copy(ValueAttrib.ParentParentValue)
+#				for (RestoreAttrib, OriginalAttrib) in [('ParentParentPHAObj', 'ParentPHAObj')]:
+#					if hasattr(ValueAttrib, RestoreAttrib):
+#						setattr(NewValueObj, OriginalAttrib, getattr(ValueAttrib, RestoreAttrib))
+#			elif NewNumberKind == core_classes.UseParentValueItem:
+#				for (RestoreAttrib, OriginalAttrib) in [('UseParentParentPHAObj', 'ParentPHAObj')]:
+#					if hasattr(ValueAttrib, RestoreAttrib):
+#						setattr(NewValueObj, OriginalAttrib, getattr(ValueAttrib, RestoreAttrib))
 			# overwrite the old Value with the new number object
 			setattr(FTElement, ValueAttribName, NewValueObj)
 		return NumberKindChanged, NewNumberKind

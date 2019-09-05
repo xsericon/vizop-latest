@@ -394,6 +394,10 @@ class NumValueItem(object): # superclass of objects in Datacore having a numeric
 	# UseParentX: attribs belonging to UseParentNumValueItem
 	PersistentAttribs = ['MaxValue', 'MinValue', 'MaxMinUnit', 'UserValue', 'UserUnit', 'UserIsSet', 'ConstConst',
 		'LookupLookupTable', 'LookupInputValue', 'ParentValue', 'ParentParentPHAObj', 'UseParentParentPHAObj']
+	# AttribsWithRRKeys: list of (Attrib name, default value) for attribs that are dicts with keys = RRs.
+	# This list is used to create keys in new number instances when changing number kinds.
+	AttribsWithRRKeys = [ ('ValueFamily', None), ('UserValueFamily', None), ('IsSetFlagFamily', None),
+		('InfinityFlagFamily', False), ('SigFigs', info.DefaultSigFigs), ('Sci', False) ]
 
 	def __init__(self, HostObj=None):
 		# HostObj: None, or the object containing this NumValueItem instance,
@@ -560,6 +564,78 @@ class NumValueItem(object): # superclass of objects in Datacore having a numeric
 
 	AcceptableUnits = property(fget=lambda self: self.GetMyAcceptableUnits(), fset=lambda self, x: self.SetMyAcceptableUnits(x))
 	# we use lambda in the property() args so that it will call the overridden methods in subclasses
+
+	def MakeNewNumberKind(self, NewNumberKind, AttribsToPreserve=[],
+			AutoCalculator=None, AutoStatusGetter=None, AutoUnitGetter=None):
+		# create an instance of NewNumberKind (a subclass of NumValueKind) and copy across all required attribs.
+		# return the new instance
+		# assumes caller has already checked that NewNumberKind is valid for the value
+		# AttribsToPreserve (list of str): any existing attribs of self listed here will be copied to the new instance
+		# AutoCalculator (etc): (3 x callable or None) if NewNumberKind is AutoNumValueItem,
+		# these 3 methods will be assigned to its methods, if they are not None
+		assert issubclass(NewNumberKind, NumValueItem)
+		# First, find the existing number kind
+		OldNumberKind = type(self)
+		# store persistent attribs for the old number kind, to allow previous number kind to be restored nicely later
+		if OldNumberKind == UserNumValueItem:
+			self.UserValue = copy.copy(self.ValueFamily)
+			self.UserIsSet = copy.copy(self.IsSetFlagFamily)
+			self.UserUnit = self.GetMyUnit()
+		elif OldNumberKind == ConstNumValueItem:
+			self.ConstConst = self.Constant
+		elif OldNumberKind == LookupNumValueItem:
+			self.LookupLookupTable = self.LookupTable
+			self.LookupInputValue = self.InputValue
+		elif OldNumberKind == ParentNumValueItem:
+			self.ParentValue = copy.copy(self.ValueFamily)
+			self.ParentParentPHAObj = self.ParentPHAObj
+		elif OldNumberKind == UseParentValueItem:
+			self.UseParentParentPHAObj = self.ParentPHAObj
+		# create new number object in the new kind
+		NewValueObj = NewNumberKind()
+		# make risk receptor keys in lists in the new number object
+		for (ThisListAttribName, DefaultValue) in NumValueItem.AttribsWithRRKeys:
+			getattr(NewValueObj, ThisListAttribName).update(dict(
+				[(ThisRR, DefaultValue) for ThisRR in self.ValueFamily.keys()]))
+		# preserve attribs as requested by caller
+		for ThisAttrib in [a for a in AttribsToPreserve if hasattr(self, a)]:
+			setattr(NewValueObj, ThisAttrib, copy.copy(getattr(self, ThisAttrib)))
+		# copy any other persistent attribs from the old to the new number object
+		# set up methods for AutoNumValueItem
+		if NewNumberKind == AutoNumValueItem:
+			if AutoCalculator is not None:
+				assert callable(AutoCalculator)
+				NewValueObj.Calculator = AutoCalculator
+			if AutoStatusGetter is not None:
+				assert callable(AutoStatusGetter)
+				NewValueObj.StatusGetter = AutoStatusGetter
+			if AutoUnitGetter is not None:
+				assert callable(AutoUnitGetter)
+				NewValueObj.UnitGetter = AutoUnitGetter
+		elif NewNumberKind == UserNumValueItem:  # set up for 'user defined value'
+			# restore any previous values
+			for (RestoreAttrib, OriginalAttrib) in [('UserValue', 'ValueFamily'), ('UserIsSet', 'IsSetFlagFamily')]:
+				if hasattr(self, RestoreAttrib): setattr(NewValueObj, OriginalAttrib,
+					copy.copy(getattr(self, RestoreAttrib)))
+			if hasattr(self, 'UserUnit'): NewValueObj.SetMyUnit(self.UserUnit)
+		elif NewNumberKind == ConstNumValueItem:
+			if hasattr(self, 'ConstConst'): NewValueObj.Constant = self.ConstConst
+		elif NewNumberKind == LookupNumValueItem:
+			for (RestoreAttrib, OriginalAttrib) in [('LookupLookupTable', 'LookupTable'),
+													('LookupInputValue', 'InputValue')]:
+				if hasattr(self, RestoreAttrib): setattr(NewValueObj, OriginalAttrib,
+					getattr(self, RestoreAttrib))
+		elif NewNumberKind == ParentNumValueItem:
+			if hasattr(self, 'ParentParentValue'):
+				NewValueObj.ParentValue = copy.copy(self.ParentParentValue)
+			for (RestoreAttrib, OriginalAttrib) in [('ParentParentPHAObj', 'ParentPHAObj')]:
+				if hasattr(self, RestoreAttrib):
+					setattr(NewValueObj, OriginalAttrib, getattr(self, RestoreAttrib))
+		elif NewNumberKind == UseParentValueItem:
+			for (RestoreAttrib, OriginalAttrib) in [('UseParentParentPHAObj', 'ParentPHAObj')]:
+				if hasattr(self, RestoreAttrib):
+					setattr(NewValueObj, OriginalAttrib, getattr(self, RestoreAttrib))
+		return NewValueObj
 
 class UserNumValueItem(NumValueItem): # class of NumValues for which user supplies a numeric value
 	# Uses GetMyValue and GetMyUnit method from superclass
