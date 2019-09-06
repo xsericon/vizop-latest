@@ -3454,8 +3454,8 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			# UnitChanged (bool): whether the unit was actually changed
 			# NewUnit (UnitItem or None): the unit changed to, or None if unit wasn't changed
 			# ValueAcceptable (bool): if the unit was suitable, but the value would be out of range, this is False; else True
-		AcceptableUnits = FTElement.AcceptableUnits()
 		ValueAttrib = getattr(FTElement, ValueAttribName) # find the applicable attrib in FTElement
+		AcceptableUnits = ValueAttrib.AcceptableUnits
 		# check whether user requested to convert the value - signified by ConvertValueMarker suffix
 		if NewUnitXMLName.endswith(info.ConvertValueMarker):
 			Convert = True

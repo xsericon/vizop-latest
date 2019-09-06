@@ -1079,8 +1079,8 @@ class ControlFrame(wx.Frame):
 				# caught by OnIdle().
 			self.NumericalValueAspect.UnitChoice = UIWidgetItem(wx.Choice(MyNotebookPage, -1, size=(100, 30), choices=[]),
 				  Handler=self.NumericalValueAspect_OnUnitWidget, Events=[wx.EVT_CHOICE], ColLoc=5, ColSpan=1)
-			self.NumericalValueAspect.ValueKindLabel = UIWidgetItem(wx.StaticText(MyNotebookPage, -1, _('Basis:')),
-				ColLoc=6, ColSpan=1)
+			self.NumericalValueAspect.ValueKindLabel = UIWidgetItem(wx.StaticText(MyNotebookPage, -1, _('Basis:') + ' '),
+				ColLoc=6, ColSpan=1, Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_RIGHT | wx.EXPAND)
 			self.NumericalValueAspect.ValueKindChoice = UIWidgetItem(wx.Choice(MyNotebookPage, -1, size=(100, 30), choices=[]),
 				  Handler=self.NumericalValueAspect_OnValueKindWidget, Events=[wx.EVT_CHOICE], ColLoc=7, ColSpan=1)
 			self.NumericalValueAspect.LinkedToLabel = UIWidgetItem(wx.StaticText(MyNotebookPage, -1, ''),
@@ -1105,14 +1105,15 @@ class ControlFrame(wx.Frame):
 				Events=[wx.EVT_BUTTON],
 				ColLoc=5, ColSpan=1,
 				Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_LEFT | wx.EXPAND)
-			self.NumericalValueAspect.ConstantLabel = UIWidgetItem(wx.StaticText(MyNotebookPage, -1, _('Constant:')),
-				ColLoc=4, ColSpan=1, NewRow=True)
+			self.NumericalValueAspect.ConstantLabel = UIWidgetItem(wx.StaticText(MyNotebookPage, -1,
+				_('Constant used:') + ' '), Debug='ConstantUsedLabel',
+				ColLoc=6, ColSpan=1, NewRow=True, Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_RIGHT | wx.EXPAND)
 			self.NumericalValueAspect.ConstantChoice = UIWidgetItem(wx.Choice(MyNotebookPage, -1, size=(100, 30), choices=[]),
-				  Handler=self.NumericalValueAspect_OnConstantWidget, Events=[wx.EVT_CHOICE], ColLoc=5, ColSpan=1)
+				  Handler=self.NumericalValueAspect_OnConstantWidget, Events=[wx.EVT_CHOICE], ColLoc=7, ColSpan=1)
 			self.NumericalValueAspect.EditConstantsButton = UIWidgetItem(wx.Button(MyNotebookPage, -1, _('Edit constants')),
 				Handler=self.NumericalValueAspect_OnEditConstantsButton,
 				Events=[wx.EVT_BUTTON],
-				ColLoc=6, ColSpan=1,
+				ColLoc=8, ColSpan=1,
 				Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_LEFT | wx.EXPAND)
 			self.NumericalValueAspect.MatrixLabel = UIWidgetItem(wx.StaticText(MyNotebookPage, -1, _('Matrix:')),
 				ColLoc=4, ColSpan=1, NewRow=True)
@@ -1185,7 +1186,6 @@ class ControlFrame(wx.Frame):
 				ApplicableValueKindOptionsList.index(True) if True in ApplicableValueKindOptionsList else wx.NOT_FOUND)
 
 		def SetWidgetVisibilityforNumericalValueAspect(self, **Args): # set IsVisible attrib for each widget%%%
-			print('CF1187 setting widget visibility')
 			# set widgets that are always visible
 			VisibleList = [self.NumericalValueAspect.NavigateBackButton,
 				self.NumericalValueAspect.NavigateForwardButton, self.NumericalValueAspect.HeaderLabel,
@@ -1204,6 +1204,7 @@ class ControlFrame(wx.Frame):
 				if True in ApplicableValueKindOptionsList else None
 			ThisValueKind = core_classes.NumValueClasses[ [c.XMLName for c in core_classes.NumValueClasses].index(
 				ThisValueKindName)] if ThisValueKindName else None
+			print('CF1187 setting widget visibility with value kind:', ThisValueKindName)
 			# set widgets that depend on value kind
 			if ThisValueKind == core_classes.ParentNumValueItem:
 				VisibleList.extend([self.NumericalValueAspect.CopyFromButton, self.NumericalValueAspect.ShowMeCopyFromButton])
@@ -1217,6 +1218,7 @@ class ControlFrame(wx.Frame):
 									self.NumericalValueAspect.EditMatricesButton])
 			# set IsVisible attribs
 			for ThisWidget in self.NumericalValueAspect.WidgetList:
+				if hasattr(ThisWidget, 'Debug'): print('CF1221 setting visibility of widget: ', ThisWidget.Debug, (ThisWidget in VisibleList))
 				ThisWidget.IsVisible = (ThisWidget in VisibleList)
 
 		def NumericalValueAspect_OnCommentButton(self, Event): pass
