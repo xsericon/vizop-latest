@@ -748,6 +748,7 @@ class ControlFrame(wx.Frame):
 				self.UndoOnCancel = Args.get('UndoOnCancel', None)
 				# prefill widgets in new aspect and activate it
 				print('CF737 activating aspect: ', TargetAspect.InternalName)
+				TargetAspect.SetWidgetVisibility(**Args)
 				TargetAspect.Prefill(**Args)
 				# set up the notebook tab for the aspect
 				TargetAspect.Initialize(ParentNotebook=self.MyNotebook)
@@ -763,6 +764,7 @@ class ControlFrame(wx.Frame):
 
 		def RedrawControlPanelAspect(self):
 			# repopulates all widgets in the current control panel aspect
+			self.ControlPanelCurrentAspect.SetWidgetVisibility(**self.ControlPanelCurrentAspect.CurrentArgs)
 			self.ControlPanelCurrentAspect.Prefill(**self.ControlPanelCurrentAspect.CurrentArgs)
 			self.ControlPanelCurrentAspect.Activate(**self.ControlPanelCurrentAspect.CurrentArgs)
 
@@ -987,8 +989,9 @@ class ControlFrame(wx.Frame):
 			Proj = self.TopLevelFrame.CurrentProj
 			# enable navigation buttons if there are any items in current project's history lists
 			self.UpdateNavigationButtonStatus(Proj)
-			# select widgets to be displayed
-#			self.WidgActive = self.PHAModelsAspect.WidgetList[:]
+
+		def SetWidgetVisibilityForPHAModelsAspect(self, **Args): # set IsVisible attrib for widgets
+			pass
 
 		def MakeStandardWidgets(self, Scope, NotebookPage):
 			# make standard set of widgets, e.g. navigation buttons and undo/redo buttons, appearing on every aspect
@@ -1017,7 +1020,8 @@ class ControlFrame(wx.Frame):
 			MyTabText = _('PHA models') # text appearing on notebook tab
 			self.PHAModelsAspect = self.ControlPanelAspectItem(InternalName='PHAModels', ParentFrame=self,
 				TopLevelFrame=self.TopLevelFrame, PrefillMethod=self.PrefillWidgetsForPHAModelsAspect,
-				NotebookPage=MyNotebookPage, TabText=MyTabText)
+				SetWidgetVisibilityMethod=self.SetWidgetVisibilityForPHAModelsAspect, NotebookPage=MyNotebookPage,
+				TabText=MyTabText)
 			# make widgets
 			self.MakeStandardWidgets(Scope=self.PHAModelsAspect, NotebookPage=MyNotebookPage)
 #			self.PHAModelsAspect.NavigateBackButton = UIWidgetItem(wx.Button(MyNotebookPage,
@@ -1053,7 +1057,8 @@ class ControlFrame(wx.Frame):
 			MyTabText = _('Value') # text appearing on notebook tab
 			self.NumericalValueAspect = self.ControlPanelAspectItem(InternalName='NumericalValue', ParentFrame=self,
 				TopLevelFrame=self.TopLevelFrame, PrefillMethod=self.PrefillWidgetsForNumericalValueAspect,
-				NotebookPage=MyNotebookPage, TabText=MyTabText)
+				SetWidgetVisibilityMethod=self.SetWidgetVisibilityforNumericalValueAspect, NotebookPage=MyNotebookPage,
+				TabText=MyTabText)
 			# make widgets
 			self.MakeStandardWidgets(Scope=self.NumericalValueAspect, NotebookPage=MyNotebookPage)
 			self.NumericalValueAspect.HeaderLabel = UIWidgetItem(wx.StaticText(MyNotebookPage, -1, ''),
@@ -1174,11 +1179,45 @@ class ControlFrame(wx.Frame):
 			self.NumericalValueAspect.ValueKindChoice.DataAttrib = self.TopLevelFrame.ComponentInControlPanel
 			# populate ValueKindChoice with value kind options
 			self.NumericalValueAspect.ValueKindChoice.Widget.Set([u.HumanName for u in ValueKindOptions])
-			# select the current value kind in ValueKindOptions TODO
-			print('CF1176 setting current value kind: ')
+			# select the current value kind in ValueKindOptions
 			ApplicableValueKindOptionsList = [u.Applicable for u in ValueKindOptions]
 			self.NumericalValueAspect.ValueKindChoice.Widget.SetSelection(
 				ApplicableValueKindOptionsList.index(True) if True in ApplicableValueKindOptionsList else wx.NOT_FOUND)
+
+		def SetWidgetVisibilityforNumericalValueAspect(self, **Args): # set IsVisible attrib for each widget%%%
+			print('CF1187 setting widget visibility')
+			# set widgets that are always visible
+			VisibleList = [self.NumericalValueAspect.NavigateBackButton,
+				self.NumericalValueAspect.NavigateForwardButton, self.NumericalValueAspect.HeaderLabel,
+				self.NumericalValueAspect.CommentButton, self.NumericalValueAspect.LinkedToLabel,
+				self.NumericalValueAspect.UndoButton, self.NumericalValueAspect.RedoButton,
+				self.NumericalValueAspect.ValueLabel, self.NumericalValueAspect.ValueText,
+				self.NumericalValueAspect.UnitChoice, self.NumericalValueAspect.ValueKindLabel,
+				self.NumericalValueAspect.ValueKindChoice]
+			# find the ValueKind for this value
+			ThisPHAObj = Args['PHAObjInControlPanel']
+			ThisDataAttribName = Args['ComponentInControlPanel']
+			ValueKindOptions = getattr(ThisPHAObj, ThisDataAttribName).ValueKindOptions # list of ChoiceItem instances
+			ApplicableValueKindOptionsList = [u.Applicable for u in ValueKindOptions]
+			# select the current value kind in ValueKindOptions
+			ThisValueKindName = ValueKindOptions[ApplicableValueKindOptionsList.index(True)].XMLName\
+				if True in ApplicableValueKindOptionsList else None
+			ThisValueKind = core_classes.NumValueClasses[ [c.XMLName for c in core_classes.NumValueClasses].index(
+				ThisValueKindName)] if ThisValueKindName else None
+			# set widgets that depend on value kind
+			if ThisValueKind == core_classes.ParentNumValueItem:
+				VisibleList.extend([self.NumericalValueAspect.CopyFromButton, self.NumericalValueAspect.ShowMeCopyFromButton])
+			elif ThisValueKind == core_classes.UseParentValueItem:
+				VisibleList.extend([self.NumericalValueAspect.LinkFromButton, self.NumericalValueAspect.ShowMeLinkFromButton])
+			elif ThisValueKind == core_classes.ConstNumValueItem:
+				VisibleList.extend([self.NumericalValueAspect.ConstantLabel, self.NumericalValueAspect.ConstantChoice,
+					self.NumericalValueAspect.EditConstantsButton])
+			elif ThisValueKind == core_classes.LookupNumValueItem:
+				VisibleList.extend([self.NumericalValueAspect.MatrixLabel, self.NumericalValueAspect.MatrixChoice,
+									self.NumericalValueAspect.EditMatricesButton])
+			# set IsVisible attribs
+			for ThisWidget in self.NumericalValueAspect.WidgetList:
+				ThisWidget.IsVisible = (ThisWidget in VisibleList)
 
 		def NumericalValueAspect_OnCommentButton(self, Event): pass
 
@@ -1203,7 +1242,7 @@ class ControlFrame(wx.Frame):
 			# handle change of selection in unit Choice widget
 			# get option selected by user
 			EventWidget = Event.GetEventObject()
-			UserSelection = Event.GetSelection()
+			UserSelection = EventWidget.GetSelection()
 			if UserSelection != wx.NOT_FOUND: # is any item selected?
 				# find widget object
 				ThisWidgetObj = [w for w in self.WidgActive if w.Widget == EventWidget][0]
@@ -1217,10 +1256,9 @@ class ControlFrame(wx.Frame):
 
 		def NumericalValueAspect_OnValueKindWidget(self, Event):
 			# handle change of selection in number kind Choice widget
-			print('CF1217 in unit Choice widget handler')
 			# get option selected by user
 			EventWidget = Event.GetEventObject()
-			UserSelection = Event.GetSelection()
+			UserSelection = EventWidget.GetSelection()
 			if UserSelection != wx.NOT_FOUND: # is any item selected?
 				# find widget object
 				ThisWidgetObj = [w for w in self.WidgActive if w.Widget == EventWidget][0]
@@ -1256,16 +1294,18 @@ class ControlFrame(wx.Frame):
 			# ParentFrame (wx.Frame): reference to Control panel
 			# TopLevelFrame (wx.Frame): reference to ControlFrame (needed for access to top level methods)
 			# PrefillMethod (callable): method that prefills widget values for an instance
+			# SetWidgetVisibilityMethod (callable): method that sets IsVisible flag for each widget
 			# NotebookPage (wx.Panel): page in a wx.Notebook containing this aspect
 			# TabText (str): human-readable name of the aspect, shown in aspect's notebook tab
 
 			def __init__(self, WidgetList=[], InternalName='', ParentFrame=None, TopLevelFrame=None, PrefillMethod=None,
-					NotebookPage=None, TabText=''):
+					SetWidgetVisibilityMethod=None, NotebookPage=None, TabText=''):
 				assert isinstance(WidgetList, list) # can be empty at this stage. Populate it, then call self.Initialize()
 				assert isinstance(InternalName, str)
 				assert isinstance(ParentFrame, wx.Panel)
 				assert isinstance(TopLevelFrame, wx.Frame)
 				assert callable(PrefillMethod)
+				assert callable(SetWidgetVisibilityMethod)
 				assert isinstance(NotebookPage, wx.Panel)
 				assert isinstance(TabText, str)
 				object.__init__(self)
@@ -1274,6 +1314,7 @@ class ControlFrame(wx.Frame):
 				self.ParentFrame = ParentFrame
 				self.TopLevelFrame = TopLevelFrame
 				self.PrefillMethod = PrefillMethod
+				self.SetWidgetVisibilityMethod = SetWidgetVisibilityMethod
 				self.NotebookPage = NotebookPage
 				self.TabText = TabText
 				self.IsInNotebook = False # whether the notebook currently has a tab for this aspect
@@ -1296,8 +1337,11 @@ class ControlFrame(wx.Frame):
 			def Deactivate(self, **Args): # deactivate widgets for this aspect
 				self.TopLevelFrame.DeactivateWidgetsInPanel(self.WidgetList, **Args)
 
-			def Prefill(self, **Args):
+			def Prefill(self, **Args): # initialise value of each appropriate widget in self.WidgetList
 				self.PrefillMethod(**Args)
+
+			def SetWidgetVisibility(self, **Args): # set IsVisible attrib of each widget in self.WidgetList
+				self.SetWidgetVisibilityMethod(**Args)
 
 	def ActivateWidgetsInPanel(self, Widgets=[], Sizer=None, ActiveWidgetList=[], **Args):
 		# activate widgets that are about to be displayed in a panel of the Control Frame
