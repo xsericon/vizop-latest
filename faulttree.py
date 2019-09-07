@@ -3364,10 +3364,12 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		MsgToControlFrame.append(RedrawDataXML)
 		vizop_misc.SendRequest(Socket=SocketFromDatacore.Socket, Command=info.NO_ShowViewport, XMLRoot=MsgToControlFrame)
 
-	def ChangeChoice(self, Proj, ElementID, TextComponentName, NewValue, **Args):
+	def ChangeChoice(self, Proj, ElementID, TextComponentName, NewValue, ViewportObj, **Args):
 		# change content of choice component in ElementID (int as str, or 'Header')
 		# identified by InternalName=TextComponentName (str)
 		# to the value whose XMLName attrib is NewValue (str)
+		# ViewportObj: the Viewport object in which to show any undo (this attrib is named ViewportObj because
+		#	Args already contains Viewport, which is the Viewport ID)
 		# Args contains all tags:texts supplied in the change request
 		# returns XML tree with information about the update
 		assert isinstance(Proj, projects.ProjectItem)
@@ -3414,7 +3416,8 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			# update value unit of FTEvent or FTGate
 			# find the FTEvent/FTGate to update
 			ThisFTEvent = [e for e in WalkOverAllFTObjs(self) if e.ID == ElementID][0]
-			UnitChanged, NewUnit, ValueAcceptable = self.ChangeUnit(FTElement=ThisFTEvent, NewUnitXMLName=NewValue, ValueAttribName='Value')
+			UnitChanged, NewUnit, ValueAcceptable = self.ChangeUnit(FTElement=ThisFTEvent, NewUnitXMLName=NewValue,
+				ValueAttribName='Value', Viewport=ViewportObj)
 			# if this is an FTGate, set its "last selected unit" attribute
 			if UnitChanged and (ComponentToUpdate == 'GateValueUnit'): ThisFTEvent.SetLastSelectedUnit(NewUnit)
 		elif ComponentToUpdate == 'TolFreq':
@@ -3422,7 +3425,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			AttribToChange = Args['Attrib']
 			if AttribToChange == 'Unit':
 				UnitChanged, NewUnit, ValueAcceptable = self.ChangeUnit(FTElement=self, NewUnitXMLName=NewValue,
-					ValueAttribName='TolFreq')
+					ValueAttribName='TolFreq', Viewport=ViewportObj)
 			elif AttribToChange == 'NumberKind':
 				ValueAcceptable = self.ChangeNumberKind(FTElement=self, NewNumberKindXMLName=NewValue,
 					ValueAttribName='TolFreq')
@@ -3446,10 +3449,11 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			RootName = 'OK'; RootText = info.ValueOutOfRangeMsg
 		return vizop_misc.MakeXMLMessage(RootName=RootName, RootText=RootText)
 
-	def ChangeUnit(self, FTElement, NewUnitXMLName, ValueAttribName): # change unit of numerical value
+	def ChangeUnit(self, FTElement, NewUnitXMLName, ValueAttribName, Viewport): # change unit of numerical value%%% working on undo
 		# FTElement: FT itself (for updating TolFreq value), or an FTEvent or FTGate instance (for updating value unit)
 		# NewUnitXMLName: (str) XML name of unit to change to, optionally with ConvertValueMarker suffix
 		# ValueAttribName: (str) Name of value attrib in FTElement to change; 'TolFreq' or 'Value'
+		# Viewport: instance of Viewport to attach to Undo record
 		# return:
 			# UnitChanged (bool): whether the unit was actually changed
 			# NewUnit (UnitItem or None): the unit changed to, or None if unit wasn't changed
@@ -3477,7 +3481,9 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 							Unit=ValueAttrib.GetMyUnit())
 				UnitChanged = ValueAcceptable
 				if ValueAcceptable:
-					ValueAttrib.ConvertToUnit(NewUnit) # convert value and change unit
+					self.DoChangeUnit(ValueAttrib=ValueAttrib, ValueAttribName=ValueAttribName, FTElement=FTElement,
+						NewUnit=NewUnit, Viewport=Viewport, Convert=True, Redoing=False)
+#					ValueAttrib.ConvertToUnit(NewUnit) # convert value and change unit
 			else:
 				# change the unit without changing the value
 				# check whether the value is in acceptable range in the new unit, for all risk receptors
@@ -3489,12 +3495,44 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 							Unit=NewUnit)
 				UnitChanged = ValueAcceptable
 				if ValueAcceptable:
-					ValueAttrib.SetMyUnit(NewUnit)
+					self.DoChangeUnit(ValueAttrib=ValueAttrib, ValueAttribName=ValueAttribName, FTElement=FTElement,
+						NewUnit=NewUnit, Viewport=Viewport, Convert=False, Redoing=False)
+#					ValueAttrib.SetMyUnit(NewUnit)
 		else: # new unit not valid for this element
 			UnitChanged = False
 			ValueAcceptable = True
 			NewUnit = None
 		return UnitChanged, NewUnit, ValueAcceptable
+
+	def DoChangeUnit(self, ValueAttrib, ValueAttribName, FTElement, NewUnit, Viewport, Convert=False,
+			Redoing=False):
+		# set unit of ValueAttrib (NumValueItem instance) in FTElement to NewUnit.
+		# If Convert (bool) is True, also convert the value of ValueAttrib from old to new unit.
+		# Redoing must be True if this is part of a redo operation.
+		# Assumes NewUnit is valid and new value validated for all RR's.
+		assert isinstance(Convert, bool)
+		assert isinstance(Redoing, bool)
+		print('FT3513 Viewport: ', Viewport, type(Viewport))
+		OldUnit = ValueAttrib.GetMyUnit()
+		if Convert:
+			ValueAttrib.ConvertToUnit(NewUnit) # convert value and change unit
+			UndoText = _('convert %s to %s') % (_(self.ComponentEnglishNames[ValueAttribName]), _(NewUnit.HumanName))
+		else:
+			ValueAttrib.SetMyUnit(NewUnit)
+			UndoText = _('change %s to %s') % (_(self.ComponentEnglishNames[ValueAttribName]), _(NewUnit.HumanName))
+		undo.AddToUndoList(Proj=self.Proj, Redoing=Redoing, UndoObj=undo.UndoItem(UndoHandler=self.ChangeUnit_Undo,
+			RedoHandler=self.ChangeUnit_Redo,
+			Chain='NoChain', ComponentHost=FTElement,
+			ViewportID=Viewport.ID,
+			ViewportClass=type(Viewport),
+			ElementID=FTElement.ID,
+			ComponentName=ValueAttribName,
+			OldUnit=OldUnit, NewUnit=NewUnit,
+			HumanText=UndoText,
+			Zoom=Viewport.Zoom, PanX=Viewport.PanX, PanY=Viewport.PanY))
+
+	def ChangeUnit_Undo(self): pass
+	def ChangeUnit_Redo(self): pass
 
 	def ChangeNumberKind(self, FTElement, NewNumberKindXMLName, ValueAttribName): # change number kind of numerical value
 		# FTElement: FT itself (for updating TolFreq value), or an FTEvent or FTGate instance (for updating event value)
@@ -3616,10 +3654,10 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 				NewValue=XMLRoot.findtext('NewValue'), Viewport=SourceViewport)
 		elif Command == 'RQ_FT_ChangeChoice':
 			Reply = self.ChangeChoice(Proj=Proj, ElementID=XMLRoot.findtext('Element'),
-				TextComponentName=XMLRoot.findtext('TextComponent'),
+				TextComponentName=XMLRoot.findtext('TextComponent'), ViewportObj=SourceViewport,
 				**dict([(ThisTag.tag, ThisTag.text) for ThisTag in XMLRoot.iter()]))
 			# The ** arg sends a dict of all tags and their texts, allowing ChangeChoice to pick up case-specific tags
-			# Attrib NewValue is already in the ** arg, so no need to include it explicitly
+			# Attribs NewValue and Viewport are already in the ** arg, so no need to include it explicitly
 		elif Command == 'RQ_FT_DescriptionCommentsVisible':  # make description comments in/visible in an FT element
 			ThisElementID = XMLRoot.findtext('Element')
 			ThisFTElement = [e for e in WalkOverAllFTObjs(self) if e.ID == ThisElementID][0]
@@ -3693,6 +3731,8 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		'ConnectorIn': _('Inward connector'), 'ConnectorOut': _('Outward connector'),
 		'EnablingCondition': _('Enabling condition'), 'ConditionalModifier': _('Conditional modifier')}
 	ConnectButtonBufferBorderX = ConnectButtonBufferBorderY = 5 # pixel allowance on each edge of connect button buffer
+	MinZoom = 0.1 # min and max zoom factors allowed for display of this Viewport
+	MaxZoom = 10.0
 
 	class SeverityCatInFT(object): # represents a severity category in FTForDisplay instance
 		# (so far, it's identical to ChoiceItem class)
@@ -4616,8 +4656,10 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 
 	def RedrawDuringZoom(self, NewZoom=1.0):
 		# redraw FT during zoom change. For now, redraw the entire FT from scratch
-		# NewZoom (float): new zoom level requested by the zoom command
+		# NewZoom (float): new zoom level requested by the zoom command;
+		# 	assumed to be constrained within self.MinZoom and self.MaxZoom
 		assert isinstance(NewZoom, (int, float))
+		assert self.MinZoom <= NewZoom <= self.MaxZoom
 		self.Zoom = NewZoom
 		self.Zooming = True # simplified drawing during zoom
 		self.DisplDevice.Redraw(FullRefresh=True)

@@ -997,6 +997,7 @@ class ControlFrame(wx.Frame):
 			# make standard set of widgets, e.g. navigation buttons and undo/redo buttons, appearing on every aspect
 			# Scope (ControlPanelAspectItem instance): the aspect owning the widgets
 			# NotebookPage (wx.Panel instance): panel in the wxNotebook containing the aspect's widgets
+			# Note: if we need [+] / [-] buttons in future, can use wx.ART_ADD / wx.ART_REMOVE
 			assert isinstance(Scope, self.ControlPanelAspectItem)
 			Scope.NavigateBackButton = UIWidgetItem(wx.Button(NotebookPage,
 				size=self.StandardImageButtonSize), KeyStroke=[wx.WXK_CONTROL, wx.WXK_LEFT],
@@ -1088,23 +1089,21 @@ class ControlFrame(wx.Frame):
 			self.NumericalValueAspect.LinkFromButton = UIWidgetItem(wx.Button(MyNotebookPage, -1, _('Link from...')),
 				Handler=self.NumericalValueAspect_OnLinkFromButton,
 				Events=[wx.EVT_BUTTON],
-				ColLoc=4, ColSpan=1, NewRow=True,
+				ColLoc=7, ColSpan=1, NewRow=True,
 				Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_LEFT | wx.EXPAND)
 			self.NumericalValueAspect.ShowMeLinkFromButton = UIWidgetItem(wx.Button(MyNotebookPage, -1, _('Show me')),
 				Handler=self.NumericalValueAspect_OnShowMeLinkFromButton,
 				Events=[wx.EVT_BUTTON],
-				ColLoc=5, ColSpan=1,
+				ColLoc=8, ColSpan=1,
 				Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_LEFT | wx.EXPAND)
 			self.NumericalValueAspect.CopyFromButton = UIWidgetItem(wx.Button(MyNotebookPage, -1, _('Copy from...')),
 				Handler=self.NumericalValueAspect_OnCopyFromButton,
 				Events=[wx.EVT_BUTTON],
-				ColLoc=4, ColSpan=1, NewRow=True,
+				ColLoc=7, ColSpan=1, NewRow=True,
 				Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_LEFT | wx.EXPAND)
 			self.NumericalValueAspect.ShowMeCopyFromButton = UIWidgetItem(wx.Button(MyNotebookPage, -1, _('Show me')),
 				Handler=self.NumericalValueAspect_OnShowMeCopyFromButton,
-				Events=[wx.EVT_BUTTON],
-				ColLoc=5, ColSpan=1,
-				Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_LEFT | wx.EXPAND)
+				Events=[wx.EVT_BUTTON], ColLoc=8, ColSpan=1, Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_LEFT | wx.EXPAND)
 			self.NumericalValueAspect.ConstantLabel = UIWidgetItem(wx.StaticText(MyNotebookPage, -1,
 				_('Constant used:') + ' '),
 				ColLoc=6, ColSpan=1, NewRow=True, Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_RIGHT | wx.EXPAND)
@@ -1115,15 +1114,13 @@ class ControlFrame(wx.Frame):
 				Events=[wx.EVT_BUTTON],
 				ColLoc=8, ColSpan=1,
 				Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_LEFT | wx.EXPAND)
-			self.NumericalValueAspect.MatrixLabel = UIWidgetItem(wx.StaticText(MyNotebookPage, -1, _('Matrix:')),
-				ColLoc=4, ColSpan=1, NewRow=True)
+			self.NumericalValueAspect.MatrixLabel = UIWidgetItem(wx.StaticText(MyNotebookPage, -1, _('Matrix used:')),
+				ColLoc=6, ColSpan=1, NewRow=True)
 			self.NumericalValueAspect.MatrixChoice = UIWidgetItem(wx.Choice(MyNotebookPage, -1, size=(100, 30), choices=[]),
-				Handler=self.NumericalValueAspect_OnMatrixWidget, Events=[wx.EVT_CHOICE], ColLoc=5, ColSpan=1)
+				Handler=self.NumericalValueAspect_OnMatrixWidget, Events=[wx.EVT_CHOICE], ColLoc=7, ColSpan=1)
 			self.NumericalValueAspect.EditMatricesButton = UIWidgetItem(wx.Button(MyNotebookPage, -1, _('Edit matrices')),
 				Handler=self.NumericalValueAspect_OnEditMatricesButton,
-				Events=[wx.EVT_BUTTON],
-				ColLoc=6, ColSpan=1,
-				Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_LEFT | wx.EXPAND)
+				Events=[wx.EVT_BUTTON], ColLoc=8, ColSpan=1, Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_LEFT | wx.EXPAND)
 			# make list of all widgets in this aspect
 			self.NumericalValueAspect.WidgetList = [self.NumericalValueAspect.NavigateBackButton,
 				self.NumericalValueAspect.NavigateForwardButton, self.NumericalValueAspect.HeaderLabel,

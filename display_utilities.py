@@ -338,7 +338,7 @@ class ZoomWidgetObj(object):
 
 	def SetZoom(self, TargetZoom): # set zoom value of widget (does not redraw it)
 		assert isinstance(TargetZoom, (int, float))
-		assert self.MinZoom < TargetZoom < self.MaxZoom
+		assert (0.999 * self.MinZoom) < TargetZoom < (self.MaxZoom * 1.001) # allowing for rounding errors
 		self.CurrentZoom = float(TargetZoom)
 
 	def DrawInBitmap(self): # draw zoom widget in own bitmap
@@ -433,6 +433,8 @@ class ZoomWidgetObj(object):
 			self.CurrentZoom = 10 ** ((ZoomFraction * self.LogMaxZoom) + (self.LogMouseLDownZoom * (1.0 - ZoomFraction)))
 		else:
 			self.CurrentZoom = 10 ** ((-ZoomFraction * self.LogMinZoom) + (self.LogMouseLDownZoom * (1.0 + ZoomFraction)))
+		# constrain zoom within min and max for HostViewport
+		self.CurrentZoom = min(HostViewport.MaxZoom, max(HostViewport.MinZoom, self.CurrentZoom))
 		HostViewport.RedrawDuringZoom(NewZoom=self.CurrentZoom)
 
 	def HandleMouseLDragEndOnMe(self, MouseX=0, MouseY=0, HostViewport=None, **Args):
