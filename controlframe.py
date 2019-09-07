@@ -1106,7 +1106,7 @@ class ControlFrame(wx.Frame):
 				ColLoc=5, ColSpan=1,
 				Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_LEFT | wx.EXPAND)
 			self.NumericalValueAspect.ConstantLabel = UIWidgetItem(wx.StaticText(MyNotebookPage, -1,
-				_('Constant used:') + ' '), Debug='ConstantUsedLabel',
+				_('Constant used:') + ' '),
 				ColLoc=6, ColSpan=1, NewRow=True, Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_RIGHT | wx.EXPAND)
 			self.NumericalValueAspect.ConstantChoice = UIWidgetItem(wx.Choice(MyNotebookPage, -1, size=(100, 30), choices=[]),
 				  Handler=self.NumericalValueAspect_OnConstantWidget, Events=[wx.EVT_CHOICE], ColLoc=7, ColSpan=1)
@@ -1790,7 +1790,7 @@ class ControlFrame(wx.Frame):
 				Handler=self.HandleMessageToLocalViewport, SendReply2=False, OriginCode=11))
 			# check messages from datacore's Viewport shadow to our local Viewports
 			MessageReceived |= bool(vizop_misc.ListenToSocket(Socket=self.CurrentViewport.D2CSocketREP,
-				Handler=self.HandleMessageToLocalViewport, SendReply2=True, Debug=True, OriginCode=12))
+				Handler=self.HandleMessageToLocalViewport, SendReply2=True, OriginCode=12))
 		# TODO should we discard incoming REQ messages to other Viewports that aren't currently on display?
 		return MessageReceived
 
@@ -2230,8 +2230,6 @@ class ControlFrame(wx.Frame):
 			assert isinstance(MessageReceived, bytes)
 			XMLTree = ElementTree.fromstring(MessageReceived)
 		# First, tell Viewport to prepare for display, with data from PHA model
-#		print('CF1837 calling PrepareFullDisplay with MessageReceived:', MessageReceived)
-#		print ('MessageAsXMLTree:', MessageAsXMLTree, "Debug:", Args.get('Debug', False))
 		self.CurrentViewport.PrepareFullDisplay(XMLTree)
 		self.MyEditPanel.EditPanelMode(self.CurrentViewport, 'Select') # set up mouse pointer and bindings (needs OffsetX/Y)
 		self.Refresh() # trigger OnPaint() so that the panel rendering is refreshed

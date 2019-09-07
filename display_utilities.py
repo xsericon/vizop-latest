@@ -746,9 +746,10 @@ def PopulateSizer(Sizer=None, Widgets=[], ActiveWidgetList=[], DefaultFont=None,
 					RowBase += 1 # leave an empty sizer row for the GapY
 					GapYAdded = False # reset flag
 				ThisRowSpan = 1 # reset for new row
-			# put widgets in sizer
+			# put widgets in sizer. wx.LEFT flag assigns the margin space to the left side only
 			Sizer.Add(ThisWidget.Widget, pos=(RowBase + ThisWidget.RowOffset, ThisWidget.ColLoc + ThisWidget.ColOffset),
-				span=(ThisWidget.RowSpan, ThisWidget.ColSpan), flag=ThisWidget.Flags | wx.LEFT, border=ThisWidget.LeftMargin)
+				span=(ThisWidget.RowSpan, ThisWidget.ColSpan), flag=wx.ALIGN_RIGHT | wx.LEFT, border=ThisWidget.LeftMargin)
+#				span=(ThisWidget.RowSpan, ThisWidget.ColSpan), flag=ThisWidget.Flags | wx.LEFT, border=ThisWidget.LeftMargin)
 			# set widget minimum size, if required
 			if (ThisWidget.MinSizeX is not None) and (ThisWidget.MinSizeY is not None):
 				Sizer.SetItemMinSize(ThisWidget.Widget, (ThisWidget.MinSizeX, ThisWidget.MinSizeY))
@@ -770,10 +771,8 @@ def PopulateSizer(Sizer=None, Widgets=[], ActiveWidgetList=[], DefaultFont=None,
 				Sizer.Add((10, ThisWidget.GapY),
 					pos=(RowBase + ThisWidget.RowOffset + ThisRowSpan, ThisWidget.ColLoc + ThisWidget.ColOffset))
 				GapYAdded = True # flag to ensure we start new row and skip over sizer row containing gap
-			# put widgets in "currently visible" list (to enable us to remove them from keyboard shortcut list when no longer needed)
+			# put widget in "currently visible" list (to enable us to remove it from keyboard shortcut list when no longer needed)
 			ActiveWidgetList.append(ThisWidget)
-			# make widgets visible
-			ThisWidget.Widget.Show()
 #				ThisWidget.DataObj = DataObj # store DataObj in UIWidget item, so that we know where to write changes
 #				# populate widgets with values
 #				if ThisWidget.DataAttrib and ThisWidget.DisplayMethod and DataObj:
@@ -782,6 +781,8 @@ def PopulateSizer(Sizer=None, Widgets=[], ActiveWidgetList=[], DefaultFont=None,
 			if getattr(ThisWidget, 'GapX', 0): # add empty space to the left of this widget
 				Sizer.Add((ThisWidget.GapX, 10),
 					pos=(RowBase + ThisWidget.RowOffset, ThisWidget.ColLoc + ThisWidget.ColOffset - 1))
+		# make widgets in/visible
+		ThisWidget.Widget.Show(ThisWidget.IsVisible)
 	Sizer.Layout() # refresh sizer
 
 def ChangeZoomAndPanValues(Viewport=None, Zoom=None, PanX=None, PanY=None):

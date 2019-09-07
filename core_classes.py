@@ -715,7 +715,8 @@ class ConstNumValueItem(NumValueItem): # class of constant NumValues. Refers to 
 	def SetMyValue(self, NewValue, RR=DefaultRiskReceptor): # attempting to set value of this class directly is evil
 		raise TypeError("Not allowed to set value of a ConstNumValueItem directly")
 
-	def GetMyUnit(self):  # returns human-readable unit name (rich str)
+	def GetMyUnit(self): # returns current unit of constant (instance of UnitItem) if self.Constant is defined,
+		# else returns NullUnit
 		if self.Constant is None: return NullUnit
 		else:
 			assert isinstance(self.Constant.Unit, UnitItem)
@@ -885,18 +886,31 @@ class LookupNumValueItem(NumValueItem): # class of values found by reference to 
 	def SetMyValue(self, NewValue, RR=DefaultRiskReceptor): # attempting to set value of this class directly is evil
 		raise TypeError("Not allowed to set value of a LookupNumValueItem directly")
 
-	def GetMyUnit(self):  # returns human-readable unit name (rich str)
-		assert isinstance(self.LookupTable, LookupTableItem)
-		print("CC661 LookupValueItem GetMyUnit needs to look up the unit of the output value, not coded")
-#		Unit = self.LookupTable.OutputUnit
-		assert isinstance(Unit, UnitItem)
-		return Unit.HumanName
+	def GetMyUnit(self): # returns unit (instance of UnitItem) looked up from LookupTable,
+		# or NullUnit if LookupTable isn't defined%%%
+		if self.LookupTable:
+			assert isinstance(self.LookupTable, LookupTableItem)
+			print("CC661 LookupValueItem GetMyUnit needs to look up the unit of the output value, not coded")
+	#		Unit = self.LookupTable.OutputUnit
+			assert isinstance(Unit, UnitItem)
+			return Unit.HumanName
+		else: return NullUnit
 
 	def SetMyUnit(self, NewUnit): # attempting to set unit of this class directly is evil
 		raise TypeError("Not allowed to set unit of a LookupNumValueItem directly")
 
 	Value = property(fget=GetMyValue, fset=SetMyValue)
 	Unit = property(fget=GetMyUnit, fset=SetMyUnit)
+
+	def GetMyAcceptableUnits(self): # return list of UnitItems permitted for display of this value.
+		# Access this function through self.AcceptableUnits, via the property() statement in the superclass.
+		if self.LookupTable is None: return []
+		else: return self.LookupTable.MyUnitKind.AcceptableUnits
+
+	def SetMyAcceptableUnits(self, NewAcceptableUnits, **Args): # set acceptable units for display of this value.
+		# Access this function through self.AcceptableUnits, via the property() statement in the superclass.
+		raise TypeError('CC912 Not allowed to set units of LookupNumValueItem')
+		return False
 
 class CategoryNameItem(NumValueItem): # class of objects defining one of a list of categories
 	# Used for lookup in a matrix. Example: a severity value
@@ -1026,6 +1040,16 @@ class ParentNumValueItem(NumValueItem): # a NumValueItem whose value was copied 
 	Value = property(fget=GetMyValue, fset=SetMyValue)
 	Unit = property(fget=GetMyUnit, fset=SetMyUnit)
 
+	def GetMyAcceptableUnits(self): # return list of UnitItems permitted for display of this value.
+		# Access this function through self.AcceptableUnits, via the property() statement in the superclass.
+		if self.ParentPHAObj is None: return []
+		else: return self.ParentPHAObj.MyUnitKind.AcceptableUnits
+
+	def SetMyAcceptableUnits(self, NewAcceptableUnits, **Args): # set acceptable units for display of this value.
+		# Access this function through self.AcceptableUnits, via the property() statement in the superclass.
+		raise TypeError('CC1050 Not allowed to set units of ParentNumValueItem')
+		return False
+
 class UseParentValueItem(NumValueItem):
 	# class indicating values are to be linked from a parent PHA object, such as a cause or a calculated value
 	HumanName = _('Linked from another value')
@@ -1055,6 +1079,16 @@ class UseParentValueItem(NumValueItem):
 
 	Value = property(fget=GetMyValue, fset=SetMyValue)
 	Unit = property(fget=GetMyUnit, fset=SetMyUnit)
+
+	def GetMyAcceptableUnits(self): # return list of UnitItems permitted for display of this value.
+		# Access this function through self.AcceptableUnits, via the property() statement in the superclass.
+		if self.ParentPHAObj is None: return []
+		else: return self.ParentPHAObj.MyUnitKind.AcceptableUnits
+
+	def SetMyAcceptableUnits(self, NewAcceptableUnits, **Args): # set acceptable units for display of this value.
+		# Access this function through self.AcceptableUnits, via the property() statement in the superclass.
+		raise TypeError('CC1090 Not allowed to set units of UseParentNumValueItem')
+		return False
 
 NumValueClasses = [UserNumValueItem, ConstNumValueItem, CalcNumValueItem, NumProblemValue, LookupNumValueItem,
 	AutoNumValueItem, ParentNumValueItem, UseParentValueItem]
