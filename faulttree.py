@@ -3482,8 +3482,8 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 				UnitChanged = ValueAcceptable
 				if ValueAcceptable:
 					self.DoChangeUnit(ValueAttrib=ValueAttrib, ValueAttribName=ValueAttribName, FTElement=FTElement,
-						NewUnit=NewUnit, Viewport=Viewport, Convert=True, Redoing=False)
-#					ValueAttrib.ConvertToUnit(NewUnit) # convert value and change unit
+						NewUnit=NewUnit, ViewportID=Viewport.ID, ViewportClass=type(Viewport), Convert=True,
+						Zoom=Viewport.Zoom, PanX=Viewport.PanX, PanY=Viewport.PanY, Redoing=False)
 			else:
 				# change the unit without changing the value
 				# check whether the value is in acceptable range in the new unit, for all risk receptors
@@ -3496,7 +3496,8 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 				UnitChanged = ValueAcceptable
 				if ValueAcceptable:
 					self.DoChangeUnit(ValueAttrib=ValueAttrib, ValueAttribName=ValueAttribName, FTElement=FTElement,
-						NewUnit=NewUnit, Viewport=Viewport, Convert=False, Redoing=False)
+						NewUnit=NewUnit, ViewportID=Viewport.ID, ViewportClass=type(Viewport), Convert=False,
+						Zoom=Viewport.Zoom, PanX=Viewport.PanX, PanY=Viewport.PanY, Redoing=False)
 #					ValueAttrib.SetMyUnit(NewUnit)
 		else: # new unit not valid for this element
 			UnitChanged = False
@@ -3504,15 +3505,14 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			NewUnit = None
 		return UnitChanged, NewUnit, ValueAcceptable
 
-	def DoChangeUnit(self, ValueAttrib, ValueAttribName, FTElement, NewUnit, Viewport, Convert=False,
-			Redoing=False):
+	def DoChangeUnit(self, ValueAttrib, ValueAttribName, FTElement, NewUnit, ViewportID, ViewportClass, Convert,
+			Zoom, PanX, PanY, Redoing=False):
 		# set unit of ValueAttrib (NumValueItem instance) in FTElement to NewUnit.
 		# If Convert (bool) is True, also convert the value of ValueAttrib from old to new unit.
 		# Redoing must be True if this is part of a redo operation.
 		# Assumes NewUnit is valid and new value validated for all RR's.
 		assert isinstance(Convert, bool)
 		assert isinstance(Redoing, bool)
-		print('FT3513 Viewport: ', Viewport, type(Viewport))
 		OldUnit = ValueAttrib.GetMyUnit()
 		if Convert:
 			ValueAttrib.ConvertToUnit(NewUnit) # convert value and change unit
@@ -3522,17 +3522,44 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			UndoText = _('change %s to %s') % (_(self.ComponentEnglishNames[ValueAttribName]), _(NewUnit.HumanName))
 		undo.AddToUndoList(Proj=self.Proj, Redoing=Redoing, UndoObj=undo.UndoItem(UndoHandler=self.ChangeUnit_Undo,
 			RedoHandler=self.ChangeUnit_Redo,
-			Chain='NoChain', ComponentHost=FTElement,
-			ViewportID=Viewport.ID,
-			ViewportClass=type(Viewport),
+			Chain='NoChain', ComponentHost=FTElement, Convert=Convert,
+			ViewportID=ViewportID,
+			ViewportClass=ViewportClass,
 			ElementID=FTElement.ID,
 			ComponentName=ValueAttribName,
 			OldUnit=OldUnit, NewUnit=NewUnit,
 			HumanText=UndoText,
-			Zoom=Viewport.Zoom, PanX=Viewport.PanX, PanY=Viewport.PanY))
+			Zoom=Zoom, PanX=PanX, PanY=PanY))
 
-	def ChangeUnit_Undo(self): pass
-	def ChangeUnit_Redo(self): pass
+	def ChangeUnit_Undo(self, Proj, UndoRecord, **Args):
+		assert isinstance(Proj, projects.ProjectItem)
+		assert isinstance(UndoRecord, undo.UndoItem)
+		# find out which datacore socket to send messages on
+		SocketFromDatacore = vizop_misc.SocketWithName(TargetName=Args['SocketFromDatacoreName'])
+		# undo the unit change, with value conversion if the original change was a conversion
+		if UndoRecord.Convert:
+			getattr(UndoRecord.ComponentHost, UndoRecord.ComponentName).ConvertToUnit(UndoRecord.OldUnit)
+			getattr(UndoRecord.ComponentHost, UndoRecord.ComponentName).ConvertToUnit(UndoRecord.OldUnit)
+		else:
+			getattr(UndoRecord.ComponentHost, UndoRecord.ComponentName).SetMyUnit(UndoRecord.OldUnit)
+		# request Control Frame to switch to the Viewport that was visible when the original edit was made
+		self.RedrawAfterUndoOrRedo(UndoRecord, SocketFromDatacore)
+		projects.SaveOnFly(Proj, UpdateData=vizop_misc.MakeXMLMessage(RootName=info.FTTag,
+			Elements={info.IDTag: self.ID, info.ComponentHostIDTag: UndoRecord.ComponentHost.ID}))
+		# TODO add data for the changed component to the Save On Fly data
+		return {'Success': True}
+
+	def ChangeUnit_Redo(self, Proj, RedoRecord, **Args):
+		self.DoChangeUnit(ValueAttrib=getattr(RedoRecord.ComponentHost, RedoRecord.ComponentName),
+			ValueAttribName=RedoRecord.ComponentName, FTElement=RedoRecord.ComponentHost, NewUnit=RedoRecord.NewUnit,
+			ViewportID=RedoRecord.ViewportID, ViewportClass=RedoRecord.ViewportClass, Convert=RedoRecord.Convert,
+			Zoom=RedoRecord.Zoom, PanX=RedoRecord.PanX, PanY=RedoRecord.PanY, Redoing=True)
+		self.RedrawAfterUndoOrRedo(RedoRecord, SocketFromDatacore=vizop_misc.SocketWithName(
+			TargetName=Args['SocketFromDatacoreName']))
+		projects.SaveOnFly(Proj, UpdateData=vizop_misc.MakeXMLMessage(RootName=info.FTTag,
+			Elements={info.IDTag: self.ID, info.ComponentHostIDTag: RedoRecord.ComponentHost.ID}))
+			# TODO add data for the changed component to the Save On Fly data
+		return {'Success': True}
 
 	def ChangeNumberKind(self, FTElement, NewNumberKindXMLName, ValueAttribName): # change number kind of numerical value
 		# FTElement: FT itself (for updating TolFreq value), or an FTEvent or FTGate instance (for updating event value)
