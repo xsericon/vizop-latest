@@ -1349,16 +1349,19 @@ class ControlFrame(wx.Frame):
 
 		def PrefillWidgetsForFaultTreeAspect(self, **Args):
 			Proj = self.TopLevelFrame.CurrentProj
-			# capture the FT on to display
+			AllFTsInProj = [p for p in Proj.PHAObjs if type(p) is faulttree.FTObjectInCore]
+			# keep a record of which FT is on display
 			CurrentFT = self.TopLevelFrame.PHAObjInControlPanel = Args['PHAObjInControlPanel']
 			# enable navigation buttons if there are any items in current project's history lists
 			self.UpdateNavigationButtonStatus(Proj)
 			# set widget values
 			# set up FTNameText and FTDescriptionText TODO limit length displayed. Smart ellipsization?
-			self.FaultTreeAspect.FTNameText.Widget.ChangeValue(CurrentFT.SIFName)
+			self.FaultTreeAspect.FTNameText.Widget.ChangeValue(CurrentFT.HumanName)
 			self.FaultTreeAspect.FTNameText.Widget.SelectAll()
 			self.FaultTreeAspect.FTDescriptionText.Widget.ChangeValue(CurrentFT.Description)
 			self.FaultTreeAspect.FTDescriptionText.Widget.SelectAll()
+			# set up GoToFTChoice
+			self.FaultTreeAspect.GoToFTChoice.Widget.Set()
 
 		def SetWidgetVisibilityforFaultTreeAspect(self): pass
 		def FaultTreeAspect_OnFTNameTextWidget(self, Event): pass

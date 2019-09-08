@@ -697,3 +697,17 @@ class ProjectInfoModelForDisplay(display_utilities.ViewportBaseClass): # object 
 		# showing this Viewport
 		self.RemoveWidgets()
 #		self.MyNotebook.Hide()
+
+def AddPHAObjsTags(Proj, XMLRoot, CurrentPHAObj=None):
+	# add PHAObjects tags to XMLRoot (an ElementTree XML element) providing info about all PHA objects in Proj.
+	# CurrentPHAObj (a PHAModel subclass instance): which PHA Object is currently displayed. This one will be flagged
+	# with an "Applicable" tag.
+	assert isinstance(Proj, projects.ProjectItem)
+	assert isinstance(XMLRoot, ElementTree.Element)
+	assert isinstance(CurrentPHAObj, core_classes.PHAModelBaseClass) or (CurrentPHAObj is None)
+	for (ThisPHAModelIndex, ThisPHAModel) in enumerate(Proj.PHAObjs):
+		PHAObjEl = ElementTree.SubElement(XMLRoot, info.PHAObjTag)
+		# set human name for grouping option to internal name of option
+		PHAObjEl.text = str(ThisPHAModel.HumanName)
+		PHAObjEl.set(info.ApplicableAttribName, utilities.Bool2Str(ThisPHAModel is CurrentPHAObj))
+		PHAObjEl.set(info.IDTag, str(ThisPHAModel.ID)) # add PHA object ID

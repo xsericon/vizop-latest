@@ -79,6 +79,7 @@ FTHeaderTag = 'Header'
 ProjIDTag = 'ProjID'
 PHAModelIDTag = 'PHAModelID'
 PHAModelTypeTag = 'PHAmodelclass' #f
+PHAObjTag = 'PHAObj'
 ProjNameTag = 'ProjectName'
 ProjNoTag = 'ProjectNo'
 DescriptionTag = 'Description'

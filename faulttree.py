@@ -8,7 +8,7 @@ import zmq, copy
 import xml.etree.ElementTree as ElementTree # XML handling
 
 # other vizop modules required here
-import text, utilities, core_classes, info, vizop_misc, projects, art, display_utilities, undo
+import text, utilities, core_classes, info, vizop_misc, projects, art, display_utilities, undo, project_display
 
 # constants applicable to fault tree
 TextElementTopBufferInCU = 2 # y-gap in canvas units between top of a text element and top of its contained text
@@ -246,7 +246,7 @@ class ButtonObjectNotInElement(ButtonElement):
 class FTHeader(object): # FT header object. Rendered by drawing text into bitmap (doesn't use native widgets or sizer)
 	# This class is used by FTForDisplay but not by FTObjectInCore (keeps header data in itself, not in sub-object)
 	# ComponentEnglishNames: used for display in Control Panel
-	ComponentEnglishNames = {'SIFName': 'SIF name', 'Rev': 'Revision', 'OpMode': 'Operating mode',
+	ComponentEnglishNames = {'HumanName': 'SIF name', 'Rev': 'Revision', 'OpMode': 'Operating mode',
 		'TolFreq': 'Tolerable frequency', 'SILTargetValue': 'SIL target', 'Description': 'Description'}
 
 	def __init__(self, FT):
@@ -259,7 +259,7 @@ class FTHeader(object): # FT header object. Rendered by drawing text into bitmap
 		self.Elements = self.CreateTextElements()
 
 	def InitializeData(self):
-		self.SIFName = ''
+		self.HumanName = ''
 		self.Description = ''
 		self.OpMode = _('<undefined>')
 		self.Rev = ''
@@ -293,8 +293,8 @@ class FTHeader(object): # FT header object. Rendered by drawing text into bitmap
 		# internal names must match attrib names in FTObjectInCore instance
 		SIFNameLabel = TextElement(self.FT, Row=0, ColStart=0, ColSpan=1, StartX=0, EndX=Col1XStartInCU-1,
 			HostObject=self, InternalName='SIFNameLabel')
-		SIFName = TextElement(self.FT, Row=0, ColStart=1, ColSpan=3, StartX=Col1XStartInCU, EndX=999,
-			HostObject=self, InternalName='SIFName', EditBehaviour='Text', MaxWidthInCU=600)
+		HumanName = TextElement(self.FT, Row=0, ColStart=1, ColSpan=3, StartX=Col1XStartInCU, EndX=999,
+			HostObject=self, InternalName='HumanName', EditBehaviour='Text', MaxWidthInCU=600)
 		RevLabel = TextElement(self.FT, Row=1, ColStart=0, ColSpan=1, StartX=0, EndX=Col1XStartInCU-1,
 			HostObject=self, InternalName='RevLabel')
 		Rev = TextElement(self.FT, Row=1, ColStart=1, ColSpan=1, StartX=Col1XStartInCU, EndX=499,
@@ -333,7 +333,7 @@ class FTHeader(object): # FT header object. Rendered by drawing text into bitmap
 			HostObject=self, InternalName='SIL')
 		# make lists of label and content elements (used for setting colours, below)
 		LabelEls = [SIFNameLabel, RevLabel, ModeLabel, self.RRLabel, SeverityLabel, TolFreqLabel, UELLabel, RRFLabel, SILLabel]
-		self.ContentEls = [SIFName, Rev, self.OpModeComponent, self.RRComponent, RRF, self.SeverityComponent, TolFreq,
+		self.ContentEls = [HumanName, Rev, self.OpModeComponent, self.RRComponent, RRF, self.SeverityComponent, TolFreq,
 			UEL, RRF, SIL]
 
 		# populate labels (content elements get populated in PopulateHeaderData() )
@@ -356,7 +356,7 @@ class FTHeader(object): # FT header object. Rendered by drawing text into bitmap
 			El.BkgColour = ColourContentBkg
 
 		# return all the elements in a list
-		return [SIFNameLabel, SIFName, RevLabel, Rev, ModeLabel, self.OpModeComponent, self.RRLabel, self.RRComponent,
+		return [SIFNameLabel, HumanName, RevLabel, Rev, ModeLabel, self.OpModeComponent, self.RRLabel, self.RRComponent,
 				SeverityLabel, self.SeverityComponent, TolFreqLabel, TolFreq, UELLabel, UEL, RRFLabel, RRF, SILLabel, SIL]
 
 	def CalculateSize(self, Zoom, PanX, PanY):
@@ -366,7 +366,7 @@ class FTHeader(object): # FT header object. Rendered by drawing text into bitmap
 		def PopulateTextElements(Elements):
 			# put required values into all text elements apart from labels
 			# The following list contains (attribs of header, element's InternalName)
-			AttribInfo = [('SIFName', 'SIFName'), ('Rev', 'Rev'), ('OpMode', 'OpMode'), ('RR', 'RR'),
+			AttribInfo = [('HumanName', 'HumanName'), ('Rev', 'Rev'), ('OpMode', 'OpMode'), ('RR', 'RR'),
 						  ('RRF', 'RRF'), ('SIL', 'SIL')]
 			# put the content into the elements
 			for (Attrib, Name) in AttribInfo:
@@ -2425,10 +2425,10 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 	DefaultRRGroupingOption = RRGroupingOptions[0]
 	DefaultViewportType = FTForDisplay
 	# names of attribs referring to header, whose value is the same as the text in the XML tag
-	TextComponentNames = ['SIFName', 'Description', 'Rev', 'SILTargetValue', 'TargetRiskRedMeasure', 'BackgColour',
+	TextComponentNames = ['HumanName', 'Description', 'Rev', 'SILTargetValue', 'TargetRiskRedMeasure', 'BackgColour',
 		'TextColour']
 	# English names for components; keys are attrib names in this class. Values are translated at point of display
-	ComponentEnglishNames = {'SIFName': 'SIF name', 'Rev': 'Revision', 'OpMode': 'Operating mode',
+	ComponentEnglishNames = {'HumanName': 'SIF name', 'Rev': 'Revision', 'OpMode': 'Operating mode',
 		'TolFreq': 'Tolerable frequency', 'SILTargetValue': 'SIL target', 'Description': 'Description'}
 	# element classes that have a number system, i.e. have a Numbering attrib. Must be tuple, not list
 	ElementsWithNumberSystem = (FTConnectorItemInCore, FTGateItemInCore, FTEventInCore)
@@ -2445,7 +2445,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		SerialObj = core_classes.SerialNumberChunkItem()
 		self.Numbering.NumberStructure = [SerialObj]
 		# define object-wide attributes. Many of these are displayed in the FT header
-		self.SIFName = ''
+		self.HumanName = ''
 		self.Description = ''
 		self.OpMode = core_classes.DefaultOpMode # instance of OpModeType
 		self.Rev = ''
@@ -2693,12 +2693,15 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 				RRGroupingEl.text = str(ThisGroupingOption)
 				RRGroupingEl.set(info.ApplicableAttribName, utilities.Bool2Str(ThisGroupingOption == self.RRGroupingOption))
 				RRGroupingEl.set(info.SerialTag, str(ThisGroupingOptionIndex)) # add grouping option serial number
+			# add PHAModels tags to inform the Control Frame about other PHA models in the project. This is used to
+			# allow the user to choose another PHA model to view.
+			project_display.AddPHAObjsTags(Proj=self.Proj, XMLRoot=El, CurrentPHAObj=self)
 
 		def PopulateHeaderData(El):
 			# put FT header data into XML element El
 			if __debug__ == 1: # do type checks
 				assert isinstance(El, ElementTree.Element), "FT1658 El is not an XML element"
-				assert isinstance(self.SIFName, str), "FT1659 Fault Tree's SIFName is not a string"
+				assert isinstance(self.HumanName, str), "FT1659 Fault Tree's HumanName is not a string"
 				assert isinstance(self.Description, str)
 				assert self.OpMode in core_classes.OpModes
 				assert isinstance(self.Rev, str), "FT1653 Fault Tree's Rev is not a string"
@@ -3887,7 +3890,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			# In DataInfo, each pair of items is: (FTHeader attrib name, XML tag)
 			assert isinstance(HeaderEl, FTHeader)
 			# set all header attribs except risk receptor (set in PopulateOverallData() )
-			DataInfo = [ ('SIFName', 'SIFName'), ('Description', 'Description'), ('OpMode', 'OpMode'), ('Rev', 'Rev'),
+			DataInfo = [ ('HumanName', 'SIFName'), ('Description', 'Description'), ('OpMode', 'OpMode'), ('Rev', 'Rev'),
 				('TargetRiskRedMeasure', 'TargetUnit'), ('BackgColour', 'BackgColour'),
 				('TextColour', 'TextColour'), ('Severity', 'Severity'),
 #				('TolFreq', 'TolFreq'), ('TolFreqUnit', 'TolFreqUnit'),
