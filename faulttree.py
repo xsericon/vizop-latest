@@ -2943,8 +2943,6 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			# CurrentOption: the item in AcceptableOptions that's currently active; ignored if AcceptableOptions is empty
 			# OptionXMLTagName (str): XML tag for option (e.g. info.UnitOptionTag)
 			# If OfferConvertOptions is True, append options to convert value to new units (special for units)
-#			assert CurrentOption in core_classes.AllSelectableUnits
-			print('FT2945 CurrentOption, AcceptableOptions:', CurrentOption.HumanName, len(AcceptableOptions))
 			assert (CurrentOption in AcceptableOptions) or not AcceptableOptions
 			assert isinstance(OfferConvertOptions, bool)
 			HowManyAcceptableOptions = len(AcceptableOptions)
@@ -3428,7 +3426,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 					ValueAttribName='TolFreq', Viewport=ViewportObj)
 			elif AttribToChange == 'NumberKind':
 				ValueAcceptable = self.ChangeNumberKind(FTElement=self, NewNumberKindXMLName=NewValue,
-					ValueAttribName='TolFreq')
+					ValueAttribName='TolFreq', Viewport=ViewportObj)
 			else: raise ValueError('FT3421 Unrecognised AttribName')
 		elif ComponentToUpdate == 'EventValueKind':  # update value kind
 			# find the FTEvent to update
@@ -3539,7 +3537,6 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		# undo the unit change, with value conversion if the original change was a conversion
 		if UndoRecord.Convert:
 			getattr(UndoRecord.ComponentHost, UndoRecord.ComponentName).ConvertToUnit(UndoRecord.OldUnit)
-			getattr(UndoRecord.ComponentHost, UndoRecord.ComponentName).ConvertToUnit(UndoRecord.OldUnit)
 		else:
 			getattr(UndoRecord.ComponentHost, UndoRecord.ComponentName).SetMyUnit(UndoRecord.OldUnit)
 		# request Control Frame to switch to the Viewport that was visible when the original edit was made
@@ -3561,10 +3558,12 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			# TODO add data for the changed component to the Save On Fly data
 		return {'Success': True}
 
-	def ChangeNumberKind(self, FTElement, NewNumberKindXMLName, ValueAttribName): # change number kind of numerical value
+	def ChangeNumberKind(self, FTElement, NewNumberKindXMLName, ValueAttribName, Viewport):
+		# change number kind of numerical value
 		# FTElement: FT itself (for updating TolFreq value), or an FTEvent or FTGate instance (for updating event value)
 		# NewNumberKindXMLName: (str) XML name of number kind to change to
-		# ValueAttribName: (str) Name of value attrib in FTElement to change; 'TolFreq' or 'Value'%%%
+		# ValueAttribName: (str) Name of value attrib in FTElement to change; 'TolFreq' or 'Value'
+		# Viewport: Viewport from which number change request was initiated - for undo
 		# return:
 			# NumberKindChanged (bool): whether the number kind was actually changed
 			# NewNumberKind (NumValueItem subclass or None): the number kind changed to, or None if number kind wasn't changed
@@ -3582,73 +3581,67 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			if NewNumberKind == core_classes.AutoNumValueItem:
 				Args = {'AutoCalculator': FTElement.GetEventValue, 'AutoStatusGetter': FTElement.GetEventValueStatus}
 			else: Args = {}
-			# make the new number object, and transfer attribs across
+			# keep a record of the old number object, make the new number object, and transfer attribs across
+			OldValueObj = ValueAttrib
 			NewValueObj = ValueAttrib.MakeNewNumberKind(NewNumberKind=NewNumberKind,
 				AttribsToPreserve=['ValueKindOptions'], **Args)
-#			# copy across acceptable units list
-#			NewValueObj.AcceptableUnits = copy.copy(ValueAttrib.AcceptableUnits)
 			# set the unit getter for AutoNumValueItem
 			if NewNumberKind == core_classes.AutoNumValueItem:
 				NewValueObj.UnitGetter = NewValueObj.GetMyUserDefinedUnit
-#			# find the existing number kind
-#			OldNumberKind = type(ValueAttrib)
-#			# store persistent attribs for the old number kind
-#			if OldNumberKind == core_classes.UserNumValueItem:
-#				ValueAttrib.UserValue = copy.copy(ValueAttrib.ValueFamily)
-#				ValueAttrib.UserIsSet = copy.copy(ValueAttrib.IsSetFlagFamily)
-#				ValueAttrib.UserUnit = ValueAttrib.GetMyUnit()
-#			elif OldNumberKind == core_classes.ConstNumValueItem:
-#				ValueAttrib.ConstConst = ValueAttrib.Constant
-#			elif OldNumberKind == core_classes.LookupNumValueItem:
-#				ValueAttrib.LookupLookupTable = ValueAttrib.LookupTable
-#				ValueAttrib.LookupInputValue = ValueAttrib.InputValue
-#			elif OldNumberKind == core_classes.ParentNumValueItem:
-#				ValueAttrib.ParentValue = copy.copy(ValueAttrib.ValueFamily)
-#				ValueAttrib.ParentParentPHAObj = ValueAttrib.ParentPHAObj
-#			elif OldNumberKind == core_classes.UseParentValueItem:
-#				ValueAttrib.UseParentParentPHAObj = ValueAttrib.ParentPHAObj
-#			# create new number object in the new kind
-#			NewValueObj = NewNumberKind()
-	#		for ThisAttrib in core_classes.NumValueClasses.PersistentAttribs:
-	#			if hasattr(FTElement.Value, ThisAttrib): setattr(NewValueObj, ThisAttrib, getattr(FTElement.Value, ThisAttrib))
-#			# make risk receptor keys in lists in the new number object
-#			for (ThisListAttribName, DefaultValue) in core_classes.NumValueItem.AttribsWithRRKeys:
-#				getattr(NewValueObj, ThisListAttribName).update(dict(
-#					[(ThisRR, DefaultValue) for ThisRR in ValueAttrib.ValueFamily.keys()]))
-#			# set up methods for AutoNumValueItem
-#			if NewNumberKind == core_classes.AutoNumValueItem:
-#				NewValueObj.Calculator = FTElement.GetEventValue  # provide method to get derived value (overridden by SetAsSIFFailureEvent())
-#				NewValueObj.StatusGetter = FTElement.GetEventValueStatus  # provide method to get status
-#				NewValueObj.UnitGetter = NewValueObj.GetMyUserDefinedUnit # return current unit when requested
-#				# we could set an initial unit here, but we don't know what the user wants. So we set it the first time
-#				# the value is successfully calculated
-#			# copy any persistent attribs from the old to the new number object
-#			elif NewNumberKind == core_classes.UserNumValueItem: # set up for 'user defined value'
-#				# restore any previous values
-#				for (RestoreAttrib, OriginalAttrib) in [('UserValue', 'ValueFamily'), ('UserIsSet', 'IsSetFlagFamily')]:
-#					if hasattr(ValueAttrib, RestoreAttrib): setattr(NewValueObj, OriginalAttrib,
-#						copy.copy(getattr(ValueAttrib, RestoreAttrib)))
-#				if hasattr(ValueAttrib, 'UserUnit'): NewValueObj.SetMyUnit(ValueAttrib.UserUnit)
-#			elif NewNumberKind == core_classes.ConstNumValueItem:
-#				if hasattr(ValueAttrib, 'ConstConst'): NewValueObj.Constant = ValueAttrib.ConstConst
-#			elif NewNumberKind == core_classes.LookupNumValueItem:
-#				for (RestoreAttrib, OriginalAttrib) in [('LookupLookupTable', 'LookupTable'),
-#						('LookupInputValue', 'InputValue')]:
-#					if hasattr(ValueAttrib, RestoreAttrib): setattr(NewValueObj, OriginalAttrib,
-#						getattr(ValueAttrib, RestoreAttrib))
-#			elif NewNumberKind == core_classes.ParentNumValueItem:
-#				if hasattr(ValueAttrib, 'ParentParentValue'):
-#					NewValueObj.ParentValue = copy.copy(ValueAttrib.ParentParentValue)
-#				for (RestoreAttrib, OriginalAttrib) in [('ParentParentPHAObj', 'ParentPHAObj')]:
-#					if hasattr(ValueAttrib, RestoreAttrib):
-#						setattr(NewValueObj, OriginalAttrib, getattr(ValueAttrib, RestoreAttrib))
-#			elif NewNumberKind == core_classes.UseParentValueItem:
-#				for (RestoreAttrib, OriginalAttrib) in [('UseParentParentPHAObj', 'ParentPHAObj')]:
-#					if hasattr(ValueAttrib, RestoreAttrib):
-#						setattr(NewValueObj, OriginalAttrib, getattr(ValueAttrib, RestoreAttrib))
 			# overwrite the old Value with the new number object
 			setattr(FTElement, ValueAttribName, NewValueObj)
+			# store undo record
+			self.DoChangeNumberKind_PostActions(ValueAttrib=ValueAttrib, ValueAttribName=ValueAttribName,
+				FTElement=FTElement, NewNumberObj=NewValueObj, OldNumberObj=OldValueObj,
+				ViewportID=Viewport.ID, ViewportClass=type(Viewport),
+				Zoom=Viewport.Zoom, PanX=Viewport.PanX, PanY=Viewport.PanY, Redoing=False)
 		return NumberKindChanged, NewNumberKind
+
+	def DoChangeNumberKind_PostActions(self, ValueAttrib, ValueAttribName, FTElement, NewNumberObj, OldNumberObj,
+			ViewportID, ViewportClass,
+			Zoom, PanX, PanY, Redoing=False):
+		undo.AddToUndoList(Proj=self.Proj, Redoing=Redoing, UndoObj=undo.UndoItem(UndoHandler=self.ChangeNumberKind_Undo,
+			RedoHandler=self.ChangeNumberKind_Redo,
+			Chain='NoChain', ComponentHost=FTElement,
+			ViewportID=ViewportID,
+			ViewportClass=ViewportClass,
+			ElementID=FTElement.ID,
+			ComponentName=ValueAttribName,
+			OldNumberObj=OldNumberObj, NewNumberObj=NewNumberObj,
+			HumanText=_('Change number basis for %s') % _(self.ComponentEnglishNames[ValueAttribName]),
+			Zoom=Zoom, PanX=PanX, PanY=PanY))
+
+	def ChangeNumberKind_Undo(self, Proj, UndoRecord, **Args):
+		assert isinstance(Proj, projects.ProjectItem)
+		assert isinstance(UndoRecord, undo.UndoItem)
+		# find out which datacore socket to send messages on
+		SocketFromDatacore = vizop_misc.SocketWithName(TargetName=Args['SocketFromDatacoreName'])
+		# undo the number kind change by reinstating the original number object
+		setattr(UndoRecord.ComponentHost, UndoRecord.ComponentName, UndoRecord.OldNumberObj)
+		# request Control Frame to switch to the Viewport that was visible when the original edit was made
+		self.RedrawAfterUndoOrRedo(UndoRecord, SocketFromDatacore)
+		projects.SaveOnFly(Proj, UpdateData=vizop_misc.MakeXMLMessage(RootName=info.FTTag,
+			Elements={info.IDTag: self.ID, info.ComponentHostIDTag: UndoRecord.ComponentHost.ID}))
+		# TODO add data for the changed component to the Save On Fly data
+		return {'Success': True}
+
+	def ChangeNumberKind_Redo(self, Proj, RedoRecord, **Args):
+		assert isinstance(Proj, projects.ProjectItem)
+		assert isinstance(RedoRecord, undo.UndoItem)
+		# redo the number kind change by reinstating the new number object
+		setattr(RedoRecord.ComponentHost, RedoRecord.ComponentName, RedoRecord.NewNumberObj)
+		# make the undo record
+		self.DoChangeNumberKind_PostActions(ValueAttrib=getattr(RedoRecord.ComponentHost, RedoRecord.ComponentName),
+			ValueAttribName=RedoRecord.ComponentName, FTElement=RedoRecord.ComponentHost,
+			NewNumberObj=RedoRecord.NewNumberObj, OldNumberObj=RedoRecord.OldNumberObj,
+			ViewportID=RedoRecord.ViewportID, ViewportClass=RedoRecord.ViewportClass,
+			Zoom=RedoRecord.Zoom, PanX=RedoRecord.PanX, PanY=RedoRecord.PanY, Redoing=True)
+		self.RedrawAfterUndoOrRedo(RedoRecord, SocketFromDatacore=vizop_misc.SocketWithName(
+			TargetName=Args['SocketFromDatacoreName']))
+		projects.SaveOnFly(Proj, UpdateData=vizop_misc.MakeXMLMessage(RootName=info.FTTag,
+			Elements={info.IDTag: self.ID, info.ComponentHostIDTag: RedoRecord.ComponentHost.ID}))
+			# TODO add data for the changed component to the Save On Fly data
+		return {'Success': True}
 
 	def HandleIncomingRequest(self, MessageReceived=None, MessageAsXMLTree=None, **Args):
 		# handle request received by FT model in datacore from a Viewport. Request can be to edit data (eg add new element)
