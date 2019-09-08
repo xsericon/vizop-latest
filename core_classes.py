@@ -680,7 +680,6 @@ class UserNumValueItem(NumValueItem): # class of NumValues for which user suppli
 
 	def SetMyAcceptableUnits(self, NewAcceptableUnits, **Args): # set acceptable units for display of this value.
 		# Access this function through self.AcceptableUnits, via the property() statement in the superclass.
-		print('CC606 setting acceptable units with %d items' % len(NewAcceptableUnits))
 		assert isinstance(NewAcceptableUnits, list)
 		assert False not in [isinstance(u, UnitItem) for u in NewAcceptableUnits] # confirm it's a list of UnitItem's
 		self.MyAcceptableUnits = NewAcceptableUnits

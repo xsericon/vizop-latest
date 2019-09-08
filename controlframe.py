@@ -831,9 +831,10 @@ class ControlFrame(wx.Frame):
 			self.MyNotebook = wx.Notebook(parent=self, style=wx.NB_TOP)
 			self.StandardImageButtonSize = wx.Size(32, 32)
 
-			# Make and populate the tabbed panels. Add more aspects here as they are developed
+			# Make widgets for the aspects to be displayed in the tabbed panels. Add more aspects here when developed
 			self.MakePHAModelsAspect()
 			self.MakeNumericalValueAspect()
+			self.MakeFaultTreeAspect()
 			# Make sizer for notebook (this is required even though there's only one item in it, the notebook itself)
 			MySizer = wx.BoxSizer()
 			MySizer.Add(self.MyNotebook, 1, wx.EXPAND)
@@ -1136,8 +1137,6 @@ class ControlFrame(wx.Frame):
 				self.NumericalValueAspect.EditConstantsButton,
 				self.NumericalValueAspect.MatrixLabel, self.NumericalValueAspect.MatrixChoice,
 				self.NumericalValueAspect.EditMatricesButton]
-			# do final setting up. We don't call Initialize() yet - wait until we want to display the aspect
-#			self.NumericalValueAspect.Initialize(ParentNotebook=self.MyNotebook)
 
 		# specific methods for NumericalValueAspect
 
@@ -1148,7 +1147,7 @@ class ControlFrame(wx.Frame):
 			self.TopLevelFrame.ComponentInControlPanel = Args['ComponentInControlPanel']
 			# enable navigation buttons if there are any items in current project's history lists
 			self.UpdateNavigationButtonStatus(Proj)
-			# set widget values %%% working here
+			# set widget values
 			# set up HeaderLabel
 			self.NumericalValueAspect.HeaderLabel.Widget.SetLabel(_('Value: %s' % self.TopLevelFrame.PHAObjInControlPanel.
 				ComponentEnglishNames[self.TopLevelFrame.ComponentInControlPanel]))
@@ -1182,7 +1181,7 @@ class ControlFrame(wx.Frame):
 			self.NumericalValueAspect.ValueKindChoice.Widget.SetSelection(
 				ApplicableValueKindOptionsList.index(True) if True in ApplicableValueKindOptionsList else wx.NOT_FOUND)
 
-		def SetWidgetVisibilityforNumericalValueAspect(self, **Args): # set IsVisible attrib for each widget%%%
+		def SetWidgetVisibilityforNumericalValueAspect(self, **Args): # set IsVisible attrib for each widget
 			# set widgets that are always visible
 			VisibleList = [self.NumericalValueAspect.NavigateBackButton,
 				self.NumericalValueAspect.NavigateForwardButton, self.NumericalValueAspect.HeaderLabel,
@@ -1201,7 +1200,6 @@ class ControlFrame(wx.Frame):
 				if True in ApplicableValueKindOptionsList else None
 			ThisValueKind = core_classes.NumValueClasses[ [c.XMLName for c in core_classes.NumValueClasses].index(
 				ThisValueKindName)] if ThisValueKindName else None
-			print('CF1187 setting widget visibility with value kind:', ThisValueKindName)
 			# set widgets that depend on value kind
 			if ThisValueKind == core_classes.ParentNumValueItem:
 				VisibleList.extend([self.NumericalValueAspect.CopyFromButton, self.NumericalValueAspect.ShowMeCopyFromButton])
@@ -1215,7 +1213,6 @@ class ControlFrame(wx.Frame):
 									self.NumericalValueAspect.EditMatricesButton])
 			# set IsVisible attribs
 			for ThisWidget in self.NumericalValueAspect.WidgetList:
-				if hasattr(ThisWidget, 'Debug'): print('CF1221 setting visibility of widget: ', ThisWidget.Debug, (ThisWidget in VisibleList))
 				ThisWidget.IsVisible = (ThisWidget in VisibleList)
 
 		def NumericalValueAspect_OnCommentButton(self, Event): pass
@@ -1285,6 +1282,91 @@ class ControlFrame(wx.Frame):
 
 		def NumericalValueAspect_OnEditMatricesButton(self, Event): pass
 
+		def MakeFaultTreeAspect(self): # make Fault Tree aspect
+			# make basic attribs needed for the aspect
+			MyNotebookPage = wx.Panel(parent=self.MyNotebook)
+			MyTabText = _('Fault Tree') # text appearing on notebook tab
+			self.FaultTreeAspect = self.ControlPanelAspectItem(InternalName='FaultTree', ParentFrame=self,
+				TopLevelFrame=self.TopLevelFrame, PrefillMethod=self.PrefillWidgetsForFaultTreeAspect,
+				SetWidgetVisibilityMethod=self.SetWidgetVisibilityforFaultTreeAspect, NotebookPage=MyNotebookPage,
+				TabText=MyTabText)
+			# make widgets%%%
+			self.MakeStandardWidgets(Scope=self.FaultTreeAspect, NotebookPage=MyNotebookPage)
+			self.FaultTreeAspect.HeaderLabel = UIWidgetItem(wx.StaticText(MyNotebookPage, -1, _('Fault Tree:')),
+				ColLoc=3, ColSpan=1, GapX=20, Font=self.TopLevelFrame.Fonts['SmallHeadingFont'])
+			self.FaultTreeAspect.FTNameText = UIWidgetItem(wx.TextCtrl(MyNotebookPage, -1,
+				style=wx.TE_PROCESS_ENTER), MinSizeY=25,
+				Events=[wx.EVT_TEXT_ENTER], Handler=self.FaultTreeAspect_OnFTNameTextWidget,
+				Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_LEFT | wx.EXPAND,
+				MinSizeX=100, ColLoc=4, ColSpan=1, DisplayMethod='StaticFromText')
+				# this TextCtrl raises events in 2 ways: (1) <Enter> key raises wx.EVT_TEXT_ENTER, (2) loss of focus is
+				# caught by OnIdle().
+			self.FaultTreeAspect.FTDescriptionLabel = UIWidgetItem(wx.StaticText(MyNotebookPage, -1, _('Description:')),
+				ColLoc=6, ColSpan=1, GapX=20)
+			self.FaultTreeAspect.FTDescriptionText = UIWidgetItem(wx.TextCtrl(MyNotebookPage, -1,
+				style=wx.TE_PROCESS_ENTER | wx.TE_MULTILINE), MinSizeY=25,
+				Events=[wx.EVT_TEXT_ENTER], Handler=self.FaultTreeAspect_OnFTDescriptionWidget,
+				Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_LEFT | wx.EXPAND,
+				MinSizeX=100, ColLoc=7, ColSpan=1, DisplayMethod='StaticFromText')
+			self.FaultTreeAspect.GoToFTLabel = UIWidgetItem(wx.StaticText(MyNotebookPage, -1, _('Go to FT:')),
+				ColLoc=3, ColSpan=1, NewRow=True)
+			self.FaultTreeAspect.GoToFTChoice = UIWidgetItem(wx.Choice(MyNotebookPage, -1, size=(100, 25), choices=[]),
+				  Handler=self.FaultTreeAspect_OnGoToFTChoice, Events=[wx.EVT_CHOICE], ColLoc=4, ColSpan=1)
+			self.FaultTreeAspect.CommentButton = UIWidgetItem(wx.Button(MyNotebookPage, -1, _('Comment')),
+				Handler=self.FaultTreeAspect_OnCommentButton,
+				Events=[wx.EVT_BUTTON],
+				ColLoc=6, ColSpan=1,
+				Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_LEFT | wx.EXPAND)
+			self.FaultTreeAspect.ActionButton = UIWidgetItem(wx.Button(MyNotebookPage, -1, _('Action')),
+				Handler=self.FaultTreeAspect_OnActionButton,
+				Events=[wx.EVT_BUTTON],
+				ColLoc=7, ColSpan=1,
+				Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_LEFT | wx.EXPAND)
+			self.FaultTreeAspect.Divider1 = UIWidgetItem(wx.StaticLine(MyNotebookPage, -1, size=(200, 5),
+				style=wx.LI_HORIZONTAL), NewRow=True,
+				ColLoc=3, ColSpan=5, LeftMargin=10, GapY=10,
+				Flags=wx.ALL | wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_CENTER)
+			self.FaultTreeAspect.ProblemLabel = UIWidgetItem(wx.StaticText(MyNotebookPage, -1, _('Problem:')),
+				ColLoc=3, ColSpan=1, NewRow=True)
+			self.FaultTreeAspect.ProblemDescription = UIWidgetItem(wx.StaticText(MyNotebookPage, -1, ''),
+				ColLoc=4, ColSpan=4)
+			self.FaultTreeAspect.ProblemShowMeButton = UIWidgetItem(wx.Button(MyNotebookPage, -1, _('Show me')),
+				Handler=self.FaultTreeAspect_OnProblemShowMeButton,
+				Events=[wx.EVT_BUTTON],
+				ColLoc=4, ColSpan=1, NewRow=True,
+				Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_LEFT | wx.EXPAND)
+			# make list of all widgets in this aspect
+			self.FaultTreeAspect.WidgetList = [self.FaultTreeAspect.NavigateBackButton,
+				self.FaultTreeAspect.NavigateForwardButton,
+				self.FaultTreeAspect.HeaderLabel, self.FaultTreeAspect.FTNameText,
+				self.FaultTreeAspect.FTDescriptionLabel, self.FaultTreeAspect.FTDescriptionText,
+				self.FaultTreeAspect.UndoButton, self.FaultTreeAspect.RedoButton,
+				self.FaultTreeAspect.GoToFTLabel, self.FaultTreeAspect.GoToFTChoice,
+				self.FaultTreeAspect.CommentButton, self.FaultTreeAspect.ActionButton,
+				self.FaultTreeAspect.Divider1,
+				self.FaultTreeAspect.ProblemLabel, self.FaultTreeAspect.ProblemDescription,
+				self.FaultTreeAspect.ProblemShowMeButton]
+
+		def PrefillWidgetsForFaultTreeAspect(self, **Args):
+			Proj = self.TopLevelFrame.CurrentProj
+			# capture the FT on to display
+			CurrentFT = self.TopLevelFrame.PHAObjInControlPanel = Args['PHAObjInControlPanel']
+			# enable navigation buttons if there are any items in current project's history lists
+			self.UpdateNavigationButtonStatus(Proj)
+			# set widget values
+			# set up FTNameText and FTDescriptionText TODO limit length displayed. Smart ellipsization?
+			self.FaultTreeAspect.FTNameText.Widget.ChangeValue(CurrentFT.SIFName)
+			self.FaultTreeAspect.FTNameText.Widget.SelectAll()
+			self.FaultTreeAspect.FTDescriptionText.Widget.ChangeValue(CurrentFT.Description)
+			self.FaultTreeAspect.FTDescriptionText.Widget.SelectAll()
+
+		def SetWidgetVisibilityforFaultTreeAspect(self): pass
+		def FaultTreeAspect_OnFTNameTextWidget(self, Event): pass
+		def FaultTreeAspect_OnFTDescriptionWidget(self, Event): pass
+		def FaultTreeAspect_OnGoToFTChoice(self, Event): pass
+		def FaultTreeAspect_OnCommentButton(self, Event): pass
+		def FaultTreeAspect_OnActionButton(self, Event): pass
+		def FaultTreeAspect_OnProblemShowMeButton(self, Event): pass
 
 		class ControlPanelAspectItem(object): # class whose instances are aspects of the Control panel
 			# attribs:

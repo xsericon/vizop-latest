@@ -247,7 +247,7 @@ class FTHeader(object): # FT header object. Rendered by drawing text into bitmap
 	# This class is used by FTForDisplay but not by FTObjectInCore (keeps header data in itself, not in sub-object)
 	# ComponentEnglishNames: used for display in Control Panel
 	ComponentEnglishNames = {'SIFName': 'SIF name', 'Rev': 'Revision', 'OpMode': 'Operating mode',
-		'TolFreq': 'Tolerable frequency', 'SILTargetValue': 'SIL target'}
+		'TolFreq': 'Tolerable frequency', 'SILTargetValue': 'SIL target', 'Description': 'Description'}
 
 	def __init__(self, FT):
 		assert isinstance(FT, FTForDisplay)
@@ -260,14 +260,13 @@ class FTHeader(object): # FT header object. Rendered by drawing text into bitmap
 
 	def InitializeData(self):
 		self.SIFName = ''
+		self.Description = ''
 		self.OpMode = _('<undefined>')
 		self.Rev = ''
 		self.RR = _('<undefined>') # risk receptors
 		self.Severity = ''
 		self.TolFreq = core_classes.NumValueItemForDisplay() # tolerable frequency, object including value, unit, possible units etc.
 		self.TolFreq.InternalName = 'TolFreq' # for cross-reference to datacore attrib during editing
-#		self.TolFreq.AcceptableUnits = core_classes.FrequencyUnits # populated in PopulateUnitOptions()
-		# TolFreq.ValueKindOptions is set in PopulateHeaderData() from values set in SetTolFreq()
 		self.UEL = '' # unmitigated event likelihood (outcome frequency) of FT
 		self.OutcomeUnit = '' # ? not used ? assumed same as unit of TolFreq ?
 		self.TargetUnit = '' # 'RRF' or 'PFD' or 'PFH'
@@ -2426,11 +2425,11 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 	DefaultRRGroupingOption = RRGroupingOptions[0]
 	DefaultViewportType = FTForDisplay
 	# names of attribs referring to header, whose value is the same as the text in the XML tag
-	TextComponentNames = ['SIFName', 'Rev', 'SILTargetValue', 'TargetRiskRedMeasure', 'BackgColour',
-							   'TextColour']
+	TextComponentNames = ['SIFName', 'Description', 'Rev', 'SILTargetValue', 'TargetRiskRedMeasure', 'BackgColour',
+		'TextColour']
 	# English names for components; keys are attrib names in this class. Values are translated at point of display
 	ComponentEnglishNames = {'SIFName': 'SIF name', 'Rev': 'Revision', 'OpMode': 'Operating mode',
-		'TolFreq': 'Tolerable frequency', 'SILTargetValue': 'SIL target'}
+		'TolFreq': 'Tolerable frequency', 'SILTargetValue': 'SIL target', 'Description': 'Description'}
 	# element classes that have a number system, i.e. have a Numbering attrib. Must be tuple, not list
 	ElementsWithNumberSystem = (FTConnectorItemInCore, FTGateItemInCore, FTEventInCore)
 
@@ -2447,6 +2446,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		self.Numbering.NumberStructure = [SerialObj]
 		# define object-wide attributes. Many of these are displayed in the FT header
 		self.SIFName = ''
+		self.Description = ''
 		self.OpMode = core_classes.DefaultOpMode # instance of OpModeType
 		self.Rev = ''
 		self.TargetRiskRedMeasure = 'RRF' # can take values in RiskRedMeasures
@@ -2699,6 +2699,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			if __debug__ == 1: # do type checks
 				assert isinstance(El, ElementTree.Element), "FT1658 El is not an XML element"
 				assert isinstance(self.SIFName, str), "FT1659 Fault Tree's SIFName is not a string"
+				assert isinstance(self.Description, str)
 				assert self.OpMode in core_classes.OpModes
 				assert isinstance(self.Rev, str), "FT1653 Fault Tree's Rev is not a string"
 				assert isinstance(self.RiskReceptorGroupOnDisplay, list), "FT1664 Fault Tree's RiskReceptorGroupOnDisplay is not a list"
@@ -3886,7 +3887,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			# In DataInfo, each pair of items is: (FTHeader attrib name, XML tag)
 			assert isinstance(HeaderEl, FTHeader)
 			# set all header attribs except risk receptor (set in PopulateOverallData() )
-			DataInfo = [ ('SIFName', 'SIFName'), ('OpMode', 'OpMode'), ('Rev', 'Rev'),
+			DataInfo = [ ('SIFName', 'SIFName'), ('Description', 'Description'), ('OpMode', 'OpMode'), ('Rev', 'Rev'),
 				('TargetRiskRedMeasure', 'TargetUnit'), ('BackgColour', 'BackgColour'),
 				('TextColour', 'TextColour'), ('Severity', 'Severity'),
 #				('TolFreq', 'TolFreq'), ('TolFreqUnit', 'TolFreqUnit'),
