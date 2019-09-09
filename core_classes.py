@@ -1096,7 +1096,6 @@ NumValueClassesToCheckValid = (UserNumValueItem, ConstNumValueItem, LookupNumVal
 	# this is a tuple, not a list, so it can be used directly in isinstance()
 NumValueClassHumanNames = [c.HumanName for c in NumValueClasses]  # list of names used in choice box
 
-
 class LookupTableItem(object):
 	# class of tables containing values that can be looked up by reference to a key value
 	# The values are assumed to support all risk receptors, so there's no explicit handling of RR's here
@@ -1730,5 +1729,18 @@ class Bookmark(object):
 
 		pass
 
+class ChoiceItem(object): # represents an item in a group of items the user can select from, in an instance of
+	# FTForDisplay (such as a risk receptor) or an instance of a PHA object shadow or an FT element
+	def __init__(self, XMLName='', HumanName='', Applicable=True):
+		# XMLName (str): stores the 'Serial' tag value received from FTObjectInCore
+		# Applicable (bool): whether the item applies to this instance (ie whether this is the "current" one)
+		assert isinstance(HumanName, str)
+		assert isinstance(XMLName, str)
+		assert len(XMLName) > 0
+		assert isinstance(Applicable, bool)
+		object.__init__(self)
+		self.HumanName = HumanName
+		self.XMLName = XMLName
+		self.Applicable = Applicable
 
 del _ # remove dummy definition

@@ -711,3 +711,14 @@ def AddPHAObjsTags(Proj, XMLRoot, CurrentPHAObj=None):
 		PHAObjEl.text = str(ThisPHAModel.HumanName)
 		PHAObjEl.set(info.ApplicableAttribName, utilities.Bool2Str(ThisPHAModel is CurrentPHAObj))
 		PHAObjEl.set(info.IDTag, str(ThisPHAModel.ID)) # add PHA object ID
+
+def ExtractPHAObjsTags(Proj, XMLRoot):
+	# extract PHAObjects from XMLRoot (an ElementTree XML element) and put them into Proj.PHAObjShadows
+	assert isinstance(Proj, projects.ProjectItem)
+	assert isinstance(XMLRoot, ElementTree.Element)
+	# first, clear existing list of PHAObjs
+	Proj.PHAObjShadows = []
+	for ThisPHAObjTag in XMLRoot.findall(info.PHAObjTag):
+		Proj.PHAObjShadows.append(core_classes.ChoiceItem(XMLName=ThisPHAObjTag.get(info.IDTag),
+			HumanName='' if ThisPHAObjTag.text is None else ThisPHAObjTag.text,
+			Applicable=utilities.Bool2Str(ThisPHAObjTag.get(info.ApplicableAttribName))))

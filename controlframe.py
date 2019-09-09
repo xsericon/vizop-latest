@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Module: controlframe. This file is part of Vizop. Copyright xSeriCon, 2018
+# Module: controlframe. This file is part of Vizop. Copyright xSeriCon, 2019
 # Encodes the main control and navigation frame seen by the user when a project is open.
 # Code tidying done on 1 Dec 2018
 
@@ -14,7 +14,7 @@ import xml.etree.ElementTree as ElementTree
 from platform import system
 # vizop modules needed:
 import settings, text, vizop_misc, art, display_utilities, info, utilities, core_classes, projects, project_display
-import undo
+import undo, faulttree
 from display_utilities import UIWidgetItem
 
 # ColourSwatchButtonSize = (60,20) # size for 'change colour' buttons. Not applied in all cases, yet
@@ -737,7 +737,8 @@ class ControlFrame(wx.Frame):
 			if self.ControlPanelCurrentAspect: self.ControlPanelCurrentAspect.Deactivate()
 			# get target aspect, if supplied as a string
 			if isinstance(NewAspect, str):
-				TargetAspect = {'CPAspect_NumValue': self.NumericalValueAspect}.get(NewAspect, None)
+				TargetAspect = {'CPAspect_NumValue': self.NumericalValueAspect,
+					'CPAspect_FaultTree': self.FaultTreeAspect}.get(NewAspect, None)
 			else: TargetAspect = NewAspect
 			if TargetAspect: # any recognised aspect supplied?
 				self.ControlPanelCurrentAspect = TargetAspect # store new aspect
@@ -1355,15 +1356,36 @@ class ControlFrame(wx.Frame):
 			# enable navigation buttons if there are any items in current project's history lists
 			self.UpdateNavigationButtonStatus(Proj)
 			# set widget values
-			# set up FTNameText and FTDescriptionText TODO limit length displayed. Smart ellipsization?
+			# set up FTNameText and FTDescriptionText TODO limit length displayed. Smart ellipsization? Also in GoToFTChoice
 			self.FaultTreeAspect.FTNameText.Widget.ChangeValue(CurrentFT.HumanName)
 			self.FaultTreeAspect.FTNameText.Widget.SelectAll()
 			self.FaultTreeAspect.FTDescriptionText.Widget.ChangeValue(CurrentFT.Description)
 			self.FaultTreeAspect.FTDescriptionText.Widget.SelectAll()
 			# set up GoToFTChoice
-			self.FaultTreeAspect.GoToFTChoice.Widget.Set()
+			self.FaultTreeAspect.GoToFTChoice.Widget.Set([p.HumanName for p in Proj.PHAObjShadows])
+			# preselect current FT in GoToFTChoice
+			ApplicablePHAObjsList = [p.Applicable for p in Proj.PHAObjShadows]
+			self.FaultTreeAspect.GoToFTChoice.Widget.SetSelection(ApplicablePHAObjsList.index(True)
+				if True in ApplicablePHAObjsList else wx.NOT_FOUND)
+			# set problem-related widgets TODO use self.TopLevelFrame.CurrentValueProblem
 
-		def SetWidgetVisibilityforFaultTreeAspect(self): pass
+		def SetWidgetVisibilityforFaultTreeAspect(self, **Args): # set IsVisible attrib for each widget
+			# set widgets that are always visible
+			VisibleList = [self.FaultTreeAspect.NavigateBackButton,
+				self.FaultTreeAspect.NavigateForwardButton, self.FaultTreeAspect.HeaderLabel,
+				self.FaultTreeAspect.FTNameText, self.FaultTreeAspect.FTDescriptionLabel,
+				self.FaultTreeAspect.UndoButton, self.FaultTreeAspect.RedoButton,
+				self.FaultTreeAspect.FTDescriptionText, self.FaultTreeAspect.GoToFTLabel,
+				self.FaultTreeAspect.GoToFTChoice, self.FaultTreeAspect.CommentButton,
+				self.FaultTreeAspect.ActionButton, self.FaultTreeAspect.Divider1]
+			# set visibility for problem-related widgets
+			ProblemVisible = bool(self.TopLevelFrame.CurrentValueProblem)
+			if ProblemVisible: VisibleList.extend( [self.FaultTreeAspect.ProblemLabel,
+				self.FaultTreeAspect.ProblemDescription, self.FaultTreeAspect.ProblemShowMeButton] )
+			# set IsVisible attribs
+			for ThisWidget in self.NumericalValueAspect.WidgetList:
+				ThisWidget.IsVisible = (ThisWidget in VisibleList)
+
 		def FaultTreeAspect_OnFTNameTextWidget(self, Event): pass
 		def FaultTreeAspect_OnFTDescriptionWidget(self, Event): pass
 		def FaultTreeAspect_OnGoToFTChoice(self, Event): pass
@@ -2049,8 +2071,6 @@ class ControlFrame(wx.Frame):
 		self.TrialViewport.C2DSocketREQObj.PHAObj = self.TrialViewport.D2CSocketREPObj.PHAObj = PHAObj
 		# set Viewport as the current Viewport and release any existing Viewport from display device
 		self.SwitchToViewport(TargetViewport=self.TrialViewport, XMLRoot=XMLRoot)
-		# set up the display in the PHA panel; now done in SwitchToViewport(), above
-#		self.ShowViewport(MessageAsXMLTree=XMLRoot)
 		# send acknowledgment message back (ListenToSockets does the actual sending)
 		return vizop_misc.MakeXMLMessage('CP_NewViewport', RootText='OK')
 
@@ -2131,6 +2151,9 @@ class ControlFrame(wx.Frame):
 		self.ShowViewport(MessageAsXMLTree=XMLRoot)
 		# update other GUI elements
 		self.RefreshGUIAfterDataChange(Proj=Proj)
+		# show appropriate aspect in Control Panel
+		self.MyControlPanel.GotoControlPanelAspect(NewAspect=self.CurrentViewport.PreferredControlPanelAspect,
+			PHAObjInControlPanel=self.CurrentViewport.PHAObj, ComponentInControlPanel=None)
 		return vizop_misc.MakeXMLMessage('Null', 'Null')
 
 	def DatacoreDoNewViewport_Undo(self, Proj, UndoRecord, **Args): # undo creation of new Viewport
@@ -2358,6 +2381,7 @@ class ControlFrame(wx.Frame):
 		self.Projects = Projects
 		self.DisplayDevices = [] # wx.Panel instances; devices that can show Viewports
 		self.TryHandshake = False # flag to OnIdle to try handshake with remote datacore
+		self.CurrentValueProblem = None # info about any value problem currently displayed in the Control Panel
 
 		# set up fonts. NormalWidgetFont and BoldWidgetFont are global, so that they can be accessed by UIWidget class
 		# other fonts are set up in SetupFonts()
@@ -2514,7 +2538,7 @@ class ControlFrame(wx.Frame):
 		self.CurrentProj = ThisProj
 		# go to appropriate initial view of project
 		if ThisProj.PHAObjs: # does the project have any PHA models?
-			pass # TODO call self.MyControlPanel.GotoControlPanelAspect
+			pass # TODO call self.MyControlPanel.GotoControlPanelAspect, although this is now done in SwitchToViewport()
 		else: # no existing PHA models
 			# no need to store a navigation milestone here - done in DoNewViewport
 			# get the user to create a PHA model

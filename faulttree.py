@@ -3717,20 +3717,6 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			Reply = vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
 		return Reply
 
-class ChoiceItem(object): # represents an item in a group of items the user can select from, in an instance of
-	# FTForDisplay (such as a risk receptor) or in instance of an FT element
-	def __init__(self, XMLName='', HumanName='', Applicable=True):
-		# XMLName (str): stores the 'Serial' tag value received from FTObjectInCore
-		# Applicable (bool): whether the item applies to this FT instance
-		assert isinstance(HumanName, str)
-		assert isinstance(XMLName, str)
-		assert len(XMLName) > 0
-		assert isinstance(Applicable, bool)
-		object.__init__(self)
-		self.HumanName = HumanName
-		self.XMLName = XMLName
-		self.Applicable = Applicable
-
 class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all data needed to display FT
 	# Each separate sub-object (header, cause etc) has attributes whose names are assumed to be same as in the data message from DataCore
 	# NB this class has a forward definition earlier in this module.
@@ -3744,6 +3730,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 	# VizopTalks message when a new FT is created. NB don't set Priority here, as it is overridden in DoNewViewportCommand()
 	NewViewportVizopTalksArgs = {'Title': 'New Fault Tree created',
 		'MainText': 'Click on grey builder button to add first FT element'}
+	PreferredControlPanelAspect = 'CPAspect_FaultTree' # aspect to show when FT is displayed
 	MinColumnLength = 100 # in canvas coords
 	MarginXInCU = 20 # margin between left edge of screen and left edge of first column, in canvas coords
 	ImageSizeNoZoom = (20, 20) # initial no-zoom size of all button images
@@ -3854,9 +3841,9 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 				# set human name according to whether this is a value conversion option (special case for unit options)
 				if ThisTag.text.endswith(info.ConvertValueMarker): ThisHumanName = _('Convert value to %s') % ThisOptionHumanName
 				else: ThisHumanName = ThisOptionHumanName
-				Options.append(ChoiceItem(XMLName=ThisTag.text,
-					HumanName=ThisHumanName,
-					Applicable=utilities.Bool2Str(ThisTag.get(info.ApplicableAttribName))))
+				Options.append(core_classes.ChoiceItem(XMLName=ThisTag.text,
+										  HumanName=ThisHumanName,
+										  Applicable=utilities.Bool2Str(ThisTag.get(info.ApplicableAttribName))))
 			# set options list in the FT component
 			setattr(getattr(HostEl, ComponentName), ListAttrib, Options)
 
@@ -3866,8 +3853,8 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			self.RiskReceptorObjs = []
 			for ThisRRTag in XMLRoot.findall(info.RiskReceptorTag):
 				Applicable = utilities.Bool2Str(ThisRRTag.get(info.ApplicableAttribName)) # whether ThisRRTag is current one
-				self.RiskReceptorObjs.append(ChoiceItem(XMLName=ThisRRTag.get(info.SerialTag),
-					HumanName=utilities.TextAsString(ThisRRTag), Applicable=Applicable))
+				self.RiskReceptorObjs.append(core_classes.ChoiceItem(XMLName=ThisRRTag.get(info.SerialTag),
+														HumanName=utilities.TextAsString(ThisRRTag), Applicable=Applicable))
 				if Applicable: HeaderEl.RR = ThisRRTag.text # set human name of current RR group in header
 			# get severity category names and whether they are applicable to this FT
 			self.SeverityCatObjs = []
@@ -3879,10 +3866,13 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			# get risk receptor grouping options and whether they are applicable to this FT
 			self.RRGroupingOptionObjs = []
 			for ThisRRGroupingTag in XMLRoot.findall(info.RiskReceptorGroupingOptionTag):
-				self.RRGroupingOptionObjs.append(ChoiceItem(
+				self.RRGroupingOptionObjs.append(core_classes.ChoiceItem(
 					XMLName=ThisRRGroupingTag.get(info.SerialTag),
 					HumanName=self.RRGroupingNameHash[ThisRRGroupingTag.text],
 					Applicable=utilities.Bool2Str(ThisRRGroupingTag.get(info.ApplicableAttribName))))
+			# get PHAObjs tags to inform the Control Frame about other PHA objects in the project. This is used to
+			# allow the user to choose another PHA object to view. The data is put into Proj.PHAObjShadows
+			project_display.ExtractPHAObjsTags(Proj=self.Proj, XMLRoot=XMLRoot)
 
 		def PopulateHeaderData(FT, HeaderEl, HeaderXMLRoot, ComponentNameToHighlight=''):
 			# put header data from HeaderXMLRoot into attribs of HeaderEl (a FTHeader instance)
@@ -3980,10 +3970,10 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			NewEvent.EventType = XMLObj.find('EventType').text
 			NewEvent.EventTypeHumanName = self.EventTypeNameHash[NewEvent.EventType]
 			# populate event type choice
-			NewEvent.EventTypeComponent.ObjectChoices = [ChoiceItem(XMLName=ThisTag.text,
-				HumanName=self.EventTypeNameHash[ThisTag.text],
-				Applicable=utilities.Bool2Str(ThisTag.get(info.ApplicableAttribName)))
-				for ThisTag in XMLObj.findall(info.EventTypeOptionTag)]
+			NewEvent.EventTypeComponent.ObjectChoices = [core_classes.ChoiceItem(XMLName=ThisTag.text,
+																	HumanName=self.EventTypeNameHash[ThisTag.text],
+																	Applicable=utilities.Bool2Str(ThisTag.get(info.ApplicableAttribName)))
+														 for ThisTag in XMLObj.findall(info.EventTypeOptionTag)]
 			# populate event value unit choice; TODO use PopulateValueOptions()
 			NewEvent.EventValueUnitComponent.ObjectChoices = []
 			for ThisTag in XMLObj.findall(info.UnitOptionTag):
@@ -3993,17 +3983,17 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 				# set human name according to whether this is a value conversion option
 				if ThisTag.text.endswith(info.ConvertValueMarker): ThisHumanName = _('Convert value to %s') % ThisUnitHumanName
 				else: ThisHumanName = ThisUnitHumanName
-				NewEvent.EventValueUnitComponent.ObjectChoices.append(ChoiceItem(XMLName=ThisTag.text,
-					HumanName=ThisHumanName,
-					Applicable=utilities.Bool2Str(ThisTag.get(info.ApplicableAttribName))))
+				NewEvent.EventValueUnitComponent.ObjectChoices.append(core_classes.ChoiceItem(XMLName=ThisTag.text,
+																				 HumanName=ThisHumanName,
+																				 Applicable=utilities.Bool2Str(ThisTag.get(info.ApplicableAttribName))))
 #			# populate value kind with HumanName of number kind class specified in incoming NumberKind tag
 #			NewEvent.ValueKind = ([c.HumanName for c in core_classes.NumValueClasses
 #				if c.XMLName == XMLObj.findtext(info.NumberKindTag, default='')] + ['???'])[0]
 			# populate value kind choice%%%
-			NewEvent.EventValueKindComponent.ObjectChoices = [ChoiceItem(XMLName=ThisTag.text,
-				HumanName=[c.HumanName for c in core_classes.NumValueClasses if c.XMLName == ThisTag.text][0],
-				Applicable=utilities.Bool2Str(ThisTag.get(info.ApplicableAttribName)))
-				for ThisTag in XMLObj.findall(info.NumberKindTag)]
+			NewEvent.EventValueKindComponent.ObjectChoices = [core_classes.ChoiceItem(XMLName=ThisTag.text,
+																		 HumanName=[c.HumanName for c in core_classes.NumValueClasses if c.XMLName == ThisTag.text][0],
+																		 Applicable=utilities.Bool2Str(ThisTag.get(info.ApplicableAttribName)))
+															  for ThisTag in XMLObj.findall(info.NumberKindTag)]
 			# populate value kind with HumanName of number kind marked as applicable
 			NewEvent.ValueKind = [c.HumanName for c in NewEvent.EventValueKindComponent.ObjectChoices
 				if c.Applicable][0]
@@ -4059,19 +4049,19 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			for Tag, Attrib in DataInfoAsList:
 				setattr(NewGate, Attrib, [El.text for El in XMLObj.findall(Tag)])
 			# populate gate kind choice
-			NewGate.GateKind.ObjectChoices = [ChoiceItem(XMLName=ThisTag.text,
-				HumanName=NewGate.GateKindHash[ThisTag.text],
-				Applicable=utilities.Bool2Str(ThisTag.get(info.ApplicableAttribName)))
-				for ThisTag in XMLObj.findall(info.FTGateTypeOptionTag)]
+			NewGate.GateKind.ObjectChoices = [core_classes.ChoiceItem(XMLName=ThisTag.text,
+														 HumanName=NewGate.GateKindHash[ThisTag.text],
+														 Applicable=utilities.Bool2Str(ThisTag.get(info.ApplicableAttribName)))
+											  for ThisTag in XMLObj.findall(info.FTGateTypeOptionTag)]
 			# populate gate value unit choice
 			NewGate.GateValueUnit.ObjectChoices = []
 			for ThisTag in XMLObj.findall(info.UnitOptionTag):
 				# find human name for this unit option
 				ThisUnitHumanName = [u.HumanName for u in core_classes.UnitItem.UserSelectableUnits
 					if ThisTag.text == u.XMLName][0]
-				NewGate.GateValueUnit.ObjectChoices.append(ChoiceItem(XMLName=ThisTag.text,
-					HumanName=ThisUnitHumanName,
-					Applicable=utilities.Bool2Str(ThisTag.get(info.ApplicableAttribName))))
+				NewGate.GateValueUnit.ObjectChoices.append(core_classes.ChoiceItem(XMLName=ThisTag.text,
+																	  HumanName=ThisUnitHumanName,
+																	  Applicable=utilities.Bool2Str(ThisTag.get(info.ApplicableAttribName))))
 			# retrieve data from ProblemIndicatorTag: decide whether to show problem button
 			ProblemTag = XMLObj.find(info.ProblemIndicatorTag)
 			if ProblemTag is None:
