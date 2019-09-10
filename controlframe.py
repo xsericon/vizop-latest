@@ -1299,7 +1299,7 @@ class ControlFrame(wx.Frame):
 				style=wx.TE_PROCESS_ENTER), MinSizeY=25,
 				Events=[wx.EVT_TEXT_ENTER], Handler=self.FaultTreeAspect_OnFTNameTextWidget,
 				Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_LEFT | wx.EXPAND,
-				MinSizeX=100, ColLoc=4, ColSpan=1, DisplayMethod='StaticFromText')
+				MinSizeX=200, ColLoc=4, ColSpan=1, DisplayMethod='StaticFromText')
 				# this TextCtrl raises events in 2 ways: (1) <Enter> key raises wx.EVT_TEXT_ENTER, (2) loss of focus is
 				# caught by OnIdle().
 			self.FaultTreeAspect.FTDescriptionLabel = UIWidgetItem(wx.StaticText(MyNotebookPage, -1, _('Description:')),
@@ -1308,20 +1308,31 @@ class ControlFrame(wx.Frame):
 				style=wx.TE_PROCESS_ENTER | wx.TE_MULTILINE), MinSizeY=25,
 				Events=[wx.EVT_TEXT_ENTER], Handler=self.FaultTreeAspect_OnFTDescriptionWidget,
 				Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_LEFT | wx.EXPAND,
-				MinSizeX=100, ColLoc=7, ColSpan=1, DisplayMethod='StaticFromText')
+				MinSizeX=200, ColLoc=7, ColSpan=2, DisplayMethod='StaticFromText')
+			self.FaultTreeAspect.ViewLabel = UIWidgetItem(wx.StaticText(MyNotebookPage, -1, _('FT view:')),
+				ColLoc=9, ColSpan=1)
+			self.FaultTreeAspect.ViewNameText = UIWidgetItem(wx.TextCtrl(MyNotebookPage, -1,
+				style=wx.TE_PROCESS_ENTER), MinSizeY=25,
+				Events=[wx.EVT_TEXT_ENTER], Handler=self.FaultTreeAspect_OnFTNameTextWidget,
+				Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_LEFT | wx.EXPAND,
+				MinSizeX=200, ColLoc=10, ColSpan=1, DisplayMethod='StaticFromText')
 			self.FaultTreeAspect.GoToFTLabel = UIWidgetItem(wx.StaticText(MyNotebookPage, -1, _('Go to FT:')),
-				ColLoc=3, ColSpan=1, NewRow=True)
-			self.FaultTreeAspect.GoToFTChoice = UIWidgetItem(wx.Choice(MyNotebookPage, -1, size=(100, 25), choices=[]),
+				ColLoc=3, ColSpan=1)
+			self.FaultTreeAspect.GoToFTChoice = UIWidgetItem(wx.Choice(MyNotebookPage, -1, size=(200, 25), choices=[]),
 				  Handler=self.FaultTreeAspect_OnGoToFTChoice, Events=[wx.EVT_CHOICE], ColLoc=4, ColSpan=1)
+			self.FaultTreeAspect.GoToViewLabel = UIWidgetItem(wx.StaticText(MyNotebookPage, -1, _('Go to view:')),
+				ColLoc=9, ColSpan=1)
+			self.FaultTreeAspect.GoToViewChoice = UIWidgetItem(wx.Choice(MyNotebookPage, -1, size=(200, 25), choices=[]),
+				  Handler=self.FaultTreeAspect_OnGoToFTChoice, Events=[wx.EVT_CHOICE], ColLoc=10, ColSpan=1)
 			self.FaultTreeAspect.CommentButton = UIWidgetItem(wx.Button(MyNotebookPage, -1, _('Comment')),
 				Handler=self.FaultTreeAspect_OnCommentButton,
 				Events=[wx.EVT_BUTTON],
-				ColLoc=6, ColSpan=1,
+				ColLoc=7, ColSpan=1,
 				Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_LEFT | wx.EXPAND)
 			self.FaultTreeAspect.ActionButton = UIWidgetItem(wx.Button(MyNotebookPage, -1, _('Action')),
 				Handler=self.FaultTreeAspect_OnActionButton,
 				Events=[wx.EVT_BUTTON],
-				ColLoc=7, ColSpan=1,
+				ColLoc=8, ColSpan=1,
 				Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_LEFT | wx.EXPAND)
 			self.FaultTreeAspect.Divider1 = UIWidgetItem(wx.StaticLine(MyNotebookPage, -1, size=(200, 5),
 				style=wx.LI_HORIZONTAL), NewRow=True,
@@ -1341,8 +1352,10 @@ class ControlFrame(wx.Frame):
 				self.FaultTreeAspect.NavigateForwardButton,
 				self.FaultTreeAspect.HeaderLabel, self.FaultTreeAspect.FTNameText,
 				self.FaultTreeAspect.FTDescriptionLabel, self.FaultTreeAspect.FTDescriptionText,
+				self.FaultTreeAspect.ViewLabel, self.FaultTreeAspect.ViewNameText,
 				self.FaultTreeAspect.UndoButton, self.FaultTreeAspect.RedoButton,
 				self.FaultTreeAspect.GoToFTLabel, self.FaultTreeAspect.GoToFTChoice,
+				self.FaultTreeAspect.GoToViewLabel, self.FaultTreeAspect.GoToViewChoice,
 				self.FaultTreeAspect.CommentButton, self.FaultTreeAspect.ActionButton,
 				self.FaultTreeAspect.Divider1,
 				self.FaultTreeAspect.ProblemLabel, self.FaultTreeAspect.ProblemDescription,
@@ -1377,7 +1390,9 @@ class ControlFrame(wx.Frame):
 				self.FaultTreeAspect.UndoButton, self.FaultTreeAspect.RedoButton,
 				self.FaultTreeAspect.FTDescriptionText, self.FaultTreeAspect.GoToFTLabel,
 				self.FaultTreeAspect.GoToFTChoice, self.FaultTreeAspect.CommentButton,
-				self.FaultTreeAspect.ActionButton, self.FaultTreeAspect.Divider1]
+				self.FaultTreeAspect.ActionButton, self.FaultTreeAspect.Divider1,
+				self.FaultTreeAspect.ViewLabel, self.FaultTreeAspect.ViewNameText,
+				self.FaultTreeAspect.GoToViewLabel, self.FaultTreeAspect.GoToViewChoice]
 			# set visibility for problem-related widgets
 			ProblemVisible = bool(self.TopLevelFrame.CurrentValueProblem)
 			if ProblemVisible: VisibleList.extend( [self.FaultTreeAspect.ProblemLabel,
@@ -1387,8 +1402,10 @@ class ControlFrame(wx.Frame):
 				ThisWidget.IsVisible = (ThisWidget in VisibleList)
 
 		def FaultTreeAspect_OnFTNameTextWidget(self, Event, **Args): pass
+		def FaultTreeAspect_OnViewNameTextWidget(self, Event, **Args): pass
 		def FaultTreeAspect_OnFTDescriptionWidget(self, Event, **Args): pass
 		def FaultTreeAspect_OnGoToFTChoice(self, Event, **Args): pass
+		def FaultTreeAspect_OnGoToViewChoice(self, Event, **Args): pass
 		def FaultTreeAspect_OnCommentButton(self, Event, **Args): pass
 		def FaultTreeAspect_OnActionButton(self, Event, **Args): pass
 		def FaultTreeAspect_OnProblemShowMeButton(self, Event, **Args): pass
