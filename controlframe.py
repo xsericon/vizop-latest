@@ -1386,12 +1386,12 @@ class ControlFrame(wx.Frame):
 			for ThisWidget in self.NumericalValueAspect.WidgetList:
 				ThisWidget.IsVisible = (ThisWidget in VisibleList)
 
-		def FaultTreeAspect_OnFTNameTextWidget(self, Event): pass
-		def FaultTreeAspect_OnFTDescriptionWidget(self, Event): pass
-		def FaultTreeAspect_OnGoToFTChoice(self, Event): pass
-		def FaultTreeAspect_OnCommentButton(self, Event): pass
-		def FaultTreeAspect_OnActionButton(self, Event): pass
-		def FaultTreeAspect_OnProblemShowMeButton(self, Event): pass
+		def FaultTreeAspect_OnFTNameTextWidget(self, Event, **Args): pass
+		def FaultTreeAspect_OnFTDescriptionWidget(self, Event, **Args): pass
+		def FaultTreeAspect_OnGoToFTChoice(self, Event, **Args): pass
+		def FaultTreeAspect_OnCommentButton(self, Event, **Args): pass
+		def FaultTreeAspect_OnActionButton(self, Event, **Args): pass
+		def FaultTreeAspect_OnProblemShowMeButton(self, Event, **Args): pass
 
 		class ControlPanelAspectItem(object): # class whose instances are aspects of the Control panel
 			# attribs:
@@ -2648,6 +2648,7 @@ def DatacoreDoNewPHAObj(Proj, XMLRoot=None, ViewportID=None, **NewPHAObjArgs):
 	# make the PHA model and attach it to the project
 	NewPHAObj = NewPHAObjType(Proj, **NewPHAObjArgs)
 	Proj.PHAObjs.append(NewPHAObj)
+	Proj.AssignDefaultNameToPHAObj(PHAObj=NewPHAObj)
 	undo.AddToUndoList(Proj, UndoObj=undo.UndoItem(UndoHandler=DatacoreDoNewPHAObj_Undo, Chain='NoChain',
 		RedoHandler=DatacoreDoNewPHAObj_Redo, ViewportID=ViewportID,
 		PHAObj=NewPHAObj, HumanText=_('new PHA model: %s' % NewPHAObjType.HumanName)))

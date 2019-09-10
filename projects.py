@@ -2,14 +2,14 @@
 # Module: projects. This file is part of Vizop. Copyright xSeriCon, 2019
 
 # standard modules needed:
-import os, shutil
+import os, shutil, datetime
 import os.path
 import xml.etree.ElementTree as ElementTree
 
 # vizop modules needed:
 from vizop_misc import IsReadableFile, IsWritableLocation, select_file_from_all
 #import settings, core_classes, info, vizop_parser, faulttree
-import settings, core_classes, info, faulttree
+import settings, core_classes, info, faulttree, utilities
 
 """
 The projects module contains functions for handling entire Vizop projects, including project files.
@@ -109,13 +109,13 @@ class ProjectItem(object): # class of PHA project instances
 		#Actual file
 		self.VizopVersion = CurrentProjDocType #str; Vizop Version
 		self.ShortTitle = 'CHAZOP with chocolate sauce'  # project short title for display
-		self.ProjNumber = 141688  # int; user's project reference number
+		self.ProjNumber = 141688 # int; user's project reference number
 		self.Description = 'A great excuse to spend 4 weeks in Seoul'  # longer description of project
-		self.EditNumber = 0  # int; incremented every time the project's dataset is changed
-		self.TeamMembers = [core_classes.TeamMember(1, 'Amy Stone', 'Consultant','Amy'), core_classes.TeamMember(2, 'Ben Smith', 'Project Manager','Ben')] # list of team members
+		self.EditNumber = 0 # int; incremented every time the project's dataset is changed
+		self.TeamMembers = [core_classes.TeamMember(1, 'Amy Stone', 'Consultant','Amy'),
+			core_classes.TeamMember(2, 'Ben Smith', 'Project Manager','Ben')] # list of team members
 		self.RiskMatrices = [core_classes.LookupTableItem()] # list of risk matrix
 		self.Constants = [] # list of constants
-		#self.FaultTree = []
 
 	def GetNewID(self):
 		# get and return ID for new object in self (str)
@@ -137,6 +137,18 @@ class ProjectItem(object): # class of PHA project instances
 		return self.ProjectFonts[PHAObject]
 		# When the 'default' font for a PHA item class is changed, in general we need to create a new ProjectFontItem instance for it.
 		# This would be done in the iWindow widget handler
+
+	def AssignDefaultNameToPHAObj(self, PHAObj): # assigns a default HumanName to PHAObj
+		# The default name is e.g. "Fault Tree", then the date in YYMMMDD, then '-' and a serial number
+		assert isinstance(PHAObj, core_classes.PHAModelBaseClass)
+		HumanNameStub = type(PHAObj).HumanName + ' ' + datetime.date.today().strftime('%Y%b%d') + '-'
+		SkipLength = len(utilities.StripSpaces(HumanNameStub))
+		# check if any other PHA objects in this project have the same HumanNameStub (ignoring spaces).
+		# If so, find the highest among their serial suffixes
+		HighestSuffix = max([utilities.str2int(utilities.StripSpaces(p.HumanName)[SkipLength:]) for p in self.PHAObjs ]
+			+ [0])
+		# assign HumanName to PHAObj
+		PHAObj.HumanName = HumanNameStub + str(HighestSuffix + 1)
 
 def TestProjectsOpenable(ProjectFilenames, ReadOnly=False):
 	"""
