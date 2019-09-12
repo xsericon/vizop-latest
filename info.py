@@ -102,6 +102,7 @@ ComponentToHighlightTag = 'componentToHighlight'
 ZoomTag = 'zoom'
 PanXTag = 'panX'
 PanYTag = 'panY'
+HumanNameTag = 'HumanName'
 
 # for alarm list
 AlarmCountTag = 'AlarmCount'

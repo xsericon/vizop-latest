@@ -3925,7 +3925,6 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 				PopulateValueOptions(XMLRoot=ThisNumTag, HostEl=HeaderEl, ComponentName=ThisNumValue,
 						ListAttrib='ValueKindOptions', OptionTagName=info.ValueKindOptionTag,
 						MasterOptionsList=core_classes.NumValueClasses)
-			print('FT3764 set TolFreq.ValueKindOptions to: ', HeaderEl.TolFreq.ValueKindOptions)
 			# populate content elements
 			for ThisEl in HeaderEl.ContentEls: ThisEl.Text.Content = getattr(HeaderEl, ThisEl.InternalName)
 			# store component name to highlight
@@ -3945,7 +3944,6 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			assert isinstance(Column, FTColumn)
 #			print("FT2236 received event data: ", ElementTree.tostring(XMLObj))
 			NewEvent = FTEvent(FT=self, Column=Column)
-#			print("FT3213 making new FTEvent: ", NewEvent)
 			# get event data. In DataInfo, each pair of items is: (XML tag, FTEvent attrib name)
 			DataInfoAsStr = [ (info.IDTag, 'ID'), ('Numbering', 'Numbering'),
 				('EventDescription', 'EventDescription'), ('Value', 'Value'), ('ValueProblemObjectID', 'ValueProblemObjectID'),

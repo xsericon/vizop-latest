@@ -1291,7 +1291,7 @@ class ControlFrame(wx.Frame):
 				TopLevelFrame=self.TopLevelFrame, PrefillMethod=self.PrefillWidgetsForFaultTreeAspect,
 				SetWidgetVisibilityMethod=self.SetWidgetVisibilityforFaultTreeAspect, NotebookPage=MyNotebookPage,
 				TabText=MyTabText)
-			# make widgets%%%
+			# make widgets
 			self.MakeStandardWidgets(Scope=self.FaultTreeAspect, NotebookPage=MyNotebookPage)
 			self.FaultTreeAspect.HeaderLabel = UIWidgetItem(wx.StaticText(MyNotebookPage, -1, _('Fault Tree:')),
 				ColLoc=3, ColSpan=1, GapX=20, Font=self.TopLevelFrame.Fonts['SmallHeadingFont'])
@@ -1334,7 +1334,7 @@ class ControlFrame(wx.Frame):
 				Events=[wx.EVT_BUTTON],
 				ColLoc=8, ColSpan=1,
 				Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_LEFT | wx.EXPAND)
-			self.FaultTreeAspect.Divider1 = UIWidgetItem(wx.StaticLine(MyNotebookPage, -1, size=(200, 5),
+			self.FaultTreeAspect.Divider1 = UIWidgetItem(wx.StaticLine(MyNotebookPage, -1, size=(500, 5),
 				style=wx.LI_HORIZONTAL), NewRow=True,
 				ColLoc=3, ColSpan=5, LeftMargin=10, GapY=10,
 				Flags=wx.ALL | wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_CENTER)
@@ -1345,7 +1345,7 @@ class ControlFrame(wx.Frame):
 			self.FaultTreeAspect.ProblemShowMeButton = UIWidgetItem(wx.Button(MyNotebookPage, -1, _('Show me')),
 				Handler=self.FaultTreeAspect_OnProblemShowMeButton,
 				Events=[wx.EVT_BUTTON],
-				ColLoc=4, ColSpan=1, NewRow=True,
+				ColLoc=9, ColSpan=1,
 				Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_LEFT | wx.EXPAND)
 			# make list of all widgets in this aspect
 			self.FaultTreeAspect.WidgetList = [self.FaultTreeAspect.NavigateBackButton,
@@ -1364,12 +1364,14 @@ class ControlFrame(wx.Frame):
 		def PrefillWidgetsForFaultTreeAspect(self, **Args):
 			Proj = self.TopLevelFrame.CurrentProj
 			AllFTsInProj = [p for p in Proj.PHAObjs if type(p) is faulttree.FTObjectInCore]
+			CurrentViewport = self.TopLevelFrame.CurrentViewport
 			# keep a record of which FT is on display
 			CurrentFT = self.TopLevelFrame.PHAObjInControlPanel = Args['PHAObjInControlPanel']
 			# enable navigation buttons if there are any items in current project's history lists
 			self.UpdateNavigationButtonStatus(Proj)
 			# set widget values
-			# set up FTNameText and FTDescriptionText TODO limit length displayed. Smart ellipsization? Also in GoToFTChoice
+			# set up FTNameText and FTDescriptionText
+			# 	TODO limit length displayed. Smart ellipsization? Also in GoToFTChoice and ViewNameText
 			self.FaultTreeAspect.FTNameText.Widget.ChangeValue(CurrentFT.HumanName)
 			self.FaultTreeAspect.FTNameText.Widget.SelectAll()
 			self.FaultTreeAspect.FTDescriptionText.Widget.ChangeValue(CurrentFT.Description)
@@ -1380,6 +1382,15 @@ class ControlFrame(wx.Frame):
 			ApplicablePHAObjsList = [p.Applicable for p in Proj.PHAObjShadows]
 			self.FaultTreeAspect.GoToFTChoice.Widget.SetSelection(ApplicablePHAObjsList.index(True)
 				if True in ApplicablePHAObjsList else wx.NOT_FOUND)
+			# set up ViewNameText
+			self.FaultTreeAspect.ViewNameText.Widget.ChangeValue(CurrentViewport.HumanName)
+			# set up GoToViewChoice
+			ViewportsInThisPHAObj = [v for v in Proj.AllViewportShadows if v.PHAObj.ID == CurrentFT.ID]
+			ViewportIDs = [v.ID for v in ViewportsInThisPHAObj]
+			self.FaultTreeAspect.GoToViewChoice.Widget.Set([v.HumanName for v in ViewportsInThisPHAObj])
+			# preselect current Viewport in GotoViewChoice
+			self.FaultTreeAspect.GoToViewChoice.Widget.SetSelection(ViewportIDs.index(CurrentViewport.ID)
+				if CurrentViewport.ID in ViewportIDs else wx.NOT_FOUND)
 			# set problem-related widgets TODO use self.TopLevelFrame.CurrentValueProblem
 
 		def SetWidgetVisibilityforFaultTreeAspect(self, **Args): # set IsVisible attrib for each widget
@@ -1995,7 +2006,8 @@ class ControlFrame(wx.Frame):
 		NewViewportAttribs = {'ControlFrame': self.ID, info.SkipRefreshTag: utilities.Bool2Str(Args['Chain']),
 			'ViewportClass': Args['ViewportClass'].InternalName, info.ProjIDTag: Proj.ID, 'Viewport': NewViewport.ID,
 			info.PHAModelIDTag: Args['PHAModel'].ID, info.PHAModelTypeTag: Args['PHAModel'].InternalName,
-			info.MilestoneIDTag: NewMilestone.ID, info.D2CSocketNoTag: str(D2CSocketNo), info.C2DSocketNoTag: str(C2DSocketNo)}
+			info.MilestoneIDTag: NewMilestone.ID, info.D2CSocketNoTag: str(D2CSocketNo),
+			info.C2DSocketNoTag: str(C2DSocketNo), info.HumanNameTag: NewViewport.HumanName}
 		vizop_misc.SendRequest(self.zmqOutwardSocket, Command=RequestToDatacore, **NewViewportAttribs)
 		# show VizopTalks confirmation message
 		if not Redoing:
@@ -2223,7 +2235,7 @@ class ControlFrame(wx.Frame):
 			Command='NO_NewViewport_Redo', XMLRoot=Notification)
 		return {'Success': True, 'Notification': Notification}
 
-	def DatacoreDoNewViewport(self, XMLRoot=None, Proj=None, ViewportClass=None, ViewportID=None,
+	def DatacoreDoNewViewport(self, XMLRoot=None, Proj=None, ViewportClass=None, ViewportID=None, HumanName='',
 		PHAModel=None, Chain='NoChain'):
 		# datacore function to handle request for new Viewport from any Control Frame (local or remote)
 		# It creates a Viewport shadow, i.e. an object that allows the datacore to know that a Viewport exists in
@@ -2234,22 +2246,25 @@ class ControlFrame(wx.Frame):
 		# This function might be better placed outside Control Frame class, but currently we can't because it needs
 		# access to ControlFrame's self.Projects
 		# First, get the attribs needed to make the Viewport in the datacore
-		if XMLRoot is None:
+		if XMLRoot is None: # this branch is not currently used
 			ThisProj = Proj
 			NewViewportClass = ViewportClass
 			NewViewportID = ViewportID
+			NewViewportHumanName = HumanName
 			ExistingPHAObj = PHAModel
 		else:
 			ThisProj = utilities.ObjectWithID(self.Projects, XMLRoot.find(info.ProjIDTag).text)
 			ClassList = display_utilities.ViewportMetaClass.ViewportClasses # list of all user-requestable Viewports
 			NewViewportClass = ClassList[[Cls.InternalName for Cls in ClassList].index(XMLRoot.find('ViewportClass').text)]
 			NewViewportID = XMLRoot.find('Viewport').text
+			NewViewportHumanName = XMLRoot.find(info.HumanNameTag).text
 			ExistingPHAObj = utilities.ObjectWithID(ThisProj.PHAObjs, XMLRoot.find(info.PHAModelIDTag).text)
 			Chain = 'Stepwise' # TODO need 'NoChain' if we are adding new Viewport to existing PHA model
 		# check if we can proceed to create the Viewport; we may need editing rights (TODO remove this requirement)
 		if Proj.EditAllowed:
 			# make the Viewport shadow
 			NewViewport = ViewportShadow(ThisProj, NewViewportID, MyClass=NewViewportClass,
+				HumanName=NewViewportHumanName,
 				D2CSocketNumber=int(XMLRoot.find(info.D2CSocketNoTag).text),
 				C2DSocketNumber=int(XMLRoot.find(info.C2DSocketNoTag).text), PHAModel=ExistingPHAObj)
 			# attach existing PHA object to the Viewport
@@ -2681,19 +2696,23 @@ class ViewportShadow(object): # defines objects that represent Viewports in the 
 	# These are not the actual (visible) Viewports - those live in the controlframe (local or remote) and aren't
 	# directly accessible by the datacore.
 
-	def __init__(self, Proj, ID, MyClass=None, D2CSocketNumber=None, C2DSocketNumber=None, PHAModel=None):
+	def __init__(self, Proj, ID, MyClass=None, D2CSocketNumber=None, C2DSocketNumber=None, PHAModel=None,
+			HumanName=''):
 		# ID (str) is the same as the ID of the corresponding "real" Viewport
 		# MyClass (ViewportClasses instance): class of actual Viewport shadowed by this one
 		# D2CSocketNumber and C2DSocketNumber (2 x int): socket numbers assigned in display_utilities.CreateViewport
 		# PHAModel: PHA model owning the real Viewport
+		# HumanName: HumanName assigned to the real Viewport
 		assert isinstance(Proj, projects.ProjectItem)
 		assert isinstance(ID, str)
 		assert MyClass in display_utilities.ViewportMetaClass.ViewportClasses
 		assert isinstance(D2CSocketNumber, int)
 		assert isinstance(C2DSocketNumber, int)
+		assert isinstance(HumanName, str)
 		object.__init__(self)
 		self.ID = ID
 		self.MyClass = MyClass
+		self.HumanName = HumanName
 		# set up sockets using socket numbers provided
 		self.C2DSocketREP, self.C2DSocketREPObj, C2DSocketNumberReturned = vizop_misc.SetupNewSocket(SocketType='REP',
 			SocketLabel='C2DREP_' + self.ID,
