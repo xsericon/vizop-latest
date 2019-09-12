@@ -3717,13 +3717,13 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			Reply = vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
 		return Reply
 
-class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all data needed to display FT
+class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all data needed to display full FT on screen
 	# Each separate sub-object (header, cause etc) has attributes whose names are assumed to be same as in the data message from DataCore
 	# NB this class has a forward definition earlier in this module.
 	IsBaseClass = False # should be done for every subclass of ViewportBaseClass
 	CanBeCreatedManually = True # whether the user should be able to create a Viewport of this class from scratch
 	InternalName = 'FTTreeView' # unique per class, used in messaging
-	HumanName = _('Fault Tree')
+	HumanName = _('Fault Tree full view')
 	PreferredKbdShortcut = 'F'
 	NewPHAObjRequired = FTObjectInCore # which datacore PHA object class this Viewport spawns on creation.
 		# Should be None if the model shouldn't create a PHA object
@@ -3759,11 +3759,13 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			self.XMLName = XMLName
 			self.Applicable = Applicable
 
-	def __init__(self, **Args): # FT object initiation. Args must include Proj and can include DisplDevice and ParentWindow
+	def __init__(self, PHAObj, **Args): # FT object initiation. Args must include Proj and can include DisplDevice and ParentWindow
 		display_utilities.ViewportBaseClass.__init__(self, **Args)
+		assert isinstance(PHAObj, core_classes.PHAModelBaseClass)
 		self.Proj = Args['Proj']
-		self.PHAObj = None # instance of FTObjectInCore shown in this Viewport (set in datacore.DoNewViewport())
+		self.PHAObj = PHAObj # instance of FTObjectInCore shown in this Viewport (set in datacore.DoNewViewport())
 		self.ID = None # assigned in display_utilities.CreateViewport()
+		self.HumanName = '' # default name is assigned in Proj.AssignDefaultNameToViewport()
 		self.DisplDevice = Args.get('DisplDevice', None)
 		self.RiskReceptorObjs = [] # ChoiceItem instances, in the order RR groups should be displayed
 		self.RRGroupingOptionObjs = [] # ChoiceItem instances, options for whether RR's should be grouped

@@ -1987,7 +1987,7 @@ class ControlFrame(wx.Frame):
 			RequestToDatacore = 'RQ_NewViewport_Redo'
 		else:
 			NewViewport, D2CSocketNo, C2DSocketNo, VizopTalksArgs = display_utilities.CreateViewport(Proj,
-				Args['ViewportClass'], DisplDevice=self.MyEditPanel, Fonts=self.Fonts)
+				Args['ViewportClass'], DisplDevice=self.MyEditPanel, PHAObj=Args['PHAModel'], Fonts=self.Fonts)
 			RequestToDatacore = 'RQ_NewViewport'
 		self.Viewports.append(NewViewport) # add it to the register for Control Frame
 		self.TrialViewport = NewViewport # set as temporary current viewport, confirmed after successful creation

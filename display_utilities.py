@@ -53,10 +53,13 @@ def CreateViewport(Proj, ViewportClass, DisplDevice=None, PHAObj=None, DatacoreI
 	# Return the Viewport instance, and D2C and C2D socket numbers (2 x int)
 	# Also returns VizopTalksArgs (dict of attrib: value; these are args to controlframe.SubmitVizopTalksMessage)
 	assert isinstance(DatacoreIsLocal, bool)
-	NewViewport = ViewportClass(Proj=Proj, DisplDevice=DisplDevice, PHAObj=PHAObj, Fonts=Fonts)
+	NewViewport = ViewportClass(Proj=Proj, PHAObj=PHAObj, DisplDevice=DisplDevice, Fonts=Fonts)
 	# append the Viewport to the project's list
 	NewViewport.ID = str(utilities.NextID(Proj.ActiveViewports)) # generate unique ID; stored as str
 	# ID is assigned this way (rather than with master lists per class, as for other objects) to avoid memory leaks
+	# assign default name to Viewport
+	Proj.AssignDefaultNameToViewport(Viewport=NewViewport)
+	print('DU62 assigned default name to viewport:', NewViewport.HumanName)
 	# set up sockets for communication with the new Viewport:
 	# D2C (Viewport to core) and C2D. Each socket has both REQ (send) and REP (reply) sides.
 #	# If datacore is local (i.e. running in the same instance of Vizop), we set up datacore's side first, to get the

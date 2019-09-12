@@ -9,7 +9,7 @@ import xml.etree.ElementTree as ElementTree
 # vizop modules needed:
 from vizop_misc import IsReadableFile, IsWritableLocation, select_file_from_all
 #import settings, core_classes, info, vizop_parser, faulttree
-import settings, core_classes, info, faulttree, utilities
+import settings, core_classes, info, faulttree, utilities, display_utilities
 
 """
 The projects module contains functions for handling entire Vizop projects, including project files.
@@ -149,6 +149,20 @@ class ProjectItem(object): # class of PHA project instances
 			+ [0])
 		# assign HumanName to PHAObj
 		PHAObj.HumanName = HumanNameStub + str(HighestSuffix + 1)
+
+	def AssignDefaultNameToViewport(self, Viewport): # assigns a default HumanName to Viewport
+		# The default name is the parent PHA object e.g. "Fault Tree", then "View", then '-' and a serial number
+		assert isinstance(Viewport, display_utilities.ViewportBaseClass)
+		ParentPHAObj = Viewport.PHAObj
+		print('PR157 PHAObj:', ParentPHAObj, getattr(ParentPHAObj, 'HumanName', None))
+		HumanNameStub = type(Viewport).HumanName + '-'
+		SkipLength = len(utilities.StripSpaces(HumanNameStub))
+		# check if any other Viewports in this PHA object have the same HumanNameStub (ignoring spaces).
+		# If so, find the highest among their serial suffixes
+		HighestSuffix = max([utilities.str2int(utilities.StripSpaces(v.HumanName)[SkipLength:])
+			for v in self.ActiveViewports if v.PHAObj == ParentPHAObj] + [0])
+		# assign HumanName to Viewport
+		Viewport.HumanName = HumanNameStub + str(HighestSuffix + 1)
 
 def TestProjectsOpenable(ProjectFilenames, ReadOnly=False):
 	"""
