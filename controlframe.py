@@ -1323,7 +1323,7 @@ class ControlFrame(wx.Frame):
 			self.FaultTreeAspect.GoToViewLabel = UIWidgetItem(wx.StaticText(MyNotebookPage, -1, _('Go to view:')),
 				ColLoc=9, ColSpan=1)
 			self.FaultTreeAspect.GoToViewChoice = UIWidgetItem(wx.Choice(MyNotebookPage, -1, size=(200, 25), choices=[]),
-				  Handler=self.FaultTreeAspect_OnGoToFTChoice, Events=[wx.EVT_CHOICE], ColLoc=10, ColSpan=1)
+				  Handler=self.FaultTreeAspect_OnGoToViewChoice, Events=[wx.EVT_CHOICE], ColLoc=10, ColSpan=1)
 			self.FaultTreeAspect.CommentButton = UIWidgetItem(wx.Button(MyNotebookPage, -1, _('Comment')),
 				Handler=self.FaultTreeAspect_OnCommentButton,
 				Events=[wx.EVT_BUTTON],
@@ -1363,7 +1363,7 @@ class ControlFrame(wx.Frame):
 
 		def PrefillWidgetsForFaultTreeAspect(self, **Args):
 			Proj = self.TopLevelFrame.CurrentProj
-			AllFTsInProj = [p for p in Proj.PHAObjs if type(p) is faulttree.FTObjectInCore]
+			AllFTsInProj = [p for p in Proj.PHAObjShadows if type(p) is faulttree.FTObjectInCore]
 			CurrentViewport = self.TopLevelFrame.CurrentViewport
 			# keep a record of which FT is on display
 			CurrentFT = self.TopLevelFrame.PHAObjInControlPanel = Args['PHAObjInControlPanel']
@@ -1377,7 +1377,7 @@ class ControlFrame(wx.Frame):
 			self.FaultTreeAspect.FTDescriptionText.Widget.ChangeValue(CurrentFT.Description)
 			self.FaultTreeAspect.FTDescriptionText.Widget.SelectAll()
 			# set up GoToFTChoice
-			self.FaultTreeAspect.GoToFTChoice.Widget.Set([p.HumanName for p in Proj.PHAObjShadows])
+			self.FaultTreeAspect.GoToFTChoice.Widget.Set([p.HumanName for p in AllFTsInProj])
 			# preselect current FT in GoToFTChoice
 			ApplicablePHAObjsList = [p.Applicable for p in Proj.PHAObjShadows]
 			self.FaultTreeAspect.GoToFTChoice.Widget.SetSelection(ApplicablePHAObjsList.index(True)
@@ -1415,7 +1415,17 @@ class ControlFrame(wx.Frame):
 		def FaultTreeAspect_OnFTNameTextWidget(self, Event, **Args): pass
 		def FaultTreeAspect_OnViewNameTextWidget(self, Event, **Args): pass
 		def FaultTreeAspect_OnFTDescriptionWidget(self, Event, **Args): pass
-		def FaultTreeAspect_OnGoToFTChoice(self, Event, **Args): pass
+
+		def FaultTreeAspect_OnGoToFTChoice(self, Event, **Args):
+			# handle change of option in GotoFT choice widget
+			# first, find out which FT was requested%%%
+			FTIndex = Event.GetEventObject.GetSelection()
+			if FTIndex != wx.NOT_FOUND: # is any item selected?
+				FTRequestedID = [p for p in Proj.PHAObjShadows if type(p) is faulttree.FTObjectInCore][FTIndex].ID
+				# requested different FT from the one on display?
+				if FTRequestedID != self.TopLevelFrame.CurrentViewport.PHAObj.ID:
+					self.TopLevelFrame.SwitchToPHAObj(Proj=self.TopLevelFrame.CurrentProj, TargetPHAObjID=FTRequestedID)
+
 		def FaultTreeAspect_OnGoToViewChoice(self, Event, **Args): pass
 		def FaultTreeAspect_OnCommentButton(self, Event, **Args): pass
 		def FaultTreeAspect_OnActionButton(self, Event, **Args): pass
@@ -2082,6 +2092,16 @@ class ControlFrame(wx.Frame):
 		return vizop_misc.MakeXMLMessage('Null', 'Null')
 #		return {'Success': True, 'Notification': vizop_misc.MakeXMLMessage('Null', 'Null')}
 
+	def SwitchToPHAObj(self, Proj, TargetPHAObjID):
+		# display most recently viewed Viewport of PHA object with ID == TargetPHAObj
+		assert isinstance(Proj, projects.ProjectItem)
+#		assert isinstance(TargetPHAObj, core_classes.PHAModelBaseClass)
+		assert isinstance(TargetPHAObjID, str)
+		assert TargetPHAObjID in [p.ID for p in Proj.PHAObjShadows]
+		TargetPHAObj = Proj.PHAObjShadows[ [p.ID for p in Proj.PHAObjShadows].index(TargetPHAObjID) ]
+		# switch to TargetPHAObj's most recently viewed Viewport, and store Milestone
+		self.SwitchToViewport(TargetViewport=TargetPHAObj.CurrentViewport[self.MyEditPanel])
+
 	def PostProcessNewViewport(self, XMLRoot):
 		# get info on newly created Viewport from datacore in XMLRoot, and use it to finish
 		# setting up new Viewport
@@ -2163,7 +2183,10 @@ class ControlFrame(wx.Frame):
 			self.MyEditPanel.ReleaseViewportFromDisplDevice()
 		# add target Viewport
 		Proj.ActiveViewports.append(ViewportToShow)
+		# set Viewport as current in Control Frame
 		self.CurrentViewport = ViewportToShow
+		# set Viewport as current for this shadow PHAObj
+		ViewportToShow.PHAObj.CurrentViewport[self.MyEditPanel] = ViewportToShow
 		# restore zoom and pan, if provided in XMLRoot
 		if XMLRoot is not None:
 			ThisZoomTag = XMLRoot.find(info.ZoomTag)
