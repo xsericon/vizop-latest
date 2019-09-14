@@ -709,16 +709,37 @@ def AddPHAObjsTags(Proj, XMLRoot, CurrentPHAObj=None):
 		PHAObjEl = ElementTree.SubElement(XMLRoot, info.PHAObjTag)
 		# set human name for grouping option to internal name of option
 		PHAObjEl.text = str(ThisPHAModel.HumanName)
+		# set tag with PHAObj class
+		PHAObjEl.set(info.PHAModelTypeTag, type(ThisPHAModel).InternalName)
 		PHAObjEl.set(info.ApplicableAttribName, utilities.Bool2Str(ThisPHAModel is CurrentPHAObj))
 		PHAObjEl.set(info.IDTag, str(ThisPHAModel.ID)) # add PHA object ID
 
-def ExtractPHAObjsTags(Proj, XMLRoot):
-	# extract PHAObjects from XMLRoot (an ElementTree XML element) and put them into Proj.PHAObjShadows
+def ExtractPHAObjsTags(Proj, XMLRoot, DatacoreIsLocal):
+	# If DatacoreIsLocal (bool), don't do anything (to avoid overwriting Proj.PHAObjShadows)
+	# Else, extract PHAObjects from XMLRoot (an ElementTree XML element) and update Proj.PHAObjShadows
+	# to match it. Existing PHAObjects in PHAObjShadows must be retained, because they are referenced as keys in
+	# DisplDevice.LatestViewport
 	assert isinstance(Proj, projects.ProjectItem)
 	assert isinstance(XMLRoot, ElementTree.Element)
-	# first, clear existing list of PHAObjs
-	Proj.PHAObjShadows = []
-	for ThisPHAObjTag in XMLRoot.findall(info.PHAObjTag):
-		Proj.PHAObjShadows.append(core_classes.ChoiceItem(XMLName=ThisPHAObjTag.get(info.IDTag),
-			HumanName='' if ThisPHAObjTag.text is None else ThisPHAObjTag.text,
-			Applicable=utilities.Bool2Str(ThisPHAObjTag.get(info.ApplicableAttribName))))
+	assert isinstance(DatacoreIsLocal, bool)
+	if not DatacoreIsLocal:
+		NewPHAObjList = []
+		# make ID list of existing PHAObjShadows
+		ExistingIDList = [p.ID for p in Proj.PHAObjShadows]
+		# work through all PHAObjs supplied in XMLRoot
+		for ThisPHAObjTag in XMLRoot.findall(info.PHAObjTag):
+			# get the ID
+			ThisPHAObjID = ThisPHAObjTag.get(info.IDTag)
+			# if this object is already in Shadows, transfer it to the new list
+			if ThisPHAObjID in ExistingIDList:
+				NewPHAObjList.append(Proj.PHAObjShadows[ExistingIDList.index(ThisPHAObjID)])
+			# otherwise, create a new PHAObj shadow and append to the list
+			# find the class of the new PHAObj
+			ThisPHAObjClass = utilities.InstanceWithAttribValue(ObjList=core_classes.PHAModelMetaClass.PHAModelClasses,
+				AttribName='InternalName', TargetValue=ThisPHAObjTag.get(info.PHAModelTypeTag))
+			# make a PHAObj instance and append to PHAObj shadows list
+			NewPHAObjList.append(ThisPHAObjClass(Proj=Proj, XMLName=ThisPHAObjID,
+				HumanName='' if ThisPHAObjTag.text is None else ThisPHAObjTag.text,
+				Applicable=utilities.Bool2Str(ThisPHAObjTag.get(info.ApplicableAttribName))))
+		# overwrite the old shadows list with the new list
+		Proj.PHAObjShadows = NewPHAObjList

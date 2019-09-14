@@ -47,7 +47,7 @@ class ViewportBaseClass(object, metaclass=ViewportMetaClass): # base class for a
 
 def CreateViewport(Proj, ViewportClass, DisplDevice=None, PHAObj=None, DatacoreIsLocal=True, Fonts=[]):
 	# create new Viewport instance of class ViewportClass in project Proj, and attach it to DisplDevice.
-	# PHAObj: PHA object to which the Viewport belongs
+	# PHAObj: PHA object shadow to which the Viewport belongs
 	# DatacoreIsLocal (bool): whether datacore is in this instance of Vizop
 	# Fonts: (dict) keys are strings such as 'SmallHeadingFont'; values are wx.Font instances
 	# Return the Viewport instance, and D2C and C2D socket numbers (2 x int)
@@ -59,7 +59,6 @@ def CreateViewport(Proj, ViewportClass, DisplDevice=None, PHAObj=None, DatacoreI
 	# ID is assigned this way (rather than with master lists per class, as for other objects) to avoid memory leaks
 	# assign default name to Viewport
 	Proj.AssignDefaultNameToViewport(Viewport=NewViewport)
-	print('DU62 assigned default name to viewport:', NewViewport.HumanName)
 	# set up sockets for communication with the new Viewport:
 	# D2C (Viewport to core) and C2D. Each socket has both REQ (send) and REP (reply) sides.
 #	# If datacore is local (i.e. running in the same instance of Vizop), we set up datacore's side first, to get the

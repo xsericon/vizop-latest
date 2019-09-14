@@ -592,7 +592,7 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 #			EditComponentInternalName = self.CurrentEditElement.InternalName
 			self.FT.DisplDevice.GotoControlPanelAspect(AspectName=self.ControlPanelAspect,
 				PHAObjInControlPanel=self.HostObject, ComponentInControlPanel=self.InternalName)
-		if self.FT.PHAObj.EditAllowed: # proceed with editing only if allowed to edit in this instance of vizop
+		if self.FT.EditAllowed: # proceed with editing only if allowed to edit in this instance of vizop
 			# get absolute position of textbox for editing: position within element + column + FT, then apply zoom and pan
 			Zoom = self.FT.Zoom
 			# check if HostObject of this element is in a column; if so, get PosX/Y within the column
@@ -2445,7 +2445,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		SerialObj = core_classes.SerialNumberChunkItem()
 		self.Numbering.NumberStructure = [SerialObj]
 		# define object-wide attributes. Many of these are displayed in the FT header
-		self.HumanName = ''
+		if not hasattr(self, 'HumanName'): self.HumanName = '' # using 'if' to avoid overwriting value provided in Args
 		self.Description = ''
 		self.OpMode = core_classes.DefaultOpMode # instance of OpModeType
 		self.Rev = ''
@@ -3799,6 +3799,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		self.EditingConnection = False # whether user is currently editing a connection between elements
 		self.Panning = self.Zooming = False # whether user is currently changing display zoom or pan, for redraw efficiency
 		self.ConnectButtons = [] # ButtonElement instances for connect buttons in inter-column strips
+		self.EditAllowed = True # whether user is allowed to edit the data in the underlying PHAObj
 
 	def Wipe(self): # wipe all data in the FT and re-initialize
 		self.Header.InitializeData()
@@ -3856,7 +3857,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			for ThisRRTag in XMLRoot.findall(info.RiskReceptorTag):
 				Applicable = utilities.Bool2Str(ThisRRTag.get(info.ApplicableAttribName)) # whether ThisRRTag is current one
 				self.RiskReceptorObjs.append(core_classes.ChoiceItem(XMLName=ThisRRTag.get(info.SerialTag),
-														HumanName=utilities.TextAsString(ThisRRTag), Applicable=Applicable))
+					HumanName=utilities.TextAsString(ThisRRTag), Applicable=Applicable))
 				if Applicable: HeaderEl.RR = ThisRRTag.text # set human name of current RR group in header
 			# get severity category names and whether they are applicable to this FT
 			self.SeverityCatObjs = []
@@ -3874,7 +3875,8 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 					Applicable=utilities.Bool2Str(ThisRRGroupingTag.get(info.ApplicableAttribName))))
 			# get PHAObjs tags to inform the Control Frame about other PHA objects in the project. This is used to
 			# allow the user to choose another PHA object to view. The data is put into Proj.PHAObjShadows
-			project_display.ExtractPHAObjsTags(Proj=self.Proj, XMLRoot=XMLRoot)
+			project_display.ExtractPHAObjsTags(Proj=self.Proj, XMLRoot=XMLRoot,
+				DatacoreIsLocal=self.DisplDevice.DatacoreIsLocal)
 
 		def PopulateHeaderData(FT, HeaderEl, HeaderXMLRoot, ComponentNameToHighlight=''):
 			# put header data from HeaderXMLRoot into attribs of HeaderEl (a FTHeader instance)
@@ -3891,16 +3893,21 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			assert ComponentNameToHighlight in [a for (a, b) in DataInfo] + ['TolFreq'] or (ComponentNameToHighlight == '')
 			for Attrib, XMLTag in DataInfo:
 				setattr(HeaderEl, Attrib, HeaderXMLRoot.findtext(XMLTag, default=''))
+			# set FT.OpMode from the HumanName OpMode supplied (possible gotcha if we ever have 2 OpModes with same HumanName)
+			FT.OpMode = utilities.InstanceWithAttribValue(ObjList=core_classes.OpModes,AttribName='HumanName',
+				TargetValue=HeaderEl.OpMode)
+			print('FT3894 OpMode set: ', FT.OpMode.XMLName)
 			# populate choice boxes for OpMode, risk receptor, severity and RR grouping
 			self.Header.OpModeComponent.ObjectChoices = core_classes.OpModes[:]
 			self.Header.RRComponent.ObjectChoices = self.RiskReceptorObjs[:]
 			self.Header.SeverityComponent.ObjectChoices = self.SeverityCatObjs[:]
 			self.Header.RRLabel.ObjectChoices = self.RRGroupingOptionObjs[:]
 			# set which OpMode is applicable (i.e. currently used)
-			for ThisOpModeIndex, ThisOpMode in enumerate(core_classes.OpModes): # check original OpMode list (not the local copy)
-				UsingThisOpMode = (ThisOpMode == self.PHAObj.OpMode)
-				self.Header.OpModeComponent.ObjectChoices[ThisOpModeIndex].Applicable = UsingThisOpMode
-				if UsingThisOpMode: FT.OpMode = ThisOpMode # set OpMode attrib of FT
+#			self.Header.OpModeComponent.ObjectChoices[self.Header.OpModeComponent.ObjectChoices.index(FT.OpMode)].Applicable = True
+			for ThisOpModeIndex, ThisOpMode in enumerate(core_classes.OpModes):
+#				UsingThisOpMode = (ThisOpMode == FT.OpMode)
+				self.Header.OpModeComponent.ObjectChoices[ThisOpModeIndex].Applicable = (ThisOpMode == FT.OpMode)
+#				if UsingThisOpMode: FT.OpMode = ThisOpMode # set OpMode attrib of FT
 			# populate TolFreq value and unit
 			TolFreqTag = HeaderXMLRoot.find(info.TolFreqTag)
 			HeaderEl.TolFreq.Value = TolFreqTag.text

@@ -1418,13 +1418,17 @@ class ControlFrame(wx.Frame):
 
 		def FaultTreeAspect_OnGoToFTChoice(self, Event, **Args):
 			# handle change of option in GotoFT choice widget
-			# first, find out which FT was requested%%%
-			FTIndex = Event.GetEventObject.GetSelection()
+			Proj = self.TopLevelFrame.CurrentProj
+			# first, find out which FT was requested
+			FTIndex = Event.GetEventObject().GetSelection()
 			if FTIndex != wx.NOT_FOUND: # is any item selected?
+				print('CF1425 Proj.PHAObjShadows:', Proj.PHAObjShadows)
 				FTRequestedID = [p for p in Proj.PHAObjShadows if type(p) is faulttree.FTObjectInCore][FTIndex].ID
 				# requested different FT from the one on display?
+				print('CF1426 checking whether to switch PHAObj')
 				if FTRequestedID != self.TopLevelFrame.CurrentViewport.PHAObj.ID:
-					self.TopLevelFrame.SwitchToPHAObj(Proj=self.TopLevelFrame.CurrentProj, TargetPHAObjID=FTRequestedID)
+					print('CF1428 switching to another PHAObj')
+					self.TopLevelFrame.SwitchToPHAObj(Proj=Proj, TargetPHAObjID=FTRequestedID)
 
 		def FaultTreeAspect_OnGoToViewChoice(self, Event, **Args): pass
 		def FaultTreeAspect_OnCommentButton(self, Event, **Args): pass
@@ -1556,6 +1560,8 @@ class ControlFrame(wx.Frame):
 			self.ColScheme = ColScheme
 			self.BackgColour = self.ColScheme.BackMid # set background colour
 			self.ViewportOwner = ViewportOwner
+			self.LatestViewport = {}
+				# keys: PHAObj shadows; values: the latest Viewport for the respective PHAObj shown in this panel
 			self.Bind(wx.EVT_PAINT, self.OnPaint)
 			self.LDragStatus = 'NotDragging' # whether we are dragging with left mouse button held down.
 				# can be 'NotDragging', 'ReadyToDrag' (L button held down, but not enough motion yet),
@@ -2047,9 +2053,12 @@ class ControlFrame(wx.Frame):
 				XMLRoot.find(info.PHAModelTypeTag).text)]
 		# make initial Viewport for the PHA model
 		ViewportType = NewPHAObjType.DefaultViewportType
+		print('CF2056 PHAObjShadows: ', Proj.PHAObjShadows)
 		self.DoNewViewportCommand(Proj, ViewportClass=ViewportType, Chain=True,
-			PHAModel=utilities.ObjectWithID(core_classes.PHAModelBaseClass.AllPHAModelObjects,
-			utilities.TextAsString(XMLRoot.find(info.PHAModelIDTag))))
+			PHAModel=utilities.ObjectWithID(Proj.PHAObjShadows,
+				TargetID=utilities.TextAsString(XMLRoot.find(info.PHAModelIDTag))))
+#			PHAModel=utilities.ObjectWithID(core_classes.PHAModelBaseClass.AllPHAModelObjects,
+#			utilities.TextAsString(XMLRoot.find(info.PHAModelIDTag))))
 		return vizop_misc.MakeXMLMessage('Null', 'Null')
 
 	def PostProcessNewPHAModel_Undo(self, XMLRoot=None):
@@ -2100,7 +2109,10 @@ class ControlFrame(wx.Frame):
 		assert TargetPHAObjID in [p.ID for p in Proj.PHAObjShadows]
 		TargetPHAObj = Proj.PHAObjShadows[ [p.ID for p in Proj.PHAObjShadows].index(TargetPHAObjID) ]
 		# switch to TargetPHAObj's most recently viewed Viewport, and store Milestone
-		self.SwitchToViewport(TargetViewport=TargetPHAObj.CurrentViewport[self.MyEditPanel])
+#		self.SwitchToViewport(TargetViewport=TargetPHAObj.CurrentViewport[self.MyEditPanel])
+		print('CF2110 TargetPHAObj: ', TargetPHAObj)
+		print('CF2110 LatestViewport:', self.MyEditPanel.LatestViewport)
+		self.SwitchToViewport(TargetViewport=self.MyEditPanel.LatestViewport[TargetPHAObj])
 
 	def PostProcessNewViewport(self, XMLRoot):
 		# get info on newly created Viewport from datacore in XMLRoot, and use it to finish
@@ -2185,8 +2197,13 @@ class ControlFrame(wx.Frame):
 		Proj.ActiveViewports.append(ViewportToShow)
 		# set Viewport as current in Control Frame
 		self.CurrentViewport = ViewportToShow
-		# set Viewport as current for this shadow PHAObj
-		ViewportToShow.PHAObj.CurrentViewport[self.MyEditPanel] = ViewportToShow
+#		# set Viewport as current for this shadow PHAObj
+#		ViewportToShow.PHAObj.CurrentViewport[self.MyEditPanel] = ViewportToShow
+		# set Viewport as the latest shown for this shadow PHAObj in this display device
+		print('CF2203 viewport PHAObj is in PHAObjs: ', ViewportToShow.PHAObj in Proj.PHAObjs)
+		print('CF2203 viewport PHAObj is in PHAObjShadows: ', ViewportToShow.PHAObj in Proj.PHAObjShadows)
+		print('CF2203 PHAObj: ', ViewportToShow.PHAObj)
+		self.MyEditPanel.LatestViewport[ViewportToShow.PHAObj] = ViewportToShow
 		# restore zoom and pan, if provided in XMLRoot
 		if XMLRoot is not None:
 			ThisZoomTag = XMLRoot.find(info.ZoomTag)
@@ -2703,6 +2720,7 @@ def DatacoreDoNewPHAObj(Proj, XMLRoot=None, ViewportID=None, **NewPHAObjArgs):
 	# make the PHA model and attach it to the project
 	NewPHAObj = NewPHAObjType(Proj, **NewPHAObjArgs)
 	Proj.PHAObjs.append(NewPHAObj)
+	Proj.PHAObjShadows.append(NewPHAObj) # put the same object in the shadows list, for local display devices to access
 	Proj.AssignDefaultNameToPHAObj(PHAObj=NewPHAObj)
 	undo.AddToUndoList(Proj, UndoObj=undo.UndoItem(UndoHandler=DatacoreDoNewPHAObj_Undo, Chain='NoChain',
 		RedoHandler=DatacoreDoNewPHAObj_Redo, ViewportID=ViewportID,

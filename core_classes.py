@@ -1239,7 +1239,10 @@ class PHAModelBaseClass(object, metaclass=PHAModelMetaClass):
 		PHAModelBaseClass.AllPHAModelObjects.append(self) # add instance to register; must do after assigning self.ID
 		self.Proj = Proj
 		self.Viewports = [] # list of Viewport instances for this PHA model; instances of subclasses of ViewportBaseClass
+#		self.CurrentViewport = {} # keys: display devices; values: PHAObj shadows. Now handled through displaydevice.LatestViewport
 		self.EditAllowed = True
+		# capture any attribs provided in Args
+		self.__dict__.update(Args)
 
 class MilestoneItem(object): # item storing info required for navigation back/forwards
 	AllNavigationItems = [] # list of all instances created in this Vizop instance

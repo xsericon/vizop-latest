@@ -371,3 +371,17 @@ def TextWithoutSpecialChars(InText):
 	# check and process each char in InText
 	# convert if the char is in ConversionHash, else keep the same char
 	return ''.join([ConversionHash.get(ThisChar, ThisChar) for ThisChar in InText])
+
+def InstanceWithAttribValue(ObjList, AttribName, TargetValue, NotFoundValue=None):
+	# find the first object in ObjList (iterable of structured objects) whose attrib with AttribName (str) == TargetValue.
+	# return the object.
+	# If no object in ObjList has attrib = TargetValue, return NotFoundValue.
+	# If all objects in ObjList don't have an attrib with AttribName, return NotFoundValue.
+	assert hasattr(ObjList, '__iter__')
+	assert isinstance(AttribName, str)
+	# choose a suitable 'no such attrib' value. We can't just use None in case TargetValue is None
+	NoSuchAttribValue = 'X' if TargetValue is None else None
+	AttribValues = [getattr(ThisObj, AttribName, NoSuchAttribValue) for ThisObj in ObjList]
+	if TargetValue in AttribValues:
+		return ObjList[AttribValues.index(TargetValue)]
+	else: return NotFoundValue

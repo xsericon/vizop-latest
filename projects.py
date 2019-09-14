@@ -67,7 +67,7 @@ class ProjectItem(object): # class of PHA project instances
 			# (1) whether license valid, and (2) whether this Vizop instance is in 'master' mode
 
 		self.MaxIDInProj = 0 # (int) highest ID of all objects in the project
-		self.PHAObjs = [] # list of PHA objects, in order created
+		self.PHAObjs = [] # list of PHA objects existing locally, in order created; empty if datacore is remote
 		self.PHAObjShadows = [] # list of info about PHA objects; used by control frame, as the project datacore may be
 			# remote, so it may not have access to self.PHAObjs; same order as self.PHAObjs
 		self.ActiveViewports = [] # list of all currently active Viewports, in order created
