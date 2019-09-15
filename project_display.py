@@ -715,14 +715,25 @@ def AddPHAObjsTags(Proj, XMLRoot, CurrentPHAObj=None):
 		PHAObjEl.set(info.IDTag, str(ThisPHAModel.ID)) # add PHA object ID
 
 def ExtractPHAObjsTags(Proj, XMLRoot, DatacoreIsLocal):
-	# If DatacoreIsLocal (bool), don't do anything (to avoid overwriting Proj.PHAObjShadows)
+	# Update Proj.PHAObjShadows using data in XMLRoot
+	# If DatacoreIsLocal (bool), just update Applicable flags for each item in Proj.PHAObjShadows
+	# (We don't need to change the list of items, because it already matches the list in Proj.PHAObjs)
 	# Else, extract PHAObjects from XMLRoot (an ElementTree XML element) and update Proj.PHAObjShadows
 	# to match it. Existing PHAObjects in PHAObjShadows must be retained, because they are referenced as keys in
 	# DisplDevice.LatestViewport
 	assert isinstance(Proj, projects.ProjectItem)
 	assert isinstance(XMLRoot, ElementTree.Element)
 	assert isinstance(DatacoreIsLocal, bool)
-	if not DatacoreIsLocal:
+	if DatacoreIsLocal:
+		# go through all PHAObjs provided in XMLRoot. Make a dict with keys = ID, values = 'Applicable' attrib value
+		PHAObjApplicableValues = {}
+		for ThisPHAObjTag in XMLRoot.findall(info.PHAObjTag):
+			PHAObjApplicableValues[ThisPHAObjTag.get(info.IDTag)] = utilities.Bool2Str(ThisPHAObjTag.get(
+				info.ApplicableAttribName))
+		# assign correct Applicable value to each item in PHAObjShadows, matching IDs with the dict
+		for ThisPHAObj in Proj.PHAObjShadows:
+			ThisPHAObj.Applicable = PHAObjApplicableValues[ThisPHAObj.ID]
+	else: # datacore not local; make an updated list of PHAObj shadows
 		NewPHAObjList = []
 		# make ID list of existing PHAObjShadows
 		ExistingIDList = [p.ID for p in Proj.PHAObjShadows]

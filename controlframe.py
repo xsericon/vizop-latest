@@ -1603,7 +1603,7 @@ class ControlFrame(wx.Frame):
 			# If NewMode == 'Blocked', Viewport arg isn't required
 
 			def OnMouseEntersViewportPanelBlocked(event):
-				print("CF1204 in OnMouseEntersViewportPanelBlocked")
+#				print("CF1204 in OnMouseEntersViewportPanelBlocked")
 				wx.SetCursor(wx.Cursor(display_utilities.StockCursors['Stop']))
 				# 'blocked' mouse pointer when inside content window
 
@@ -1719,6 +1719,9 @@ class ControlFrame(wx.Frame):
 			# handle request from Viewport to change the aspect in the Control Panel
 			self.TopLevelFrame.MyControlPanel.GotoControlPanelAspect(NewAspect=AspectName,
 				PHAObjInControlPanel=PHAObjInControlPanel, ComponentInControlPanel=ComponentInControlPanel)
+
+		# allow this display device to return DatacoreIsLocal value from parent frame
+		DatacoreIsLocal = property(fget=lambda self: self.TopLevelFrame.DatacoreIsLocal)
 
 	def OnExitVizopRequest(self, event): # Handle 'Exit Vizop' request from File menu, button press or keyboard shortcut
 		ControlFrameData.Data['RequestToQuit'] = True # set return data for use by heart
