@@ -2131,36 +2131,32 @@ class ControlFrame(wx.Frame):
 #		else:
 #			NewViewport, D2CSocketNo, C2DSocketNo, VizopTalksArgs = display_utilities.CreateViewport(Proj,
 #				Args['ViewportClass'], DisplDevice=self.MyEditPanel, PHAObj=Args['PHAModel'], Fonts=self.Fonts)
-		RequestToDatacore = 'RQ_NewViewport'
+		RequestToDatacore = 'RQ_SwitchToViewport'
 #		self.Viewports.append(NewViewport) # add it to the register for Control Frame
 #		self.TrialViewport = NewViewport # set as temporary current viewport, confirmed after successful creation
 #		# request datacore to create new viewport shadow
+		# The attribs in the dict below are used in DatacoreSwitchToViewport(). Many of them are not currently used;
+		# TODO remove unneeded attribs for bug resilience
 		TargetViewportAttribs = {'ControlFrame': self.ID, info.SkipRefreshTag: utilities.Bool2Str(Chain),
-			info.ProjIDTag: Proj.ID, 'Viewport': Viewport.ID,
-			info.PHAModelIDTag: Args['PHAModel'].ID, info.PHAModelTypeTag: Args['PHAModel'].InternalName,
+			info.ProjIDTag: Proj.ID, info.ViewportTag: Viewport.ID,
+			info.PHAModelIDTag: PHAObj.ID,
+#			info.PHAModelIDTag: PHAObj.ID, info.PHAModelTypeTag: PHAObj.InternalName,
 			info.MilestoneIDTag: NewMilestone.ID}
 		vizop_misc.SendRequest(self.zmqOutwardSocket, Command=RequestToDatacore, **TargetViewportAttribs)
 		# show VizopTalks confirmation message
 		if not Redoing:
-			VizopTalksArgs.update( {'Priority': ConfirmationPriority} ) # set message priority
 			self.MyVTPanel.SubmitVizopTalksMessage(Title=_('Now showing %s:') % type(PHAObj).HumanName,
-				MainText=PHAObj.HumanName + '\n\n' + _('Use back button to go back'))
+				MainText=PHAObj.HumanName + '\n\n' + _('Use back button to go back'), Priority=ConfirmationPriority)
 		return vizop_misc.MakeXMLMessage('Null', 'Null')
 
 	def SwitchToPHAObj(self, Proj, TargetPHAObjID):
 		# display most recently viewed Viewport of PHA object with ID == TargetPHAObj
 		assert isinstance(Proj, projects.ProjectItem)
-#		assert isinstance(TargetPHAObj, core_classes.PHAModelBaseClass)
 		assert isinstance(TargetPHAObjID, str)
 		assert TargetPHAObjID in [p.ID for p in Proj.PHAObjShadows]
 		TargetPHAObj = Proj.PHAObjShadows[ [p.ID for p in Proj.PHAObjShadows].index(TargetPHAObjID) ]
 		TargetViewport = self.MyEditPanel.LatestViewport[TargetPHAObj]
-		print('CF2110 TargetPHAObj: ', TargetPHAObj)
-		print('CF2110 LatestViewport:', self.MyEditPanel.LatestViewport)
-#		# get XML data required to draw Viewport
-#		ViewportXMLData = self.MakeXMLMessageForDrawViewport(MessageHead='RP_SwitchToViewport', PHAObj=TargetPHAObj,
-#			Viewport=TargetViewport, ViewportID=TargetViewport.ID)
-		self.DoSwitchToViewportCommand(Proj=None, PHAObj=TargetPHAObj, Viewport=TargetViewport, XMLRoot=ViewportXMLData)
+		self.DoSwitchToViewportCommand(Proj=Proj, PHAObj=TargetPHAObj, Viewport=TargetViewport)
 
 	def PostProcessSwitchToViewport(self, XMLRoot):
 		# get info on an existing Viewport from datacore in XMLRoot, and display the Viewport
@@ -2400,18 +2396,16 @@ class ControlFrame(wx.Frame):
 		assert isinstance(MessageHead, str)
 		assert isinstance(PHAObj, core_classes.PHAModelBaseClass)
 		assert isinstance(Viewport, ViewportShadow)
-#		assert isinstance(Viewport, display_utilities.ViewportBaseClass)
 		assert isinstance(ViewportID, str)
 		# fetch full redraw data of new PHA object
 		RedrawXMLData = PHAObj.GetFullRedrawData(Viewport=Viewport, ViewportClass=Viewport.MyClass)
 		# put ID of PHA object, followed by full redraw data, into XML element
-		Reply = vizop_misc.MakeXMLMessage(RootName='RP_NewViewport', RootText=ViewportID,
-			Elements={info.IDTag: PHAObj.ID})
+		Reply = vizop_misc.MakeXMLMessage(RootName=MessageHead, RootText=ViewportID, Elements={info.IDTag: PHAObj.ID})
 		Reply.append(RedrawXMLData)
 		return Reply
 
 	def DatacoreSwitchToViewport(self, XMLRoot=None, Proj=None, ViewportClass=None, ViewportID=None, HumanName='',
-			PHAModel=None, Chain='NoChain'):
+			PHAObj=None, Chain='NoChain'):
 		# datacore function to handle request to switch to an existing Viewport from any Control Frame (local or remote)
 		# It assumes a Viewport shadow, i.e. an object that allows the datacore to know that a Viewport exists in
 		# one of the Control Frames (local or remote), already exists for this Viewport.
@@ -2426,18 +2420,20 @@ class ControlFrame(wx.Frame):
 			TargetViewportClass = ViewportClass
 			TargetViewportID = ViewportID
 			TargetViewportHumanName = HumanName
-			ExistingPHAObj = PHAModel
+			ExistingPHAObj = PHAObj
 		else:
 			ThisProj = utilities.ObjectWithID(self.Projects, XMLRoot.find(info.ProjIDTag).text)
 			ClassList = display_utilities.ViewportMetaClass.ViewportClasses # list of all user-requestable Viewport classes
+			TargetViewportID = XMLRoot.find(info.ViewportTag).text
 			TargetViewport = utilities.ObjectWithID(ThisProj.AllViewportShadows, TargetID=TargetViewportID)
+			ExistingPHAObj = utilities.ObjectWithID(ThisProj.PHAObjs, TargetID=XMLRoot.find(info.PHAModelIDTag).text)
 #				TargetViewportClass = ClassList[
 #					[Cls.InternalName for Cls in ClassList].index(XMLRoot.find('ViewportClass').text)]
 #				TargetViewportID = XMLRoot.find('Viewport').text
 #				TargetViewportHumanName = XMLRoot.find(info.HumanNameTag).text
 #				ExistingPHAObj = utilities.ObjectWithID(ThisProj.PHAObjs, XMLRoot.find(info.PHAModelIDTag).text)
 #				Chain = 'Stepwise' # TODO need 'NoChain' if we are adding new Viewport to existing PHA model
-#			# check if we can proceed to create the Viewport; we may need editing rights (TODO remove this requirement)
+#			# check if we can proceed to create the Viewport; we may need editing rights
 #			if Proj.EditAllowed:
 #				# make the Viewport shadow
 #				NewViewport = ViewportShadow(ThisProj, TargetViewportID, MyClass=TargetViewportClass,
@@ -2450,7 +2446,7 @@ class ControlFrame(wx.Frame):
 #				ExistingPHAObj.Viewports.append(NewViewport)  # add Viewport to list in the PHA object
 		# make reply message to send to control frame
 		Reply = self.MakeXMLMessageForDrawViewport(MessageHead='RP_SwitchToViewport', PHAObj=ExistingPHAObj,
-			Viewport=NewViewport, ViewportID=TargetViewportID)
+			Viewport=TargetViewport, ViewportID=TargetViewportID)
 		# send the info back to control frame as a reply message (via ListenToSocket)
 		return Reply
 
