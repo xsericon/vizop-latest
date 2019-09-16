@@ -676,60 +676,6 @@ class ControlFrame(wx.Frame):
 						'Chain': False})
 				return WidgList
 
-#			def ModeEditText(NextMode='Edit-Centre', NextModeArgs={}, Aspect='Default', ResetCursorPos=False):
-#				# fetch widgets for ControlPanel's Edit-Text mode,
-#				# initialize widgets and set some bindings and flags
-#				# NextMode is next screen mode required on exit
-#				# NextModeArgs is dict of args to next GotoControlPanelAspect() call
-#				# Aspect indicates which set of formatting widgets to show, 'Default' or 'Selected'
-#				# If ResetCursorPos, cursor position is set to default position in text entry box
-#				self.NextEditPanelMode = NextMode # remember mode for switching after text editing is finished
-#				self.NextEditPanelModeArgs = NextModeArgs
-#				(Usablewlist, NextRow) = self.WidgetsInPosition(self.ETBasicWidgets, StartingRow=0) # start with basic set of widgets
-#				# add widgets for either 'default' or 'selected characters' formatting
-#				if (Aspect == 'Default'):
-#					(FormatWidgets, NextRow) = self.WidgetsInPosition(self.ETBaseFormatWidgets, StartingRow=NextRow)
-#				elif (Aspect == 'Selected'):
-#					(FormatWidgets, NextRow) = self.WidgetsInPosition(self.ETNowFormatWidgets, StartingRow=NextRow)
-#				else: # bug trapping
-#					FormatWidgets = []
-#					print("Oops, invalid Edit-Text mode aspect '%s' requested (problem code CF4740). This is a bug; please report it" % Aspect)
-#				Usablewlist += FormatWidgets
-#				HideList = [] # widgets to hide
-#				ThisPHAObj = self.CurrentViewport.CurrentPHAObjs[0] # which PHA object owns the Text object we are editing
-#				CurrentTextObj = ThisPHAObj.Text
-#				# initialize widget values and other variables
-#				self.PreviousLeanText = text.StripOutEscapeSequences(CurrentTextObj.Content)
-#				self.ETcontentText.Widget.SetValue(self.PreviousLeanText)
-#				HorizAlignment = CurrentTextObj.ParaHorizAlignment
-#				if HorizAlignment == 'Left': self.ETparaLeftRadio.Widget.SetValue(True)
-#				elif HorizAlignment == 'Right': self.ETparaRightRadio.Widget.SetValue(True)
-#				elif HorizAlignment == 'Centred': self.ETparaHorizCentreRadio.Widget.SetValue(True)
-#				VertAlignment = CurrentTextObj.ParaVertAlignment
-#				if VertAlignment == 'Top': self.ETparaTopRadio.Widget.SetValue(True)
-#				elif VertAlignment == 'Bottom': self.ETparaBottomRadio.Widget.SetValue(True)
-#				elif VertAlignment == 'Centred': self.ETparaVertCentreRadio.Widget.SetValue(True)
-#				if (Aspect == 'Default'): # set 'default format' widget values
-#					self.ETlineSpacingText.Widget.SetValue(str(CurrentTextObj.LineSpacing))
-#					self.ETcharBaseFontText.Widget.SetStringSelection(CurrentTextObj.Font)
-#					self.ETcharBaseSizeText.Widget.SetValue(str(CurrentTextObj.PointSize))
-#					self.ETcharBaseBoldCheck.Widget.SetValue(CurrentTextObj.Bold)
-#					self.ETcharBaseUnderlineCheck.Widget.SetValue(CurrentTextObj.Underlined)
-#					self.ETcharBaseItalicCheck.Widget.SetValue(CurrentTextObj.Italics)
-#					self.ETcharBaseColourSwatch.Widget.SetBackgroundColour(CurrentTextObj.Colour)
-#					self.ETcontentText.Widget.SetFocus() # trying to set focus on text entry box, but doesn't work FIXME
-#					if ResetCursorPos: # should we set cursor to default position (end of text)?
-#						self.ETcontentTextSelection = (len(self.PreviousLeanText), len(self.PreviousLeanText)) # initialize (selection start, end) tuple
-#						self.ETcontentText_Updated = False # flag used by cursor move event detection routine
-#				elif (Aspect == 'Selected'): # set values of all "now" (selected) text format widgets
-#					self.UpdateTextFormatNowWidgets(CurrentTextObj.Content, self.ETcontentTextSelection[0])
-#				# special bindings for content text widget, to allow detection of cursor position before a change
-#				self.ETcontentText.Bind(wx.EVT_LEFT_UP, self.OnETcontentText_CursorMove)
-#				self.ETcontentText.Bind(wx.EVT_KEY_UP, self.OnETcontentText_CursorMove)
-#				# store the current Aspect; used elsewhere to check whether a change of Aspect is required
-#				self.EditTextModeAspect = Aspect
-#				return (Usablewlist, HideList)
-
 			# main procedure for GotoControlPanelAspect
 			assert isinstance(NewAspect, (self.ControlPanelAspectItem, str))
 			global KeyPressHash
@@ -748,20 +694,20 @@ class ControlFrame(wx.Frame):
 				# fetch UndoOnCancel value to store in undo record for any tasks that should be undone when Cancel pressed
 				self.UndoOnCancel = Args.get('UndoOnCancel', None)
 				# prefill widgets in new aspect and activate it
-				print('CF737 activating aspect: ', TargetAspect.InternalName)
 				TargetAspect.SetWidgetVisibility(**Args)
 				TargetAspect.Prefill(**Args)
 				# set up the notebook tab for the aspect
-				TargetAspect.Initialize(ParentNotebook=self.MyNotebook)
 				TargetAspect.Activate()
 				# switch to tab for new aspect
-				if TargetAspect.IsInNotebook: # is there a tab already?
+				if TargetAspect.IsInNotebook: # does the notebook already have a tab for this aspect?
 					self.MyNotebook.ChangeSelection(self.MyNotebook.FindPage(TargetAspect.NotebookPage))
 				else: # no tab yet; make one, and insert it at the end
 					self.MyNotebook.InsertPage(index=self.MyNotebook.GetPageCount(), page=TargetAspect.NotebookPage,
 						text=TargetAspect.TabText)
-					self.MyNotebook.SetSelection(index=self.MyNotebook.GetPageCount()-1)
+					self.MyNotebook.ChangeSelection(page=self.MyNotebook.GetPageCount() - 1)
+					TargetAspect.IsInNotebook = True
 			else: print('CF744 warning, unrecognised control panel aspect "%s" requested' % str(NewAspect))
+			# Note: we may need to remove notebook pages not currently required; use Notebook.RemovePage(page=PageIndex)
 
 		def RedrawControlPanelAspect(self):
 			# repopulates all widgets in the current control panel aspect
@@ -1051,8 +997,6 @@ class ControlFrame(wx.Frame):
 			self.PHAModelsAspect.WidgetList = [self.PHAModelsAspect.NavigateBackButton,
 				self.PHAModelsAspect.NavigateForwardButton, self.PHAModelsAspect.NewPHAModelTypesLabel,
 				self.PHAModelsAspect.UndoButton, self.PHAModelsAspect.RedoButton, self.PHAModelsAspect.NewPHAModelTypesList]
-			# do final setting up
-#			self.PHAModelsAspect.Initialize(ParentNotebook=self.MyNotebook)
 
 		def MakeNumericalValueAspect(self): # make Control Panel aspect for numerical value editing
 			# make basic attribs needed for the aspect
@@ -1448,7 +1392,7 @@ class ControlFrame(wx.Frame):
 
 			def __init__(self, WidgetList=[], InternalName='', ParentFrame=None, TopLevelFrame=None, PrefillMethod=None,
 					SetWidgetVisibilityMethod=None, NotebookPage=None, TabText=''):
-				assert isinstance(WidgetList, list) # can be empty at this stage. Populate it, then call self.Initialize()
+				assert isinstance(WidgetList, list) # can be empty at this stage
 				assert isinstance(InternalName, str)
 				assert isinstance(ParentFrame, wx.Panel)
 				assert isinstance(TopLevelFrame, wx.Frame)
@@ -1466,16 +1410,19 @@ class ControlFrame(wx.Frame):
 				self.NotebookPage = NotebookPage
 				self.TabText = TabText
 				self.IsInNotebook = False # whether the notebook currently has a tab for this aspect
-
-			def Initialize(self, ParentNotebook=None):
-				# initialize the aspect after populating its WidgetList
-				assert isinstance(ParentNotebook, wx.Notebook)
-				ParentNotebook.AddPage(page=self.NotebookPage, text=self.TabText)
-				self.IsInNotebook = True
-				# make a sizer for the widgets, and populate the sizer
-				self.MySizer = wx.GridBagSizer(vgap=0, hgap=0) # make sizer for widgets. Rappin p343
+				# make a sizer for the widgets (to be populated later)
+				self.MySizer = wx.GridBagSizer(vgap=0, hgap=0) # make sizer for widgets
 				self.NotebookPage.SetSizer(self.MySizer)
-				# widgets will be added to the sizer at the time of display - as the widget lineup may vary
+
+#			def Initialize(self, ParentNotebook=None):
+#				# initialize the aspect, but don't add it to ParentNotebook yet
+#				assert isinstance(ParentNotebook, wx.Notebook)
+#				ParentNotebook.AddPage(page=self.NotebookPage, text=self.TabText)
+#				self.IsInNotebook = True
+#				# make a sizer for the widgets, and populate the sizer
+#				self.MySizer = wx.GridBagSizer(vgap=0, hgap=0) # make sizer for widgets. Rappin p343
+#				self.NotebookPage.SetSizer(self.MySizer)
+#				# widgets will be added to the sizer at the time of display - as the widget lineup may vary
 
 			def Activate(self, **Args): # activate widgets for this aspect
 				Proj = self.ParentFrame.CurrentProj
@@ -2060,12 +2007,9 @@ class ControlFrame(wx.Frame):
 				XMLRoot.find(info.PHAModelTypeTag).text)]
 		# make initial Viewport for the PHA model
 		ViewportType = NewPHAObjType.DefaultViewportType
-		print('CF2056 PHAObjShadows: ', Proj.PHAObjShadows)
 		self.DoNewViewportCommand(Proj, ViewportClass=ViewportType, Chain=True,
 			PHAModel=utilities.ObjectWithID(Proj.PHAObjShadows,
 				TargetID=utilities.TextAsString(XMLRoot.find(info.PHAModelIDTag))))
-#			PHAModel=utilities.ObjectWithID(core_classes.PHAModelBaseClass.AllPHAModelObjects,
-#			utilities.TextAsString(XMLRoot.find(info.PHAModelIDTag))))
 		return vizop_misc.MakeXMLMessage('Null', 'Null')
 
 	def PostProcessNewPHAModel_Undo(self, XMLRoot=None):
@@ -2258,12 +2202,7 @@ class ControlFrame(wx.Frame):
 		# store Viewport as shown in edit panel
 		if not (self.CurrentViewport in self.MyEditPanel.AllViewportsShown):
 			self.MyEditPanel.AllViewportsShown.append(self.CurrentViewport)
-#		# set Viewport as current for this shadow PHAObj
-#		ViewportToShow.PHAObj.CurrentViewport[self.MyEditPanel] = ViewportToShow
 		# set Viewport as the latest shown for this shadow PHAObj in this display device
-		print('CF2203 viewport PHAObj is in PHAObjs: ', ViewportToShow.PHAObj in Proj.PHAObjs)
-		print('CF2203 viewport PHAObj is in PHAObjShadows: ', ViewportToShow.PHAObj in Proj.PHAObjShadows)
-		print('CF2203 PHAObj: ', ViewportToShow.PHAObj)
 		self.MyEditPanel.LatestViewport[ViewportToShow.PHAObj] = ViewportToShow
 		# restore zoom and pan, if provided in XMLRoot
 		if XMLRoot is not None:

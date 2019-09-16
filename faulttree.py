@@ -1747,7 +1747,7 @@ class FTEventInCore(object): # FT event object used in DataCore by FTObjectInCor
 		# set up 'user defined' number kind, for event types that support it,
 		# or in case user switches to an event type that supports it
 		self.Value = core_classes.UserNumValueItem(HostObj=self) # gets reassigned in self.SetAsSIFFailureEvent()
-		# TODO replace above with call to ChangeValueKind()
+		# TODO replace above with call to ChangeNumberKind()
 		self.OldFreqValue = core_classes.UserNumValueItem(HostObj=self) # for restoring after switching btw freq/prob
 		self.OldProbValue = core_classes.UserNumValueItem(HostObj=self)
 		# store the initial (and most recently user-selected) unit for each quantity kind. Values are UnitKind instances
@@ -1764,9 +1764,12 @@ class FTEventInCore(object): # FT event object used in DataCore by FTObjectInCor
 		self.Value.SetMyUnit(FTEventInCore.DefaultFreqUnit)
 		self.OldFreqValue.SetMyUnit(FTEventInCore.DefaultFreqUnit)
 		self.OldProbValue.SetMyUnit(FTEventInCore.DefaultProbUnit)
-		# change value kind if user defined kind isn't supported
+		# change value kind if user defined kind isn't supported%%
 		if FTEventInCore.DefaultValueKind[self.EventType] != core_classes.UserNumValueItem:
-			self.ChangeValueKind(FTEventInCore.DefaultValueKind[self.EventType])
+#			self.ChangeValueKind(FTEventInCore.DefaultValueKind[self.EventType])
+			self.FT.ChangeNumberKind(FTElement=self,
+				NewNumberKindXMLName=FTEventInCore.DefaultValueKind[self.EventType].XMLName, ValueAttribName='',
+				StoreUndoRecord=False)
 		self.IsSIFFailureEventInRelevantOpMode = False # whether this event was the SIF failure event when we were in
 			# relevant opmodes (used to restore SIF failure event if we change back to those modes)
 		self.CanEditValue = True # False if the value should only be calculated and not overridden by user
@@ -1781,9 +1784,12 @@ class FTEventInCore(object): # FT event object used in DataCore by FTObjectInCor
 		self.ShowActionItems = True
 		self.MakeTestComments()
 		self.ConnectTo = [] # FT object instances in next column to the right, to which this element is connected
-#		self.LinkedTo = [] # list of LinkItem instances of which this item is a LinkMaster
 		self.LinkedFrom = [] # list of LinkItem instances for linking individual attribs to a master element elsewhere in the project
 		self.CollapseGroups = [] # CollapseGroup objects this object belongs to
+
+	def AcceptableValueKinds(self): # return list of value kinds (subclasses of NumValueItem) for event
+		return [core_classes.UserNumValueItem, core_classes.ConstNumValueItem,
+			core_classes.ParentNumValueItem, core_classes.UseParentValueItem]
 
 	def MakeTestComments(self):
 		# make test comments for the FTEvent. Temporary
@@ -1862,7 +1868,7 @@ class FTEventInCore(object): # FT event object used in DataCore by FTObjectInCor
 			self.Value = copy.copy(self.OldFreqValue)
 		# change to derived value kind if necessary
 		if ChangeToDerivedValueKind:
-			self.ChangeValueKind(NewValueKind=FTEventInCore.DefaultValueKind[NewEventType])
+			self.ChangeValueKind(NewValueKind=FTEventInCore.DefaultValueKind[NewEventType]) # TODO change to ChangeNumberKind()
 		if NewEventTypeToApply == 'SIFFailureEvent': self.SetAsSIFFailureEvent() # set this event as the SIF failure event
 		else: self.EventType = NewEventTypeToApply
 
@@ -1905,7 +1911,7 @@ class FTEventInCore(object): # FT event object used in DataCore by FTObjectInCor
 		self.ValueInLowDemandMode = copy.copy(self.Value)
 		self.IsSIFFailureEventInRelevantOpMode = True
 		# Make and set up AutoNumValueItem for self.Value
-		self.ChangeValueKind(NewValueKind=core_classes.AutoNumValueItem)
+		self.ChangeValueKind(NewValueKind=core_classes.AutoNumValueItem) # TODO change to ChangeNumberKind()
 		self.Value.Calculator = self.CalcSIFFailureFreq
 		self.Value.UnitGetter = None # %%% TODO: point to the getter for the unit of the tolerable frequency
 		return ReturnValue
@@ -1931,7 +1937,7 @@ class FTEventInCore(object): # FT event object used in DataCore by FTObjectInCor
 				return core_classes.NumProblemValue_DivisionByZero
 			else:
 				# set trial value and try to calculate FT outcome
-				AutoValueObject = copy.copy(self.Value) # so that we can restore if afterwards TODO use ChangeValueKind()
+				AutoValueObject = copy.copy(self.Value) # so that we can restore if afterwards TODO use ChangeNumberKind()
 				self.Value = core_classes.UserNumValueItem(HostObj=self)
 				TrialValue = 1.0
 				self.Value.SetMyValue(NewValue=TrialValue, RR=core_classes.DefaultRiskReceptor)
@@ -3435,7 +3441,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		elif ComponentToUpdate == 'EventValueKind':  # update value kind
 			# find the FTEvent to update
 			ThisFTEvent = [e for e in WalkOverAllFTObjs(self) if e.ID == ElementID][0]
-			ThisFTEvent.ChangeValueKind(NewValueKind=NewValue)  # update the value kind
+			ThisFTEvent.ChangeValueKind(NewValueKind=NewValue)  # update the value kind; TODO use ChangeNumberKind()
 		elif ComponentToUpdate == 'GateKind': # update FTGate kind
 			# find the FTGate to update
 			ThisFTGate = [e for e in WalkOverAllFTObjs(self) if e.ID == ElementID][0]
@@ -3562,17 +3568,23 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			# TODO add data for the changed component to the Save On Fly data
 		return {'Success': True}
 
-	def ChangeNumberKind(self, FTElement, NewNumberKindXMLName, ValueAttribName, Viewport):
+	def ChangeNumberKind(self, FTElement, NewNumberKindXMLName, ValueAttribName='', Viewport=None, StoreUndoRecord=True):
 		# change number kind of numerical value
 		# FTElement: FT itself (for updating TolFreq value), or an FTEvent or FTGate instance (for updating event value)
 		# NewNumberKindXMLName: (str) XML name of number kind to change to
-		# ValueAttribName: (str) Name of value attrib in FTElement to change; 'TolFreq' or 'Value'
-		# Viewport: Viewport from which number change request was initiated - for undo
+		# ValueAttribName: (str) Name of value attrib in FTElement to change; 'TolFreq' or 'Value';
+		#	should be '' if FTElement is not the FT itself
+		# Viewport: Viewport from which number change request was initiated - for undo; ignored if StoreUndoRecord is False
+		# StoreUndoRecord (bool): whether to store an undo record for the number kind change
 		# return:
 			# NumberKindChanged (bool): whether the number kind was actually changed
 			# NewNumberKind (NumValueItem subclass or None): the number kind changed to, or None if number kind wasn't changed
+		assert isinstance(StoreUndoRecord, bool)
+		if StoreUndoRecord: assert Viewport is not None
 		AcceptableNumberKinds = FTElement.AcceptableValueKinds() # TODO maybe we have 2 separate lists of number kinds, should consolidate
-		ValueAttrib = getattr(FTElement, ValueAttribName) # find the applicable attrib in FTElement
+		# find the applicable attrib in FTElement, if it's an FT
+		if ValueAttribName: ValueAttrib = getattr(FTElement, ValueAttribName)
+		else: ValueAttrib = FTElement
 		# check if requested number kind is acceptable
 		if NewNumberKindXMLName in [NK.XMLName for NK in AcceptableNumberKinds]: # it's recognised
 			NewNumberKind = [NK for NK in AcceptableNumberKinds if NK.XMLName == NewNumberKindXMLName][0]
@@ -3595,10 +3607,11 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			# overwrite the old Value with the new number object
 			setattr(FTElement, ValueAttribName, NewValueObj)
 			# store undo record
-			self.DoChangeNumberKind_PostActions(ValueAttrib=ValueAttrib, ValueAttribName=ValueAttribName,
-				FTElement=FTElement, NewNumberObj=NewValueObj, OldNumberObj=OldValueObj,
-				ViewportID=Viewport.ID, ViewportClass=type(Viewport),
-				Zoom=Viewport.Zoom, PanX=Viewport.PanX, PanY=Viewport.PanY, Redoing=False)
+			if StoreUndoRecord:
+				self.DoChangeNumberKind_PostActions(ValueAttrib=ValueAttrib, ValueAttribName=ValueAttribName,
+					FTElement=FTElement, NewNumberObj=NewValueObj, OldNumberObj=OldValueObj,
+					ViewportID=Viewport.ID, ViewportClass=type(Viewport),
+					Zoom=Viewport.Zoom, PanX=Viewport.PanX, PanY=Viewport.PanY, Redoing=False)
 		return NumberKindChanged, NewNumberKind
 
 	def DoChangeNumberKind_PostActions(self, ValueAttrib, ValueAttribName, FTElement, NewNumberObj, OldNumberObj,
@@ -3887,16 +3900,15 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			DataInfo = [ ('HumanName', 'SIFName'), ('Description', 'Description'), ('OpMode', 'OpMode'), ('Rev', 'Rev'),
 				('TargetRiskRedMeasure', 'TargetUnit'), ('BackgColour', 'BackgColour'),
 				('TextColour', 'TextColour'), ('Severity', 'Severity'),
-#				('TolFreq', 'TolFreq'), ('TolFreqUnit', 'TolFreqUnit'),
 				('UEL', 'UEL'), ('TargetRiskRed', 'RRF'),
 				('SIL', 'SIL'), ('OutcomeUnit', 'OutcomeUnit') ]
 			assert ComponentNameToHighlight in [a for (a, b) in DataInfo] + ['TolFreq'] or (ComponentNameToHighlight == '')
 			for Attrib, XMLTag in DataInfo:
 				setattr(HeaderEl, Attrib, HeaderXMLRoot.findtext(XMLTag, default=''))
+				if Attrib == 'HumanName': print('FT3896 populating HumanName: ', HeaderXMLRoot.findtext(XMLTag, default='no tag found'))
 			# set FT.OpMode from the HumanName OpMode supplied (possible gotcha if we ever have 2 OpModes with same HumanName)
 			FT.OpMode = utilities.InstanceWithAttribValue(ObjList=core_classes.OpModes,AttribName='HumanName',
 				TargetValue=HeaderEl.OpMode)
-			print('FT3894 OpMode set: ', FT.OpMode.XMLName)
 			# populate choice boxes for OpMode, risk receptor, severity and RR grouping
 			self.Header.OpModeComponent.ObjectChoices = core_classes.OpModes[:]
 			self.Header.RRComponent.ObjectChoices = self.RiskReceptorObjs[:]
