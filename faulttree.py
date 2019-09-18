@@ -1786,7 +1786,7 @@ class FTEventInCore(object): # FT event object used in DataCore by FTObjectInCor
 		self.CollapseGroups = [] # CollapseGroup objects this object belongs to
 
 	def AcceptableValueKinds(self): # return list of value kinds (subclasses of NumValueItem) for event
-		return [core_classes.UserNumValueItem, core_classes.ConstNumValueItem,
+		return [core_classes.UserNumValueItem, core_classes.ConstNumValueItem, core_classes.AutoNumValueItem,
 			core_classes.ParentNumValueItem, core_classes.UseParentValueItem]
 
 	def MakeTestComments(self):
@@ -2037,7 +2037,6 @@ class FTEventInCore(object): # FT event object used in DataCore by FTObjectInCor
 		if ConnectFrom: # is any event connected to this one? get status from the connected one
 			assert len(ConnectFrom) == 1
 			assert isinstance(ConnectFrom[0], (FTEventInCore, FTGateItemInCore, FTConnectorItemInCore))
-			print("FT1596 status of connected value: ", ConnectFrom[0].Value.Status(RR=RR).InternalName)
 			return ConnectFrom[0].Value.Status(RR=RR)
 		else: # not connected
 			return core_classes.NumProblemValue_FTNotConnected
@@ -2125,6 +2124,9 @@ class FTGateItemInCore(object): # logic gate in a Fault Tree, used in DataCore
 			self.BackgColour = GateBaseColourStr
 			self.Style = FTGateItemInCore.DefaultGateStyle # must be in GateStyles
 			self.Numbering = core_classes.NumberingItem()
+
+	def AcceptableValueKinds(self): # return list of value kinds (subclasses of NumValueItem) for gate
+		return [core_classes.AutoNumValueItem]
 
 	def GetMyStatus(self, RiskReceptor=core_classes.DefaultRiskReceptor):
 		# return NumProblemValue instance for specified risk receptor, indicating whether gate can be calculated
@@ -3106,9 +3108,14 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			elif self.HasPathBetween(ToEl, FromEl): Problem = _('connection would create a circular pathway')
 			else:
 				FromEl.ConnectTo.append(ToEl)
+				# if ToEl isn't a gate, set ToEl's number kind for its Value attrib to Auto (gates are already set to Auto)
+				if not isinstance(ToEl, FTGateItemInCore):
+					NumberKindChanged, NewNumberKind = self.ChangeNumberKind(FTElement=ToEl,
+						NewNumberKindXMLName=core_classes.AutoNumValueItem.XMLName,
+						ValueAttribName='', Viewport=None, StoreUndoRecord=False)
 				Problem = ''
 		return Problem
-		# TODO undo, redo
+		# TODO undo - in ChangeNumberKind call, set StoreUndoRecord to True (also Chained) and supply Viewport arg
 
 	def DisconnectElements(self, FromEl, ToEl):
 		# break a connection from FromEl to ToEl (instances of FTxxxInCore)
@@ -3568,9 +3575,10 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		assert isinstance(StoreUndoRecord, bool)
 		if StoreUndoRecord: assert Viewport is not None
 		AcceptableNumberKinds = FTElement.AcceptableValueKinds() # TODO maybe we have 2 separate lists of number kinds, should consolidate
-		# find the applicable attrib in FTElement, if it's an FT
-		if ValueAttribName: ValueAttrib = getattr(FTElement, ValueAttribName)
-		else: ValueAttrib = FTElement
+		# find the applicable attrib in FTElement
+		if not ValueAttribName: ValueAttribNameToUse = 'Value'
+		else: ValueAttribNameToUse = ValueAttribName
+		ValueAttrib = getattr(FTElement, ValueAttribNameToUse)
 		# check if requested number kind is acceptable
 		if NewNumberKindXMLName in [NK.XMLName for NK in AcceptableNumberKinds]: # it's recognised
 			NewNumberKind = [NK for NK in AcceptableNumberKinds if NK.XMLName == NewNumberKindXMLName][0]
@@ -3591,10 +3599,11 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			if NewNumberKind == core_classes.AutoNumValueItem:
 				NewValueObj.UnitGetter = NewValueObj.GetMyUserDefinedUnit
 			# overwrite the old Value with the new number object
-			setattr(FTElement, ValueAttribName, NewValueObj)
+			setattr(FTElement, ValueAttribNameToUse, NewValueObj)
+			print('FT3601 set element IDs numberkind to:', FTElement.ID, )
 			# store undo record
 			if StoreUndoRecord:
-				self.DoChangeNumberKind_PostActions(ValueAttrib=ValueAttrib, ValueAttribName=ValueAttribName,
+				self.DoChangeNumberKind_PostActions(ValueAttrib=ValueAttrib, ValueAttribName=ValueAttribNameToUse,
 					FTElement=FTElement, NewNumberObj=NewValueObj, OldNumberObj=OldValueObj,
 					ViewportID=Viewport.ID, ViewportClass=type(Viewport),
 					Zoom=Viewport.Zoom, PanX=Viewport.PanX, PanY=Viewport.PanY, Redoing=False)
@@ -3694,7 +3703,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			ThisElementID = XMLRoot.findtext('Element')
 			ThisFTElement = [e for e in WalkOverAllFTObjs(self) if e.ID == ThisElementID][0]
 			Reply = ThisFTElement.ShowActionItemsOnOff(Show=utilities.Bool2Str(XMLRoot.findtext('Visible')))
-		elif Command == 'RQ_FT_ChangeConnection': # change connections between elements
+		elif Command == 'RQ_FT_ChangeConnection': # change connections between elements%%%
 			AllElementsInFT = [e for e in WalkOverAllFTObjs(self)] # get list of all elements in FT
 			# do requested disconnections
 			DisconnectIDList = utilities.UnpackPairsList(XMLRoot.findtext('Disconnect'))
