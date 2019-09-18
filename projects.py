@@ -139,7 +139,7 @@ class ProjectItem(object): # class of PHA project instances
 		# This would be done in the iWindow widget handler
 
 	def AssignDefaultNameToPHAObj(self, PHAObj): # assigns a default HumanName to PHAObj
-		# The default name is e.g. "Fault Tree", then the date in YYMMMDD, then '-' and a serial number
+		# The default name is e.g. "Fault Tree", then the date in YYYYMMMDD, then '-' and a serial number
 		assert isinstance(PHAObj, core_classes.PHAModelBaseClass)
 		HumanNameStub = type(PHAObj).HumanName + ' ' + datetime.date.today().strftime('%Y%b%d') + '-'
 		SkipLength = len(utilities.StripSpaces(HumanNameStub))
@@ -154,7 +154,6 @@ class ProjectItem(object): # class of PHA project instances
 		# The default name is the parent PHA object e.g. "Fault Tree", then "View", then '-' and a serial number
 		assert isinstance(Viewport, display_utilities.ViewportBaseClass)
 		ParentPHAObj = Viewport.PHAObj
-		print('PR157 PHAObj:', ParentPHAObj, getattr(ParentPHAObj, 'HumanName', None))
 		HumanNameStub = type(Viewport).HumanName + '-'
 		SkipLength = len(utilities.StripSpaces(HumanNameStub))
 		# check if any other Viewports in this PHA object have the same HumanNameStub (ignoring spaces).

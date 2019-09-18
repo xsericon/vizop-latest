@@ -1356,7 +1356,9 @@ class ControlFrame(wx.Frame):
 			for ThisWidget in self.NumericalValueAspect.WidgetList:
 				ThisWidget.IsVisible = (ThisWidget in VisibleList)
 
-		def FaultTreeAspect_OnFTNameTextWidget(self, Event, **Args): pass
+		def FaultTreeAspect_OnFTNameTextWidget(self, Event, **Args):
+			print('CF1360 in handler for FT name widget; not coded yet')
+
 		def FaultTreeAspect_OnViewNameTextWidget(self, Event, **Args): pass
 		def FaultTreeAspect_OnFTDescriptionWidget(self, Event, **Args): pass
 

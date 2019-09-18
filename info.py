@@ -163,7 +163,8 @@ ConstantsTag = 'Constants'
 ConstantTag = 'Constant'
 FaultTreesTag = 'FaultTrees'
 FaultTreeTag = 'FaultTree'
-SIFNameTag = 'SIFName'
+SIFNameTag = 'HumanName' # possible clash with HumanNameTag; this one must be HumanName because FTObjectInCore's
+	# attributes listed in TextComponentNames are assumed to have the same name and XML tag, oops
 CommentsTag = 'Comments'
 CommentTag = 'Comment'
 ContentTag = 'Content'

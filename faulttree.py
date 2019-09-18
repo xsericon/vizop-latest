@@ -1698,9 +1698,9 @@ class FTEventInCore(object): # FT event object used in DataCore by FTObjectInCor
 	# event types for which the user must supply a value
 	EventTypesWithUserValues = ['InitiatingEvent', 'IPL', 'EnablingCondition', 'ConditionalModifier']
 	# event types for which user can supply a value, or it can be derived from elsewhere
-	EventTypesUserOrDerivedValues = ['ConnectorIn']
+	EventTypesUserOrDerivedValues = ['ConnectorIn', 'IntermediateEvent', 'ConnectorOut']
 	# event types for which value is derived, not user supplied
-	EventTypesWithDerivedValues = ['SIFFailureEvent', 'IntermediateEvent', 'TopEvent', 'ConnectorOut']
+	EventTypesWithDerivedValues = ['SIFFailureEvent', 'TopEvent']
 	UserSuppliedNumberKinds = [core_classes.UserNumValueItem, core_classes.ConstNumValueItem,
 		core_classes.LookupNumValueItem, core_classes.ParentNumValueItem, core_classes.UseParentValueItem]
 	DerivedNumberKinds = [core_classes.AutoNumValueItem]
@@ -2484,18 +2484,9 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			self.TolFreq.SetMyValue(TolFreqValueObj.GetMyValue(RR=RR), RR=RR)
 			self.TolFreq.SetMyUnit(TolFreqValueObj.GetMyUnit()) # setting the same unit several times, never mind
 		# set lists of permissible units and ValueKinds; used elsewhere to offer options to user
-		print('FT2481 setting TolFreq.AcceptableUnits')
 		self.TolFreq.AcceptableUnits = core_classes.FrequencyUnits
 		self.TolFreq.ValueKindOptions = [core_classes.UserNumValueItem, core_classes.ConstNumValueItem,
 			core_classes.LookupNumValueItem, core_classes.UseParentValueItem, core_classes.ParentNumValueItem]
-
-#	def MyAcceptableUnits(self): # return list of units (UnitItem instances) for FT's TolFreq
-#		if type(self.TolFreq) is core_classes.UserNumValueItem:
-#			return core_classes.FrequencyUnits
-#		else: # any type other than UserNumValueItem can only take the unit imposed by the "parent" type
-#			return [self.TolFreq.Unit]
-#
-#	AcceptableUnits = property(fget=MyAcceptableUnits)
 
 	def AcceptableValueKinds(self): # return list of value kinds (subclasses of NumValueItem) for FT's TolFreq
 		return [core_classes.UserNumValueItem, core_classes.ConstNumValueItem, core_classes.LookupNumValueItem,
@@ -3897,7 +3888,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			# In DataInfo, each pair of items is: (FTHeader attrib name, XML tag)
 			assert isinstance(HeaderEl, FTHeader)
 			# set all header attribs except risk receptor (set in PopulateOverallData() )
-			DataInfo = [ ('HumanName', 'SIFName'), ('Description', 'Description'), ('OpMode', 'OpMode'), ('Rev', 'Rev'),
+			DataInfo = [ ('HumanName', info.SIFNameTag), ('Description', 'Description'), ('OpMode', 'OpMode'), ('Rev', 'Rev'),
 				('TargetRiskRedMeasure', 'TargetUnit'), ('BackgColour', 'BackgColour'),
 				('TextColour', 'TextColour'), ('Severity', 'Severity'),
 				('UEL', 'UEL'), ('TargetRiskRed', 'RRF'),
@@ -3905,7 +3896,6 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			assert ComponentNameToHighlight in [a for (a, b) in DataInfo] + ['TolFreq'] or (ComponentNameToHighlight == '')
 			for Attrib, XMLTag in DataInfo:
 				setattr(HeaderEl, Attrib, HeaderXMLRoot.findtext(XMLTag, default=''))
-				if Attrib == 'HumanName': print('FT3896 populating HumanName: ', HeaderXMLRoot.findtext(XMLTag, default='no tag found'))
 			# set FT.OpMode from the HumanName OpMode supplied (possible gotcha if we ever have 2 OpModes with same HumanName)
 			FT.OpMode = utilities.InstanceWithAttribValue(ObjList=core_classes.OpModes,AttribName='HumanName',
 				TargetValue=HeaderEl.OpMode)
@@ -4003,16 +3993,13 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 				if ThisTag.text.endswith(info.ConvertValueMarker): ThisHumanName = _('Convert value to %s') % ThisUnitHumanName
 				else: ThisHumanName = ThisUnitHumanName
 				NewEvent.EventValueUnitComponent.ObjectChoices.append(core_classes.ChoiceItem(XMLName=ThisTag.text,
-																				 HumanName=ThisHumanName,
-																				 Applicable=utilities.Bool2Str(ThisTag.get(info.ApplicableAttribName))))
-#			# populate value kind with HumanName of number kind class specified in incoming NumberKind tag
-#			NewEvent.ValueKind = ([c.HumanName for c in core_classes.NumValueClasses
-#				if c.XMLName == XMLObj.findtext(info.NumberKindTag, default='')] + ['???'])[0]
-			# populate value kind choice%%%
+					HumanName=ThisHumanName,
+					Applicable=utilities.Bool2Str(ThisTag.get(info.ApplicableAttribName))))
+			# populate value kind choice
 			NewEvent.EventValueKindComponent.ObjectChoices = [core_classes.ChoiceItem(XMLName=ThisTag.text,
-																		 HumanName=[c.HumanName for c in core_classes.NumValueClasses if c.XMLName == ThisTag.text][0],
-																		 Applicable=utilities.Bool2Str(ThisTag.get(info.ApplicableAttribName)))
-															  for ThisTag in XMLObj.findall(info.NumberKindTag)]
+				HumanName=[c.HumanName for c in core_classes.NumValueClasses if c.XMLName == ThisTag.text][0],
+				Applicable=utilities.Bool2Str(ThisTag.get(info.ApplicableAttribName)))
+					for ThisTag in XMLObj.findall(info.NumberKindTag)]
 			# populate value kind with HumanName of number kind marked as applicable
 			NewEvent.ValueKind = [c.HumanName for c in NewEvent.EventValueKindComponent.ObjectChoices
 				if c.Applicable][0]

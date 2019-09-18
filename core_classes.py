@@ -428,7 +428,7 @@ class NumValueItem(object): # superclass of objects in Datacore having a numeric
 			print("Warning, missing '%s' key in NumValueItem risk receptors (problem code: D26)" % RR)
 			if DefaultRiskReceptor in self.ValueFamily:
 				RR = DefaultRiskReceptor
-			else:  # DefaultRiskReceptor key is missing
+			else: # DefaultRiskReceptor key is missing
 				print("Oops, missing DefaultRiskReceptor key in NumValueItem risk receptors (problem code: D28). This is a bug; please report it")
 				return InvalidResult
 		# get the actual value
@@ -530,6 +530,7 @@ class NumValueItem(object): # superclass of objects in Datacore having a numeric
 					return '%0.*f' % (Decimals, TruncatedValue)
 
 	def Status(self, RR=DefaultRiskReceptor): # return NumProblemValue item indicating status of value
+		# This method doesn't check the value is within valid range. For that, call CheckValue() in module FaultTree
 		if not (RR in self.ValueFamily):  # requested risk receptor not defined for this value object
 			print("Warning, missing '%s' key in NumValueItem risk receptors (problem code: CC390)" % RR.HumanName)
 			if DefaultRiskReceptor in self.ValueFamily:
@@ -541,9 +542,11 @@ class NumValueItem(object): # superclass of objects in Datacore having a numeric
 		if (self.ValueFamily[RR] is None) or (self.IsSetFlagFamily[RR] != 'ValueStatus_OK'):
 			# value not defined, returned 'undefined' NumProblemValue
 			return NumProblemValue_UndefNumValue
-		else: # value set; check if it is valid by trying to call self.HostObj.CheckValue(self)
-			# (the lambda function is invoked if HostObj is None or CheckValue isn't defined
-			return getattr(self.HostObj, 'CheckValue', lambda v: NumProblemValue_NoProblem)(self)
+		else: # value set (skipping the value check below - this is not the purpose of Status())
+#		else: # value set; check if it is valid by trying to call self.HostObj.CheckValue(self)
+#			# (the lambda function is invoked if HostObj is None or CheckValue isn't defined
+#			return getattr(self.HostObj, 'CheckValue', lambda v: NumProblemValue_NoProblem)(self)
+			return NumProblemValue_NoProblem
 
 	def GetMyStatus(self, RR=DefaultRiskReceptor, **Args): # get status of value (NumProblemValue item)
 		return self.Status(RR=RR)
