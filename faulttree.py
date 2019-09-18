@@ -933,7 +933,6 @@ class FTGate(FTBoxyObject): # object containing FT gates for display. These belo
 		self.GateDescriptionComments = [] # str values
 		self.ActionItems = [] # str values
 		self.ShowActionItems = True
-#		self.ConnectTo = [] # str values, ID's of connected items in next column (already defined in superclass)
 		self.SizeXInCU = self.SizeXInPx = self.SizeYInCU = self.SizeYInPx = 10 # size in canvas units and screen pixels
 		self.PosZ = 0 # z-coordinate
 		self.Buffer = wx.Bitmap(width=self.SizeXInPx, height=self.SizeYInPx, depth=wx.BITMAP_SCREEN_DEPTH)
@@ -1349,7 +1348,6 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 		self.ConnectorDescription = ''
 		self.Value = ''
 		self.ValueUnit = '' # *
-#		self.ConnectTo = [] # str values, ID's of connected items in next column (already defined in superclass)
 		self.SizeXInCU = self.SizeXInPx = self.SizeYInCU = self.SizeYInPx = 10 # size in canvas units and screen pixels
 		self.PosZ = 0 # z-coordinate
 		self.Buffer = wx.Bitmap(width=self.SizeXInPx, height=self.SizeYInPx, depth=wx.BITMAP_SCREEN_DEPTH)
@@ -1559,7 +1557,7 @@ class FTColumn(object): # object containing a column of FT objects for display, 
 		self.PosXInPx = 0 # X coord of left edge in pixels, relative to display device origin, including zoom and pan
 		self.SizeXInPx = 10 # width in pixels
 			# PosXInPx and SizeXInPx needed to determine x-coord of inter-column strip to the right
-		self.FTElements = []
+		self.FTElements = [] # list of FT objects in the column, including builder buttons
 
 	def RenderElementsInOwnBitmaps(self, Zoom):
 		# Get each element to calculate its own contents and draw itself in own individual bitmap
@@ -2090,11 +2088,8 @@ class FTGateItemInCore(object): # logic gate in a Fault Tree, used in DataCore
 		assert isinstance(FT, FTObjectInCore)
 		assert isinstance(Column, FTColumnInCore)
 		object.__init__(self)
-#		self.ID = str(utilities.NextID(FTGateItemInCore.AllFTGatesInCore)) # generate unique ID; stored as str
-#		FTGateItemInCore.AllFTGatesInCore.append(self) # add self to register. Must do after assigning self.ID
 		FT.MaxElementID += 1 # find next available ID
 		self.ID = str(FT.MaxElementID)
-		print("FT1996 created FTGate in core with ID: ", self.ID, type(self.ID))
 		self.Proj = Proj
 		self.FT = FT
 		self.Column = Column
@@ -4028,7 +4023,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			for Tag, Attrib in DataInfoAsBool:
 				setattr(NewConnector, Attrib, bool(ConnectorEl.findtext(Tag, default='False')))
 			# DataInfoAsList: (Tag of each item in a list, name of the list to put the tag's text into)
-			DataInfoAsList = [ ('DescriptionComments', 'DescriptionComments'), ('ConnectTo', 'ConnectTo'),
+			DataInfoAsList = [ ('DescriptionComments', 'DescriptionComments'), ('ConnectTo', 'ConnectToIDs'),
 				('CollapseGroups', 'CollapseGroups') ]
 			for Tag, Attrib in DataInfoAsList:
 				setattr(NewConnector, Attrib, [El.text for El in ConnectorEl.findall(Tag)])
@@ -4036,7 +4031,6 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 
 		def PopulateFTGate(XMLObj, Column):
 			# create an FTGate, get data for FTGate from XMLObj (XML element). Return the FTGate
-			print("FT3299 creating new FTGate")
 			NewGate = FTGate(FT=self, Column=Column)
 			# get gate data. In DataInfoAsXXX, each pair of items is: (XML tag, FTGate attrib name)
 			DataInfoAsStr = [ (info.IDTag, 'ID'), ('Algorithm', ''), ('BackgColour', 'BackgColour'),
@@ -4050,7 +4044,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			for Tag, Attrib in DataInfoAsBool:
 				setattr(NewGate, Attrib, bool(XMLObj.findtext(Tag, default='False')))
 			# DataInfoAsList: (Tag of each item in a list, name of the list to put the tag's text into)
-			DataInfoAsList = [ ('DescriptionComments', 'DescriptionComments'), ('ConnectTo', 'ConnectTo'),
+			DataInfoAsList = [ ('DescriptionComments', 'DescriptionComments'), ('ConnectTo', 'ConnectToIDs'),
 				('CollapseGroups', 'CollapseGroups') ]
 			for Tag, Attrib in DataInfoAsList:
 				setattr(NewGate, Attrib, [El.text for El in XMLObj.findall(Tag)])
@@ -4326,7 +4320,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 
 			def DrawConnectingVerticals(LeftColumn, RightColumn, DrawDC, ConnectedOnRightEls):
 				# In DrawDC, draw vertical parts of connecting lines between horizontals of connected items in Left and Right columns
-				# ConnectedOnRightEls is a list or set of object IDs in the right column that are connected
+				# ConnectedOnRightEls is a list or set of FT elements in the right column that are connected
 				LineThickness = 4 # in canvas coords
 				LineXInCU = int(round(0.5 * self.InterColumnStripWidth)) # line will be drawn in centre of strip
 				LineColour = (0xf6, 0xff, 0x2a) # golden yellow
@@ -4392,7 +4386,6 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 				# make a set of elements in right column that are connected to the left column
 				ConnectedOnRightEls = set(utilities.Flatten([Obj.ConnectTo for Obj in
 					self.Columns[LeftColIndex].FTElements]))
-#				print("FT3674 ConnectedOnRightEls: ", ConnectedOnRightEls)
 				# check if right col has any connectable objects
 				RightColConnectable = True in [getattr(El, 'NeedsConnectButton', False)
 					for El in self.Columns[LeftColIndex + 1].FTElements]
