@@ -680,7 +680,8 @@ class FTEvent(FTBoxyObject): # FT event object. Rendered by drawing text into bi
 		self.InitializeData()
 		(self.TopFixedEls, self.ValueFixedEls) = self.CreateFixedTextElements()
 		self.BorderColour = (0x35, 0x6d, 0x5f) # darker green
-		self.BackgroundColour = (0x54, 0xae, 0x97) # slightly darker than text entry boxes
+		self.BackgroundColourUnselected = (0x54, 0xae, 0x97) # green, slightly darker than text entry boxes
+		self.BackgroundColourSelected = (0xf2, 0xc5, 0xab) # coral-orange
 		self.MaxElementsConnectedToThis = FTEventInCore.MaxElementsConnectedToThis
 
 	def InitializeData(self):
@@ -854,7 +855,8 @@ class FTEvent(FTBoxyObject): # FT event object. Rendered by drawing text into bi
 
 		def DrawBackgroundBox(DC, Zoom): # draw FTEvent's background box in DC
 			DC.SetPen(wx.Pen(self.BorderColour, width=1)) # for now, a 1 pixel border around the event. TODO make nicer and apply zoom
-			DC.SetBrush(wx.Brush(self.BackgroundColour))
+			BackgColour = self.BackgroundColourSelected if self in self.FT.CurrentElements else self.BackgroundColourUnselected
+			DC.SetBrush(wx.Brush(BackgColour))
 			# box is drawn in FTElement's own bitmap, so coords are relative to element (not using PosX/YInPx, which are relative to column)
 			DC.DrawRectangle(0, 0, self.SizeXInPx, self.SizeYInPx)
 
@@ -1478,7 +1480,7 @@ class FTBuilder(FTBoxyObject): # 'add' button object within an FTColumn.
 		# ObjTypeRequested: which type of FT object will be created when user selects this FTBuilder - must be an element class
 		# belonging to FTObj (not FTForDisplay)
 		FTBoxyObject.__init__(self, **Args)
-		self.ID = 0
+		self.ID = 'builder'
 		self.BackgColour = (0,0,0)
 		self.Description = '' # the text in the button
 		self.Visible = True
@@ -4142,6 +4144,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		for ThisEl in WalkOverAllFTObjs(self):
 			if ThisEl.ID in self.CurrentElementIDsToSetOnRefresh: self.CurrentElements.append(ThisEl)
 		# request appropriate control panel aspect %%% working here
+		self.SwitchToPreferredControlPanelAspect(CurrentElements=self.CurrentElements)
 
 	def RenderInDC(self, TargetDC, FullRefresh=True, **Args):
 		# render all FT components into TargetDC provided by ControlFrame
@@ -4752,7 +4755,8 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 						Element=ElementID, TextComponent=EditComponentInternalName,
 						NewValue=ChosenXMLName)
 					# store current element's ID to set as "current" when display is refreshed
-					self.CurrentElementIDsToSetOnRefresh = self.PHAObj.ID
+					if ElementID != 'Header':
+						self.CurrentElementIDsToSetOnRefresh = [ElementID]
 				else: # no change made, or change rejected; destroy the choice widget
 					self.CurrentEditChoice.Destroy()
 					self.CurrentEditElement = self.CurrentEditChoice = None
@@ -4812,18 +4816,27 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		# set TargetFTElement (FTElement or FTGate instance) as the current one. This will be reflected in Control Panel and
 		# edit operations such as "delete element".
 		# if UnsetPrevious (bool), the element(s) previously set as current will be unset. This is normal behaviour except
-		# when the user is multi-selecting elements.%%%
+		# when the user is multi-selecting elements.
+		# This function is not used yet.
 		assert isinstance(TargetFTElement, (FTGate, FTConnector, FTEvent))
 		assert isinstance(UnsetPrevious, bool)
 		if UnsetPrevious: self.CurrentElements = [] # unset previous current elements list
 		self.CurrentElements.append(TargetFTElement)
-		# if TargetFTElement has a preferred aspect of Control Panel, try to jump to that aspect
-		# (currently used for Connector-Out)
-		print('FT4811 trying to switch to relevant control aspect: '), getattr(TargetFTElement, 'ControlPanelAspect', None)
-		if getattr(TargetFTElement, 'ControlPanelAspect', None):
-			if hasattr(self.DisplDevice, 'GotoControlPanelAspect'):
-				self.DisplDevice.GotoControlPanelAspect(AspectName=TargetFTElement.ControlPanelAspect,
-					PHAObjInControlPanel=TargetFTElement)
+
+	def SwitchToPreferredControlPanelAspect(self, CurrentElements):
+		# if appropriate, ask our display device's Control Panel to go to the preferred aspect, considering which
+		# FT elements are in CurrentElements (list)
+		assert hasattr(CurrentElements, '__iter__') # confirm it's a list
+		# does our display device have a control panel?
+		if hasattr(self.DisplDevice, 'GotoControlPanelAspect'):
+			# is CurrentElements non-empty, and are all current elements of the same type?
+			if len(set([type(e) for e in CurrentElements])) == 1:
+				# does the type have a preferred control panel aspect?
+				print('FT4811 trying to switch to relevant control aspect: ',
+					type(CurrentElements[0]), getattr(CurrentElements[0], 'ControlPanelAspect', None))
+				if getattr(CurrentElements[0], 'ControlPanelAspect', None):
+					self.DisplDevice.GotoControlPanelAspect(AspectName=CurrentElements[0].ControlPanelAspect,
+						PHAObjInControlPanel=CurrentElements[0])
 
 FTObjectInCore.DefaultViewportType = FTForDisplay # set here (not in FTForDisplay class) due to the order of the
 	# class definitions
