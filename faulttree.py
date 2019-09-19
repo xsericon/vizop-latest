@@ -471,7 +471,6 @@ class FTBoxyObject(object): # superclass of vaguely box-like FT components for u
 		return [El for El in self.AllElements if El.IsClickable
 			if (El.Selected or not SelectedOnly) if (El.Visible or not VisibleOnly)]
 
-
 class TextElement(FTBoxyObject): # object containing a text object and other attributes and methods needed to render it
 	# Consists of a single text inside a coloured box. It's a component of an FTHeader or FTEvent.
 
@@ -582,6 +581,7 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 		# first, request control frame to show appropriate aspect in control panel
 #		# find out which object contains the parameter to be edited, if any
 #		DataHostObj = self.FT if isinstance(self.HostObject, FTHeader) else self.HostObject
+		# first, try to go to any preferred aspect of the Control panel, if our display device has a control panel
 		if getattr(self, 'ControlPanelAspect', None):
 #			if isinstance(self.CurrentEditElement.HostObject, FTHeader):
 #				ElementID = 'Header'
@@ -590,8 +590,9 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 #				ElementID = self.CurrentEditElement.HostObject.ID
 #				DatacoreHostObj = self.HostObject.FT
 #			EditComponentInternalName = self.CurrentEditElement.InternalName
-			self.FT.DisplDevice.GotoControlPanelAspect(AspectName=self.ControlPanelAspect,
-				PHAObjInControlPanel=self.HostObject, ComponentInControlPanel=self.InternalName)
+			if hasattr(self.FT.DisplDevice, 'GotoControlPanelAspect'):
+				self.FT.DisplDevice.GotoControlPanelAspect(AspectName=self.ControlPanelAspect,
+					PHAObjInControlPanel=self.HostObject, ComponentInControlPanel=self.InternalName)
 		if self.FT.EditAllowed: # proceed with editing only if allowed to edit in this instance of vizop
 			# get absolute position of textbox for editing: position within element + column + FT, then apply zoom and pan
 			Zoom = self.FT.Zoom
@@ -1450,9 +1451,12 @@ class FTConnectorIn(FTConnector):
 		FTConnector.__init__(self)
 
 class FTConnectorOut(FTConnector):
+	ControlPanelAspect = 'FTConnectorOut' # preferred Control Panel aspect to show when selecting an instance of this class
 
 	def __init__(self):
 		FTConnector.__init__(self)
+		self.ConnectorIns = [] # list of Choice items, each representing a Connector-In to which this connector is
+			# connected. Expected attribs in the items: HumanName (str), ID (str)
 
 class FTCollapseGroup(object): # depiction of a group of FT objects that have been collapsed to a single display object
 	# The CollapseGroup is not actually an FT object in itself, and is not stored in any column.
@@ -1911,7 +1915,7 @@ class FTEventInCore(object): # FT event object used in DataCore by FTObjectInCor
 		# Make and set up AutoNumValueItem for self.Value
 		self.ChangeValueKind(NewValueKind=core_classes.AutoNumValueItem) # TODO change to ChangeNumberKind()
 		self.Value.Calculator = self.CalcSIFFailureFreq
-		self.Value.UnitGetter = None # %%% TODO: point to the getter for the unit of the tolerable frequency
+		self.Value.UnitGetter = None # TODO: point to the getter for the unit of the tolerable frequency
 		return ReturnValue
 
 	def CalcSIFFailureFreq(self, RR, FormulaAntecedents, **args):
@@ -2067,7 +2071,6 @@ class FTEventInCore(object): # FT event object used in DataCore by FTObjectInCor
 	def ConnectToElement(self, DestinationEl): # make connection from this element to DestinationEl
 		# redundant
 		assert isinstance(DestinationEl, (FTEventInCore, FTGateItemInCore, FTConnectorItemInCore))
-		print("FT1975 connecting to: ", DestinationEl)
 		self.ConnectTo.append(DestinationEl)
 		# set DestinationEl's value unit appropriate to the value kind of the connected event
 		DestinationEl.Value.SetMyUnit(DestinationEl.LastSelectedUnitPerQtyKind[self.Value.GetMyUnit().QtyKind])
@@ -2750,7 +2753,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 					ConstantOptionEl.text = str(ThisConstantOption.HumanName)
 					IDEl = ElementTree.SubElement(ConstantOptionEl, info.IDTag)
 					IDEl.text = ThisConstantOption.ID
-				for ThisMatrixOption in self.Proj.TolRiskModels: # %%% working here
+				for ThisMatrixOption in self.Proj.TolRiskModels:
 					MatrixOptionEl = ElementTree.SubElement(AttribEl, info.MatrixOptionTag)
 					MatrixOptionEl.text = str(ThisMatrixOption.HumanName)
 					MatrixOptionIDEl = ElementTree.SubElement(MatrixOptionEl, info.IDTag)
@@ -3422,7 +3425,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			# if this is an FTGate, set its "last selected unit" attribute
 			if UnitChanged and (ComponentToUpdate == 'GateValueUnit'): ThisFTEvent.SetLastSelectedUnit(NewUnit)
 		elif ComponentToUpdate == 'TolFreq':
-			# update unit or number kind of TolFreq in FT header%%%
+			# update unit or number kind of TolFreq in FT header
 			AttribToChange = Args['Attrib']
 			if AttribToChange == 'Unit':
 				UnitChanged, NewUnit, ValueAcceptable = self.ChangeUnit(FTElement=self, NewUnitXMLName=NewValue,
@@ -3450,7 +3453,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			RootName = 'OK'; RootText = info.ValueOutOfRangeMsg
 		return vizop_misc.MakeXMLMessage(RootName=RootName, RootText=RootText)
 
-	def ChangeUnit(self, FTElement, NewUnitXMLName, ValueAttribName, Viewport): # change unit of numerical value%%% working on undo
+	def ChangeUnit(self, FTElement, NewUnitXMLName, ValueAttribName, Viewport): # change unit of numerical value
 		# FTElement: FT itself (for updating TolFreq value), or an FTEvent or FTGate instance (for updating value unit)
 		# NewUnitXMLName: (str) XML name of unit to change to, optionally with ConvertValueMarker suffix
 		# ValueAttribName: (str) Name of value attrib in FTElement to change; 'TolFreq' or 'Value'
@@ -3473,7 +3476,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			if Convert:
 				# check whether the value is in acceptable range in the old unit, for all risk receptors
 				# (in principle, this check is redundant, as the value
-				# in MaxMinUnit isn't changing, but we check anyway in case the value got messed up somehow)%%%
+				# in MaxMinUnit isn't changing, but we check anyway in case the value got messed up somehow)
 				ValueAcceptable = True
 				for ThisRR in ValueAttrib.ValueFamily.keys():
 					# check value for each RR, if the value is defined for that RR
@@ -3703,7 +3706,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			ThisElementID = XMLRoot.findtext('Element')
 			ThisFTElement = [e for e in WalkOverAllFTObjs(self) if e.ID == ThisElementID][0]
 			Reply = ThisFTElement.ShowActionItemsOnOff(Show=utilities.Bool2Str(XMLRoot.findtext('Visible')))
-		elif Command == 'RQ_FT_ChangeConnection': # change connections between elements%%%
+		elif Command == 'RQ_FT_ChangeConnection': # change connections between elements
 			AllElementsInFT = [e for e in WalkOverAllFTObjs(self)] # get list of all elements in FT
 			# do requested disconnections
 			DisconnectIDList = utilities.UnpackPairsList(XMLRoot.findtext('Disconnect'))
@@ -3780,7 +3783,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		self.SeverityCatObjs = [] # SeverityCatInFT instances, in the order severity categories should be displayed
 		self.Header = FTHeader(FT=self)
 		self.Columns = [] # this will be FTColumn objects
-		self.InterColumnStripWidth = 100  # in canvas coords
+		self.InterColumnStripWidth = 100 # in canvas coords
 		self.Zoom = 1.0 # ratio of canvas coords to screen coords (absolute ratio, not %)
 		self.PanX = self.PanY = 0 # offset of drawing origin, in screen coords
 		self.OffsetX = self.OffsetY = 0 # offset of Viewport in display panel, in screen coords;
@@ -3808,6 +3811,10 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		self.Panning = self.Zooming = False # whether user is currently changing display zoom or pan, for redraw efficiency
 		self.ConnectButtons = [] # ButtonElement instances for connect buttons in inter-column strips
 		self.EditAllowed = True # whether user is allowed to edit the data in the underlying PHAObj
+		self.CurrentElements = [] # which element(s) are "current", i.e. selected for editing
+		self.CurrentElementIDsToSetOnRefresh = [] # IDs of elements to be set as current when display is next refreshed.
+			# This is used so we can store the selection across a refresh - as datacore doesn't know which elements are
+			# "current" in our Viewport
 
 	def Wipe(self): # wipe all data in the FT and re-initialize
 		self.Header.InitializeData()
@@ -4130,6 +4137,11 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		self.AddBuilderButtons()
 		# populate elements' ConnectTo attribs (must be done AFTER populating all elements)
 		self.PopulateConnectTo()
+		# populate which elements are currently selected
+		self.CurrentElements = []
+		for ThisEl in WalkOverAllFTObjs(self):
+			if ThisEl.ID in self.CurrentElementIDsToSetOnRefresh: self.CurrentElements.append(ThisEl)
+		# request appropriate control panel aspect %%% working here
 
 	def RenderInDC(self, TargetDC, FullRefresh=True, **Args):
 		# render all FT components into TargetDC provided by ControlFrame
@@ -4701,7 +4713,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			if CurrentEditBehaviour == 'Text':
 				# get the text typed by the user
 				TextEntered = self.CurrentEditTextCtrl.GetValue().strip()
-				# check if any changes made%%%
+				# check if any changes made
 				if AcceptEditsThisTime and (TextEntered != self.CurrentEditElement.Text.Content):
 					if isinstance(self.CurrentEditElement.HostObject, FTHeader): ElementID = 'Header'
 					else: ElementID = self.CurrentEditElement.HostObject.ID
@@ -4739,6 +4751,8 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 						ProjID=self.Proj.ID, PHAObj=self.PHAObj.ID, Viewport=self.ID,
 						Element=ElementID, TextComponent=EditComponentInternalName,
 						NewValue=ChosenXMLName)
+					# store current element's ID to set as "current" when display is refreshed
+					self.CurrentElementIDsToSetOnRefresh = self.PHAObj.ID
 				else: # no change made, or change rejected; destroy the choice widget
 					self.CurrentEditChoice.Destroy()
 					self.CurrentEditElement = self.CurrentEditChoice = None
@@ -4791,9 +4805,25 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		StripCentreXInPx = 0.5 * (StripMinXInPx + StripMaxXInPx)
 		return StripCentreXInPx, StripMinXInPx, StripMinYInPx, StripMaxXInPx, StripMaxYInPx
 
-
 	def ReleaseDisplayDevice(self, DisplDevice, **Args):  # wrap-up actions needed when display device is no longer showing FT
 		pass # no specific actions needed (later, might need to store any unstored user inputs, and kill any active widgets)
+
+	def SetElementAsCurrent(self, TargetFTElement, UnsetPrevious=False):
+		# set TargetFTElement (FTElement or FTGate instance) as the current one. This will be reflected in Control Panel and
+		# edit operations such as "delete element".
+		# if UnsetPrevious (bool), the element(s) previously set as current will be unset. This is normal behaviour except
+		# when the user is multi-selecting elements.%%%
+		assert isinstance(TargetFTElement, (FTGate, FTConnector, FTEvent))
+		assert isinstance(UnsetPrevious, bool)
+		if UnsetPrevious: self.CurrentElements = [] # unset previous current elements list
+		self.CurrentElements.append(TargetFTElement)
+		# if TargetFTElement has a preferred aspect of Control Panel, try to jump to that aspect
+		# (currently used for Connector-Out)
+		print('FT4811 trying to switch to relevant control aspect: '), getattr(TargetFTElement, 'ControlPanelAspect', None)
+		if getattr(TargetFTElement, 'ControlPanelAspect', None):
+			if hasattr(self.DisplDevice, 'GotoControlPanelAspect'):
+				self.DisplDevice.GotoControlPanelAspect(AspectName=TargetFTElement.ControlPanelAspect,
+					PHAObjInControlPanel=TargetFTElement)
 
 FTObjectInCore.DefaultViewportType = FTForDisplay # set here (not in FTForDisplay class) due to the order of the
 	# class definitions

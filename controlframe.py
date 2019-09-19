@@ -15,7 +15,7 @@ from platform import system
 # vizop modules needed:
 import settings, text, vizop_misc, art, display_utilities, info, utilities, core_classes, projects, project_display
 import undo, faulttree
-from display_utilities import UIWidgetItem
+from display_utilities import UIWidgetItem, UIWidgetPlaceholderItem
 
 # ColourSwatchButtonSize = (60,20) # size for 'change colour' buttons. Not applied in all cases, yet
 # HeadingTextPointSize = 13 # default point size of heading font in iWindow
@@ -719,6 +719,7 @@ class ControlFrame(wx.Frame):
 			# set up widgets in WidgList (list of UIWidgetItems) for insertion into an overall widget list at StartingRow
 			# and offset by ColOffset columns to the right
 			# return ( [widgets with offsets set], next available row number)
+			# This procedure may be obsolete, as we don't use RowLoc any more
 			NextRow = 0
 			for Widget in WidgList:
 				Widget.RowOffset = StartingRow - Widget.RowLoc
@@ -728,9 +729,102 @@ class ControlFrame(wx.Frame):
 
 		def HowManyWidgetRows(self, WidgList): # return no of rows occupied by widgets in WidgList
 			# find the lowest and highest row numbers occupied, taking RowSpan into account
+			# This procedure may be obsolete, as we don't use RowLoc any more
 			MinRow = min([9999] + [W.RowLoc for W in WidgList])
 			MaxRow = max([-1] + [W.RowLoc + W.RowSpan - 1 for W in WidgList])
 			return max(0, MaxRow - MinRow + 1) # the 0 handles empty WidgList case
+
+		def InsertVariableWidgets(self, TargetPlaceholderName, FixedWidgets, VariableWidgets):
+			# finds TargetPlaceholderName (str) in FixedWidgets (list of UIWidgetItem instances with placeholder(s))
+			# creates and returns combined widget list,
+			# replacing the placeholder with the variable widgets inserted in the correct position according to their
+			# RowOffset and ColOffset attribs (NB row posn doesn't consider any GapY defined in variable widgets)
+			# doesn't check whether this causes position clashes with existing widgets
+			# doesn't take accound of RowOffset, ColOffset attribs
+			# return: CombinedWidgetList
+			# The overall algorithm is:
+			# 1. Find the applicable placeholder in FixedWidgets. Transfer all widgets before the placeholder to
+			# CombinedWidgets.
+			# 2. Keep transferring FixedWidgets until the next FixedWidget is to the right of, or below, the first
+			# variable widget.
+			# 3. Transfer the first variable widget to CombinedWidgets.
+			# 4. Repeat steps 2 and 3 with each successive variable widget until all the widgets are used up.
+			assert isinstance(TargetPlaceholderName, str)
+			assert hasattr(FixedWidgets, '__iter__') # confirm it's an iterable
+			assert hasattr(VariableWidgets, '__iter__')
+			# confirm matching placeholder found in FixedWidgets
+			assert TargetPlaceholderName in [P.Name for P in FixedWidgets if isinstance(P, UIWidgetPlaceholderItem)]
+			# find row and column address of placeholder
+			ThisRow = NextCol = 0 # ThisRow: current row; NextCol: next available column in the row
+			PlaceholderFound = False
+			FixedWidgetIndex = 0
+			ThisRowSpan = 1 # how many sizer rows are taken up by current row of widgets
+			GapYAdded = False # whether the current row contains any widget with GapY set, i.e. leaving a gap above
+			while not PlaceholderFound: # walk through FixedWidgets until placeholder is found
+				ThisWidget = FixedWidgets[FixedWidgetIndex]
+				if isinstance(ThisWidget, UIWidgetPlaceholderItem) and\
+					(getattr(ThisWidget, 'Name', None) == TargetPlaceholderName):
+					PlaceholderFound = True
+				else:
+					if ThisWidget.NewRow: # start new row if required
+						ThisRow += ThisRowSpan # add span of preceding row
+						ThisRowSpan = 1 # reset ThisRowSpan for new row
+						GapYAdded = False # reset flag
+					NextCol = ThisWidget.ColLoc + ThisWidget.ColSpan
+					if (ThisWidget.GapY > 0) and not GapYAdded: # did the widget require a GapY above?
+						ThisRow += 1 # add a row for the GapY
+						GapYAdded = True # set flag to avoid repeat-adding gap if another widget has GapY in the same row
+					FixedWidgetIndex += 1
+			# now we have ThisRow and NextCol (start location for variable widgets) and FixedWidgetIndex (index of placeholder)
+			# put widgets before the placeholder into the combined list
+			CombinedWidgets = FixedWidgets[:FixedWidgetIndex]
+			print('CF774 added first %d widgets to CombinedWidgets' % len(CombinedWidgets))
+			# assign row and column positions to variable widgets
+			for ThisVarWidget in VariableWidgets:
+				ThisVarWidget.ActualRow = ThisRow + ThisVarWidget.RowOffset
+				ThisVarWidget.ActualCol = NextCol + ThisVarWidget.ColOffset
+			# copy remaining FixedWidgets and all VariableWidgets into CombinedWidgets in the correct order
+			FixedWidgetIndex += 1 # skip over the placeholder
+			VarWidgetIndex = 0
+			FixedWidgetsFinished = (FixedWidgetIndex >= len(FixedWidgets))
+			VarWidgetsFinished = (VarWidgetIndex >= len(VariableWidgets)) # whether we have used up all widgets in the lists
+			while not (FixedWidgetsFinished or VarWidgetsFinished): # loop while neither list is used up
+				# find insertion row and column of next variable widget
+				if not VarWidgetsFinished:
+					NextVarWidgetRow = VariableWidgets[VarWidgetIndex].ActualRow
+					NextVarWidgetCol = VariableWidgets[VarWidgetIndex].ActualCol
+				# add fixed widgets until the next fixed widget is beyond the target location of the next variable widget
+				StopAddingFixedWidgets = False
+				while (not FixedWidgetsFinished) or (not StopAddingFixedWidgets):
+					ThisFixedWidget = FixedWidgets[FixedWidgetIndex]
+					# update ThisRow for ThisFixedWidget (use getattr in case it's a placeholder widget)
+					if getattr(ThisFixedWidget, 'NewRow', False): ThisRow += 1
+					# are there any more variable widgets?
+					if VarWidgetsFinished: StopAddingFixedWidgets = False # if not, keep adding fixed widgets
+					else:
+						# check if ThisFixedWidget is to the right of, or below, the next variable widget
+						StopAddingFixedWidgets = (ThisRow > NextVarWidgetRow) or (ThisFixedWidget.ColLoc > NextVarWidgetCol)
+					# if it isn't, add it to the combined list and move to the next fixed widget
+					if not StopAddingFixedWidgets:
+						CombinedWidgets.append(ThisFixedWidget)
+						print('CF803 added fixed widget to CombinedWidgets')
+						FixedWidgetIndex += 1
+						FixedWidgetsFinished = (FixedWidgetIndex >= len(FixedWidgets))
+				# add a variable widget (step 3)
+				if not VarWidgetsFinished:
+					ThisVariableWidget = VariableWidgets[VarWidgetIndex]
+					# set row and column attribs for ThisVariableWidget
+					if NextVarWidgetRow > ThisRow: # moving to next row
+						ThisVariableWidget.NewRow = True
+						ThisRow += 1
+					ThisVariableWidget.ColLoc = NextVarWidgetCol
+					# add next variable widget to combined list
+					CombinedWidgets.append(ThisVariableWidget)
+					print('CF809 added variable widget to CombinedWidgets')
+					# move to next variable widget
+					VarWidgetIndex += 1
+					VarWidgetsFinished = (VarWidgetIndex >= len(VariableWidgets))
+			return CombinedWidgets
 
 		def SetInitialControlPanelAspect(self):
 			# sets the initial display of control panel, when first created. Currently, this is empty.
@@ -782,38 +876,17 @@ class ControlFrame(wx.Frame):
 			self.MakePHAModelsAspect()
 			self.MakeNumericalValueAspect()
 			self.MakeFaultTreeAspect()
+			self.MakeFTConnectorOutAspect()
 			# Make sizer for notebook (this is required even though there's only one item in it, the notebook itself)
 			MySizer = wx.BoxSizer()
 			MySizer.Add(self.MyNotebook, 1, wx.EXPAND)
 			self.SetSizer(MySizer)
 
-			# Make all the widgets that can ever appear in ControlPanel, and hide them all
-			# In Vizop, all widgets in sizers are in the form of a UIWidgetItem object
-			# Handler: handling routine
 			self.WidgActive = [] # list of widgets currently visible
-#			self.CancelButton = UIWidgetItem(wx.Button(self, -1, _('Cancel | Esc')), ColLoc=4, ColSpan=2, KeyStroke=wx.WXK_ESCAPE)
-#				# binding provided at point of use
-#			self.CancelButtonWidgets = [self.CancelButton]
-#
-#			# ControlPanel task selection buttons - visible in most modes
-#			self.ProjectButton = UIWidgetItem(wx.Button(self, -1, _('Project | F9')), KeyStroke=wx.WXK_F9,
-#											  Handler=self.OnProjectButton, Events=[wx.EVT_BUTTON], ColLoc=1, ColSpan=2)
-#			self.ViewportsButton = UIWidgetItem(wx.Button(self, -1, _('Viewports | F11')), KeyStroke = wx.WXK_F11,
-#												 Handler=self.OnViewportsButton, Events=[wx.EVT_BUTTON], ColLoc=3, ColSpan=2)
-#			self.InputDocsButton = UIWidgetItem(wx.Button(self, -1, _('Input docs | F12')), KeyStroke = wx.WXK_F12,
-#												Handler=self.OnInputDocsButton, Events=[wx.EVT_BUTTON], ColLoc=5, ColSpan=2)
-#			self.TaskSelectionWidgets = [self.ProjectButton, self.ViewportsButton, self.InputDocsButton]
-#
-#			# widgets for 'New-PHAModel' ControlPanel modes (now moved to separate method)
-#			self.NewViewportTypesLabel = UIWidgetItem(wx.StaticText(self, -1, _('Select a Viewport type:')),
-#													   RowLoc=2, ColLoc=0, ColSpan=3)
-#			self.NewViewportWidgets = self.WidgetsInPosition(self.TaskSelectionWidgets, StartingRow=0)[0] + \
-#				[self.NewViewportTypesLabel, self.WViewportList]
-
-			#generate list of system fonts
-			e = wx.FontEnumerator()
-			e.EnumerateFacenames()
-			SystemFonts = e.GetFacenames()
+			# generate list of system fonts (not currently used)
+#			e = wx.FontEnumerator()
+#			e.EnumerateFacenames()
+#			SystemFonts = e.GetFacenames()
 
 #				# widgets for edit-text screen
 #			self.ETheaderLabel = UIWidgetItem(wx.StaticText(self, -1, _('EDIT TEXT IN ELEMENT')), ColSpan=2)
@@ -926,13 +999,6 @@ class ControlFrame(wx.Frame):
 			self.PHAModelsAspect.UndoButton.Widget.Enable(bool(Proj.UndoList))
 			self.PHAModelsAspect.RedoButton.Widget.Enable(bool(Proj.RedoList))
 
-#		def GotoAspect(self, NewAspect=''):
-#			# switch Control Panel to aspect named in NewAspect (str). Not used
-#			# Ignored if NewAspect is not a recognised aspect name
-#			assert isinstance(NewAspect, str)
-#			if NewAspect == 'CPAspect_NumValue': # requested Numerical Values aspect
-#				self.MakeNumericalValueAspect()
-
 		def PrefillWidgetsForPHAModelsAspect(self): # set initial values for widgets in PHAModels aspect
 			Proj = self.TopLevelFrame.CurrentProj
 			# enable navigation buttons if there are any items in current project's history lists
@@ -945,7 +1011,6 @@ class ControlFrame(wx.Frame):
 			# make standard set of widgets, e.g. navigation buttons and undo/redo buttons, appearing on every aspect
 			# Scope (ControlPanelAspectItem instance): the aspect owning the widgets
 			# NotebookPage (wx.Panel instance): panel in the wxNotebook containing the aspect's widgets
-			# Note: if we need [+] / [-] buttons in future, can use wx.ART_ADD / wx.ART_REMOVE
 			assert isinstance(Scope, self.ControlPanelAspectItem)
 			Scope.NavigateBackButton = UIWidgetItem(wx.Button(NotebookPage,
 				size=self.StandardImageButtonSize), KeyStroke=[wx.WXK_CONTROL, wx.WXK_LEFT],
@@ -973,23 +1038,8 @@ class ControlFrame(wx.Frame):
 				TabText=MyTabText)
 			# make widgets
 			self.MakeStandardWidgets(Scope=self.PHAModelsAspect, NotebookPage=MyNotebookPage)
-#			self.PHAModelsAspect.NavigateBackButton = UIWidgetItem(wx.Button(MyNotebookPage,
-#				size=self.StandardImageButtonSize), KeyStroke=[wx.WXK_CONTROL, wx.WXK_LEFT],
-#				ColLoc=0, ColSpan=1, Events=[wx.EVT_BUTTON], Handler=self.OnNavigateBackButton, Flags=0)
-#			self.PHAModelsAspect.NavigateBackButton.Widget.SetBitmap(self.TopLevelFrame.ButtonBitmap(wx.ART_GO_BACK))
-#			self.PHAModelsAspect.NavigateBackButton.ToolTip = ToolTip.SuperToolTip(_("Go back"))
-#			self.PHAModelsAspect.NavigateBackButton.ToolTip.SetTarget(self.PHAModelsAspect.NavigateBackButton.Widget)
-#			self.PHAModelsAspect.NavigateForwardButton = UIWidgetItem(wx.Button(MyNotebookPage, size=self.StandardImageButtonSize), KeyStroke=[wx.WXK_CONTROL, wx.WXK_RIGHT],
-#				ColLoc=1, ColSpan=1, Events=[wx.EVT_BUTTON], Handler=self.OnNavigateForwardButton, Flags=0)
-#			self.PHAModelsAspect.NavigateForwardButton.Widget.SetBitmap(self.TopLevelFrame.ButtonBitmap(wx.ART_GO_FORWARD))
 			self.PHAModelsAspect.NewPHAModelTypesLabel = UIWidgetItem(wx.StaticText(MyNotebookPage, -1, _('Select a type of PHA model:')),
 				ColLoc=3, ColSpan=3, GapX=20)
-#			self.PHAModelsAspect.UndoButton = UIWidgetItem(wx.Button(MyNotebookPage, size=self.StandardImageButtonSize), KeyStroke=[wx.WXK_CONTROL, ord('z')],
-#				ColLoc=0, ColSpan=1, Events=[wx.EVT_BUTTON], Handler=self.TopLevelFrame.OnUndoRequest, NewRow=True, Flags=0) # =0 keeps button at fixed size
-#			self.PHAModelsAspect.UndoButton.Widget.SetBitmap(self.TopLevelFrame.ButtonBitmap(wx.ART_UNDO))
-#			self.PHAModelsAspect.RedoButton = UIWidgetItem(wx.Button(MyNotebookPage, size=self.StandardImageButtonSize), KeyStroke=[wx.WXK_CONTROL, ord('y')],
-#				ColLoc=1, ColSpan=1, Events=[wx.EVT_BUTTON], Handler=self.TopLevelFrame.OnRedoRequest, Flags=0)
-#			self.PHAModelsAspect.RedoButton.Widget.SetBitmap(self.TopLevelFrame.ButtonBitmap(wx.ART_REDO))
 			self.PHAModelsAspect.NewPHAModelTypesList = UIWidgetItem(wx.ListBox(MyNotebookPage, -1,
 				choices=self.ViewportsCanBeCreatedManuallyWithShortcuts,
 				style=wx.LB_SINGLE), Handler=self.OnNewPHAModelListbox, Events=[wx.EVT_LISTBOX], ColLoc=3, ColSpan=4)
@@ -1094,8 +1144,8 @@ class ControlFrame(wx.Frame):
 			self.UpdateNavigationButtonStatus(Proj)
 			# set widget values
 			# set up HeaderLabel
-			self.NumericalValueAspect.HeaderLabel.Widget.SetLabel(_('Value: %s' % self.TopLevelFrame.PHAObjInControlPanel.
-				ComponentEnglishNames[self.TopLevelFrame.ComponentInControlPanel]))
+			self.NumericalValueAspect.HeaderLabel.Widget.SetLabel(_('Value: %s') % self.TopLevelFrame.PHAObjInControlPanel.
+				ComponentEnglishNames[self.TopLevelFrame.ComponentInControlPanel])
 			# set up ValueText
 			self.NumericalValueAspect.ValueText.PHAObj = self.TopLevelFrame.PHAObjInControlPanel
 			PHAObj = self.NumericalValueAspect.ValueText.PHAObj
@@ -1381,6 +1431,110 @@ class ControlFrame(wx.Frame):
 		def FaultTreeAspect_OnActionButton(self, Event, **Args): pass
 		def FaultTreeAspect_OnProblemShowMeButton(self, Event, **Args): pass
 
+		def MakeFTConnectorOutAspect(self): # make Fault Tree connector-out aspect for Control Panel
+			# make basic attribs needed for the aspect
+			MyNotebookPage = wx.Panel(parent=self.MyNotebook)
+			MyTabText = _('Outward connector') # text appearing on notebook tab
+			self.FTConnectorOutAspect = self.ControlPanelAspectItem(InternalName='FTConnectorOut', ParentFrame=self,
+				TopLevelFrame=self.TopLevelFrame, PrefillMethod=self.PrefillWidgetsForFTConnectorOutAspect,
+				SetWidgetVisibilityMethod=self.SetWidgetVisibilityforFTConnectorOutAspect, NotebookPage=MyNotebookPage,
+				TabText=MyTabText)
+#			self.FTConnectorOutAspect.NotebookPage = MyNotebookPage # keep a record, used as parent for variable widgets
+#			(# (redundant, as the aspect's __init__() already does this)
+			# make fixed widgets (this aspect also has variable widgets depending on the number of associated connector-ins)
+			self.MakeStandardWidgets(Scope=self.FTConnectorOutAspect, NotebookPage=MyNotebookPage)
+			self.FTConnectorOutAspect.HeaderLabel = UIWidgetItem(wx.StaticText(MyNotebookPage, -1, _('Outward connector:')),
+				ColLoc=3, ColSpan=1, GapX=20, Font=self.TopLevelFrame.Fonts['SmallHeadingFont'])
+			self.FTConnectorOutAspect.ConnectorNameText = UIWidgetItem(wx.TextCtrl(MyNotebookPage, -1,
+				style=wx.TE_PROCESS_ENTER), MinSizeY=25,
+				Events=[wx.EVT_TEXT_ENTER], Handler=self.FTConnectorOutAspect_OnConnectorNameTextWidget,
+				Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_LEFT | wx.EXPAND,
+				MinSizeX=200, ColLoc=4, ColSpan=1, DisplayMethod='StaticFromText')
+				# this TextCtrl raises events in 2 ways: (1) <Enter> key raises wx.EVT_TEXT_ENTER, (2) loss of focus is
+				# caught by OnIdle().
+			self.FTConnectorOutAspect.ConnectorDescriptionLabel = UIWidgetItem(wx.StaticText(MyNotebookPage, -1, _('Description:')),
+				ColLoc=6, ColSpan=1, GapX=20)
+			self.FTConnectorOutAspect.ConnectorDescriptionText = UIWidgetItem(wx.TextCtrl(MyNotebookPage, -1,
+				style=wx.TE_PROCESS_ENTER | wx.TE_MULTILINE), MinSizeY=25,
+				Events=[wx.EVT_TEXT_ENTER], Handler=self.FTConnectorOutAspect_OnConnectorDescriptionWidget,
+				Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_LEFT | wx.EXPAND,
+				MinSizeX=200, ColLoc=7, ColSpan=2, DisplayMethod='StaticFromText')
+			self.FTConnectorOutAspect.ConnectToLabel = UIWidgetItem(wx.StaticText(MyNotebookPage, -1, _('Connect to:')),
+				ColLoc=3, ColSpan=1)
+			self.FTConnectorOutAspect.ConnectorInPlaceholder = UIWidgetPlaceholderItem(Name='ConnectorIn')
+			# make list of all fixed widgets in this aspect
+			self.FTConnectorOutAspect.FixedWidgetList = [self.FTConnectorOutAspect.NavigateBackButton,
+				self.FTConnectorOutAspect.NavigateForwardButton,
+				self.FTConnectorOutAspect.HeaderLabel, self.FTConnectorOutAspect.ConnectorNameText,
+				self.FTConnectorOutAspect.ConnectorDescriptionLabel, self.FTConnectorOutAspect.ConnectorDescriptionText,
+				self.FTConnectorOutAspect.UndoButton, self.FTConnectorOutAspect.RedoButton,
+				self.FTConnectorOutAspect.ConnectToLabel, self.FTConnectorOutAspect.ConnectorInPlaceholder]
+			self.FTConnectorOutAspect.VariableWidgetList = [] # populated in LineupVariableWidgetsForFTConnectorOutAspect()
+			self.FTConnectorOutAspect.WidgetList = [] # complete widget list, populated in Lineup...()
+
+		def LineupVariableWidgetsForFTConnectorOutAspect(self, ConnectorOut, StartRow, StartCol, NotebookPage):
+			# adjust variable widgets in FT Connector-out aspect of Control Panel%%%
+			# depending on number of connector-in's to which this Connector-Out is connected
+			# StartRow, StartCol (2 x int): sizer position to insert the first connector-in-related widget
+			# NotebookPage: parent window for the variable widgets
+			assert isinstance(StartRow, int)
+			assert StartRow >= 0
+			assert isinstance(StartCol, int)
+			assert StartCol >= 0
+			# first, destroy all existing variable widgets (to avoid memory leak)
+			for ThisWidget in self.FTConnectorOutAspect.VariableWidgetList: ThisWidget.Widget.Destroy()
+			FTConnectorOutAspect.VariableWidgetList = []
+			# make a name widget and 'remove' button for each connector-in
+			# RowOffset and ColOffset are offsets from the position of the placeholder in FixedWidgetList
+			for (ThisConnectorInIndex, ThisConnectorIn) in enumerate(ConnectorOut.ConnectorIns):
+				FTConnectorOutAspect.VariableWidgetList.append(UIWidgetItem(wx.StaticText(NotebookPage, -1,
+					ThisConnectorIn.HumanName), RowOffset=ThisConnectorInIndex, ColOffset=0, ColSpan=1))
+				DisconnectButtonWidget = UIWidgetItem(wx.Button(NotebookPage,
+					size=self.StandardImageButtonSize),
+					RowOffset=ThisConnectorInIndex, ColOffset=1, ColSpan=1, Events=[wx.EVT_BUTTON],
+					Handler=lambda Event: self.FTConnectorOutAspect_OnConnectorInDisconnectButton(Event,
+					ConnectorIn=ThisConnectorIn))
+				FTConnectorOutAspect.VariableWidgetList.append(DisconnectButtonWidget)
+				DisconnectButtonWidget.Widget.SetBitmap(self.TopLevelFrame.ButtonBitmap(wx.ART_MINUS))
+			# add 'add' button at the bottom of the list of connector-ins
+			ConnectButtonWidget = UIWidgetItem(wx.Button(NotebookPage,
+				size=self.StandardImageButtonSize),
+				RowOffset=len(ConnectorOut.ConnectorIns), ColOffset=1, ColSpan=1, Events=[wx.EVT_BUTTON],
+				Handler=self.FTConnectorOutAspect_OnConnectorInConnectButton)
+			FTConnectorOutAspect.VariableWidgetList.append(ConnectButtonWidget)
+			ConnectButtonWidget.Widget.SetBitmap(self.TopLevelFrame.ButtonBitmap(wx.ART_PLUS))
+			# insert connector-in widgets into widget list, based on RowOffset and ColOffset
+			self.FTConnectorOutAspect.CombinedWidgetList = self.InsertVariableWidgets(TargetPlaceholderName='ConnectorIn',
+				FixedWidgets=self.FTConnectorOutAspect.FixedWidgetList, VariableWidgets=ConnectorInWidgets)
+
+		def PrefillWidgetsForFTConnectorOutAspect(self, **Args):
+			# populate widgets for FT Connector-out aspect of Control Panel
+			Proj = self.TopLevelFrame.CurrentProj
+			CurrentViewport = self.TopLevelFrame.CurrentViewport
+			# capture which connector element is current
+			self.TopLevelFrame.PHAObjInControlPanel = Args['PHAObjInControlPanel']
+			# enable navigation buttons if there are any items in current project's history lists
+			self.UpdateNavigationButtonStatus(Proj)
+			# set widget values
+			# set up ConnectorNameText and ConnectorDescriptionText
+			# TODO limit length displayed. Smart ellipsization?
+			self.FTConnectorOutAspect.ConnectorNameText.Widget.ChangeValue(self.TopLevelFrame.ComponentInControlPanel.HumanName)
+			self.FTConnectorOutAspect.ConnectorNameText.Widget.SelectAll()
+			self.FTConnectorOutAspect.ConnectorDescriptionText.Widget.ChangeValue(self.TopLevelFrame.ComponentInControlPanel.Description)
+			self.FTConnectorOutAspect.ConnectorDescriptionText.Widget.SelectAll()
+			# set up lineup of variable widgets
+			self.LineupVariableWidgetsForFTConnectorOutAspect(ConnectorOut=self.TopLevelFrame.PHAObjInControlPanel,
+				NotebookPage=self.FTConnectorOutAspect.NotebookPage)
+
+		def SetWidgetVisibilityforFTConnectorOutAspect(self, **Args): # set IsVisible attrib for each widget
+			# set IsVisible attribs for all fixed and variable widgets
+			print('FT1559 setting visibility for %d widgets in Connector Out aspect' % len(self.NumericalValueAspect.CombinedWidgetList))
+			for ThisWidget in self.NumericalValueAspect.CombinedWidgetList: ThisWidget.IsVisible = True
+
+		def FTConnectorOutAspect_OnConnectorNameTextWidget(self, Event, **Args): pass
+		def FTConnectorOutAspect_OnConnectorDescriptionWidget(self, Event, **Args): pass
+		def FTConnectorOutAspect_OnConnectorInDisconnectButton(self, Event, ConnectorIn): pass
+
 		class ControlPanelAspectItem(object): # class whose instances are aspects of the Control panel
 			# attribs:
 			# WidgetList (list): UIWidgetItem instances - widgets visible in the aspect
@@ -1416,16 +1570,6 @@ class ControlFrame(wx.Frame):
 				self.MySizer = wx.GridBagSizer(vgap=0, hgap=0) # make sizer for widgets
 				self.NotebookPage.SetSizer(self.MySizer)
 
-#			def Initialize(self, ParentNotebook=None):
-#				# initialize the aspect, but don't add it to ParentNotebook yet
-#				assert isinstance(ParentNotebook, wx.Notebook)
-#				ParentNotebook.AddPage(page=self.NotebookPage, text=self.TabText)
-#				self.IsInNotebook = True
-#				# make a sizer for the widgets, and populate the sizer
-#				self.MySizer = wx.GridBagSizer(vgap=0, hgap=0) # make sizer for widgets. Rappin p343
-#				self.NotebookPage.SetSizer(self.MySizer)
-#				# widgets will be added to the sizer at the time of display - as the widget lineup may vary
-
 			def Activate(self, **Args): # activate widgets for this aspect
 				Proj = self.ParentFrame.CurrentProj
 				self.TopLevelFrame.ActivateWidgetsInPanel(Widgets=self.WidgetList, Sizer=self.MySizer,
@@ -1439,6 +1583,7 @@ class ControlFrame(wx.Frame):
 
 			def SetWidgetVisibility(self, **Args): # set IsVisible attrib of each widget in self.WidgetList
 				self.SetWidgetVisibilityMethod(**Args)
+
 
 	def ActivateWidgetsInPanel(self, Widgets=[], Sizer=None, ActiveWidgetList=[], **Args):
 		# activate widgets that are about to be displayed in a panel of the Control Frame

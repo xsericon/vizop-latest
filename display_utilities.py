@@ -596,6 +596,16 @@ class UIWidgetItem(object):
 		else: self.Widget.SetValue(StringToDisplay)
 		self.SetMyFont(DefaultFont=Args.get('Font', None))
 
+class UIWidgetPlaceholderItem(object):
+	# instances of this class are placeholders in a list of UIWidgetItem instances to indicate where to insert variable
+	# widgets
+	def __init__(self, Name='', **Attrs):
+		# Name (str): identifier used by InsertVariableWidgets() to find insertion point for variable widgets
+		assert isinstance(Name, str)
+		assert len(Name) > 0
+		object.__init__(self)
+		self.Name = Name
+
 def StringFromNum(InputNumber, RR):
 	# returns correctly formatted string representation of InputNumber
 	# (NumValueItem instance), taking the number object's attribs Sci and Decimals into account
