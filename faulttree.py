@@ -57,7 +57,7 @@ class ButtonElement(object): # object containing a button and attributes and met
 		assert InternalName in ['EventLinkedButton', 'EventGroupedButton', 'EventCommentButton',
 			'EventActionItemButton', 'ValueCommentButton', 'ValueProblemButton', 'ConnectButton', 'GateLinkedButton',
 			'GateLinkedButton', 'GateCommentButton', 'GateActionItemButton', 'ValueProblemButton',
-			'GateStyleButton', 'GateGroupedButton']
+			'GateStyleButton', 'GateGroupedButton', 'ConnGroupedButton', 'ConnValueProblemButton']
 		assert isinstance(HostObject, (FTEvent, FTGate, FTCollapseGroup, FTConnector)) or (HostObject is None)
 		object.__init__(self)
 		self.FT = FT
@@ -86,8 +86,9 @@ class ButtonElement(object): # object containing a button and attributes and met
 			'ValueProblemButton': 'FT_ProblemButton', 'GateLinkedButton': 'FT_LinkButton',
 			'GateLinkedButton': 'FT_LinkButton', 'GateCommentButton': 'FT_CommentButton',
 			'GateActionItemButton': 'FT_ActionButton', 'ValueProblemButton': 'FT_ProblemButton',
-			'GateGroupedButton': 'FT_GroupButton', 'GateStyleButton': 'FT_GateStyleButton'}[InternalName]
-			# ArtProviderName is name to pass to ArtProvider + _ + key of BitmapZoomed
+			'GateGroupedButton': 'FT_GroupButton', 'GateStyleButton': 'FT_GateStyleButton',
+			'ConnGroupedButton': 'FT_GroupButton', 'ConnValueProblemButton': 'FT_ProblemButton'}[InternalName]
+			# ArtProviderName is name to pass to ArtProvider + '_' + key of BitmapZoomed
 		self.SizeXInCU = self.SizeYInCU = 30 # no-zoom size in pixels
 		self.SetupImages()
 		self.Visible = True
@@ -444,6 +445,9 @@ class FTBoxyObject(object): # superclass of vaguely box-like FT components for u
 		self.Connectable = True # whether instances of this class can be connected
 		self.Selected = False # bool; whether currently user-selected i.e. highlighted
 		self.ColNo = Args.get('ColNo') # (int) column number (index in HostFT.Columns) in which this instance lives
+		self.BorderColour = (0x35, 0x6d, 0x5f) # darker green
+		self.BackgroundColourUnselected = (0x54, 0xae, 0x97) # green, slightly darker than text entry boxes
+		self.BackgroundColourSelected = (0xf2, 0xc5, 0xab) # coral-orange
 
 	def MouseHit(self, MouseXInPx, MouseYInPx, TolXInPx, TolYInPx):
 		# returns (str) hotspot hit in FTBoxyObject instance, or None if not hit
@@ -472,7 +476,7 @@ class FTBoxyObject(object): # superclass of vaguely box-like FT components for u
 			if (El.Selected or not SelectedOnly) if (El.Visible or not VisibleOnly)]
 
 class TextElement(FTBoxyObject): # object containing a text object and other attributes and methods needed to render it
-	# Consists of a single text inside a coloured box. It's a component of an FTHeader or FTEvent.
+	# Consists of a single text inside a coloured box. It's a component of an FTHeader, FTConnector or FTEvent.
 
 	def __init__(self, FT, Row=0, RowBase=0, ColStart=0, ColSpan=1, EndX=200, MinHeight=10, InternalName='',
 				 HostObject=None, **Args):
@@ -495,7 +499,7 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 		self.RowBase = RowBase # relative row of grid within a subgroup of elements
 		self.ColStart = ColStart # column of grid in which text starts (int counting from 0)
 		self.ColSpan = ColSpan # how many columns of grid are spanned by the text (int)
-		self.PosXInCU = 0 # X-coord (canvas coords) of text container left end
+		self.PosXInCU = self.PosYInCU = 0 # X/Y-coord (canvas coords) of text container left end, top edge
 		self.StartY = 0 # Y-coord (canvas coords) of text container top edge, relative to whole of header.
 		self.EndX = self.EndXInCU = EndX # similar for right end of container (not the actual text in the container)
 		self.MinSizeXInCU = 100 # minimum width in canvas coords
@@ -564,6 +568,7 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 	def Draw(self, DC, Zoom, **Args): # render text element, including background box, in DC
 		# Optional arg BackBoxRoundedness: radius of background box corner curvature, in canvas coords
 		# Optional arg Highlight (bool): whether to highlight the background box
+		print('FT568 drawing element: ', self.InternalName)
 		DefaultRound = 3 # default value of BackBoxRoundedness if not supplied
 		# set background colour according to whether to highlight
 		BkgColour = HighlightColour if Args.get('Highlight', False) else self.BkgColour
@@ -679,9 +684,7 @@ class FTEvent(FTBoxyObject): # FT event object. Rendered by drawing text into bi
 		self.FT = Args['FT']
 		self.InitializeData()
 		(self.TopFixedEls, self.ValueFixedEls) = self.CreateFixedTextElements()
-		self.BorderColour = (0x35, 0x6d, 0x5f) # darker green
-		self.BackgroundColourUnselected = (0x54, 0xae, 0x97) # green, slightly darker than text entry boxes
-		self.BackgroundColourSelected = (0xf2, 0xc5, 0xab) # coral-orange
+		# colour definitions such as BorderColour are in FTBoxyObject's __init__
 		self.MaxElementsConnectedToThis = FTEventInCore.MaxElementsConnectedToThis
 
 	def InitializeData(self):
@@ -836,7 +839,7 @@ class FTEvent(FTBoxyObject): # FT event object. Rendered by drawing text into bi
 			NumberingEl = ElementNamed(Elements, info.NumberingTag)
 			if NumberingEl: NumberingEl.Text.Content = self.Numbering
 
-		def SetElementSizesInCU():  # set sizes in canvas units of all elements in the FTEvent instance
+		def SetElementSizesInCU(): # set sizes in canvas units of all elements in the FTEvent instance
 			for ThisEl in self.AllElements:
 				ThisEl.SizeXInCU, ThisEl.SizeYInCU = ThisEl.MinSizeInCU
 
@@ -867,7 +870,7 @@ class FTEvent(FTBoxyObject): # FT event object. Rendered by drawing text into bi
 				if getattr(El, 'Visible', True):
 					El.Draw(DC, Zoom, BackBoxRoundedness=BackBoxRoundedness)
 
-		# start of main procedure for RenderIntoBitmap()
+		# start of main procedure for RenderIntoBitmap() for FTEvent
 		BorderX = BorderY = 10 # outer border in canvas coords
 		GapBetweenRows = GapBetweenCols = 5 # in canvas coords
 		MinColWidth = 40
@@ -1342,9 +1345,13 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 	Attribs = [(info.IDTag, int, False), ('BackgColour', 'rgb', False), ('Style', str, False), ('Numbering', str, False),
 		('Description', str, False), ('Value', str, False), ('ValueUnit', str, False), ('ConnectTo', int, True)]
 
-	def __init__(self, **Args): # attribs marked * below are named in quotes elsewhere: be careful if names changed
+	def __init__(self, FT, Column, **Args): # attribs marked * below are named in quotes elsewhere: be careful if names changed
+		assert isinstance(FT, FTForDisplay)
+		assert isinstance(Column, FTColumn)
 		FTBoxyObject.__init__(self, **Args)
 		self.ID = None
+		self.FT = FT
+		self.Column = Column
 		self.BackgColour = '0,0,0'
 		self.Style = FTConnector.ConnectorStyles[0]
 		self.Numbering = ''
@@ -1384,16 +1391,14 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 		self.ConnValueProblemButton = ButtonElement(self.FT, Row=1, ColStart=4, ColSpan=1, StartX=250, EndX=299,
 			HostObject=self, InternalName='ConnValueProblemButton')
 		# Connectors don't have "value types" (it's always calculated), "comments" or "action items"
-
+		# TODO %%% fix the above; CX-in needs other value types, and all CX's should have comments and action items
 		# make list of elements
 		TopEls = [ConnDescription, ConnGroupedButton, ConnValue, ConnValueUnit, self.ConnValueProblemButton]
-
 		# set text element colours
 		for El in TopEls:
 			if type(El) is TextElement:
 				El.Text.Colour = ColourContentFg
 				El.BkgColour = ColourContentBkg
-
 		return TopEls
 
 	def RenderIntoBitmap(self, Zoom): # draw FTConnector in its own self.Bitmap. Also calculates FTConnector's size attributes
@@ -1419,44 +1424,65 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 			for El in Elements:
 				El.Draw(DC, Zoom, BackBoxRoundedness=BackBoxRoundedness) # render element, including any background box, in DC
 
+		def DrawBackgroundBox(DC, Zoom): # draw FTConnector's background box in DC
+			DC.SetPen(wx.Pen(self.BorderColour, width=1)) # for now, a 1 pixel border around the event. TODO make nicer and apply zoom
+			BackgColour = self.BackgroundColourSelected if self in self.FT.CurrentElements else self.BackgroundColourUnselected
+			DC.SetBrush(wx.Brush(BackgColour))
+			# box is drawn in FTConnector's own bitmap, so coords are relative to element (not using PosX/YInPx, which are relative to column)
+			DC.DrawRectangle(0, 0, self.SizeXInPx, self.SizeYInPx)
+
 		# start of main procedure for RenderIntoBitmap() for class FTConnector
-		BorderX = BorderY = 20 # outer border in canvas coords
-		GapBetweenRows = GapBetweenCols = 10 # in canvas coords
+		BorderX = BorderY = 10 # outer border in canvas coords
+		GapBetweenRows = GapBetweenCols = 5 # in canvas coords
 		MinColWidth = 40
 		# build combined element list (even though there's only one group of elements, left this way for consistency)
 		self.AllElements = BuildFullElementList(self.FixedEls)
 
+		def SetElementSizesInCU(): # set sizes in canvas units of all elements in the FTConnector instance
+			for ThisEl in self.AllElements:
+				ThisEl.SizeXInCU, ThisEl.SizeYInCU = ThisEl.MinSizeInCU
+
 		PopulateTextElements(self.AllElements) # put required text values in the elements
+		SetElementSizesInCU()
 		SetButtonStati(self.AllElements) # set button elements to required status
 		# calculate height of each "sizer" row in canvas coords
 		ColWidths, ColStartXs, ColEndXs, RowHeights, RowStartYs, RowEndYs = CalculateRowAndColumnDimensions(self.AllElements, GapBetweenCols,
 			GapBetweenRows, MinColWidth, BorderX, BorderY)
-		# set element Y positions and sizes according to row heights TODO update based on changes in FTElement
+		# set element X, Y positions and sizes according to column positions and row heights
 		for El in self.AllElements:
-			El.StartY = RowStartYs[El.Row]
-			El.EndY = RowEndYs[El.Row]
+			El.PosXInCU = ColStartXs[El.ColStart]
+			El.EndXInCU = El.PosXInCU + sum([ColWidths[c] for c in range(El.ColStart, El.ColStart + El.ColSpan)]) - GapBetweenCols
+			# if element should fill available X-space, adjust its X size to match available space
+			if El.FillXSpace: El.SizeXInCU = El.EndXInCU - El.PosXInCU
+			El.SizeXInPx = int(round(El.SizeXInCU * Zoom))
+			El.PosXInPx = int(round(El.PosXInCU * Zoom))
+			El.StartY = El.PosYInCU = RowStartYs[El.Row] # transitioning from StartY to PosYInCU; eventually should kill StartY
+			El.EndYInCU = RowEndYs[El.Row]
+			El.SizeYInCU = El.EndYInCU - El.PosYInCU
+			El.SizeYInPx = int(round(El.SizeYInCU * Zoom))
 		# calculate FTConnector size
-		self.SizeXInCU = max([El.EndX for El in self.AllElements]) + BorderX # the + BorderX adds right border space
-		self.SizeYInCU = RowEndYs[-1] - GapBetweenRows + BorderY # remove bottom "gap", add bottom border
+		self.SizeXInCU = max([El.EndXInCU for El in self.AllElements]) - GapBetweenCols + 2 * BorderX
+		self.SizeYInCU = RowEndYs[-1] - GapBetweenRows + 2 * BorderY
 		self.SizeXInPx = int(round(self.SizeXInCU * Zoom))
 		self.SizeYInPx = int(round(self.SizeYInCU * Zoom))
 		# make the bitmap
 		self.Bitmap = wx.Bitmap(width=self.SizeXInPx, height=self.SizeYInPx, depth=wx.BITMAP_SCREEN_DEPTH)
 		# make a DC for drawing
 		DC = wx.MemoryDC(self.Bitmap)
-		# draw elements into the bitmap
+		# draw background box, then elements, into the bitmap
+		DrawBackgroundBox(DC, Zoom)
 		DrawElements(DC, self.AllElements, Zoom)
 
 class FTConnectorIn(FTConnector):
 
-	def __init__(self):
-		FTConnector.__init__(self)
+	def __init__(self, FT, Column, **Args):
+		FTConnector.__init__(self, FT, Column, **Args)
 
 class FTConnectorOut(FTConnector):
 	ControlPanelAspect = 'FTConnectorOut' # preferred Control Panel aspect to show when selecting an instance of this class
 
-	def __init__(self):
-		FTConnector.__init__(self)
+	def __init__(self, FT, Column, **Args):
+		FTConnector.__init__(self, FT, Column, **Args)
 		self.ConnectorIns = [] # list of Choice items, each representing a Connector-In to which this connector is
 			# connected. Expected attribs in the items: HumanName (str), ID (str)
 
@@ -4038,25 +4064,36 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 					['Level7', 'Level10'])
 			return NewEvent
 
-		def PopulateFTConnector(ConnectorEl):
-			# create an FTConnector, get data for FTConnector from EventEl (XML element). Return the FTConnector
-			# First, find out if it's in- or out-connector and create appropriate object
-			NewConnector = {'In': FTConnectorIn, 'Out': FTConnectorOut}[ConnectorEl.findtext('Connectivity')]()
+		def PopulateFTConnector(XMLObj, Column):
+			# create an FTConnector, get data for FTConnector from XMLObj (XML element). Return the FTConnector
+			assert isinstance(Column, FTColumn)
+			print('FT4045 making connector with connectivity: ', XMLObj.findtext('Connectivity'))
+			# First, find out if it's in- or out-connector from 'Connectivity' tag, and create appropriate object
+			NewConnector = {'In': FTConnectorIn, 'Out': FTConnectorOut}[XMLObj.findtext('Connectivity')]\
+				(FT=self, Column=Column)
 			# get connector data. In DataInfoAsXXX, each pair of items is: (XML tag, FTConnector attrib name)
 			DataInfoAsStr = [ (info.IDTag, 'ID'), ('Description', 'Description'), ('BackgColour', 'BackgColour'),
 				('Numbering', 'Numbering'), ('Style', 'Style'), ('RelatedConnector', 'RelatedConnector'),
 				('Value', 'Value'), ('ValueProblemObjectID', 'ValueProblemObjectID'),
 				('Unit', 'ValueUnit'), ('ValueProblemID', 'ValueProblemID') ]
 			for Tag, Attrib in DataInfoAsStr:
-				setattr(NewConnector, Attrib, ConnectorEl.findtext(Tag, default=''))
+				setattr(NewConnector, Attrib, XMLObj.findtext(Tag, default=''))
 			DataInfoAsBool = [ ('ShowDescriptionComments', 'ShowDescriptionComments') ]
 			for Tag, Attrib in DataInfoAsBool:
-				setattr(NewConnector, Attrib, bool(ConnectorEl.findtext(Tag, default='False')))
+				setattr(NewConnector, Attrib, bool(XMLObj.findtext(Tag, default='False')))
 			# DataInfoAsList: (Tag of each item in a list, name of the list to put the tag's text into)
 			DataInfoAsList = [ ('DescriptionComments', 'DescriptionComments'), ('ConnectTo', 'ConnectToIDs'),
 				('CollapseGroups', 'CollapseGroups') ]
 			for Tag, Attrib in DataInfoAsList:
-				setattr(NewConnector, Attrib, [El.text for El in ConnectorEl.findall(Tag)])
+				setattr(NewConnector, Attrib, [El.text for El in XMLObj.findall(Tag)])
+			# retrieve data from ProblemIndicatorTag: decide whether to show problem button
+			ProblemTag = XMLObj.find(info.ProblemIndicatorTag)
+			if ProblemTag is None:
+				NewConnector.ConnValueProblemButton.Visible = False  # if no problem info received, don't show problem button
+			else:
+				NewConnector.ProblemHumanHelp = ProblemTag.text
+				NewConnector.ConnValueProblemButton.Visible = (ProblemTag.get(info.ProblemLevelAttribName, '') in
+					['Level7', 'Level10'])
 			return NewConnector
 
 		def PopulateFTGate(XMLObj, Column):
