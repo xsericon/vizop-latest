@@ -1475,7 +1475,7 @@ class FTBuilder(FTBoxyObject): # 'add' button object within an FTColumn.
 
 	def __init__(self, **Args): # Args must include: HostFT (handled by superclass), ObjTypeRequested, OffsetXInCU
 		assert 'HostFT' in Args
-		assert Args['ObjTypeRequested'] in [FTEventInCore, FTGateItemInCore]
+		assert Args['ObjTypeRequested'] in [FTEventInCore, FTGateItemInCore, FTConnectorItemInCore]
 		assert isinstance(Args['OffsetXInCU'], int) # X offset relative to column
 		# ObjTypeRequested: which type of FT object will be created when user selects this FTBuilder - must be an element class
 		# belonging to FTObj (not FTForDisplay)
@@ -1524,6 +1524,10 @@ class FTBuilder(FTBoxyObject): # 'add' button object within an FTColumn.
 			DC.DrawLine(self.SizeXInPx * 0.5, self.SizeYInPx * 0.3, self.SizeXInPx * 0.6, self.SizeYInPx * 0.3)
 			DC.DrawLine(self.SizeXInPx * 0.5, self.SizeYInPx * 0.7, self.SizeXInPx * 0.6, self.SizeYInPx * 0.7)
 			DC.DrawLine(self.SizeXInPx * 0.75, self.SizeYInPx * 0.5, self.SizeXInPx * 0.85, self.SizeYInPx * 0.5)
+		elif self.ObjTypeRequested == FTConnectorItemInCore: # draw connector: triangle
+			DC.SetBrush(wx.Brush('white', style=wx.BRUSHSTYLE_TRANSPARENT)) # no fill
+			DC.DrawPolygon(points=[ (self.SizeXInPx * 0.4, self.SizeYInPx * 0.2),
+				(self.SizeXInPx * 0.8, self.SizeYInPx * 0.5), (self.SizeXInPx * 0.4, self.SizeYInPx * 0.8) ])
 
 	def HandleMouseLClickOnMe(self, HitHotspot, **Args): # process mouse left click on HitHotspot (str)
 		# request DataCore to create new FT object, and get back confirmation
@@ -1549,10 +1553,10 @@ class FTBuilder(FTBoxyObject): # 'add' button object within an FTColumn.
 class FTColumn(object): # object containing a column of FT objects for display, including:
 	# FTEvent (including IPL), FTGate, FTConnectorIn/Out, collapse groups, and builder buttons
 	# Used to populate Columns[] in FTForDisplay instance
-	# This class declaration has to be below those named in SuitableObjects
-	# SuitableObjects: keys are tags of recognised objects, values are corresponding object classes
-	SuitableObjects = {'event': FTEvent, 'gate': FTGate, 'connector-in': FTConnectorIn,
-		'connector-out': FTConnectorOut, 'FTAddButton': None}
+	# This class declaration has to be below the declaration of FTEvent and FTGate
+#	# SuitableObjects: keys are tags of recognised objects, values are corresponding object classes
+#	SuitableObjects = {'event': FTEvent, 'gate': FTGate, 'connector-in': FTConnectorIn,
+#		'connector-out': FTConnectorOut, 'FTAddButton': None}
 
 	def __init__(self, FT, ColNo): # ColNo: column number, counting from zero (int)
 		object.__init__(self)
@@ -2086,7 +2090,7 @@ class FTGateItemInCore(object): # logic gate in a Fault Tree, used in DataCore
 	DefaultGateStyle = 'IEEE 91'
 	MaxElementsConnectedToThis = 100 # arbitrary limit on number of inputs
 
-	def __init__(self, Proj=None, FT=None, Column=None, ModelGate=None):
+	def __init__(self, Proj=None, FT=None, Column=None, ModelGate=None, **Args):
 		# ModelGate is another FTGateItemInCore to derive formatting attributes from
 		assert isinstance(Proj, projects.ProjectItem)
 		assert isinstance(FT, FTObjectInCore)
@@ -2358,19 +2362,24 @@ def NextCombination(Length, PassMark):
 class FTConnectorItemInCore(object):  # in- and out-connectors (CX's) to allow data transfer between multiple FTs
 	AllFTCXInCore = [] # register of all FTConnectors currently active in Vizop; used to generate unique IDs
 	ConnectorStyles = ['Default'] # future, will define various connector appearances (squares, arrows, circles etc)
-	MaxElementsConnectedToThis = 1
+	MaxElementsConnectedToThis = 100 # arbitrary limit on connectivity of out-CX
+	InternalName = 'FTConnectorInCore'
 
-	def __init__(self, FT): # FT is the FaultTree object this connector belongs to
+	def __init__(self, FT, Column, ColumnIndex=0, **Args):
+		# FT is the FaultTree object this connector belongs to
+		# Column (FTColumnInCore instance): Column to which this CX belongs
+		# ColumnIndex (int): index of FT column to which this CX belongs
 		object.__init__(self)
-#		self.ID = str(utilities.NextID(FTConnectorItemInCore.AllFTCXInCore)) # generate unique ID; stored as str
-#		FTConnectorItemInCore.AllFTCXInCore.append(self) # add self to register. Must do after assigning self.ID
 		assert isinstance(FT, FTObjectInCore)
+		assert isinstance(Column, FTColumnInCore)
+		assert isinstance(ColumnIndex, int)
+		assert ColumnIndex >= 0
 		FT.MaxElementID += 1 # find next available ID
 		self.ID = str(FT.MaxElementID)
 		self.FT = FT
-		self.Out = True # True if this is an out-CX (else, it is an in-CX)
+		self.Column = Column
+		self.Out = (ColumnIndex > 0) # True if this is an out-CX (else, it is an in-CX). Initialise to out-CX unless in 0th column
 		self.ConnectorDescription = '' # text shown in the CX, if it's an out-CX. Also shown in in-CX if RelatedCX is None.
-		# If it's an in-CX, this is ignored and the displayed text is derived from the connected out-CX
 		self.ConnectorDescriptionComments = [] # list of AssociatedTextItem instances
 		self.ShowDescriptionComments = False # whether description comments are visible
 		self.RelatedCX = None # an FTConnectorItemInCore instance:
@@ -2912,7 +2921,8 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			# elements where the text is the same as the FTConnector attribute
 			DataInfo = [ (info.IDTag, FTConnector.ID), ('Connectivity', {True: 'Out', False: 'In'}[FTConnector.Out]),
 				('Description', FTConnector.ConnectorDescription), ('BackgColour', FTConnector.BackgColour),
-				('Numbering', FTConnector.Numbering.HumanValue(FTGate)[0]), ('Style', FTConnector.Style),
+				('Numbering', FTConnector.Numbering.HumanValue(PHAItem=FTConnector, Host=FTConnector.Column.FTElements)[0]),
+				('Style', FTConnector.Style),
 				('ShowDescriptionComments', str(FTConnector.ShowDescriptionComments)), ('Value', str(EventValue)),
 				('Unit', EventUnit.HumanName), ('ValueProblemID', getattr(ProblemValue, 'ID', '')),
 				('ValueProblemObjectID', getattr(ProblemObj, 'ID', '')) ]
@@ -2933,11 +2943,11 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			# elements with special handling: RelatedCX
 			El = ElementTree.SubElement(ConnEl, 'RelatedConnector')
 			if FTConnector.RelatedCX is None:
-				El.Text = '-1'
+				El.text = '-1'
 			else:
 				assert isinstance(FTConnector.RelatedCX, FTConnectorItemInCore)
 				assert isinstance(FTConnector.RelatedCX.ID, str)
-				El.Text = FTConnector.RelatedCX.ID
+				El.text = FTConnector.RelatedCX.ID
 			return ConnEl
 
 #		def PopulateValueOptionField(FTEvent, EventEl, OfferConvertOptions=True):
@@ -3094,11 +3104,13 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		assert 0 <= ThisColIndex <= len(self.Columns) # allows for ThisColIndex to be 1+no of columns
 		if ThisColIndex < len(self.Columns): assert 0 <= ThisIndexInCol <= len(self.Columns[ThisColIndex].FTElements)
 		# First, decide what kind of event to insert
-		NewEventClass = {'FTEventInCore': FTEventInCore, 'FTGateInCore': FTGateItemInCore}[ObjKindRequested]
+		NewEventClass = {'FTEventInCore': FTEventInCore, 'FTGateInCore': FTGateItemInCore,
+			'FTConnectorInCore': FTConnectorItemInCore}[ObjKindRequested]
 		# insert new column if needed
 		if ThisColIndex == len(self.Columns): self.CreateColumn(NewColIndex=len(self.Columns))
 		# insert new event
-		NewEvent = NewEventClass(Proj=Proj, FT=self, Column=self.Columns[ThisColIndex], ModelGate=self.ModelGate)
+		NewEvent = NewEventClass(Proj=Proj, FT=self, Column=self.Columns[ThisColIndex], ModelGate=self.ModelGate,
+			ColIndex=ThisColIndex)
 		self.Columns[ThisColIndex].FTElements.insert(ThisIndexInCol, NewEvent)
 		return vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
 
@@ -4226,9 +4238,10 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 	def AddBuilderButtons(self): # add builder buttons between objects in each column, and in a "new" column to the right
 		BuilderButtonOffsetInCU = 70 # X offset between builder button left edges
 		for ColNo, Col in enumerate(self.Columns):
-			# work out which builders are needed: event builders, gate builders or both
+			# work out which builders are needed: event builders, gate builders, connector builders, or all
 			BuildersNeeded = [FTEventInCore]
-			if ColNo > 0: BuildersNeeded.append(FTGateItemInCore)
+			if ColNo == 0: BuildersNeeded.insert(0, FTConnectorItemInCore)
+			else: BuildersNeeded.extend( [FTGateItemInCore, FTConnectorItemInCore] )
 			ColContent = [] # build list of builders and objects, with extra builder button set on the end (hence [None])
 			for Obj in Col.FTElements + [None]:
 				for ThisBuilderIndex, ThisBuilderKind in enumerate(BuildersNeeded): # add builder button family
@@ -4238,9 +4251,11 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			Col.FTElements = ColContent[:] # put copy of new list in column
 		# add an extra column containing only a builder button, if there are no columns in the FT, or if the last column isn't empty
 		if self.Columns:
-			ExtraColNeeded = (len(self.Columns[-1].FTElements) > 1) # True if last column doesn't contain only a builder button
+#			ExtraColNeeded = (len(self.Columns[-1].FTElements) > 1) # True if last column doesn't contain only a builder button
+			ExtraColNeeded = set( [type(e) for e in self.Columns[-1].FTElements] ) != set( [FTBuilder] )
+				# True if last column doesn't contain only builder buttons
 			ExtraColNumber = self.Columns[-1].ColNo + 1
-		else: # no columns in FT; make an initial column for the builder button
+		else: # no columns in FT; make an initial column for builder buttons
 			ExtraColNeeded = True
 			ExtraColNumber = 0
 		if ExtraColNeeded:
@@ -4248,7 +4263,8 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			self.Columns.append(ThisCol) # store the column in the FT
 			# work out which builders are needed: event builders, gate builders or both
 			BuildersNeeded = [FTEventInCore]
-			if ExtraColNumber > 0: BuildersNeeded.append(FTGateItemInCore)
+			if ExtraColNumber == 0: BuildersNeeded.insert(0, FTConnectorItemInCore)
+			else: BuildersNeeded.extend( [FTGateItemInCore, FTConnectorItemInCore] )
 			# make builder buttons in the column
 			for ThisBuilderIndex, ThisBuilderKind in enumerate(BuildersNeeded): # add builder button family
 				ThisCol.FTElements.append(FTBuilder(HostFT=self, ColNo=ExtraColNumber, ObjTypeRequested=ThisBuilderKind,
