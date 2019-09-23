@@ -27,9 +27,20 @@ GateTextFgColour = (0x00, 0x00, 0x00) # black
 HighlightColour = (0xfd, 0xf8, 0x47) # yellow
 HighlightColourStr = '253,248,71' # yellow
 ConnectingLineThicknessInCU = 4 # in canvas coords
+# XMLNames of event types whose value is a frequency or probability
+FTEventTypesWithFreqValue = ['InitiatingEvent', 'SIFFailureEvent', 'IntermediateEvent', 'TopEvent',
+						   'ConnectorIn', 'ConnectorOut']
+FTEventTypesWithProbValue = ['IPL', 'EnablingCondition', 'ConditionalModifier']
+FTEventTypeNameHash = {'InitiatingEvent': _('Initiating event'), 'SIFFailureEvent': _('SIF failure event'),
+	'IntermediateEvent': _('Intermediate event'), 'IPL': _('Independent protection layer'),
+	'TopEvent': _('Top event'),
+	'ConnectorIn': _('Inward connector'), 'ConnectorOut': _('Outward connector'),
+	'EnablingCondition': _('Enabling condition'), 'ConditionalModifier': _('Conditional modifier')}
+
 
 def SILTarget(Mode='', RiskRed=1.0):
 	# returns SIL target (str) corresponding to RiskRed (PFH or RRF depending on Mode)
+	# This function is safety critical code
 	assert Mode in core_classes.OpModes
 	assert isinstance(RiskRed, float)
 	if Mode in [core_classes.HighDemandMode, core_classes.ContinuousMode]:
@@ -42,7 +53,7 @@ def SILTarget(Mode='', RiskRed=1.0):
 		SILTable = [(1.1, '0'), (10.0, 'a'), (100.0, '1'), (1000.0, '2'), (10000.0, '3'), (100000.0, '4')]
 		for MinRiskRed, ThisSILTarget in SILTable: # step through SILTable until we find a RRF value >= RiskRed
 			if MinRiskRed >= RiskRed: break
-		else: # Python 'else' statement executes if 'for' loop runs without being 'break'd
+		else: # 'else' statement executes if 'for' loop runs without being 'break'd
 			ThisSILTarget = 'b' # RRF is beyond SIL 4 range
 	return ThisSILTarget
 
@@ -691,6 +702,12 @@ class FTEvent(FTBoxyObject): # FT event object. Rendered by drawing text into bi
 		('ValueUnit', str, False), ('Status', int, False), ('CanEditValue', bool, False), ('ShowActionItems', bool, False), ('BackgColour', 'rgb', False),
 		('DescriptionComment', str, True), ('ValueComment', str, True), ('ValueUnitComment', str, True),
 		('ValueKindComment', str, True), ('ActionItems', str, True), ('ConnectTo', int, True)]
+	# Make lists of HumanNames of event types that expect a frequency or probability value
+	EventTypesWithFreqValue = [FTEventTypeNameHash[e] for e in FTEventTypesWithFreqValue]
+	EventTypesWithProbValue = [FTEventTypeNameHash[e] for e in FTEventTypesWithProbValue]
+#	EventTypesWithFreqValue = ['InitiatingEvent', 'SIFFailureEvent', 'IntermediateEvent', 'TopEvent',
+#		'ConnectorIn', 'ConnectorOut']
+#	EventTypesWithProbValue = ['IPL', 'EnablingCondition', 'ConditionalModifier']
 
 	def __init__(self, Column, **Args):
 		# Args must include FT (the FTForDisplay instance containing this element)
@@ -776,7 +793,8 @@ class FTEvent(FTBoxyObject): # FT event object. Rendered by drawing text into bi
 		EventActionItemButton = ButtonElement(self.FT, Row=2, ColStart=3, ColSpan=1, StartX=350, EndX=399,
 			HostObject=self, InternalName='EventActionItemButton')
 		EventValue = TextElement(self.FT, RowBase=0, ColStart=0, ColSpan=1, EndX=99, EditBehaviour='Text',
-			HostObject=self, InternalName='Value') # internal name = 'Value' to match attrib name in Core object
+			HostObject=self, InternalName='Value', ControlPanelAspect='CPAspect_NumValue')
+			# internal name = 'Value' to match attrib name in Core object
 		self.EventValueUnitComponent = TextElement(self.FT, RowBase=0, ColStart=1, ColSpan=2, EndX=199,
 			HostObject=self, InternalName='EventValueUnit', EditBehaviour='Choice', ObjectChoices=[],
 			DisplAttrib='HumanName')
@@ -925,6 +943,15 @@ class FTEvent(FTBoxyObject): # FT event object. Rendered by drawing text into bi
 		# draw background box, then elements, into the bitmap
 		DrawBackgroundBox(DC, Zoom)
 		DrawElements(DC, self.AllElements, Zoom)
+
+	def AcceptableUnits(self): # return list of units (UnitItem instances) this event can offer%%%
+		if self.EventType in self.EventTypesWithFreqValue:
+			AcceptableUnits = core_classes.FrequencyUnits
+		elif self.EventType in self.EventTypesWithProbValue:
+			AcceptableUnits = core_classes.ProbabilityUnits
+		else:
+			raise ValueError("FT986 don't know value type for event type '%s'" % self.EventType)
+		return AcceptableUnits
 
 class FTGate(FTBoxyObject): # object containing FT gates for display. These belong to FTColumn's.
 	# Rendered by drawing into bitmap (doesn't use native widgets or sizer)
@@ -1748,11 +1775,13 @@ class FTEventInCore(object): # FT event object used in DataCore by FTObjectInCor
 	# IPLs, intermediate events, final events, connectors in/out but not gates
 	EventTypes = ['InitiatingEvent', 'SIFFailureEvent', 'IntermediateEvent', 'IPL', 'TopEvent',
 		'ConnectorIn', 'ConnectorOut', 'EnablingCondition', 'ConditionalModifier']
-	# event types whose value is a frequency
-	EventTypesWithFreqValue = ['InitiatingEvent', 'SIFFailureEvent', 'IntermediateEvent', 'TopEvent',
-		'ConnectorIn', 'ConnectorOut']
-	# event types whose value is a probability
-	EventTypesWithProbValue = ['IPL', 'EnablingCondition', 'ConditionalModifier']
+	# event types whose value is a frequency or probability
+	EventTypesWithFreqValue = FTEventTypesWithFreqValue
+	EventTypesWithProbValue = FTEventTypesWithProbValue
+#	EventTypesWithFreqValue = ['InitiatingEvent', 'SIFFailureEvent', 'IntermediateEvent', 'TopEvent',
+#		'ConnectorIn', 'ConnectorOut']
+#	# event types whose value is a probability
+#	EventTypesWithProbValue = ['IPL', 'EnablingCondition', 'ConditionalModifier']
 	# event types for which the user must supply a value
 	EventTypesWithUserValues = ['InitiatingEvent', 'IPL', 'EnablingCondition', 'ConditionalModifier']
 	# event types for which user can supply a value, or it can be derived from elsewhere
@@ -2837,6 +2866,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			# put FT event data into XML element El
 			# EventListForNumbering: list containing all FTEvents to consider when numbering this one
 			# FT: FTObjectInCore containing FT event
+			print('FT2840 starting PopulateFTEventData')
 			if __debug__ == 1: # do type checks
 				assert isinstance(FT, FTObjectInCore)
 				TypeChecks = [ (El, ElementTree.Element), (FTEvent.ID, str), (FTEvent.IsIPL, bool),
@@ -2945,8 +2975,11 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 				NumValueClassesToShow = FTEvent.DerivedNumberKinds
 			elif FTEvent.EventType in FTEvent.EventTypesUserOrDerivedValues:
 				NumValueClassesToShow = FTEvent.UserSuppliedNumberKinds + FTEvent.DerivedNumberKinds
+#			if isinstance(FTEvent, FTConnectorItemInCore):
+			print('FT2949: NumValueClassesToShow: ', NumValueClassesToShow, type(FTEvent.Value))
 			for (ThisValueKindIndex, ThisValueKind) in enumerate(NumValueClassesToShow):
-				ValueKindEl = ElementTree.SubElement(EventEl, info.NumberKindTag)
+#				ValueKindEl = ElementTree.SubElement(EventEl, info.NumberKindTag)
+				ValueKindEl = ElementTree.SubElement(EventEl, info.ValueKindOptionTag)
 				# set human name for number kind option to internal name of option
 				ValueKindEl.text = ThisValueKind.XMLName
 				ValueKindEl.set(info.ApplicableAttribName, utilities.Bool2Str(ThisValueKind == type(FTEvent.Value)))
@@ -3812,10 +3845,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 	# HumanNames for risk receptor grouping options. Keys must match those in FTObjectInCore (see assert, below)
 	RRGroupingNameHash = {'Grouped': _('Show grouped'), 'Singly': _('Show separately')}
 	assert set(RRGroupingNameHash.keys()) == set(FTObjectInCore.RRGroupingOptions)
-	EventTypeNameHash = {'InitiatingEvent': _('Initiating event'), 'SIFFailureEvent': _('SIF failure event'),
-		'IntermediateEvent': _('Intermediate event'), 'IPL': _('Independent protection layer'), 'TopEvent': _('Top event'),
-#		'ConnectorIn': _('Inward connector'), 'ConnectorOut': _('Outward connector'),
-		'EnablingCondition': _('Enabling condition'), 'ConditionalModifier': _('Conditional modifier')}
+	EventTypeNameHash = FTEventTypeNameHash
 	ConnectButtonBufferBorderX = ConnectButtonBufferBorderY = 5 # pixel allowance on each edge of connect button buffer
 	MinZoom = 0.1 # min and max zoom factors allowed for display of this Viewport
 	MaxZoom = 10.0
@@ -3913,10 +3943,11 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			# Used for unit choice, value kind choice etc.
 			# These choices are offered to the user in a choice widget
 			# HostEl: element containing the numerical value
-			# ComponentName (str): the numerical component name in HostEl
+			# ComponentName (str): the numerical component name in HostEl (if HostEl is the FT) or '' if HostEl is an FT element
 			# ListAttrib (str): name of the list in Component to populate
 			# OptionTagName (str): the XML tag containing an option
 			# MasterOptionsList (list): list of subclasses with XMLName attribs to match against options in XMLRoot
+			assert isinstance(ComponentName, str)
 			Options = []
 			for ThisTag in XMLRoot.findall(OptionTagName):
 				# find human name for this option (use startswith() to ignore convert unit marker suffix)
@@ -3925,11 +3956,12 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 				# set human name according to whether this is a value conversion option (special case for unit options)
 				if ThisTag.text.endswith(info.ConvertValueMarker): ThisHumanName = _('Convert value to %s') % ThisOptionHumanName
 				else: ThisHumanName = ThisOptionHumanName
-				Options.append(core_classes.ChoiceItem(XMLName=ThisTag.text,
-										  HumanName=ThisHumanName,
+				Options.append(core_classes.ChoiceItem(XMLName=ThisTag.text, HumanName=ThisHumanName,
 										  Applicable=utilities.Bool2Str(ThisTag.get(info.ApplicableAttribName))))
-			# set options list in the FT component
-			setattr(getattr(HostEl, ComponentName), ListAttrib, Options)
+			# set options list in the FT element or component
+			if ComponentName:
+				setattr(getattr(HostEl, ComponentName), ListAttrib, Options)
+			else: setattr(HostEl, ListAttrib, Options)
 
 		def PopulateOverallData(XMLRoot, HeaderEl):
 			# extract data about the overall FT from XMLRoot
@@ -4073,12 +4105,16 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 					HumanName=ThisHumanName,
 					Applicable=utilities.Bool2Str(ThisTag.get(info.ApplicableAttribName))))
 			# populate value kind choice
-			NewEvent.EventValueKindComponent.ObjectChoices = [core_classes.ChoiceItem(XMLName=ThisTag.text,
-				HumanName=[c.HumanName for c in core_classes.NumValueClasses if c.XMLName == ThisTag.text][0],
-				Applicable=utilities.Bool2Str(ThisTag.get(info.ApplicableAttribName)))
-					for ThisTag in XMLObj.findall(info.NumberKindTag)]
+			PopulateValueOptions(XMLRoot=XMLObj, HostEl=NewEvent, ComponentName='',
+				ListAttrib='ValueKindOptions', OptionTagName=info.ValueKindOptionTag,
+				MasterOptionsList=core_classes.NumValueClasses)
+#			NewEvent.EventValueKindComponent.ObjectChoices = [core_classes.ChoiceItem(XMLName=ThisTag.text,
+#				HumanName=[c.HumanName for c in core_classes.NumValueClasses if c.XMLName == ThisTag.text][0],
+#				Applicable=utilities.Bool2Str(ThisTag.get(info.ApplicableAttribName)))
+#					for ThisTag in XMLObj.findall(info.NumberKindTag)]
 			# populate value kind with HumanName of number kind marked as applicable
-			NewEvent.ValueKind = [c.HumanName for c in NewEvent.EventValueKindComponent.ObjectChoices
+#			NewEvent.ValueKind = [c.HumanName for c in NewEvent.EventValueKindComponent.ObjectChoices
+			NewEvent.ValueKind = [c.HumanName for c in NewEvent.ValueKindOptions
 				if c.Applicable][0]
 			# retrieve data from ProblemIndicatorTag: decide whether to show problem button
 			ProblemTag = XMLObj.find(info.ProblemIndicatorTag)

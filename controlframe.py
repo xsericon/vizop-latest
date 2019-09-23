@@ -1144,19 +1144,26 @@ class ControlFrame(wx.Frame):
 			self.UpdateNavigationButtonStatus(Proj)
 			# set widget values
 			# set up HeaderLabel
-			self.NumericalValueAspect.HeaderLabel.Widget.SetLabel(_('Value: %s') % self.TopLevelFrame.PHAObjInControlPanel.
-				ComponentEnglishNames[self.TopLevelFrame.ComponentInControlPanel])
+			if self.TopLevelFrame.ComponentInControlPanel: # is there a component name? (editing value in FT header)
+				self.NumericalValueAspect.HeaderLabel.Widget.SetLabel(_('Value: %s') % self.TopLevelFrame.PHAObjInControlPanel.
+					ComponentEnglishNames[self.TopLevelFrame.ComponentInControlPanel])
+			else:
+				self.NumericalValueAspect.HeaderLabel.Widget.SetLabel(_('Value: %s %s') %
+					(self.TopLevelFrame.PHAObjInControlPanel.EventTypeHumanName,
+					self.TopLevelFrame.PHAObjInControlPanel.Numbering))
 			# set up ValueText
 			self.NumericalValueAspect.ValueText.PHAObj = self.TopLevelFrame.PHAObjInControlPanel
 			PHAObj = self.NumericalValueAspect.ValueText.PHAObj
 			self.NumericalValueAspect.ValueText.DataAttrib = self.TopLevelFrame.ComponentInControlPanel
+			# find host for attribs such as Value and AcceptableUnits
 			DataAttrib = self.NumericalValueAspect.ValueText.DataAttrib
+			DataHost = getattr(PHAObj, DataAttrib) if DataAttrib else PHAObj
 			# populate ValueText with the current value
-			self.NumericalValueAspect.ValueText.Widget.SetValue(getattr(PHAObj, DataAttrib).Value)
+			self.NumericalValueAspect.ValueText.Widget.SetValue(DataHost.Value)
 			# select all text in the value text widget - user intuitively expects this
 			self.NumericalValueAspect.ValueText.Widget.SelectAll()
 			# set up UnitChoice
-			UnitOptions = getattr(PHAObj, DataAttrib).AcceptableUnits # list of ChoiceItem instances
+			UnitOptions = DataHost.AcceptableUnits # list of ChoiceItem instances
 			self.NumericalValueAspect.UnitChoice.PHAObj = self.TopLevelFrame.PHAObjInControlPanel
 			self.NumericalValueAspect.UnitChoice.DataAttrib = self.TopLevelFrame.ComponentInControlPanel
 			# populate UnitChoice with unit options
@@ -1166,7 +1173,7 @@ class ControlFrame(wx.Frame):
 			self.NumericalValueAspect.UnitChoice.Widget.SetSelection(
 				ApplicableUnitOptionsList.index(True) if True in ApplicableUnitOptionsList else wx.NOT_FOUND)
 			# set up ValueKindChoice
-			ValueKindOptions = getattr(PHAObj, DataAttrib).ValueKindOptions # list of ChoiceItem instances
+			ValueKindOptions = DataHost.ValueKindOptions # list of ChoiceItem instances
 			self.NumericalValueAspect.ValueKindChoice.PHAObj = self.TopLevelFrame.PHAObjInControlPanel
 			self.NumericalValueAspect.ValueKindChoice.DataAttrib = self.TopLevelFrame.ComponentInControlPanel
 			# populate ValueKindChoice with value kind options
