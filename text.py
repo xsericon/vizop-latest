@@ -46,10 +46,10 @@ def BrighterThan(OldCol, PercentBrighter=50):  # return colour that is a notiona
 class TextObject(object):
 	# text contained within an element, along with its formatting attributes
 
-	def __init__(self, Content=''):
-		# super(TextObject, self).__init__(Proj)
+	def __init__(self, Content='', **Args):
 		object.__init__(self)
-		self.Content = Content # text to display
+		assert isinstance(Content, str)
+		self.Content = Content # text to display (str)
 			# Can contain <CR> (chr(13)) and escape sequences consisting of <elements.text.TextEscStartChar> followed by:
 			# B: bold*; U: underlined*; I: italics*; S: standout*; X: revert all formatting to default
 			# (commands marked * take integer arg: 0 = default, 1 = no effect, 2 = minimum effect (eg single underline), 255 = maximum effect)
@@ -67,6 +67,8 @@ class TextObject(object):
 		self.LineSpacing = DefaultTextLineSpacing
 		self.ParentSizeBasis = {} # dict: {object size parm: value} used for calculating required text point size based on an object's actual size.
 		self.TextSize = None
+		# soak up any attribs provided in Args (dangerous, no value checks done)
+		self.__dict__.update(Args)
 
 	def RequiredTextPointSizeInCU(self, TextIdentifier, PointSize, ParentSizeBasis=None):
 		# return text point size adjusted to take account of animations, but not zoom. Placeholder, for future
@@ -233,7 +235,7 @@ def RequiredPointSize(BasicPointSize, CanvZoomX=1.0, CanvZoomY=1.0, StandOutFrac
 	return int(round(BasicPointSize * 0.5 * (CanvZoomX + CanvZoomY) * (1 + StandOutFraction * StandoutIncrement)
 		* TextSizeRatio))
 
-def CalculateTextSizeAndSpacing(El, TextIdentifier, VertAlignment, CanvZoomX, CanvZoomY):
+def CalculateTextSizeAndSpacing(El, Text, TextIdentifier, VertAlignment, CanvZoomX, CanvZoomY):
 	# calculate all required values for drawing text, including dividing the text into lines and chunks
 	# returned ScaledPointSizeNoZoom does not take account of zoom
 
@@ -388,7 +390,8 @@ def CalculateTextSizeAndSpacing(El, TextIdentifier, VertAlignment, CanvZoomX, Ca
 	# Main procedure for CalculateTextSizeAndSpacing()
 	# First, set initial format settings; intentionally NOT allowing for standout, as standing-out text doesn't get any extra space
 	# Find target point size, allowing for change of Element size
-	Text = El.Text # fetch the text object from supplied element
+#	Text = El.Text # fetch the text object from supplied element; now using Text supplied as arg, to allow us to use
+#	# a substitute text instead
 	ScaledPointSizeNoZoom = Text.RequiredTextPointSizeInCU(TextIdentifier, Text.PointSize, Text.ParentSizeBasis)
 	ItalicsNow = Text.Italics
 	BoldNow = Text.Bold
@@ -463,10 +466,10 @@ def CalculateTextSizeAndSpacing(El, TextIdentifier, VertAlignment, CanvZoomX, Ca
 		El, TextIdentifier, TextLines, MaxYaboveText, Text.LineSpacing, 0, VertAlignment, Yhere, Xsofar, IsFmtCmd)
 	return YaboveText, Sublines, SublineHeights, SublineX, SublineY, ScaledPointSizeNoZoom, YatTextBottom
 
-def TextSize(El, TextIdentifier, CanvZoomX, CanvZoomY, VertAlignment='Top'):
+def TextSize(El, Text, TextIdentifier, CanvZoomX, CanvZoomY, VertAlignment='Top'):
 	# returns (Xsize, Ystart, Yend) for text in El
 	(YaboveText, Sublines, SublineHeights, SublineX, SublineY, ScaledPointSizeNoZoom, YatTextBottom) =\
-		CalculateTextSizeAndSpacing(El, TextIdentifier, VertAlignment, CanvZoomX, CanvZoomY)
+		CalculateTextSizeAndSpacing(El, Text, TextIdentifier, VertAlignment, CanvZoomX, CanvZoomY)
 	# get Xsize from the X-coord of the end of the longest subline
 	Xsize = max([ThisSubline[-1] for ThisSubline in SublineX])
 	return (Xsize, YaboveText, YatTextBottom)
@@ -609,9 +612,10 @@ def DrawTextInElement(El, dc, Text, TextIdentifier, LayerOffsetX=0, LayerOffsetY
 			YStart += (SublineHeight + SublineHeights[SublineNo][1]) * Text.LineSpacing  # set up for next subline
 
 	# main procedure for DrawTextInElement()
-	if Text.Content.strip():  # don't process if text content is empty or whitespace only
+	if Text.Content == 'Type a description': print('TE617 rendering "type a description"')
+	if Text.Content.strip(): # don't process if text content is empty or whitespace only
 		(YaboveText, Sublines, SublineHeights, SublineX, SublineY, ScaledPointSizeNoZoom, YatTextBottom) =\
-			CalculateTextSizeAndSpacing(El, TextIdentifier, VertAlignment, CanvZoomX, CanvZoomY)
+			CalculateTextSizeAndSpacing(El, Text, TextIdentifier, VertAlignment, CanvZoomX, CanvZoomY)
 		# find the actual Y coordinate in pixels to start drawing the text. max(0, ) avoids text spilling over top of element
 		DummyX, YStartInPx = utilities.ScreenCoords(0, El.MinTextY(TextIdentifier) + max(0, YaboveText),
 			Zoom=CanvZoomY, PanX=PanX, PanY=PanY)

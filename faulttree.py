@@ -350,10 +350,10 @@ class FTHeader(object): # FT header object. Rendered by drawing text into bitmap
 
 		# set element colours
 		for El in LabelEls:
-			El.Text.Colour = ColourLabelFg
+			El.Text.Colour = El.PromptTextObj.Colour = ColourLabelFg
 			El.BkgColour = ColourLabelBkg
 		for El in self.ContentEls:
-			El.Text.Colour = ColourContentFg
+			El.Text.Colour = El.PromptTextObj.Colour = ColourContentFg
 			El.BkgColour = ColourContentBkg
 
 		# return all the elements in a list
@@ -479,8 +479,9 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 	# Consists of a single text inside a coloured box. It's a component of an FTHeader, FTConnector or FTEvent.
 
 	def __init__(self, FT, Row=0, RowBase=0, ColStart=0, ColSpan=1, EndX=200, MinHeight=10, InternalName='',
-				 HostObject=None, **Args):
+				 HostObject=None, PromptText='', **Args):
 		# HostObject: the FTHeader or FTEvent instance containing this TextElement instance
+		# 'PromptText' (str): text to show when self.Content is empty
 		# Args can include:
 		# 	HorizAlignment ('Left', 'Centre' or 'Right') (defaults to Centre if not specified)
 		#	MaxWidthInCU (int) max width of component containing the text (defaults to 999)
@@ -492,6 +493,7 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 		FTBoxyObject.__init__(self, **Args)
 		assert isinstance(FT, FTForDisplay)
 		assert isinstance(HostObject, (FTHeader, FTEvent, FTGate, FTConnector))
+		assert isinstance(PromptText, str)
 		assert Args.get('HorizAlignment', 'Centre') in ['Left', 'Centre', 'Right']
 		self.FT = FT
 		self.HostObject = HostObject
@@ -511,6 +513,9 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 		self.Text.Font = wx.Font(pointSize=12, style=wx.FONTSTYLE_NORMAL, weight=wx.FONTWEIGHT_NORMAL,
 			family=DefaultFontFamily).GetFaceName() # system name for actual font used (str)
 		self.Text.ParaHorizAlignment = Args.get('HorizAlignment', 'Centre') # centre aligned horizontally by default
+		self.PromptTextObj = copy.copy(self.Text) # text object to use for prompt text when actual text is empty
+		self.PromptTextObj.Content = PromptText
+		self.PromptTextObj.Italics = text.BIUSNoEffectValue + 1 # show prompt text in italics
 		self.InternalName = InternalName # name used to identify specific elements
 		self.BkgColour = (0x40, 0x40, 0x40)
 		self.Visible = True
@@ -558,17 +563,21 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 		return OrigPointSize
 
 	def GetMinSizeInCU(self): # calculate property MinSize - in canvas coords
-		SizeX, TopY, BottomY = text.TextSize(self, TextIdentifier=0, CanvZoomX=1.05, CanvZoomY=1.05)
+		# decide whether to show 'actual' text or prompt text
+		Text = self.PromptTextObj if self.UsePromptText() else self.Text
+		SizeX, TopY, BottomY = text.TextSize(self, Text, TextIdentifier=0, CanvZoomX=1.05, CanvZoomY=1.05)
 			# zoom args set to 1 so that we get canvas units, with a buffer to allow for rounding errors
 			# (buffer needed to avoid sudden line breaks during zoom)
 		return max(self.MinSizeXInCU, SizeX), max(self.MinSizeYInCU, BottomY - TopY)
 
 	MinSizeInCU = property(fget=GetMinSizeInCU)
 
+	def UsePromptText(self): # return True if we should display a prompt text instead of the actual text
+		return (self.Text.Content == '')
+
 	def Draw(self, DC, Zoom, **Args): # render text element, including background box, in DC
 		# Optional arg BackBoxRoundedness: radius of background box corner curvature, in canvas coords
 		# Optional arg Highlight (bool): whether to highlight the background box
-		print('FT568 drawing element: ', self.InternalName)
 		DefaultRound = 3 # default value of BackBoxRoundedness if not supplied
 		# set background colour according to whether to highlight
 		BkgColour = HighlightColour if Args.get('Highlight', False) else self.BkgColour
@@ -578,8 +587,10 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 		ThisStartX, ThisStartY = utilities.ScreenCoords(self.PosXInCU, self.PosYInCU, Zoom=Zoom, PanX=0, PanY=0)
 		DC.DrawRoundedRectangle(ThisStartX, ThisStartY, (self.EndXInCU - self.PosXInCU) * Zoom,
 			(self.EndYInCU - self.PosYInCU) * Zoom, radius=Args.get('BackBoxRoundedness', DefaultRound) * Zoom)
+		# if the text content is empty, provide a prompt text from the text component's PromptText attrib, if any
+		TextToShow = self.PromptTextObj if self.UsePromptText() else self.Text
 		# draw the text on top of the box
-		text.DrawTextInElement(self, DC, self.Text, TextIdentifier=0, CanvZoomX=Zoom,
+		text.DrawTextInElement(self, DC, TextToShow, TextIdentifier=0, CanvZoomX=Zoom,
 			CanvZoomY=Zoom, PanX=0, PanY=0, VertAlignment='Top')
 
 	def HandleMouseLClickOnMe(self, **Args): # handle mouse left button single click on TextElement instance
@@ -780,7 +791,7 @@ class FTEvent(FTBoxyObject): # FT event object. Rendered by drawing text into bi
 		# set text element colours
 		for El in TopEls + ValueEls:
 			if type(El) is TextElement:
-				El.Text.Colour = ColourContentFg
+				El.Text.Colour = El.PromptTextObj.Colour = ColourContentFg
 				El.BkgColour = ColourContentBkg
 		self.EventTypeComponent.BkgColour = HeaderLabelBkg
 		return TopEls, ValueEls
@@ -825,7 +836,6 @@ class FTEvent(FTBoxyObject): # FT event object. Rendered by drawing text into bi
 			# (variable elements are populated in CreateVariableTextElements() )
 			# The following list contains (attribs of FTEvent, element's InternalName)
 			# It's a combined list for both DescriptionElements and ValueElements, hence the "if" below
-#			AttribInfo = [ ('EventTypeHumanName', 'EventType'), ('Value', 'EventValue'),
 			AttribInfo = [ ('EventTypeHumanName', 'EventType'), ('Value', 'Value'),
 				('ValueUnit', 'EventValueUnit'), ('ValueKind', 'EventValueKind') ]
 			# put the content into the elements
@@ -986,7 +996,7 @@ class FTGate(FTBoxyObject): # object containing FT gates for display. These belo
 		# set text element colours
 		for El in TopEls + ValueEls:
 			if type(El) is TextElement:
-				El.Text.Colour = GateTextFgColour
+				El.Text.Colour = El.PromptTextObj.Colour = GateTextFgColour
 				El.BkgColour = GateTextBkgColour
 
 		return TopEls, ValueEls
@@ -1339,6 +1349,7 @@ class FTGate(FTBoxyObject): # object containing FT gates for display. These belo
 class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for display. These belong to FTColumn's.
 	# Is the superclass of FTConnectorIn and FTConnectorOut
 	# Rendered by drawing into bitmap (doesn't use native widgets or sizer)
+	ConnClassHumanName = {True: _('Inward connector'), False: _('Outward connector')}
 	ConnectorStyles = ['Default'] # future, will define various connector appearances (squares, arrows, circles etc)
 	NeedsConnectButton = True # whether to provide connect buttons
 	# Attribs are used by ParseFTData() to populate object's attributes from data transferred from datacore (may be redundant)
@@ -1380,34 +1391,38 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 		# column widths: 100, 100, 50, 50
 		# any element with MinHeight parm set is growable in the y axis to fit the text.
 		# it should be assigned to the Row that it can force to grow
-		ConnDescription = TextElement(self.FT, Row=0, ColStart=0, ColSpan=2, EndX=199, MinHeight=50, HostObject=self,
-			InternalName='ConnDescription')
-		ConnGroupedButton = ButtonElement(self.FT, Row=0, ColStart=4, ColSpan=1, StartX=250, EndX=299,
+		ConnKind = TextElement(self.FT, Row=0, ColStart=0, ColSpan=4, EndX=199, HostObject=self,
+			InternalName='ConnKind', DisplAttrib='HumanName')
+		ConnDescription = TextElement(self.FT, Row=1, ColStart=0, ColSpan=2, EndX=199, MinHeight=50, HostObject=self,
+			InternalName='ConnDescription', PromptText=_('Type a description'))
+		ConnGroupedButton = ButtonElement(self.FT, Row=1, ColStart=4, ColSpan=1, StartX=250, EndX=299,
 			HostObject=self, InternalName='ConnGroupedButton')
-		ConnValue = TextElement(self.FT, Row=1, ColStart=0, ColSpan=1, EndX=99, HostObject=self,
+		ConnValue = TextElement(self.FT, Row=2, ColStart=0, ColSpan=1, EndX=99, HostObject=self,
 			InternalName='ConnValue')
-		ConnValueUnit = TextElement(self.FT, Row=1, ColStart=1, ColSpan=1, EndX=199, HostObject=self,
+		ConnValueUnit = TextElement(self.FT, Row=2, ColStart=1, ColSpan=1, EndX=199, HostObject=self,
 			InternalName='ConnValueUnit')
-		self.ConnValueProblemButton = ButtonElement(self.FT, Row=1, ColStart=4, ColSpan=1, StartX=250, EndX=299,
+		self.ConnValueProblemButton = ButtonElement(self.FT, Row=2, ColStart=4, ColSpan=1, StartX=250, EndX=299,
 			HostObject=self, InternalName='ConnValueProblemButton')
 		# Connectors don't have "value types" (it's always calculated), "comments" or "action items"
 		# TODO %%% fix the above; CX-in needs other value types, and all CX's should have comments and action items
 		# make list of elements
-		TopEls = [ConnDescription, ConnGroupedButton, ConnValue, ConnValueUnit, self.ConnValueProblemButton]
+		TopEls = [ConnKind, ConnDescription, ConnGroupedButton, ConnValue, ConnValueUnit, self.ConnValueProblemButton]
 		# set text element colours
 		for El in TopEls:
 			if type(El) is TextElement:
-				El.Text.Colour = ColourContentFg
+				El.Text.Colour = El.PromptTextObj.Colour = ColourContentFg
 				El.BkgColour = ColourContentBkg
 		return TopEls
 
 	def RenderIntoBitmap(self, Zoom): # draw FTConnector in its own self.Bitmap. Also calculates FTConnector's size attributes
 
 		def PopulateTextElements(Elements):
-			# put required values into all fixed text elements
-			# The following list contains (attribs of FTConnector, element's InternalName)
+			# put required values into all fixed text elements; first, connector kind
+			print('FT1409 connector type: ', type(self))
+			ElementNamed(Elements, 'ConnKind').Text.Content = self.ConnClassHumanName[isinstance(self, FTConnectorIn)]
+			# The following list contains (attribs of FTConnector, element's InternalName)%%%
 			AttribInfo = [ ('Description', 'ConnDescription'), ('Value', 'ConnValue'), ('ValueUnit', 'ConnValueUnit') ]
-			# put the content into the elements
+			# put the content into the other elements
 			for (Attrib, Name) in AttribInfo:
 				MatchingEl = ElementNamed(Elements, Name)
 				if MatchingEl:
@@ -1858,13 +1873,13 @@ class FTEventInCore(object): # FT event object used in DataCore by FTObjectInCor
 	def SetAvailableEventTypes(self):
 		# work out what types of event this FTObjectInCore instance can be.
 		# Return list of event types (list of str), default event type (str)
-		AvailEventTypes = ['IPL', 'EnablingCondition', 'ConditionalModifier', 'ConnectorIn'] # these are always allowed
+		AvailEventTypes = ['IPL', 'EnablingCondition', 'ConditionalModifier'] # these are always allowed
 		if self.Column.ColNo == 0: # these are only allowed in 1st column
 			AvailEventTypes.append('InitiatingEvent')
 			if self.FT.OpMode in [core_classes.HighDemandMode, core_classes.ContinuousMode]:
 				AvailEventTypes.append('SIFFailureEvent') # only allowed in these OpModes
 		else:
-			AvailEventTypes.extend(['TopEvent', 'IntermediateEvent', 'ConnectorOut'])
+			AvailEventTypes.extend(['TopEvent', 'IntermediateEvent'])
 		# sort into the same order as EventTypes, for nice display
 		AvailEventTypesForDisplay = [t for t in self.EventTypes if t in AvailEventTypes]
 		return AvailEventTypesForDisplay, AvailEventTypesForDisplay[0]
@@ -3790,7 +3805,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 	assert set(RRGroupingNameHash.keys()) == set(FTObjectInCore.RRGroupingOptions)
 	EventTypeNameHash = {'InitiatingEvent': _('Initiating event'), 'SIFFailureEvent': _('SIF failure event'),
 		'IntermediateEvent': _('Intermediate event'), 'IPL': _('Independent protection layer'), 'TopEvent': _('Top event'),
-		'ConnectorIn': _('Inward connector'), 'ConnectorOut': _('Outward connector'),
+#		'ConnectorIn': _('Inward connector'), 'ConnectorOut': _('Outward connector'),
 		'EnablingCondition': _('Enabling condition'), 'ConditionalModifier': _('Conditional modifier')}
 	ConnectButtonBufferBorderX = ConnectButtonBufferBorderY = 5 # pixel allowance on each edge of connect button buffer
 	MinZoom = 0.1 # min and max zoom factors allowed for display of this Viewport
@@ -3855,6 +3870,8 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		self.CurrentElementIDsToSetOnRefresh = [] # IDs of elements to be set as current when display is next refreshed.
 			# This is used so we can store the selection across a refresh - as datacore doesn't know which elements are
 			# "current" in our Viewport
+		self.ExistingElementIDsOnLastRefresh = [] # IDs of all elements existing in FT when it is redrawn.
+			# This is used so we can detect which IDs are new, so they can be made "current" (highlighted)%%%
 
 	def Wipe(self): # wipe all data in the FT and re-initialize
 		self.Header.InitializeData()
@@ -4188,10 +4205,16 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		self.AddBuilderButtons()
 		# populate elements' ConnectTo attribs (must be done AFTER populating all elements)
 		self.PopulateConnectTo()
-		# populate which elements are currently selected
+		# populate which elements are currently selected - either in CurrentElementIDsToSetOnRefresh, or newly created
+		# since last refresh
 		self.CurrentElements = []
+		ExistingElementIDs = []
 		for ThisEl in WalkOverAllFTObjs(self):
-			if ThisEl.ID in self.CurrentElementIDsToSetOnRefresh: self.CurrentElements.append(ThisEl)
+			if ThisEl.ID in self.CurrentElementIDsToSetOnRefresh or not\
+				(ThisEl.ID in self.ExistingElementIDsOnLastRefresh): self.CurrentElements.append(ThisEl)
+			# populate "existing elements" list
+			ExistingElementIDs.append(ThisEl.ID)
+		self.ExistingElementIDsOnLastRefresh = ExistingElementIDs
 		# request appropriate control panel aspect %%% working here
 		self.SwitchToPreferredControlPanelAspect(CurrentElements=self.CurrentElements)
 
