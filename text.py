@@ -612,7 +612,6 @@ def DrawTextInElement(El, dc, Text, TextIdentifier, LayerOffsetX=0, LayerOffsetY
 			YStart += (SublineHeight + SublineHeights[SublineNo][1]) * Text.LineSpacing  # set up for next subline
 
 	# main procedure for DrawTextInElement()
-	if Text.Content == 'Type a description': print('TE617 rendering "type a description"')
 	if Text.Content.strip(): # don't process if text content is empty or whitespace only
 		(YaboveText, Sublines, SublineHeights, SublineX, SublineY, ScaledPointSizeNoZoom, YatTextBottom) =\
 			CalculateTextSizeAndSpacing(El, Text, TextIdentifier, VertAlignment, CanvZoomX, CanvZoomY)

@@ -599,7 +599,12 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 #		DataHostObj = self.FT if isinstance(self.HostObject, FTHeader) else self.HostObject
 		# first, try to go to any preferred aspect of the Control panel, if our display device has a control panel
 		if getattr(self, 'ControlPanelAspect', None):
+			# if editing a component in the header, get the component name
 #			if isinstance(self.CurrentEditElement.HostObject, FTHeader):
+			if isinstance(self.HostObject, FTHeader):
+				ComponentName = self.InternalName
+			else:
+				ComponentName = ''
 #				ElementID = 'Header'
 #				DatacoreHostObj = self.FT
 #			else:
@@ -608,7 +613,7 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 #			EditComponentInternalName = self.CurrentEditElement.InternalName
 			if hasattr(self.FT.DisplDevice, 'GotoControlPanelAspect'):
 				self.FT.DisplDevice.GotoControlPanelAspect(AspectName=self.ControlPanelAspect,
-					PHAObjInControlPanel=self.HostObject, ComponentInControlPanel=self.InternalName)
+					PHAObjInControlPanel=self.HostObject, ComponentInControlPanel=ComponentName)
 		if self.FT.EditAllowed: # proceed with editing only if allowed to edit in this instance of vizop
 			# get absolute position of textbox for editing: position within element + column + FT, then apply zoom and pan
 			Zoom = self.FT.Zoom
@@ -633,6 +638,9 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 			elif self.InternalName == 'EventValueKind' and ThisEventType == 'SIFFailureEvent': MyEditBehaviour = None
 			if MyEditBehaviour == 'Text':
 				# make and populate a TextCtrl for editing
+				self.FT.PaintNeeded = False # suppress paint while TextCtrl is in use, as the cursor blinking triggers
+					# needless paint events - see ControlFrame.EditPanel.OnPaint()
+					# TODO resolve issue in MacOS - we get a thick white border during editing
 				self.EditTextCtrl = wx.TextCtrl(parent=self.FT.DisplDevice, value=self.Text.Content,
 					pos=(self.TextCtrlPosXInPxWithinDisplDevice, self.TextCtrlPosYInPxWithinDisplDevice),
 					size=(self.SizeXInCU * Zoom, (self.SizeYInCU + 5) * Zoom),
@@ -656,8 +664,6 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 					size=((self.SizeXInCU + 20) * Zoom, (self.SizeYInCU + 3) * Zoom),
 					choices=[getattr(c, self.DisplAttrib) for c in self.ObjectChoices])
 				self.EditChoice.SetFocus()
-#				self.EditChoice.SetFont(wx.Font(pointSize=int(round(self.Text.PointSize * Zoom)), family=DefaultFontFamily,
-#					style=wx.FONTSTYLE_NORMAL, weight=wx.FONTWEIGHT_NORMAL, faceName=self.Text.Font))
 				self.EditChoice.SetFont(wx.Font(wx.FontInfo(pointSize=int(round(self.Text.PointSize * Zoom))).Family(wx.FONTFAMILY_SWISS)))
 				self.EditChoice.SetForegroundColour(self.Text.Colour)
 				self.EditChoice.SetBackgroundColour(self.BkgColour)
@@ -1369,6 +1375,9 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 		self.ConnectorDescription = ''
 		self.Value = ''
 		self.ValueUnit = '' # *
+		self.ValueKindOptions = [core_classes.UserNumValueItem, core_classes.ConstNumValueItem,
+							core_classes.LookupNumValueItem, core_classes.UseParentValueItem,
+							core_classes.ParentNumValueItem]
 		self.SizeXInCU = self.SizeXInPx = self.SizeYInCU = self.SizeYInPx = 10 # size in canvas units and screen pixels
 		self.PosZ = 0 # z-coordinate
 		self.Buffer = wx.Bitmap(width=self.SizeXInPx, height=self.SizeYInPx, depth=wx.BITMAP_SCREEN_DEPTH)
@@ -1397,8 +1406,8 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 			InternalName='ConnDescription', PromptText=_('Type a description'))
 		ConnGroupedButton = ButtonElement(self.FT, Row=1, ColStart=4, ColSpan=1, StartX=250, EndX=299,
 			HostObject=self, InternalName='ConnGroupedButton')
-		ConnValue = TextElement(self.FT, Row=2, ColStart=0, ColSpan=1, EndX=99, HostObject=self,
-			InternalName='ConnValue')
+		self.ConnValue = TextElement(self.FT, Row=2, ColStart=0, ColSpan=1, EndX=99, HostObject=self,
+			InternalName='ConnValue', ControlPanelAspect='CPAspect_NumValue')
 		ConnValueUnit = TextElement(self.FT, Row=2, ColStart=1, ColSpan=1, EndX=199, HostObject=self,
 			InternalName='ConnValueUnit')
 		self.ConnValueProblemButton = ButtonElement(self.FT, Row=2, ColStart=4, ColSpan=1, StartX=250, EndX=299,
@@ -1406,7 +1415,7 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 		# Connectors don't have "value types" (it's always calculated), "comments" or "action items"
 		# TODO %%% fix the above; CX-in needs other value types, and all CX's should have comments and action items
 		# make list of elements
-		TopEls = [ConnKind, ConnDescription, ConnGroupedButton, ConnValue, ConnValueUnit, self.ConnValueProblemButton]
+		TopEls = [ConnKind, ConnDescription, ConnGroupedButton, self.ConnValue, ConnValueUnit, self.ConnValueProblemButton]
 		# set text element colours
 		for El in TopEls:
 			if type(El) is TextElement:
@@ -4801,6 +4810,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 					# refreshed by ControlFrame's OnPaint() afterwards)
 					self.CurrentEditTextCtrl.Destroy()
 					self.CurrentEditElement = self.CurrentEditTextCtrl = None
+					self.PaintNeeded = True # turn off paint suppression while TextCtrl was in use
 					# request PHA object in datacore to update text attribute
 					self.RequestChangeText(ElementID, EditComponentInternalName, NewValue=TextEntered)
 #					vizop_misc.SendRequest(Socket=self.C2DSocketREQ, Command='RQ_FT_ChangeText',
@@ -4809,6 +4819,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 				else: # no change made, or change rejected; destroy the textctrl widget
 					self.CurrentEditTextCtrl.Destroy()
 					self.CurrentEditElement = self.CurrentEditTextCtrl = None
+					self.PaintNeeded = True # turn off paint suppression while TextCtrl was in use
 			elif CurrentEditBehaviour == 'Choice': # it was a choice editing operation
 				# get the option selected by the user
 				TextSelected = self.CurrentEditChoice.GetStringSelection()

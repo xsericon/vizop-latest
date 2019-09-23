@@ -1187,8 +1187,12 @@ class ControlFrame(wx.Frame):
 				self.NumericalValueAspect.ValueKindChoice]
 			# find the ValueKind for this value
 			ThisPHAObj = Args['PHAObjInControlPanel']
-			ThisDataAttribName = Args['ComponentInControlPanel']
-			ValueKindOptions = getattr(ThisPHAObj, ThisDataAttribName).ValueKindOptions # list of ChoiceItem instances
+			ThisDataAttribName = Args['ComponentInControlPanel'] # contains attrib name if editing an FT header
+				# component, else ''
+			print('CF1191 ThisPHAObj ID, ThisDataAttribName: ', ThisPHAObj.ID, ThisDataAttribName)
+			# find value kind options (list of ChoiceItem instances)
+			ValueKindOptions = getattr(ThisPHAObj, ThisDataAttribName).ValueKindOptions if ThisDataAttribName else\
+				ThisPHAObj.ValueKindOptions
 			ApplicableValueKindOptionsList = [u.Applicable for u in ValueKindOptions]
 			# select the current value kind in ValueKindOptions
 			ThisValueKindName = ValueKindOptions[ApplicableValueKindOptionsList.index(True)].XMLName\
