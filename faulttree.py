@@ -29,7 +29,7 @@ HighlightColourStr = '253,248,71' # yellow
 ConnectingLineThicknessInCU = 4 # in canvas coords
 # XMLNames of event types whose value is a frequency or probability
 FTEventTypesWithFreqValue = ['InitiatingEvent', 'SIFFailureEvent', 'IntermediateEvent', 'TopEvent',
-						   'ConnectorIn', 'ConnectorOut']
+	'ConnectorIn', 'ConnectorOut']
 FTEventTypesWithProbValue = ['IPL', 'EnablingCondition', 'ConditionalModifier']
 FTEventTypeNameHash = {'InitiatingEvent': _('Initiating event'), 'SIFFailureEvent': _('SIF failure event'),
 	'IntermediateEvent': _('Intermediate event'), 'IPL': _('Independent protection layer'),
@@ -702,9 +702,9 @@ class FTEvent(FTBoxyObject): # FT event object. Rendered by drawing text into bi
 		('ValueUnit', str, False), ('Status', int, False), ('CanEditValue', bool, False), ('ShowActionItems', bool, False), ('BackgColour', 'rgb', False),
 		('DescriptionComment', str, True), ('ValueComment', str, True), ('ValueUnitComment', str, True),
 		('ValueKindComment', str, True), ('ActionItems', str, True), ('ConnectTo', int, True)]
-	# Make lists of HumanNames of event types that expect a frequency or probability value
-	EventTypesWithFreqValue = [FTEventTypeNameHash[e] for e in FTEventTypesWithFreqValue]
-	EventTypesWithProbValue = [FTEventTypeNameHash[e] for e in FTEventTypesWithProbValue]
+	# Make lists of HumanNames of event types that expect a frequency or probability value (now using global FTEventTypesWith...)
+#	EventTypesWithFreqValue = [FTEventTypeNameHash[e] for e in FTEventTypesWithFreqValue]
+#	EventTypesWithProbValue = [FTEventTypeNameHash[e] for e in FTEventTypesWithProbValue]
 #	EventTypesWithFreqValue = ['InitiatingEvent', 'SIFFailureEvent', 'IntermediateEvent', 'TopEvent',
 #		'ConnectorIn', 'ConnectorOut']
 #	EventTypesWithProbValue = ['IPL', 'EnablingCondition', 'ConditionalModifier']
@@ -944,17 +944,18 @@ class FTEvent(FTBoxyObject): # FT event object. Rendered by drawing text into bi
 		DrawBackgroundBox(DC, Zoom)
 		DrawElements(DC, self.AllElements, Zoom)
 
-	def AcceptableUnits(self): # return list of units (UnitItem instances) this event can offer%%%
-		if self.EventType in self.EventTypesWithFreqValue:
+	def GetMyAcceptableUnits(self): # return list of units (UnitItem instances) this event can offer
+		if self.EventType in FTEventTypesWithFreqValue:
 			AcceptableUnits = core_classes.FrequencyUnits
-		elif self.EventType in self.EventTypesWithProbValue:
+		elif self.EventType in FTEventTypesWithProbValue:
 			AcceptableUnits = core_classes.ProbabilityUnits
 		else:
 			raise ValueError("FT986 don't know value type for event type '%s'" % self.EventType)
 		return AcceptableUnits
 
+	AcceptableUnits = property(fget=GetMyAcceptableUnits) # this is accessed in PrefillWidgetsForNumericalValueAspect()
+
 class FTGate(FTBoxyObject): # object containing FT gates for display. These belong to FTColumn's.
-	# Rendered by drawing into bitmap (doesn't use native widgets or sizer)
 	NeedsConnectButton = True # whether to provide connect buttons
 	# Attribs are used by ParseFTData() to populate object's attributes from data transferred from datacore (may be redundant)
 	Attribs = [(info.IDTag, int, False), ('Algorithm', str, False), ('BackgColour', 'rgb', False), ('Style', str, False), ('Numbering', str, False),
@@ -2866,7 +2867,6 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			# put FT event data into XML element El
 			# EventListForNumbering: list containing all FTEvents to consider when numbering this one
 			# FT: FTObjectInCore containing FT event
-			print('FT2840 starting PopulateFTEventData')
 			if __debug__ == 1: # do type checks
 				assert isinstance(FT, FTObjectInCore)
 				TypeChecks = [ (El, ElementTree.Element), (FTEvent.ID, str), (FTEvent.IsIPL, bool),
@@ -3473,6 +3473,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		#	Args already contains Viewport, which is the Viewport ID)
 		# Args contains all tags:texts supplied in the change request
 		# returns XML tree with information about the update
+		print('FT3476 in ChangeChoice')
 		assert isinstance(Proj, projects.ProjectItem)
 		assert isinstance(ElementID, str)
 		assert isinstance(TextComponentName, str)
@@ -3559,6 +3560,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			# UnitChanged (bool): whether the unit was actually changed
 			# NewUnit (UnitItem or None): the unit changed to, or None if unit wasn't changed
 			# ValueAcceptable (bool): if the unit was suitable, but the value would be out of range, this is False; else True
+		print('FT3563 in ChangeUnit with FTElement.ID, ValueAttribName: ', FTElement.ID, ValueAttribName)
 		ValueAttrib = getattr(FTElement, ValueAttribName) # find the applicable attrib in FTElement
 		AcceptableUnits = ValueAttrib.AcceptableUnits
 		# check whether user requested to convert the value - signified by ConvertValueMarker suffix
@@ -3567,6 +3569,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			NewUnitXMLName = NewUnitXMLName[:-len(info.ConvertValueMarker)] # remove marker
 		else:
 			Convert = False
+		print('FT3572 checking if unit is acceptable. NewUnitXMLName, AcceptableUnits: ', NewUnitXMLName, AcceptableUnits)
 		if NewUnitXMLName in [u.XMLName for u in AcceptableUnits]: # it's recognised
 			NewUnit = [u for u in AcceptableUnits if u.XMLName == NewUnitXMLName][0]
 			# decide whether to convert the value
@@ -4027,7 +4030,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			# populate lists of options relating to numerical values
 			for ThisNumValue, ThisNumTag in [ ('TolFreq', TolFreqTag) ]:
 				PopulateValueOptions(XMLRoot=ThisNumTag, HostEl=HeaderEl, ComponentName=ThisNumValue,
-					ListAttrib='AcceptableUnits', OptionTagName=info.UnitOptionTag,
+					ListAttrib='UnitOptions', OptionTagName=info.UnitOptionTag,
 					MasterOptionsList=core_classes.UnitItem.UserSelectableUnits)
 				ThisNumAttrib = getattr(HeaderEl, ThisNumValue)
 				for (ThisOptionTag, ThisOption) in [
@@ -4092,18 +4095,24 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 																	HumanName=self.EventTypeNameHash[ThisTag.text],
 																	Applicable=utilities.Bool2Str(ThisTag.get(info.ApplicableAttribName)))
 														 for ThisTag in XMLObj.findall(info.EventTypeOptionTag)]
-			# populate event value unit choice; TODO use PopulateValueOptions()
-			NewEvent.EventValueUnitComponent.ObjectChoices = []
-			for ThisTag in XMLObj.findall(info.UnitOptionTag):
-				# find human name for this unit option (use startswith() to ignore convert marker suffix)
-				ThisUnitHumanName = [u.HumanName for u in core_classes.UnitItem.UserSelectableUnits
-					if ThisTag.text.startswith(u.XMLName)][0]
-				# set human name according to whether this is a value conversion option
-				if ThisTag.text.endswith(info.ConvertValueMarker): ThisHumanName = _('Convert value to %s') % ThisUnitHumanName
-				else: ThisHumanName = ThisUnitHumanName
-				NewEvent.EventValueUnitComponent.ObjectChoices.append(core_classes.ChoiceItem(XMLName=ThisTag.text,
-					HumanName=ThisHumanName,
-					Applicable=utilities.Bool2Str(ThisTag.get(info.ApplicableAttribName))))
+			# populate event value unit choice; both NewEvent.UnitOptionis (for Control Panel) and unit component's
+			# ObjectChoices list (for edit-in-place)
+			PopulateValueOptions(XMLRoot=XMLObj, HostEl=NewEvent, ComponentName='',
+				ListAttrib='UnitOptions', OptionTagName=info.UnitOptionTag,
+				MasterOptionsList=core_classes.UnitItem.UserSelectableUnits)
+			NewEvent.EventValueUnitComponent.ObjectChoices = [core_classes.ChoiceItem(XMLName=u.XMLName,
+					HumanName=u.HumanName, Applicable=u.Applicable) for u in NewEvent.UnitOptions]
+			# old way of populating unit choices is below
+#			for ThisTag in XMLObj.findall(info.UnitOptionTag):
+#				# find human name for this unit option (use startswith() to ignore convert marker suffix)
+#				ThisUnitHumanName = [u.HumanName for u in core_classes.UnitItem.UserSelectableUnits
+#					if ThisTag.text.startswith(u.XMLName)][0]
+#				# set human name according to whether this is a value conversion option
+#				if ThisTag.text.endswith(info.ConvertValueMarker): ThisHumanName = _('Convert value to %s') % ThisUnitHumanName
+#				else: ThisHumanName = ThisUnitHumanName
+#				NewEvent.EventValueUnitComponent.ObjectChoices.append(core_classes.ChoiceItem(XMLName=ThisTag.text,
+#					HumanName=ThisHumanName,
+#					Applicable=utilities.Bool2Str(ThisTag.get(info.ApplicableAttribName))))
 			# populate value kind choice
 			PopulateValueOptions(XMLRoot=XMLObj, HostEl=NewEvent, ComponentName='',
 				ListAttrib='ValueKindOptions', OptionTagName=info.ValueKindOptionTag,
@@ -4849,9 +4858,6 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 					self.PaintNeeded = True # turn off paint suppression while TextCtrl was in use
 					# request PHA object in datacore to update text attribute
 					self.RequestChangeText(ElementID, EditComponentInternalName, NewValue=TextEntered)
-#					vizop_misc.SendRequest(Socket=self.C2DSocketREQ, Command='RQ_FT_ChangeText',
-#						Proj=self.Proj.ID, PHAObj=self.PHAObj.ID, Viewport=self.ID,
-#						Element=ElementID, TextComponent=EditComponentInternalName, NewValue=TextEntered)
 				else: # no change made, or change rejected; destroy the textctrl widget
 					self.CurrentEditTextCtrl.Destroy()
 					self.CurrentEditElement = self.CurrentEditTextCtrl = None
@@ -4859,6 +4865,8 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			elif CurrentEditBehaviour == 'Choice': # it was a choice editing operation
 				# get the option selected by the user
 				TextSelected = self.CurrentEditChoice.GetStringSelection()
+				print('FT4866 handling choice with TextSelected:', TextSelected)
+				print('FT4867 AcceptEditsThisTime, self.CurrentEditElement.Text.Content:', AcceptEditsThisTime, self.CurrentEditElement.Text.Content)
 				# check if any changes made
 				if AcceptEditsThisTime and (TextSelected != self.CurrentEditElement.Text.Content):
 					if isinstance(self.CurrentEditElement.HostObject, FTHeader):
@@ -4868,6 +4876,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 					EditComponentInternalName = self.CurrentEditElement.InternalName
 					# get matching XMLName of user's selection
 					ChosenXMLName = [i.XMLName for i in self.CurrentEditElement.ObjectChoices if i.HumanName == TextSelected][0]
+					print('FT4876 EditComponentInternalName, ElementID, ChosenXMLName: ', EditComponentInternalName, ElementID, ChosenXMLName)
 					# destroy the Choice widget (to avoid memory leak) (do this before SendRequest() so that the FT gets fully
 					# refreshed by ControlFrame's OnPaint() afterwards)
 					self.CurrentEditChoice.Destroy()

@@ -1155,7 +1155,7 @@ class ControlFrame(wx.Frame):
 			self.NumericalValueAspect.ValueText.PHAObj = self.TopLevelFrame.PHAObjInControlPanel
 			PHAObj = self.NumericalValueAspect.ValueText.PHAObj
 			self.NumericalValueAspect.ValueText.DataAttrib = self.TopLevelFrame.ComponentInControlPanel
-			# find host for attribs such as Value and AcceptableUnits
+			# find host for attribs such as Value and UnitOptions
 			DataAttrib = self.NumericalValueAspect.ValueText.DataAttrib
 			DataHost = getattr(PHAObj, DataAttrib) if DataAttrib else PHAObj
 			# populate ValueText with the current value
@@ -1163,7 +1163,7 @@ class ControlFrame(wx.Frame):
 			# select all text in the value text widget - user intuitively expects this
 			self.NumericalValueAspect.ValueText.Widget.SelectAll()
 			# set up UnitChoice
-			UnitOptions = DataHost.AcceptableUnits # list of ChoiceItem instances
+			UnitOptions = DataHost.UnitOptions # list of ChoiceItem instances
 			self.NumericalValueAspect.UnitChoice.PHAObj = self.TopLevelFrame.PHAObjInControlPanel
 			self.NumericalValueAspect.UnitChoice.DataAttrib = self.TopLevelFrame.ComponentInControlPanel
 			# populate UnitChoice with unit options
@@ -1196,7 +1196,6 @@ class ControlFrame(wx.Frame):
 			ThisPHAObj = Args['PHAObjInControlPanel']
 			ThisDataAttribName = Args['ComponentInControlPanel'] # contains attrib name if editing an FT header
 				# component, else ''
-			print('CF1191 ThisPHAObj ID, ThisDataAttribName: ', ThisPHAObj.ID, ThisDataAttribName)
 			# find value kind options (list of ChoiceItem instances)
 			ValueKindOptions = getattr(ThisPHAObj, ThisDataAttribName).ValueKindOptions if ThisDataAttribName else\
 				ThisPHAObj.ValueKindOptions
@@ -1248,12 +1247,19 @@ class ControlFrame(wx.Frame):
 			if UserSelection != wx.NOT_FOUND: # is any item selected?
 				# find widget object
 				ThisWidgetObj = [w for w in self.WidgActive if w.Widget == EventWidget][0]
+				# find host object of UnitOptions, and matching edit component name
+				if ThisWidgetObj.DataAttrib:
+					HostObj = getattr(ThisWidgetObj.PHAObj, ThisWidgetObj.DataAttrib)
+					EditComponentName = HostObj.InternalName
+				else:
+					HostObj = ThisWidgetObj.PHAObj
+					# check if we're editing an FT gate
+					EditComponentName = 'GateValueUnit' if isinstance(HostObj, faulttree.FTGate) else 'EventValueUnit'
 				# find XML name of unit requested
-				TargetUnitName = getattr(ThisWidgetObj.PHAObj, ThisWidgetObj.DataAttrib).AcceptableUnits[
-					EventWidget.GetSelection()].XMLName
+				TargetUnitName = HostObj.UnitOptions[EventWidget.GetSelection()].XMLName
 				# get Viewport to request unit change (no validation here; done in datacore)
 				self.TopLevelFrame.CurrentViewport.RequestChangeChoice(ElementID=ThisWidgetObj.PHAObj.ID,
-					EditComponentInternalName=getattr(ThisWidgetObj.PHAObj, ThisWidgetObj.DataAttrib).InternalName,
+					EditComponentInternalName=EditComponentName,
 					AttribName='Unit', NewValue=TargetUnitName)
 
 		def NumericalValueAspect_OnValueKindWidget(self, Event):
