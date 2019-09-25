@@ -399,7 +399,7 @@ class NumValueItem(object): # superclass of objects in Datacore having a numeric
 	AttribsWithRRKeys = [ ('ValueFamily', None), ('UserValueFamily', None), ('IsSetFlagFamily', None),
 		('InfinityFlagFamily', False), ('SigFigs', info.DefaultSigFigs), ('Sci', False) ]
 
-	def __init__(self, HostObj=None):
+	def __init__(self, HostObj=None, **Args):
 		# HostObj: None, or the object containing this NumValueItem instance,
 		# which can optionally provide a CheckValue(v=NumValueItem instance) method
 		object.__init__(self)
@@ -645,9 +645,9 @@ class UserNumValueItem(NumValueItem): # class of NumValues for which user suppli
 	HumanName = _('User defined')
 	XMLName = 'User'
 
-	def __init__(self, **Args): # Args can contain any special attribs with initial values. These will be preserved on
+	def __init__(self, HostObj=None, **Args): # Args can contain any special attribs with initial values. These will be preserved on
 		# save only if listed in NumValueItem.PersistentAttribs
-		NumValueItem.__init__(self)
+		NumValueItem.__init__(self, HostObj, **Args)
 		self.MyAcceptableUnits = []
 		self.__dict__.update(Args)
 

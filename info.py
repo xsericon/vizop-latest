@@ -43,6 +43,7 @@ DefaultSigFigs = 2 # default number of sig figs for displaying all numbers
 SciThresholdUpper = 1e5 - 1 # thresholds for displaying numbers in scientific notation
 SciThresholdLower = 9.9999e-4
 ZeroThreshold = 1e-20 # numbers with absolute value less than this are treated as zero
+CantDisplayValueOnScreen = '- - -' # undisplayable values are shown on screen like this
 
 # XML tags and attrib names for internal communication. Those marked #f are also used in project files
 IDTag = 'ID' #f

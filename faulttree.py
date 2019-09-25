@@ -1771,18 +1771,51 @@ class FTColumnInCore(object): # FT column object used in DataCore by FTObjectInC
 		self.FT = FT
 		self.FTElements = []
 
-class FTEventInCore(object): # FT event object used in DataCore by FTObjectInCore
+class FTElementInCore(object): # superclass used to contain common methods for FT events and FT connectors
+	# event types whose value is a frequency or probability
+	EventTypesWithFreqValue = FTEventTypesWithFreqValue
+	EventTypesWithProbValue = FTEventTypesWithProbValue
+
+	def __init__(self):
+		object.__init__(self)
+
+	def CheckValue(self, NumValueInstance=None):
+		# check whether value in NumValueInstance (a UserNumValueItem instance) is acceptable in the FT element
+		# return a NumProblemValue instance
+		assert isinstance(NumValueInstance, core_classes.NumValueItem) or (NumValueInstance is None)
+		if isinstance(NumValueInstance, core_classes.NumValueClassesToCheckValid): # check numerical value supplied by user
+			# check FTIE1: value >= 0; check FTIE2: value <= 1/day if frequency; check FTIE3: value <= 1.0 if probability
+			ValueNow = NumValueInstance.GetMyValue(RR=self.FT.RiskReceptorGroupOnDisplay[0])
+			IsFrequency = (self.EventType in self.EventTypesWithFreqValue) # whether this event is frequency-based
+			if IsFrequency:
+				MinValueAllowedPerDay = 0.0
+				MaxValueAllowedPerDay = 1.0
+				MinValueAllowedInMyUnit = MinValueAllowedPerDay * core_classes.PerDayUnit.Conversion.get(
+					NumValueInstance.GetMyUnit(), -1e20)
+				MaxValueAllowedInMyUnit = MaxValueAllowedPerDay * core_classes.PerDayUnit.Conversion.get(
+					NumValueInstance.GetMyUnit(), 1e20)
+			else: # it's a probability
+				MinProbabilityAllowed = 0.0
+				MaxProbabilityAllowed = 1.0
+				MinValueAllowedInMyUnit = MinProbabilityAllowed * core_classes.ProbabilityUnit.Conversion.get(
+					NumValueInstance.GetMyUnit(), -1e20)
+				MaxValueAllowedInMyUnit = MaxProbabilityAllowed * core_classes.ProbabilityUnit.Conversion.get(
+					NumValueInstance.GetMyUnit(), 1e20)
+			# check value is in allowed range, allowing for rounding errors
+			if (0.999 * MinValueAllowedInMyUnit) <= ValueNow < (1.001 * MaxValueAllowedInMyUnit):
+				return core_classes.NumProblemValue_NoProblem
+			else: return core_classes.NumProblemValue(InternalName='OutOfRange',
+				HumanHelp=_('Outside acceptable range %s to %s') % \
+					(str(utilities.RoundToSigFigs(MinValueAllowedInMyUnit, SigFigs=2)[0]),
+					 str(utilities.RoundToSigFigs(MaxValueAllowedInMyUnit, SigFigs=2)[0])))
+		else: # not an attrib that needs checking
+			return core_classes.NumProblemValue_NoProblem
+
+class FTEventInCore(FTElementInCore): # FT event object used in DataCore by FTObjectInCore
 	# Used for causes, SIF failure events (a single bottom level event used in high demand and continuous modes),
 	# IPLs, intermediate events, final events, connectors in/out but not gates
 	EventTypes = ['InitiatingEvent', 'SIFFailureEvent', 'IntermediateEvent', 'IPL', 'TopEvent',
 		'ConnectorIn', 'ConnectorOut', 'EnablingCondition', 'ConditionalModifier']
-	# event types whose value is a frequency or probability
-	EventTypesWithFreqValue = FTEventTypesWithFreqValue
-	EventTypesWithProbValue = FTEventTypesWithProbValue
-#	EventTypesWithFreqValue = ['InitiatingEvent', 'SIFFailureEvent', 'IntermediateEvent', 'TopEvent',
-#		'ConnectorIn', 'ConnectorOut']
-#	# event types whose value is a probability
-#	EventTypesWithProbValue = ['IPL', 'EnablingCondition', 'ConditionalModifier']
 	# event types for which the user must supply a value
 	EventTypesWithUserValues = ['InitiatingEvent', 'IPL', 'EnablingCondition', 'ConditionalModifier']
 	# event types for which user can supply a value, or it can be derived from elsewhere
@@ -1805,7 +1838,7 @@ class FTEventInCore(object): # FT event object used in DataCore by FTObjectInCor
 	InternalName = 'FTEventInCore'
 	DefaultLikelihood = 0.0 # initial numerical value of likelihood
 	DefaultProbability = 1.0 # initial numerical value of probability
-	DefaultFreqUnit = core_classes.PerYearUnit
+	DefaultFreqUnit = core_classes.PerYearUnit # also used as default unit for connectors
 	DefaultProbUnit = core_classes.ProbabilityUnit
 	DefaultTimeUnit = core_classes.YearUnit
 	DefaultRatioUnit = core_classes.DimensionlessUnit
@@ -1818,7 +1851,7 @@ class FTEventInCore(object): # FT event object used in DataCore by FTObjectInCor
 		assert isinstance(Proj, projects.ProjectItem)
 		assert isinstance(FT, FTObjectInCore)
 		assert isinstance(Column, FTColumnInCore)
-		object.__init__(self)
+		FTElementInCore.__init__(self)
 #		self.ID = str(utilities.NextID(FTEventInCore.AllFTEventsInCore)) # generate unique ID; stored as str
 #		FTEventInCore.AllFTEventsInCore.append(self) # add self to register; must do after assigning self.ID
 		FT.MaxElementID += 1 # find next available ID
@@ -1835,7 +1868,6 @@ class FTEventInCore(object): # FT event object used in DataCore by FTObjectInCor
 		# set up 'user defined' number kind, for event types that support it,
 		# or in case user switches to an event type that supports it
 		self.Value = core_classes.UserNumValueItem(HostObj=self) # gets reassigned in self.SetAsSIFFailureEvent()
-		# TODO replace above with call to ChangeNumberKind()
 		self.OldFreqValue = core_classes.UserNumValueItem(HostObj=self) # for restoring after switching btw freq/prob
 		self.OldProbValue = core_classes.UserNumValueItem(HostObj=self)
 		# store the initial (and most recently user-selected) unit for each quantity kind. Values are UnitKind instances
@@ -1852,9 +1884,8 @@ class FTEventInCore(object): # FT event object used in DataCore by FTObjectInCor
 		self.Value.SetMyUnit(FTEventInCore.DefaultFreqUnit)
 		self.OldFreqValue.SetMyUnit(FTEventInCore.DefaultFreqUnit)
 		self.OldProbValue.SetMyUnit(FTEventInCore.DefaultProbUnit)
-		# change value kind if user defined kind isn't supported%%
+		# change value kind if user defined kind isn't supported
 		if FTEventInCore.DefaultValueKind[self.EventType] != core_classes.UserNumValueItem:
-#			self.ChangeValueKind(FTEventInCore.DefaultValueKind[self.EventType])
 			self.FT.ChangeNumberKind(FTElement=self,
 				NewNumberKindXMLName=FTEventInCore.DefaultValueKind[self.EventType].XMLName, ValueAttribName='',
 				StoreUndoRecord=False)
@@ -2439,22 +2470,25 @@ def NextCombination(Length, PassMark):
 				yield LastList
 	return # finished
 
-class FTConnectorItemInCore(object):  # in- and out-connectors (CX's) to allow data transfer between multiple FTs
+class FTConnectorItemInCore(FTElementInCore): # in- and out-connectors (CX's) to allow data transfer between multiple FTs
 	AllFTCXInCore = [] # register of all FTConnectors currently active in Vizop; used to generate unique IDs
 	ConnectorStyles = ['Default'] # future, will define various connector appearances (squares, arrows, circles etc)
 	MaxElementsConnectedToThis = 100 # arbitrary limit on connectivity of out-CX
 	InternalName = 'FTConnectorInCore'
+	AcceptableNumberKinds = [core_classes.UserNumValueItem, core_classes.ConstNumValueItem,
+		core_classes.AutoNumValueItem,
+		core_classes.LookupNumValueItem, core_classes.ParentNumValueItem, core_classes.UseParentValueItem]
 
 	def __init__(self, FT, Column, ColumnIndex=0, **Args):
 		# FT is the FaultTree object this connector belongs to
 		# Column (FTColumnInCore instance): Column to which this CX belongs
 		# ColumnIndex (int): index of FT column to which this CX belongs
-		object.__init__(self)
 		assert isinstance(FT, FTObjectInCore)
 		assert isinstance(Column, FTColumnInCore)
 		assert isinstance(ColumnIndex, int)
 		assert ColumnIndex >= 0
-		FT.MaxElementID += 1 # find next available ID
+		FTElementInCore.__init__(self)
+		FT.MaxElementID += 1 # find next available ID. FIXME should use project ID list
 		self.ID = str(FT.MaxElementID)
 		self.FT = FT
 		self.Column = Column
@@ -2472,24 +2506,30 @@ class FTConnectorItemInCore(object):  # in- and out-connectors (CX's) to allow d
 		self.Style = FTConnector.ConnectorStyles[0]
 		self.ApplicableRiskReceptors = FT.MyTolRiskModel.RiskReceptors[:] # set which risk receptors apply to this connector
 			# NB, in-CX should use RR's from any related out-CX; but if RelatedCX is None, it still needs its own RR list
+		# set up Value attrib
+		self.Value = core_classes.UserNumValueItem(HostObj=self) # use ChangeNumberKind() if needed
+		for ThisRR in self.ApplicableRiskReceptors:
+			self.Value.SetMyValue(FTEventInCore.DefaultLikelihood, RR=ThisRR)
+			self.Value.SetMyStatus(NewStatus='ValueStatus_Unset', RR=ThisRR)
+		self.Value.SetMyUnit(FTEventInCore.DefaultFreqUnit)
 
-	def GetMyValue(self, RiskReceptor=core_classes.DefaultRiskReceptor):
-		# calculate and return output value of the connector for specified risk receptor
-		# returns (float, UnitItem instance, 1st NumProblemValue in calculation chain (or None),
-		# 1st PHAObject yielding a problem value (or None).
-		assert isinstance(RiskReceptor, core_classes.RiskReceptorItem)
-		if self.Out: # if this is an out-CX, its value is obtained from joined-from object
-			JoinedFromObj = JoinedFrom(self.FT, self, FirstOnly=True)[0]
-			if not JoinedFromObj: # not connected; return problem indicator
-				return 0, core_classes.NullUnit, core_classes.NumProblemValue_BrokenLink, self
-			return JoinedFromObj.Value # return tuple received from .Value method
-		else: # it's an in-CX: get value from the out-CX it's related to
-			if self.RelatedCX is None: # not connected; return problem indicator
-				return 0, core_classes.NullUnit, core_classes.NumProblemValue_BrokenLink, self
-			assert isinstance(self.RelatedCX, FTConnectorItemInCore)
-			return self.RelatedCX.Value
-
-	Value = property(fget=GetMyValue) # returns (value, UnitItem, any NumProblemValue, ID of object yielding NumProb)
+#	def GetMyValue(self, RiskReceptor=core_classes.DefaultRiskReceptor):
+#		# calculate and return output value of the connector for specified risk receptor
+#		# returns (float, UnitItem instance, 1st NumProblemValue in calculation chain (or None),
+#		# 1st PHAObject yielding a problem value (or None).
+#		assert isinstance(RiskReceptor, core_classes.RiskReceptorItem)
+#		if self.Out: # if this is an out-CX, its value is obtained from joined-from object
+#			JoinedFromObj = JoinedFrom(self.FT, self, FirstOnly=True)[0]
+#			if not JoinedFromObj: # not connected; return problem indicator
+#				return 0, core_classes.NullUnit, core_classes.NumProblemValue_BrokenLink, self
+#			return JoinedFromObj.Value # return tuple received from .Value method
+#		else: # it's an in-CX: get value from the out-CX it's related to
+#			if self.RelatedCX is None: # not connected; return problem indicator
+#				return 0, core_classes.NullUnit, core_classes.NumProblemValue_BrokenLink, self
+#			assert isinstance(self.RelatedCX, FTConnectorItemInCore)
+#			return self.RelatedCX.Value
+#
+#	Value = property(fget=GetMyValue, fset=SetMyValue)
 
 class FTCollapseGroupInCore(object): # collapse group containing one or more FT elements that can be shown collapsed
 	# into a single object for more compact display
@@ -2526,7 +2566,8 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		'TextColour']
 	# English names for components; keys are attrib names in this class. Values are translated at point of display
 	ComponentEnglishNames = {'HumanName': 'SIF name', 'Rev': 'Revision', 'OpMode': 'Operating mode',
-		'TolFreq': 'Tolerable frequency', 'SILTargetValue': 'SIL target', 'Description': 'Description'}
+		'TolFreq': 'Tolerable frequency', 'SILTargetValue': 'SIL target', 'Description': 'Description',
+		'Value': 'event value'} # key 'Value' is used for elements other than the FT itself
 	# element classes that have a number system, i.e. have a Numbering attrib. Must be tuple, not list
 	ElementsWithNumberSystem = (FTConnectorItemInCore, FTGateItemInCore, FTEventInCore)
 
@@ -2825,7 +2866,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			for Tag, Attrib in DataInfo:
 				AttribEl = ElementTree.SubElement(HeaderEl, Tag)
 #				AttribEl.text = str(Attrib.GetMyValue(RR=RRForCalc))
-#				AttribEl.text = Attrib.GetDisplayValue(RR=RRForCalc, InvalidResult='- - -')
+#				AttribEl.text = Attrib.GetDisplayValue(RR=RRForCalc, InvalidResult=info.CantDisplayValueOnScreen)
 				# get correctly formatted string representation of numerical value
 				AttribEl.text = display_utilities.StringFromNum(InputNumber=Attrib, RR=RRForCalc)
 				V = display_utilities.StringFromNum(InputNumber=Attrib, RR=RRForCalc)
@@ -2867,6 +2908,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			# put FT event data into XML element El
 			# EventListForNumbering: list containing all FTEvents to consider when numbering this one
 			# FT: FTObjectInCore containing FT event
+			print('FT2871 in PopulateFTEventData')
 			if __debug__ == 1: # do type checks
 				assert isinstance(FT, FTObjectInCore)
 				TypeChecks = [ (El, ElementTree.Element), (FTEvent.ID, str), (FTEvent.IsIPL, bool),
@@ -2901,7 +2943,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 				else: ProblemLevel = 'Level10'
 			else: # can't display value; make tag for problem indicator
 				if ValueStatus == core_classes.NumProblemValue_UndefNumValue: EventValue = _('not set')
-				else: EventValue = '- - -' # signifying value unobtainable
+				else: EventValue = info.CantDisplayValueOnScreen # signifying value unobtainable
 				ProblemLevel = 'Level10'
 			if ProblemLevel: # do we need to display value problem indicator?
 				ProblemTag = ElementTree.SubElement(EventEl, info.ProblemIndicatorTag)
@@ -2909,7 +2951,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 				ProblemTag.set(info.ProblemLevelAttribName, ProblemLevel) # indicating the seriousness of the problem
 			EventUnit = FTEvent.Value.GetMyUnit()
 			ProblemValue = FTEvent.Value.Status(RR=FT.RiskReceptorGroupOnDisplay[0])
-			ProblemObj = None # TODO work out how to fetch this from the NumValueItem instance
+			ProblemObj = None # TODO work out how to fetch this from the NumValueItem instance; also in FTConnectorInCore
 			# make sub-elements for all the required attribs:
 			# elements where the text is the same as the FTEvent attribute in str form
 			FTEvent.TextComponentHash = {info.IDTag: FTEvent.ID, 'IsIPL': FTEvent.IsIPL, 'EventType': FTEvent.EventType,
@@ -2975,8 +3017,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 				NumValueClassesToShow = FTEvent.DerivedNumberKinds
 			elif FTEvent.EventType in FTEvent.EventTypesUserOrDerivedValues:
 				NumValueClassesToShow = FTEvent.UserSuppliedNumberKinds + FTEvent.DerivedNumberKinds
-#			if isinstance(FTEvent, FTConnectorItemInCore):
-			print('FT2949: NumValueClassesToShow: ', NumValueClassesToShow, type(FTEvent.Value))
+				print('FT2979 making value kind options: NumValueClassesToShow, this one: ', type(FTEvent.Value), NumValueClassesToShow)
 			for (ThisValueKindIndex, ThisValueKind) in enumerate(NumValueClassesToShow):
 #				ValueKindEl = ElementTree.SubElement(EventEl, info.NumberKindTag)
 				ValueKindEl = ElementTree.SubElement(EventEl, info.ValueKindOptionTag)
@@ -2986,54 +3027,83 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 				ValueKindEl.set(info.SerialTag, str(ThisValueKindIndex)) # add number kind option serial number
 			return EventEl
 
-		def PopulateFTConnectorData(El, FTConnector):
-			# put FT connector-in/out data into XML element El
+		def PopulateFTConnectorData(El, FTConn):
+			# put FT connector-in/out data from FTConn (connector object) into XML element El. Return the connector's
+			# XML sub-element
+			assert isinstance(FTConn, FTConnectorItemInCore)
 			if __debug__ == 1: # do type checks
-				TypeChecks = [(El, ElementTree.Element), (FTConnector, FTConnectorItemInCore),
-							  (FTConnector.ID, str), (FTConnector.FT, FTObjectInCore), (FTConnector.Out, bool),
-							  (FTConnector.ConnectorDescription, str), (FTConnector.BackgColour, str),
-							  (FTConnector.ConnectTo, list), (FTConnector.CollapseGroups, list),
-							  (FTConnector.Numbering, core_classes.NumberingItem), (FTConnector.Style, str)]
-				IterableChecks = [(FTConnector.CollapseGroups, FTCollapseGroup)]
+				TypeChecks = [(El, ElementTree.Element), (FTConn, FTConnectorItemInCore),
+							  (FTConn.ID, str), (FTConn.FT, FTObjectInCore), (FTConn.Out, bool),
+							  (FTConn.ConnectorDescription, str), (FTConn.BackgColour, str),
+							  (FTConn.ConnectTo, list), (FTConn.CollapseGroups, list),
+							  (FTConn.Numbering, core_classes.NumberingItem), (FTConn.Style, str)]
+				IterableChecks = [(FTConn.CollapseGroups, FTCollapseGroup)]
 				# didn't do iterableCheck on ConnectTo, as several types are possible
 				core_classes.DoTypeChecks(TypeChecks, IterableChecks)
-			# make FTConnector element to contain all the other elements
+			# make XML element to contain all the other sub-elements
 			ConnEl = ElementTree.SubElement(El, 'FTConnector')
-			EventValue, EventUnit, ProblemValue, ProblemObj = FTConnector.Value # get the current value of the FTConnector
-			# make sub-elements for all the required attribs:
-			# elements where the text is the same as the FTConnector attribute
-			DataInfo = [ (info.IDTag, FTConnector.ID), ('Connectivity', {True: 'Out', False: 'In'}[FTConnector.Out]),
-				('Description', FTConnector.ConnectorDescription), ('BackgColour', FTConnector.BackgColour),
-				('Numbering', FTConnector.Numbering.HumanValue(PHAItem=FTConnector, Host=FTConnector.Column.FTElements)[0]),
-				('Style', FTConnector.Style),
-				('ShowDescriptionComments', str(FTConnector.ShowDescriptionComments)), ('Value', str(EventValue)),
-				('Unit', EventUnit.HumanName), ('ValueProblemID', getattr(ProblemValue, 'ID', '')),
-				('ValueProblemObjectID', getattr(ProblemObj, 'ID', '')) ]
+			# get value and unit for display
+			RRToDisplay = self.RiskReceptorGroupOnDisplay[0]
+			ProblemValue = FTConn.Value.Status(RR=RRToDisplay)
+			ProblemObj = None # TODO get this from ProblemValue
+			if ProblemValue == core_classes.NumProblemValue_NoProblem:
+				# get the output value of the ConnEl, and format for display
+				OutputValue = utilities.RoundValueForDisplay(InputValue=FTConn.Value.GetMyValue(RR=RRToDisplay),
+					SigFigs=info.EventValueSigFigs)
+				# run value checks
+				ProblemValue = FTConn.CheckValue(NumValueInstance=FTConn.Value)
+				# decide whether a problem indicator is needed
+				if (ProblemValue == core_classes.NumProblemValue_NoProblem):
+					ProblemLevel = None
+				else:
+					ProblemLevel = 'Level10'
+			else:
+				if ProblemValue == core_classes.NumProblemValue_UndefNumValue:
+					OutputValue = _('not set')
+				else:
+					OutputValue = info.CantDisplayValueOnScreen  # signifying value unobtainable
+
+		# make sub-elements for all the required attribs:
+			# elements where the text is the same as the FTConn attribute
+			DataInfo = [(info.IDTag, FTConn.ID), ('Connectivity', {True: 'Out', False: 'In'}[FTConn.Out]),
+						('Description', FTConn.ConnectorDescription), ('BackgColour', FTConn.BackgColour),
+						('Numbering', FTConn.Numbering.HumanValue(PHAItem=FTConn, Host=FTConn.Column.FTElements)[0]),
+						('Style', FTConn.Style),
+						('ShowDescriptionComments', str(FTConn.ShowDescriptionComments)), ('Value', OutputValue),
+						('Unit', FTConn.Value.Unit.HumanName), ('ValueProblemID', getattr(ProblemValue, 'ID', '')),
+						('ValueProblemObjectID', getattr(ProblemObj, 'ID', ''))]
 			for Tag, Attrib in DataInfo:
 				El = ElementTree.SubElement(ConnEl, Tag)
 				El.text = str(Attrib)
 			# elements for lists of AssociatedTextItems
-			DataInfo = [ ('DescriptionComments', FTConnector.ConnectorDescriptionComments) ]
+			DataInfo = [('DescriptionComments', FTConn.ConnectorDescriptionComments)]
 			for Tag, ListName in DataInfo:
 				for Item in ListName:
 					El = ElementTree.SubElement(ConnEl, Tag)
 					El.text = Item.Content # rich text
 			# elements for lists of items with IDs
-			for Tag, ListName in [('ConnectTo', FTConnector.ConnectTo), ('CollapseGroups', FTConnector.CollapseGroups)]:
+			for Tag, ListName in [('ConnectTo', FTConn.ConnectTo), ('CollapseGroups', FTConn.CollapseGroups)]:
 				for Item in ListName:
 					El = ElementTree.SubElement(ConnEl, Tag)
 					El.text = Item.ID
 			# elements with special handling: RelatedCX
 			El = ElementTree.SubElement(ConnEl, 'RelatedConnector')
-			if FTConnector.RelatedCX is None:
+			if FTConn.RelatedCX is None:
 				El.text = '-1'
 			else:
-				assert isinstance(FTConnector.RelatedCX, FTConnectorItemInCore)
-				assert isinstance(FTConnector.RelatedCX.ID, str)
-				El.text = FTConnector.RelatedCX.ID
+				assert isinstance(FTConn.RelatedCX, FTConnectorItemInCore)
+				assert isinstance(FTConn.RelatedCX.ID, str)
+				El.text = FTConn.RelatedCX.ID
+			# add options for value kind
+			print('FT3039 populating connector value kinds: ', type(FTConn.Value))
+			for (ThisValueKindIndex, ThisValueKind) in enumerate(FTConn.AcceptableNumberKinds):
+				ValueKindEl = ElementTree.SubElement(ConnEl, info.ValueKindOptionTag)
+				# set human name for number kind option to internal name of option
+				ValueKindEl.text = ThisValueKind.XMLName
+				ValueKindEl.set(info.ApplicableAttribName, utilities.Bool2Str(ThisValueKind == type(FTConn.Value)))
+				ValueKindEl.set(info.SerialTag, str(ThisValueKindIndex)) # add number kind option serial number
 			return ConnEl
 
-#		def PopulateValueOptionField(FTEvent, EventEl, OfferConvertOptions=True):
 		def PopulateValueOptionField(CurrentOption, AcceptableOptions, EventEl, OptionXMLTagName, OfferConvertOptions=True):
 			# put options for value attrib (e.g. unit, value kind) into element EventEl in FTEvent's XML representation
 			# CurrentOption: the item in AcceptableOptions that's currently active; ignored if AcceptableOptions is empty
@@ -3087,7 +3157,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 				if (ValueStatus == core_classes.NumProblemValue_NoProblem): ProblemLevel = None
 				else: ProblemLevel = 'Level10'
 			else: # can't display value; make tag for problem indicator
-				OutputValue = '- - -' # signifying value unobtainable
+				OutputValue = info.CantDisplayValueOnScreen # signifying value unobtainable
 				ProblemLevel = 'Level10'
 			if ProblemLevel: # do we need to display value problem indicator?
 				ProblemTag = ElementTree.SubElement(GateEl, info.ProblemIndicatorTag)
@@ -3488,7 +3558,6 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			HostElement = [El for c in self.Columns for El in c.FTElements if El.ID == ElementID][0]
 			ComponentToUpdate = TextComponentName
 			ComponentHost = HostElement
-		print('FT3307 in ChangeChoice: ComponentToUpdate: ', ComponentToUpdate, type(ComponentToUpdate))
 		# update component's value (TODO add undo)
 		if ComponentToUpdate == 'Severity': # update severity in all currently displayed risk receptors
 			NewSeverityObj = [s for s in self.MyTolRiskModel.TolFreqTable.Keys[
@@ -3560,16 +3629,14 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			# UnitChanged (bool): whether the unit was actually changed
 			# NewUnit (UnitItem or None): the unit changed to, or None if unit wasn't changed
 			# ValueAcceptable (bool): if the unit was suitable, but the value would be out of range, this is False; else True
-		print('FT3563 in ChangeUnit with FTElement.ID, ValueAttribName: ', FTElement.ID, ValueAttribName)
 		ValueAttrib = getattr(FTElement, ValueAttribName) # find the applicable attrib in FTElement
-		AcceptableUnits = ValueAttrib.AcceptableUnits
-		# check whether user requested to convert the value - signified by ConvertValueMarker suffix
+		AcceptableUnits = FTElement.AcceptableUnits() if (ValueAttribName == 'Value') else ValueAttrib.AcceptableUnits
+		# check whether user requested to convert the value - indicated by ConvertValueMarker suffix
 		if NewUnitXMLName.endswith(info.ConvertValueMarker):
 			Convert = True
 			NewUnitXMLName = NewUnitXMLName[:-len(info.ConvertValueMarker)] # remove marker
 		else:
 			Convert = False
-		print('FT3572 checking if unit is acceptable. NewUnitXMLName, AcceptableUnits: ', NewUnitXMLName, AcceptableUnits)
 		if NewUnitXMLName in [u.XMLName for u in AcceptableUnits]: # it's recognised
 			NewUnit = [u for u in AcceptableUnits if u.XMLName == NewUnitXMLName][0]
 			# decide whether to convert the value
@@ -4095,7 +4162,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 																	HumanName=self.EventTypeNameHash[ThisTag.text],
 																	Applicable=utilities.Bool2Str(ThisTag.get(info.ApplicableAttribName)))
 														 for ThisTag in XMLObj.findall(info.EventTypeOptionTag)]
-			# populate event value unit choice; both NewEvent.UnitOptionis (for Control Panel) and unit component's
+			# populate event value unit choice; both NewEvent.UnitOptions (for Control Panel) and unit component's
 			# ObjectChoices list (for edit-in-place)
 			PopulateValueOptions(XMLRoot=XMLObj, HostEl=NewEvent, ComponentName='',
 				ListAttrib='UnitOptions', OptionTagName=info.UnitOptionTag,
@@ -4157,6 +4224,11 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 				('CollapseGroups', 'CollapseGroups') ]
 			for Tag, Attrib in DataInfoAsList:
 				setattr(NewConnector, Attrib, [El.text for El in XMLObj.findall(Tag)])
+			# populate value kind choice
+			PopulateValueOptions(XMLRoot=XMLObj, HostEl=NewConnector, ComponentName='',
+				 ListAttrib='ValueKindOptions', OptionTagName=info.ValueKindOptionTag,
+				 MasterOptionsList=core_classes.NumValueClasses)
+			NewConnector.ValueKind = [c.HumanName for c in NewConnector.ValueKindOptions if c.Applicable][0]
 			# retrieve data from ProblemIndicatorTag: decide whether to show problem button
 			ProblemTag = XMLObj.find(info.ProblemIndicatorTag)
 			if ProblemTag is None:
