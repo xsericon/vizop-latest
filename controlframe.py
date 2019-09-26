@@ -1236,10 +1236,11 @@ class ControlFrame(wx.Frame):
 				# if we just did undo of viewport creation
 				# get Viewport to request value change (no validation here; done in datacore)
 				print('CF1238 DataAttrib:', ThisWidgetObj.DataAttrib)
-				ValueAttrib = getattr(ThisWidgetObj.PHAObj, ThisWidgetObj.DataAttrib) if ThisWidgetObj.DataAttrib\
-					else ThisWidgetObj.PHAObj
+				# find name of component (if any) whose value we are updating
+				ValueAttribName = getattr(ThisWidgetObj.PHAObj, ThisWidgetObj.DataAttrib).InternalName if ThisWidgetObj.DataAttrib\
+					else 'Value'
 				self.TopLevelFrame.CurrentViewport.RequestChangeText(ElementID=ThisWidgetObj.PHAObj.ID,
-					EditComponentInternalName=ValueAttrib.InternalName, NewValue=UserEntry)
+					EditComponentInternalName=ValueAttribName, NewValue=UserEntry)
 
 		def NumericalValueAspect_OnUnitWidget(self, Event):
 			# handle change of selection in unit Choice widget

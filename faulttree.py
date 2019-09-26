@@ -29,7 +29,7 @@ HighlightColourStr = '253,248,71' # yellow
 ConnectingLineThicknessInCU = 4 # in canvas coords
 # XMLNames of event types whose value is a frequency or probability
 FTEventTypesWithFreqValue = ['InitiatingEvent', 'SIFFailureEvent', 'IntermediateEvent', 'TopEvent',
-	'ConnectorIn', 'ConnectorOut']
+	'ConnectorIn', 'ConnectorOut', 'Connector']
 FTEventTypesWithProbValue = ['IPL', 'EnablingCondition', 'ConditionalModifier']
 FTEventTypeNameHash = {'InitiatingEvent': _('Initiating event'), 'SIFFailureEvent': _('SIF failure event'),
 	'IntermediateEvent': _('Intermediate event'), 'IPL': _('Independent protection layer'),
@@ -2481,6 +2481,8 @@ class FTConnectorItemInCore(FTElementInCore): # in- and out-connectors (CX's) to
 	AcceptableNumberKinds = [core_classes.UserNumValueItem, core_classes.ConstNumValueItem,
 		core_classes.AutoNumValueItem,
 		core_classes.LookupNumValueItem, core_classes.ParentNumValueItem, core_classes.UseParentValueItem]
+	ComponentEnglishNames = {'Value': 'Value'}
+	EventType = 'Connector'
 
 	def __init__(self, FT, Column, ColumnIndex=0, **Args):
 		# FT is the FaultTree object this connector belongs to
@@ -4981,7 +4983,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 				self.DisplDevice.SetKeystrokeHandlerOnOff(On=True) # turn on keypress shortcut detection in control frame
 
 	def RequestChangeText(self, ElementID, EditComponentInternalName, NewValue):
-		# send request to Datacore to update text attribute. Also used for updating value fields
+		# send request to Datacore to update text attribute. Also used for updating value fields, in which case
 		# at this stage, NewValue has not been validated - could be unacceptable
 		vizop_misc.SendRequest(Socket=self.C2DSocketREQ, Command='RQ_FT_ChangeText',
 							   Proj=self.Proj.ID, PHAObj=self.PHAObj.ID, Viewport=self.ID,
