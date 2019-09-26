@@ -1424,6 +1424,7 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 		ColourLabelFg = (0xFF, 0xFF, 0xFF) # white; however not used in FTConnector
 		ColourContentBkg = (0x6A, 0xDA, 0xBD) # mint green
 		ColourContentFg = (0x00, 0x00, 0x00) # black
+		ColourPromptText = (0x80, 0x80, 0x80) # mid grey
 
 		# column widths: 100, 100, 50, 50
 		# any element with MinHeight parm set is growable in the y axis to fit the text.
@@ -1436,18 +1437,20 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 			HostObject=self, InternalName='ConnGroupedButton')
 		self.ConnValue = TextElement(self.FT, Row=2, ColStart=0, ColSpan=1, EndX=99, HostObject=self,
 			InternalName='ConnValue', ControlPanelAspect='CPAspect_NumValue')
-		ConnValueUnit = TextElement(self.FT, Row=2, ColStart=1, ColSpan=1, EndX=199, HostObject=self,
+		self.ConnValueUnitComponent = TextElement(self.FT, Row=2, ColStart=1, ColSpan=1, EndX=199, HostObject=self,
 			InternalName='ConnValueUnit')
 		self.ConnValueProblemButton = ButtonElement(self.FT, Row=2, ColStart=4, ColSpan=1, StartX=250, EndX=299,
 			HostObject=self, InternalName='ConnValueProblemButton')
 		# Connectors don't have "value types" (it's always calculated), "comments" or "action items"
 		# TODO %%% fix the above; CX-in needs other value types, and all CX's should have comments and action items
 		# make list of elements
-		TopEls = [ConnKind, ConnDescription, ConnGroupedButton, self.ConnValue, ConnValueUnit, self.ConnValueProblemButton]
+		TopEls = [ConnKind, ConnDescription, ConnGroupedButton, self.ConnValue, self.ConnValueUnitComponent,
+			self.ConnValueProblemButton]
 		# set text element colours
 		for El in TopEls:
 			if type(El) is TextElement:
-				El.Text.Colour = El.PromptTextObj.Colour = ColourContentFg
+				El.Text.Colour = ColourContentFg
+				El.PromptTextObj.Colour = ColourPromptText
 				El.BkgColour = ColourContentBkg
 		return TopEls
 
@@ -3061,14 +3064,15 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 				if ProblemValue == core_classes.NumProblemValue_UndefNumValue:
 					OutputValue = _('not set')
 				else:
-					OutputValue = info.CantDisplayValueOnScreen  # signifying value unobtainable
+					OutputValue = info.CantDisplayValueOnScreen # signifying value unobtainable
 
 		# make sub-elements for all the required attribs:
 			# elements where the text is the same as the FTConn attribute
+			# for EventType tag, tag name must be a key in FTEventTypeNameHash
 			DataInfo = [(info.IDTag, FTConn.ID), ('Connectivity', {True: 'Out', False: 'In'}[FTConn.Out]),
 						('Description', FTConn.ConnectorDescription), ('BackgColour', FTConn.BackgColour),
 						('Numbering', FTConn.Numbering.HumanValue(PHAItem=FTConn, Host=FTConn.Column.FTElements)[0]),
-						('Style', FTConn.Style),
+						('Style', FTConn.Style), ('EventType', {True: 'ConnectorOut', False: 'ConnectorIn'}[FTConn.Out]),
 						('ShowDescriptionComments', str(FTConn.ShowDescriptionComments)), ('Value', OutputValue),
 						('Unit', FTConn.Value.Unit.HumanName), ('ValueProblemID', getattr(ProblemValue, 'ID', '')),
 						('ValueProblemObjectID', getattr(ProblemObj, 'ID', ''))]
@@ -4159,9 +4163,9 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			NewEvent.EventTypeHumanName = self.EventTypeNameHash[NewEvent.EventType]
 			# populate event type choice
 			NewEvent.EventTypeComponent.ObjectChoices = [core_classes.ChoiceItem(XMLName=ThisTag.text,
-																	HumanName=self.EventTypeNameHash[ThisTag.text],
-																	Applicable=utilities.Bool2Str(ThisTag.get(info.ApplicableAttribName)))
-														 for ThisTag in XMLObj.findall(info.EventTypeOptionTag)]
+				HumanName=self.EventTypeNameHash[ThisTag.text],
+				Applicable=utilities.Bool2Str(ThisTag.get(info.ApplicableAttribName)))
+				for ThisTag in XMLObj.findall(info.EventTypeOptionTag)]
 			# populate event value unit choice; both NewEvent.UnitOptions (for Control Panel) and unit component's
 			# ObjectChoices list (for edit-in-place)
 			PopulateValueOptions(XMLRoot=XMLObj, HostEl=NewEvent, ComponentName='',
@@ -4224,11 +4228,21 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 				('CollapseGroups', 'CollapseGroups') ]
 			for Tag, Attrib in DataInfoAsList:
 				setattr(NewConnector, Attrib, [El.text for El in XMLObj.findall(Tag)])
+			# populate connector type name: internal name and human name
+			NewConnector.EventType = XMLObj.find('EventType').text
+			NewConnector.EventTypeHumanName = self.EventTypeNameHash[NewConnector.EventType]
 			# populate value kind choice
 			PopulateValueOptions(XMLRoot=XMLObj, HostEl=NewConnector, ComponentName='',
 				 ListAttrib='ValueKindOptions', OptionTagName=info.ValueKindOptionTag,
 				 MasterOptionsList=core_classes.NumValueClasses)
 			NewConnector.ValueKind = [c.HumanName for c in NewConnector.ValueKindOptions if c.Applicable][0]
+			# populate connector value unit choice; both NewConnector.UnitOptions (for Control Panel) and unit component's
+			# ObjectChoices list (for edit-in-place)
+			PopulateValueOptions(XMLRoot=XMLObj, HostEl=NewConnector, ComponentName='',
+				ListAttrib='UnitOptions', OptionTagName=info.UnitOptionTag,
+				MasterOptionsList=core_classes.UnitItem.UserSelectableUnits)
+			NewConnector.ConnValueUnitComponent.ObjectChoices = [core_classes.ChoiceItem(XMLName=u.XMLName,
+				HumanName=u.HumanName, Applicable=u.Applicable) for u in NewConnector.UnitOptions]
 			# retrieve data from ProblemIndicatorTag: decide whether to show problem button
 			ProblemTag = XMLObj.find(info.ProblemIndicatorTag)
 			if ProblemTag is None:
