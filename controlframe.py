@@ -684,7 +684,8 @@ class ControlFrame(wx.Frame):
 			# get target aspect, if supplied as a string
 			if isinstance(NewAspect, str):
 				TargetAspect = {'CPAspect_NumValue': self.NumericalValueAspect,
-					'CPAspect_FaultTree': self.FaultTreeAspect}.get(NewAspect, None)
+					'CPAspect_FaultTree': self.FaultTreeAspect,
+					'CPAspect_FTConnectorOut': self.FTConnectorOutAspect}.get(NewAspect, None)
 			else: TargetAspect = NewAspect
 			if TargetAspect: # any recognised aspect supplied?
 				self.ControlPanelCurrentAspect = TargetAspect # store new aspect
@@ -694,8 +695,8 @@ class ControlFrame(wx.Frame):
 				# fetch UndoOnCancel value to store in undo record for any tasks that should be undone when Cancel pressed
 				self.UndoOnCancel = Args.get('UndoOnCancel', None)
 				# prefill widgets in new aspect and activate it
-				TargetAspect.SetWidgetVisibility(**Args)
 				TargetAspect.Prefill(**Args)
+				TargetAspect.SetWidgetVisibility(**Args)
 				# set up the notebook tab for the aspect
 				TargetAspect.Activate()
 				# switch to tab for new aspect
@@ -1539,18 +1540,19 @@ class ControlFrame(wx.Frame):
 			# set widget values
 			# set up ConnectorNameText and ConnectorDescriptionText
 			# TODO limit length displayed. Smart ellipsization?
-			self.FTConnectorOutAspect.ConnectorNameText.Widget.ChangeValue(self.TopLevelFrame.ComponentInControlPanel.HumanName)
+			self.FTConnectorOutAspect.ConnectorNameText.Widget.ChangeValue(self.TopLevelFrame.PHAObjInControlPanel.HumanName)
 			self.FTConnectorOutAspect.ConnectorNameText.Widget.SelectAll()
 			self.FTConnectorOutAspect.ConnectorDescriptionText.Widget.ChangeValue(self.TopLevelFrame.ComponentInControlPanel.Description)
 			self.FTConnectorOutAspect.ConnectorDescriptionText.Widget.SelectAll()
 			# set up lineup of variable widgets
+			print('FT1548 setting up variable widgets')
 			self.LineupVariableWidgetsForFTConnectorOutAspect(ConnectorOut=self.TopLevelFrame.PHAObjInControlPanel,
 				NotebookPage=self.FTConnectorOutAspect.NotebookPage)
 
 		def SetWidgetVisibilityforFTConnectorOutAspect(self, **Args): # set IsVisible attrib for each widget
 			# set IsVisible attribs for all fixed and variable widgets
-			print('FT1559 setting visibility for %d widgets in Connector Out aspect' % len(self.NumericalValueAspect.CombinedWidgetList))
-			for ThisWidget in self.NumericalValueAspect.CombinedWidgetList: ThisWidget.IsVisible = True
+			print('FT1559 setting visibility for %d widgets in Connector Out aspect' % len(self.FTConnectorOutAspect.CombinedWidgetList))
+			for ThisWidget in self.FTConnectorOutAspect.CombinedWidgetList: ThisWidget.IsVisible = True
 
 		def FTConnectorOutAspect_OnConnectorNameTextWidget(self, Event, **Args): pass
 		def FTConnectorOutAspect_OnConnectorDescriptionWidget(self, Event, **Args): pass

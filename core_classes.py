@@ -1238,13 +1238,14 @@ class PHAModelBaseClass(object, metaclass=PHAModelMetaClass):
 
 	def __init__(self, Proj, **Args):
 		object.__init__(self)
-		self.ID = str(utilities.NextID(PHAModelBaseClass.AllPHAModelObjects)) # generate unique ID; stored as str
+#		self.ID = str(utilities.NextID(PHAModelBaseClass.AllPHAModelObjects)) # generate unique ID; stored as str
+		self.ID = Proj.GetNewID() # find next available ID
 		PHAModelBaseClass.AllPHAModelObjects.append(self) # add instance to register; must do after assigning self.ID
 		self.Proj = Proj
 		self.Viewports = [] # list of Viewport instances for this PHA model; instances of subclasses of ViewportBaseClass
 #		self.CurrentViewport = {} # keys: display devices; values: PHAObj shadows. Now handled through displaydevice.LatestViewport
 		self.EditAllowed = True
-		# capture any attribs provided in Args
+		# capture any attribs provided in Args (risky, no checks performed)
 		self.__dict__.update(Args)
 
 class MilestoneItem(object): # item storing info required for navigation back/forwards
@@ -1461,53 +1462,90 @@ class ArabicNumberSystem(NumberSystem):  # decimal number system using 0/1/2...
 	MaxValue = 9999
 	StartIndex = 1  # digits in higher placeholders (not the 'units' digit) start from index 1 (eg ten = 10 not 00)
 	StartValue = 1
-	PadChar = '0'  # default left-padding character for use in serial chunks of NumberingItem instances
+	PadChar = '0' # default left-padding character for use in serial chunks of NumberingItem instances
+	HasZero = True # whether the first digit represents zero
 
 	@staticmethod
-	def HumanValue(TargetValue=0,
-				   FieldWidth=4):  # returns string representation of TargetValue (int) in the numbering system, left-padded to required width
+	def HumanValue(TargetValue=0, FieldWidth=1):
+		# returns string representation of TargetValue (int) in the numbering system, left-padded to required width
 		return utilities.Pad(str(min(ArabicNumberSystem.MaxValue, max(ArabicNumberSystem.MinValue, int(TargetValue)))),
-							 FieldWidth=FieldWidth, PadChar=ArabicNumberSystem.PadChar)
+			FieldWidth=FieldWidth, PadChar=ArabicNumberSystem.PadChar)
 
 
 class SequenceNumberSystem(NumberSystem):  # number system using any sequence of digits, eg a/b/c...
 	# to write a class for a different sequence, it should be sufficient to define only HumanName and Digits
 
-	MinValue = 0  # min and max acceptable value in terms of int equivalent
-	MaxValue = 9999
+	MinValue = 0 # min and max acceptable value in terms of int equivalent
+	MaxValue = 99999999
 	StartIndex = 0
 	StartValue = 0
 	PadChar = ' '
+	HasZero = False # whether the first digit represents zero
 
 	@classmethod
-	def HumanValue(cls, TargetValue=0,
-				   FieldWidth=4):  # returns string representation of TargetValue (int) in the numbering system, left-padded to required width
+	def HumanValue(cls, TargetValue=0, FieldWidth=1):
+		# returns string representation of TargetValue (int) in the numbering system, left-padded to required width
 		Remainder = min(cls.MaxValue, max(cls.MinValue, TargetValue))
-		Position = 0  # to allow for StartIndex on digits other than the least significant one
 		Result = ''  # build up result string
+		ZeroAdj = int(not cls.HasZero) # adjustment term needed if number system has no zero; either 0 or 1
 		# work through significant digits from lowest to highest
-		while Remainder >= cls.Base:
-			ThisDigitValue = Remainder % cls.Base
-			Result = Result + Digits[ThisDigitValue - cls.StartValue + Position]
-			Remainder -= ThisDigitValue
-			Position = StartIndex
+		while Remainder:
+			ThisDigitValue = ZeroAdj + int((Remainder - ZeroAdj) % cls.Base) # get least significant digit
+			Result = cls.Digits[ThisDigitValue - ZeroAdj] + Result # prepend it to Result
+			Remainder = (Remainder - ThisDigitValue) / cls.Base # deduct value of last digit from Remainder
 		return utilities.Pad(Result, FieldWidth=FieldWidth, PadChar=cls.PadChar)
 
-
-class LowerCaseLetterNumberSystem(SequenceNumberSystem):  # number system using a/b/c...
+class LowerCaseLetterNumberSystem(SequenceNumberSystem): # number system using a/b/c...
 	HumanName = _('Lower case (a, b...)')
 	Digits = [chr(x) for x in range(ord('a'), ord('z') + 1)]
-	Base = len(Digits) + 1
+	Base = len(Digits)
+	MinValue = 1
 
-
-class UpperCaseLetterNumberSystem(SequenceNumberSystem):  # number system using A/B/C...
+class UpperCaseLetterNumberSystem(SequenceNumberSystem): # number system using A/B/C...
 	HumanName = _('Upper case (A, B...)')
 	Digits = [chr(x) for x in range(ord('A'), ord('Z') + 1)]
-	Base = len(Digits) + 1
+	Base = len(Digits)
+	MinValue = 1
 
+class RomanNumberSystem(NumberSystem):
+	MinValue = 1 # min and max acceptable value in terms of int equivalent
+	MaxValue = 4999
+	PadChar = ' '
+	HasZero = False # whether the first value (I) represents zero
 
-NumberSystems = [ArabicNumberSystem, LowerCaseLetterNumberSystem, UpperCaseLetterNumberSystem]
+	@classmethod
+	def HumanValue(cls, TargetValue=0, FieldWidth=1):
+		# returns string representation of TargetValue (int) in the numbering system, left-padded to required width
+		# make string for each part of the number
+		Remainder = TargetValue
+		HowManyThousands = int(Remainder // 1000)
+		Thousands = cls.ThousandSymbol * HowManyThousands
+		Remainder -= (1000 * HowManyThousands)
+		HowManyHundreds = int(Remainder // 100)
+		Hundreds = cls.HundredSequence[HowManyHundreds]
+		Remainder -= (100 * HowManyHundreds)
+		HowManyTens = int(Remainder // 10)
+		Tens = cls.TenSequence[HowManyTens]
+		HowManyUnits = Remainder - (10 * HowManyTens)
+		Units = cls.UnitSequence[HowManyUnits]
+		return utilities.Pad(Thousands + Hundreds + Tens + Units, FieldWidth=FieldWidth, PadChar=cls.PadChar)
 
+class UpperCaseRomanNumberSystem(RomanNumberSystem):
+	HumanName = _('Roman (I, II...)')
+	ThousandSymbol = 'M'
+	HundredSequence = ['', 'C', 'CC', 'CCC', 'CD', 'D', 'DC', 'DCC', 'DCCC', 'CM']
+	TenSequence = ['', 'X', 'XX', 'XXX', 'XL', 'L', 'LX', 'LXX', 'LXXX', 'XC']
+	UnitSequence = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX']
+
+class LowerCaseRomanNumberSystem(RomanNumberSystem):
+	HumanName = _('Roman (i, ii...)')
+	ThousandSymbol = 'm'
+	HundredSequence = ['', 'c', 'cc', 'ccc', 'cd', 'd', 'dc', 'dcc', 'dccc', 'cm']
+	TenSequence = ['', 'x', 'xx', 'xxx', 'xl', 'l', 'lx', 'lxx', 'lxxx', 'xc']
+	UnitSequence = ['', 'i', 'ii', 'iii', 'iv', 'v', 'vi', 'vii', 'viii', 'ix']
+
+NumberSystems = [ArabicNumberSystem, LowerCaseLetterNumberSystem, UpperCaseLetterNumberSystem,
+	UpperCaseRomanNumberSystem, LowerCaseRomanNumberSystem]
 
 class TextItem(object):  # text forming part of a PHA object, such as a description, comment or recommendation
 	DefaultTextHorizAlignment = 'Centre'

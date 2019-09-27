@@ -14,7 +14,7 @@ from info import ZeroThreshold # numbers whose absolute value < this are treated
 def Pad(InStr, FieldWidth=4, PadChar=' '):
 	# return InStr (str) padded to length of FieldWidth by adding PadChar's to the left
 	# If PadChar contains more than one character, it will be used as a repeating pattern
-	return ((int(FieldWidth) * str(PadChar)) + str(InStr))[-max(len(str(InStr)), abs(int(FieldWidth)))]
+	return ((int(FieldWidth) * str(PadChar)) + str(InStr))[-max(len(str(InStr)), abs(int(FieldWidth))):]
 
 def PadList(InList, FieldWidth=4, PadValue=None, Truncate=False):
 	# return InList (list) padded to length of FieldWidth (int≥0) by adding PadValue's to the right

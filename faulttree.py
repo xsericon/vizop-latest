@@ -1534,7 +1534,7 @@ class FTConnectorIn(FTConnector):
 		FTConnector.__init__(self, FT, Column, **Args)
 
 class FTConnectorOut(FTConnector):
-	ControlPanelAspect = 'FTConnectorOut' # preferred Control Panel aspect to show when selecting an instance of this class
+	ControlPanelAspect = 'CPAspect_FTConnectorOut' # preferred Control Panel aspect to show when selecting an instance of this class
 
 	def __init__(self, FT, Column, **Args):
 		FTConnector.__init__(self, FT, Column, **Args)
@@ -1766,10 +1766,11 @@ class FTColumnInCore(object): # FT column object used in DataCore by FTObjectInC
 		object.__init__(self)
 #		self.ID = str(utilities.NextID(FTEventInCore.AllFTEventsInCore))  # generate unique ID; stored as str
 #		FTEventInCore.AllFTEventsInCore.append(self)  # add self to register; must do after assigning self.ID
-		FT.MaxElementID += 1 # find next available ID
-		self.ID = str(FT.MaxElementID)
+#		FT.MaxElementID += 1 # find next available ID
+#		self.ID = str(FT.MaxElementID)
 		assert isinstance(ColNo, int)
 		assert ColNo >= 0
+		self.ID = FT.Proj.GetNewID() # find next available ID
 		self.ColNo = ColNo
 		self.FT = FT
 		self.FTElements = []
@@ -1857,8 +1858,9 @@ class FTEventInCore(FTElementInCore): # FT event object used in DataCore by FTOb
 		FTElementInCore.__init__(self)
 #		self.ID = str(utilities.NextID(FTEventInCore.AllFTEventsInCore)) # generate unique ID; stored as str
 #		FTEventInCore.AllFTEventsInCore.append(self) # add self to register; must do after assigning self.ID
-		FT.MaxElementID += 1 # find next available ID
-		self.ID = str(FT.MaxElementID)
+#		FT.MaxElementID += 1 # find next available ID
+#		self.ID = str(FT.MaxElementID)
+		self.ID = FT.Proj.GetNewID() # find next available ID
 		self.Proj = Proj
 		self.FT = FT
 		self.Column = Column
@@ -2210,8 +2212,9 @@ class FTGateItemInCore(object): # logic gate in a Fault Tree, used in DataCore
 		assert isinstance(FT, FTObjectInCore)
 		assert isinstance(Column, FTColumnInCore)
 		object.__init__(self)
-		FT.MaxElementID += 1 # find next available ID
-		self.ID = str(FT.MaxElementID)
+#		FT.MaxElementID += 1 # find next available ID
+#		self.ID = str(FT.MaxElementID)
+		self.ID = FT.Proj.GetNewID() # find next available ID
 		self.Proj = Proj
 		self.FT = FT
 		self.Column = Column
@@ -2484,20 +2487,27 @@ class FTConnectorItemInCore(FTElementInCore): # in- and out-connectors (CX's) to
 	ComponentEnglishNames = {'Value': 'Value'}
 	EventType = 'Connector'
 
-	def __init__(self, FT, Column, ColumnIndex=0, **Args):
+	def __init__(self, FT, Column, ColIndex=0, **Args):
 		# FT is the FaultTree object this connector belongs to
 		# Column (FTColumnInCore instance): Column to which this CX belongs
-		# ColumnIndex (int): index of FT column to which this CX belongs
+		# ColIndex (int): index of FT column to which this CX belongs
 		assert isinstance(FT, FTObjectInCore)
 		assert isinstance(Column, FTColumnInCore)
-		assert isinstance(ColumnIndex, int)
-		assert ColumnIndex >= 0
+		assert isinstance(ColIndex, int)
+		assert ColIndex >= 0
 		FTElementInCore.__init__(self)
-		FT.MaxElementID += 1 # find next available ID. FIXME should use project ID list
-		self.ID = str(FT.MaxElementID)
+#		FT.MaxElementID += 1 #. FIXME should use project ID list
+		self.ID = FT.Proj.GetNewID() # find next available ID
 		self.FT = FT
 		self.Column = Column
-		self.Out = (ColumnIndex > 0) # True if this is an out-CX (else, it is an in-CX). Initialise to out-CX unless in 0th column
+		self.Out = (ColIndex > 0) # True if this is an out-CX (else, it is an in-CX). Initialise to out-CX unless in 0th column
+#		# assign visible name - used when selecting opposite connectors to join together
+		# default value is a letter in sequence (A, B, C...). The line below counts all connectors in all FTs
+		# and assigns the letter for the next connector number
+		self.HumanName = core_classes.UpperCaseLetterNumberSystem.HumanValue(1 + len([El for El in WalkOverAllFTObjs(ThisFT)
+			for ThisFT in [p for p in FT.Proj.PHAObjs if isinstance(p, FTObjectInCore)]
+			if isinstance(El, FTConnectorItemInCore)]))
+		print('FT2506 assigned HumanName: ', self.HumanName)
 		self.ConnectorDescription = '' # text shown in the CX, if it's an out-CX. Also shown in in-CX if RelatedCX is None.
 		self.ConnectorDescriptionComments = [] # list of AssociatedTextItem instances
 		self.ShowDescriptionComments = False # whether description comments are visible
@@ -2542,8 +2552,9 @@ class FTCollapseGroupInCore(object): # collapse group containing one or more FT 
 	def __init__(self, FT): # FT is the FaultTree object this connector belongs to
 		object.__init__(self)
 		assert isinstance(FT, FTObjectInCore)
-		FT.MaxElementID += 1  # find next available ID
-		self.ID = str(FT.MaxElementID)
+#		FT.MaxElementID += 1  # find next available ID
+#		self.ID = str(FT.MaxElementID)
+		self.ID = FT.Proj.GetNewID() # find next available ID
 		self.FT = FT
 		self.CollapseGroupDescription = '' # text shown in the collapse group, if collapsed
 		self.CollapsedInitially = False # whether the collapse group is shown collapsed when the FT is first displayed.
@@ -2581,7 +2592,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		# ID is already assigned in PHAModelBaseClass.__init__
 		# self.EditAllowed attrib is inherited from base class
 		FTObjectInCore.AllFTObjects.append(self) # add self to register; must do after assigning self.ID
-		self.MaxElementID = 0 # Highest ID (int) of all elements in this FT. Used only to determine next available ID
+#		self.MaxElementID = 0 # Highest ID (int) of all elements in this FT. Used only to determine next available ID
 		# set up numbering for the FT itself - to appear in a high-level list of all FTs in the project
 		self.Numbering = core_classes.NumberingItem()
 		# put a serial number into the numbering object
@@ -3260,6 +3271,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		assert isinstance(IndexInCol, str)
 		assert isinstance(ObjKindRequested, str)
 		ThisColIndex = int(ColNo); ThisIndexInCol = int(IndexInCol)
+		print('FT3264 ColNo, ThisColIndex: ', ColNo, type(ColNo), ThisColIndex, type(ThisColIndex))
 		assert 0 <= ThisColIndex <= len(self.Columns) # allows for ThisColIndex to be 1+no of columns
 		if ThisColIndex < len(self.Columns): assert 0 <= ThisIndexInCol <= len(self.Columns[ThisColIndex].FTElements)
 		# First, decide what kind of event to insert
@@ -3854,6 +3866,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		Reply = vizop_misc.MakeXMLMessage(RootName='Fail', RootText='CommandNotRecognised')
 		# process the command
 		if Command == 'RQ_FT_NewElement':
+			print('FT3858 requesting new element in column: ', XMLRoot.findtext('ColNo'))
 			Reply = self.AddNewElement(Proj=Proj, ColNo=XMLRoot.findtext('ColNo'),
 				IndexInCol=XMLRoot.findtext('IndexInCol'), ObjKindRequested=XMLRoot.findtext('ObjKindRequested'))
 		elif Command == 'RQ_FT_ChangeText':
@@ -5056,7 +5069,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 					type(CurrentElements[0]), getattr(CurrentElements[0], 'ControlPanelAspect', None))
 				if getattr(CurrentElements[0], 'ControlPanelAspect', None):
 					self.DisplDevice.GotoControlPanelAspect(AspectName=CurrentElements[0].ControlPanelAspect,
-						PHAObjInControlPanel=CurrentElements[0])
+						PHAObjInControlPanel=CurrentElements[0], ComponentInControlPanel='')
 
 FTObjectInCore.DefaultViewportType = FTForDisplay # set here (not in FTForDisplay class) due to the order of the
 	# class definitions
