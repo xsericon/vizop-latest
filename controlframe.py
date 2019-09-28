@@ -742,7 +742,7 @@ class ControlFrame(wx.Frame):
 			# RowOffset and ColOffset attribs (NB row posn doesn't consider any GapY defined in variable widgets)
 			# doesn't check whether this causes position clashes with existing widgets
 			# doesn't take accound of RowOffset, ColOffset attribs
-			# return: CombinedWidgetList
+			# return: CombinedWidgets
 			# The overall algorithm is:
 			# 1. Find the applicable placeholder in FixedWidgets. Transfer all widgets before the placeholder to
 			# CombinedWidgets.
@@ -750,6 +750,7 @@ class ControlFrame(wx.Frame):
 			# variable widget.
 			# 3. Transfer the first variable widget to CombinedWidgets.
 			# 4. Repeat steps 2 and 3 with each successive variable widget until all the widgets are used up.
+			print('CF753 starting InsertVariableWidgets with FixedWidgets, VariableWidgets: ', len(FixedWidgets), len(VariableWidgets))
 			assert isinstance(TargetPlaceholderName, str)
 			assert hasattr(FixedWidgets, '__iter__') # confirm it's an iterable
 			assert hasattr(VariableWidgets, '__iter__')
@@ -776,10 +777,10 @@ class ControlFrame(wx.Frame):
 						ThisRow += 1 # add a row for the GapY
 						GapYAdded = True # set flag to avoid repeat-adding gap if another widget has GapY in the same row
 					FixedWidgetIndex += 1
+			print('CF780 PlaceholderFound, ThisRow, NextCol, FixedWidgetIndex: ', PlaceholderFound, ThisRow, NextCol, FixedWidgetIndex)
 			# now we have ThisRow and NextCol (start location for variable widgets) and FixedWidgetIndex (index of placeholder)
 			# put widgets before the placeholder into the combined list
 			CombinedWidgets = FixedWidgets[:FixedWidgetIndex]
-			print('CF774 added first %d widgets to CombinedWidgets' % len(CombinedWidgets))
 			# assign row and column positions to variable widgets
 			for ThisVarWidget in VariableWidgets:
 				ThisVarWidget.ActualRow = ThisRow + ThisVarWidget.RowOffset
@@ -789,14 +790,14 @@ class ControlFrame(wx.Frame):
 			VarWidgetIndex = 0
 			FixedWidgetsFinished = (FixedWidgetIndex >= len(FixedWidgets))
 			VarWidgetsFinished = (VarWidgetIndex >= len(VariableWidgets)) # whether we have used up all widgets in the lists
-			while not (FixedWidgetsFinished or VarWidgetsFinished): # loop while neither list is used up
+			while not (FixedWidgetsFinished and VarWidgetsFinished): # loop while either list has unused widgets
 				# find insertion row and column of next variable widget
 				if not VarWidgetsFinished:
 					NextVarWidgetRow = VariableWidgets[VarWidgetIndex].ActualRow
 					NextVarWidgetCol = VariableWidgets[VarWidgetIndex].ActualCol
 				# add fixed widgets until the next fixed widget is beyond the target location of the next variable widget
 				StopAddingFixedWidgets = False
-				while (not FixedWidgetsFinished) or (not StopAddingFixedWidgets):
+				while (not FixedWidgetsFinished) and (not StopAddingFixedWidgets):
 					ThisFixedWidget = FixedWidgets[FixedWidgetIndex]
 					# update ThisRow for ThisFixedWidget (use getattr in case it's a placeholder widget)
 					if getattr(ThisFixedWidget, 'NewRow', False): ThisRow += 1
@@ -1494,40 +1495,41 @@ class ControlFrame(wx.Frame):
 			self.FTConnectorOutAspect.VariableWidgetList = [] # populated in LineupVariableWidgetsForFTConnectorOutAspect()
 			self.FTConnectorOutAspect.WidgetList = [] # complete widget list, populated in Lineup...()
 
-		def LineupVariableWidgetsForFTConnectorOutAspect(self, ConnectorOut, StartRow, StartCol, NotebookPage):
-			# adjust variable widgets in FT Connector-out aspect of Control Panel%%%
+		def LineupVariableWidgetsForFTConnectorOutAspect(self, ConnectorOut, NotebookPage):
+			# adjust variable widgets in FT Connector-out aspect of Control Panel
 			# depending on number of connector-in's to which this Connector-Out is connected
-			# StartRow, StartCol (2 x int): sizer position to insert the first connector-in-related widget
+#			# StartRow, StartCol (2 x int): sizer position to insert the first connector-in-related widget
 			# NotebookPage: parent window for the variable widgets
-			assert isinstance(StartRow, int)
-			assert StartRow >= 0
-			assert isinstance(StartCol, int)
-			assert StartCol >= 0
+#			assert isinstance(StartRow, int)
+#			assert StartRow >= 0
+#			assert isinstance(StartCol, int)
+#			assert StartCol >= 0
 			# first, destroy all existing variable widgets (to avoid memory leak)
 			for ThisWidget in self.FTConnectorOutAspect.VariableWidgetList: ThisWidget.Widget.Destroy()
-			FTConnectorOutAspect.VariableWidgetList = []
+			self.FTConnectorOutAspect.VariableWidgetList = []
 			# make a name widget and 'remove' button for each connector-in
 			# RowOffset and ColOffset are offsets from the position of the placeholder in FixedWidgetList
 			for (ThisConnectorInIndex, ThisConnectorIn) in enumerate(ConnectorOut.ConnectorIns):
-				FTConnectorOutAspect.VariableWidgetList.append(UIWidgetItem(wx.StaticText(NotebookPage, -1,
+				self.FTConnectorOutAspect.VariableWidgetList.append(UIWidgetItem(wx.StaticText(NotebookPage, -1,
 					ThisConnectorIn.HumanName), RowOffset=ThisConnectorInIndex, ColOffset=0, ColSpan=1))
 				DisconnectButtonWidget = UIWidgetItem(wx.Button(NotebookPage,
 					size=self.StandardImageButtonSize),
 					RowOffset=ThisConnectorInIndex, ColOffset=1, ColSpan=1, Events=[wx.EVT_BUTTON],
 					Handler=lambda Event: self.FTConnectorOutAspect_OnConnectorInDisconnectButton(Event,
 					ConnectorIn=ThisConnectorIn))
-				FTConnectorOutAspect.VariableWidgetList.append(DisconnectButtonWidget)
+				self.FTConnectorOutAspect.VariableWidgetList.append(DisconnectButtonWidget)
 				DisconnectButtonWidget.Widget.SetBitmap(self.TopLevelFrame.ButtonBitmap(wx.ART_MINUS))
 			# add 'add' button at the bottom of the list of connector-ins
 			ConnectButtonWidget = UIWidgetItem(wx.Button(NotebookPage,
 				size=self.StandardImageButtonSize),
 				RowOffset=len(ConnectorOut.ConnectorIns), ColOffset=1, ColSpan=1, Events=[wx.EVT_BUTTON],
 				Handler=self.FTConnectorOutAspect_OnConnectorInConnectButton)
-			FTConnectorOutAspect.VariableWidgetList.append(ConnectButtonWidget)
+			self.FTConnectorOutAspect.VariableWidgetList.append(ConnectButtonWidget)
 			ConnectButtonWidget.Widget.SetBitmap(self.TopLevelFrame.ButtonBitmap(wx.ART_PLUS))
 			# insert connector-in widgets into widget list, based on RowOffset and ColOffset
-			self.FTConnectorOutAspect.CombinedWidgetList = self.InsertVariableWidgets(TargetPlaceholderName='ConnectorIn',
-				FixedWidgets=self.FTConnectorOutAspect.FixedWidgetList, VariableWidgets=ConnectorInWidgets)
+			self.FTConnectorOutAspect.WidgetList = self.InsertVariableWidgets(TargetPlaceholderName='ConnectorIn',
+				FixedWidgets=self.FTConnectorOutAspect.FixedWidgetList,
+				VariableWidgets=self.FTConnectorOutAspect.VariableWidgetList)
 
 		def PrefillWidgetsForFTConnectorOutAspect(self, **Args):
 			# populate widgets for FT Connector-out aspect of Control Panel
@@ -1535,14 +1537,17 @@ class ControlFrame(wx.Frame):
 			CurrentViewport = self.TopLevelFrame.CurrentViewport
 			# capture which connector element is current
 			self.TopLevelFrame.PHAObjInControlPanel = Args['PHAObjInControlPanel']
+			self.TopLevelFrame.ComponentInControlPanel = Args['ComponentInControlPanel']
 			# enable navigation buttons if there are any items in current project's history lists
 			self.UpdateNavigationButtonStatus(Proj)
 			# set widget values
 			# set up ConnectorNameText and ConnectorDescriptionText
 			# TODO limit length displayed. Smart ellipsization?
-			self.FTConnectorOutAspect.ConnectorNameText.Widget.ChangeValue(self.TopLevelFrame.PHAObjInControlPanel.HumanName)
+			self.FTConnectorOutAspect.ConnectorNameText.Widget.ChangeValue(
+				self.TopLevelFrame.PHAObjInControlPanel.HumanName)
 			self.FTConnectorOutAspect.ConnectorNameText.Widget.SelectAll()
-			self.FTConnectorOutAspect.ConnectorDescriptionText.Widget.ChangeValue(self.TopLevelFrame.ComponentInControlPanel.Description)
+			self.FTConnectorOutAspect.ConnectorDescriptionText.Widget.ChangeValue(
+				self.TopLevelFrame.PHAObjInControlPanel.Description)
 			self.FTConnectorOutAspect.ConnectorDescriptionText.Widget.SelectAll()
 			# set up lineup of variable widgets
 			print('FT1548 setting up variable widgets')
@@ -1551,12 +1556,13 @@ class ControlFrame(wx.Frame):
 
 		def SetWidgetVisibilityforFTConnectorOutAspect(self, **Args): # set IsVisible attrib for each widget
 			# set IsVisible attribs for all fixed and variable widgets
-			print('FT1559 setting visibility for %d widgets in Connector Out aspect' % len(self.FTConnectorOutAspect.CombinedWidgetList))
-			for ThisWidget in self.FTConnectorOutAspect.CombinedWidgetList: ThisWidget.IsVisible = True
+			print('FT1559 setting visibility for %d widgets in Connector Out aspect' % len(self.FTConnectorOutAspect.WidgetList))
+			for ThisWidget in self.FTConnectorOutAspect.WidgetList: ThisWidget.IsVisible = True
 
 		def FTConnectorOutAspect_OnConnectorNameTextWidget(self, Event, **Args): pass
 		def FTConnectorOutAspect_OnConnectorDescriptionWidget(self, Event, **Args): pass
 		def FTConnectorOutAspect_OnConnectorInDisconnectButton(self, Event, ConnectorIn): pass
+		def FTConnectorOutAspect_OnConnectorInConnectButton(self, Event, ConnectorIn): pass
 
 		class ControlPanelAspectItem(object): # class whose instances are aspects of the Control panel
 			# attribs:

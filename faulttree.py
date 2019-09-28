@@ -2496,16 +2496,15 @@ class FTConnectorItemInCore(FTElementInCore): # in- and out-connectors (CX's) to
 		assert isinstance(ColIndex, int)
 		assert ColIndex >= 0
 		FTElementInCore.__init__(self)
-#		FT.MaxElementID += 1 #. FIXME should use project ID list
 		self.ID = FT.Proj.GetNewID() # find next available ID
 		self.FT = FT
 		self.Column = Column
 		self.Out = (ColIndex > 0) # True if this is an out-CX (else, it is an in-CX). Initialise to out-CX unless in 0th column
-#		# assign visible name - used when selecting opposite connectors to join together
+		# assign visible name - used when selecting opposite connectors to join together
 		# default value is a letter in sequence (A, B, C...). The line below counts all connectors in all FTs
 		# and assigns the letter for the next connector number
-		self.HumanName = core_classes.UpperCaseLetterNumberSystem.HumanValue(1 + len([El for El in WalkOverAllFTObjs(ThisFT)
-			for ThisFT in [p for p in FT.Proj.PHAObjs if isinstance(p, FTObjectInCore)]
+		self.HumanName = core_classes.UpperCaseLetterNumberSystem.HumanValue(1 + len([El
+			for ThisFT in [p for p in FT.Proj.PHAObjs if isinstance(p, FTObjectInCore)] for El in WalkOverAllFTObjs(ThisFT)
 			if isinstance(El, FTConnectorItemInCore)]))
 		print('FT2506 assigned HumanName: ', self.HumanName)
 		self.ConnectorDescription = '' # text shown in the CX, if it's an out-CX. Also shown in in-CX if RelatedCX is None.
@@ -3083,12 +3082,12 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			# elements where the text is the same as the FTConn attribute
 			# for EventType tag, tag name must be a key in FTEventTypeNameHash
 			DataInfo = [(info.IDTag, FTConn.ID), ('Connectivity', {True: 'Out', False: 'In'}[FTConn.Out]),
-						('Description', FTConn.ConnectorDescription), ('BackgColour', FTConn.BackgColour),
-						('Numbering', FTConn.Numbering.HumanValue(PHAItem=FTConn, Host=FTConn.Column.FTElements)[0]),
-						('Style', FTConn.Style), ('EventType', {True: 'ConnectorOut', False: 'ConnectorIn'}[FTConn.Out]),
-						('ShowDescriptionComments', str(FTConn.ShowDescriptionComments)), ('Value', OutputValue),
-						('Unit', FTConn.Value.Unit.HumanName), ('ValueProblemID', getattr(ProblemValue, 'ID', '')),
-						('ValueProblemObjectID', getattr(ProblemObj, 'ID', ''))]
+				('Description', FTConn.ConnectorDescription), ('BackgColour', FTConn.BackgColour),
+				('Numbering', FTConn.Numbering.HumanValue(PHAItem=FTConn, Host=FTConn.Column.FTElements)[0]),
+				('Style', FTConn.Style), ('EventType', {True: 'ConnectorOut', False: 'ConnectorIn'}[FTConn.Out]),
+				('ShowDescriptionComments', str(FTConn.ShowDescriptionComments)), ('Value', OutputValue),
+				('Unit', FTConn.Value.Unit.HumanName), ('ValueProblemID', getattr(ProblemValue, 'ID', '')),
+				('ValueProblemObjectID', getattr(ProblemObj, 'ID', '')), ('HumanName', FTConn.HumanName)]
 			for Tag, Attrib in DataInfo:
 				El = ElementTree.SubElement(ConnEl, Tag)
 				El.text = str(Attrib)
@@ -4232,7 +4231,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			DataInfoAsStr = [ (info.IDTag, 'ID'), ('Description', 'Description'), ('BackgColour', 'BackgColour'),
 				('Numbering', 'Numbering'), ('Style', 'Style'), ('RelatedConnector', 'RelatedConnector'),
 				('Value', 'Value'), ('ValueProblemObjectID', 'ValueProblemObjectID'),
-				('Unit', 'ValueUnit'), ('ValueProblemID', 'ValueProblemID') ]
+				('Unit', 'ValueUnit'), ('ValueProblemID', 'ValueProblemID'), ('HumanName', 'HumanName') ]
 			for Tag, Attrib in DataInfoAsStr:
 				setattr(NewConnector, Attrib, XMLObj.findtext(Tag, default=''))
 			DataInfoAsBool = [ ('ShowDescriptionComments', 'ShowDescriptionComments') ]
