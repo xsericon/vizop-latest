@@ -1458,9 +1458,8 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 
 		def PopulateTextElements(Elements):
 			# put required values into all fixed text elements; first, connector kind
-			print('FT1409 connector type: ', type(self))
 			ElementNamed(Elements, 'ConnKind').Text.Content = self.ConnClassHumanName[isinstance(self, FTConnectorIn)]
-			# The following list contains (attribs of FTConnector, element's InternalName)%%%
+			# The following list contains (attribs of FTConnector, element's InternalName)
 			AttribInfo = [ ('Description', 'ConnDescription'), ('Value', 'ConnValue'), ('ValueUnit', 'ConnValueUnit') ]
 			# put the content into the other elements
 			for (Attrib, Name) in AttribInfo:

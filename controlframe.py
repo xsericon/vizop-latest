@@ -680,7 +680,8 @@ class ControlFrame(wx.Frame):
 			assert isinstance(NewAspect, (self.ControlPanelAspectItem, str))
 			global KeyPressHash
 			# deactivate previous aspect
-			if self.ControlPanelCurrentAspect: self.ControlPanelCurrentAspect.Deactivate()
+			if self.ControlPanelCurrentAspect:
+				self.ControlPanelCurrentAspect.Deactivate(Widgets=self.ControlPanelCurrentAspect.WidgetList)
 			# get target aspect, if supplied as a string
 			if isinstance(NewAspect, str):
 				TargetAspect = {'CPAspect_NumValue': self.NumericalValueAspect,
@@ -694,7 +695,7 @@ class ControlFrame(wx.Frame):
 				self.ComponentInControlPanel = Args.get('ComponentInControlPanel', None)
 				# fetch UndoOnCancel value to store in undo record for any tasks that should be undone when Cancel pressed
 				self.UndoOnCancel = Args.get('UndoOnCancel', None)
-				# prefill widgets in new aspect and activate it
+				# prefill widgets in new aspect and activate it. TODO consider calling RedrawControlPanelAspect() instead
 				TargetAspect.Prefill(**Args)
 				TargetAspect.SetWidgetVisibility(**Args)
 				# set up the notebook tab for the aspect
@@ -712,8 +713,8 @@ class ControlFrame(wx.Frame):
 
 		def RedrawControlPanelAspect(self):
 			# repopulates all widgets in the current control panel aspect
-			self.ControlPanelCurrentAspect.SetWidgetVisibility(**self.ControlPanelCurrentAspect.CurrentArgs)
 			self.ControlPanelCurrentAspect.Prefill(**self.ControlPanelCurrentAspect.CurrentArgs)
+			self.ControlPanelCurrentAspect.SetWidgetVisibility(**self.ControlPanelCurrentAspect.CurrentArgs)
 			self.ControlPanelCurrentAspect.Activate(**self.ControlPanelCurrentAspect.CurrentArgs)
 
 		def WidgetsInPosition(self, WidgList, StartingRow=1, ColOffset=0):
@@ -750,7 +751,6 @@ class ControlFrame(wx.Frame):
 			# variable widget.
 			# 3. Transfer the first variable widget to CombinedWidgets.
 			# 4. Repeat steps 2 and 3 with each successive variable widget until all the widgets are used up.
-			print('CF753 starting InsertVariableWidgets with FixedWidgets, VariableWidgets: ', len(FixedWidgets), len(VariableWidgets))
 			assert isinstance(TargetPlaceholderName, str)
 			assert hasattr(FixedWidgets, '__iter__') # confirm it's an iterable
 			assert hasattr(VariableWidgets, '__iter__')
@@ -777,7 +777,6 @@ class ControlFrame(wx.Frame):
 						ThisRow += 1 # add a row for the GapY
 						GapYAdded = True # set flag to avoid repeat-adding gap if another widget has GapY in the same row
 					FixedWidgetIndex += 1
-			print('CF780 PlaceholderFound, ThisRow, NextCol, FixedWidgetIndex: ', PlaceholderFound, ThisRow, NextCol, FixedWidgetIndex)
 			# now we have ThisRow and NextCol (start location for variable widgets) and FixedWidgetIndex (index of placeholder)
 			# put widgets before the placeholder into the combined list
 			CombinedWidgets = FixedWidgets[:FixedWidgetIndex]
@@ -809,7 +808,6 @@ class ControlFrame(wx.Frame):
 					# if it isn't, add it to the combined list and move to the next fixed widget
 					if not StopAddingFixedWidgets:
 						CombinedWidgets.append(ThisFixedWidget)
-						print('CF803 added fixed widget to CombinedWidgets')
 						FixedWidgetIndex += 1
 						FixedWidgetsFinished = (FixedWidgetIndex >= len(FixedWidgets))
 				# add a variable widget (step 3)
@@ -822,7 +820,6 @@ class ControlFrame(wx.Frame):
 					ThisVariableWidget.ColLoc = NextVarWidgetCol
 					# add next variable widget to combined list
 					CombinedWidgets.append(ThisVariableWidget)
-					print('CF809 added variable widget to CombinedWidgets')
 					# move to next variable widget
 					VarWidgetIndex += 1
 					VarWidgetsFinished = (VarWidgetIndex >= len(VariableWidgets))
@@ -884,7 +881,7 @@ class ControlFrame(wx.Frame):
 			MySizer.Add(self.MyNotebook, 1, wx.EXPAND)
 			self.SetSizer(MySizer)
 
-			self.WidgActive = [] # list of widgets currently visible
+#			self.WidgActive = [] # list of widgets currently visible. Not used; use Visible attrib of widgets instead
 			# generate list of system fonts (not currently used)
 #			e = wx.FontEnumerator()
 #			e.EnumerateFacenames()
@@ -1229,7 +1226,7 @@ class ControlFrame(wx.Frame):
 			# if invoked from Enter keypress, find widget object containing text widget
 			if Event:
 				EventWidget = Event.GetEventObject()
-				ThisWidgetObj = [w for w in self.WidgActive if w.Widget == EventWidget][0]
+				ThisWidgetObj = [w for w in self.NumericalValueAspect.WidgetList if w.Widget == EventWidget][0]
 				EventWidget.SelectAll() # select all text in the widget, as visual indicator to user that <Enter> worked
 			else: ThisWidgetObj = WidgetObj
 			# get value entered by user
@@ -1251,14 +1248,14 @@ class ControlFrame(wx.Frame):
 			UserSelection = EventWidget.GetSelection()
 			if UserSelection != wx.NOT_FOUND: # is any item selected?
 				# find widget object
-				ThisWidgetObj = [w for w in self.WidgActive if w.Widget == EventWidget][0]
+				ThisWidgetObj = [w for w in self.NumericalValueAspect.WidgetList if w.Widget == EventWidget][0]
 				# find host object of UnitOptions, and matching edit component name
 				if ThisWidgetObj.DataAttrib:
 					HostObj = getattr(ThisWidgetObj.PHAObj, ThisWidgetObj.DataAttrib)
 					EditComponentName = HostObj.InternalName
 				else:
 					HostObj = ThisWidgetObj.PHAObj
-					# check if we're editing an FT gate
+					# check if we're editing an FT gate (ugly; this module shouldn't care what the PHA model is)
 					EditComponentName = 'GateValueUnit' if isinstance(HostObj, faulttree.FTGate) else 'EventValueUnit'
 				# find XML name of unit requested
 				TargetUnitName = HostObj.UnitOptions[EventWidget.GetSelection()].XMLName
@@ -1274,7 +1271,7 @@ class ControlFrame(wx.Frame):
 			UserSelection = EventWidget.GetSelection()
 			if UserSelection != wx.NOT_FOUND: # is any item selected?
 				# find widget object and attrib containing value kind options
-				ThisWidgetObj = [w for w in self.WidgActive if w.Widget == EventWidget][0]
+				ThisWidgetObj = [w for w in self.NumericalValueAspect.WidgetList if w.Widget == EventWidget][0]
 				OptionsAttrib = getattr(ThisWidgetObj.PHAObj, ThisWidgetObj.DataAttrib) if ThisWidgetObj.DataAttrib\
 					else ThisWidgetObj.PHAObj
 				# find XML name of number kind requested
@@ -1504,7 +1501,8 @@ class ControlFrame(wx.Frame):
 #			assert StartRow >= 0
 #			assert isinstance(StartCol, int)
 #			assert StartCol >= 0
-			# first, destroy all existing variable widgets (to avoid memory leak)
+			# first, deactivate and destroy all existing variable widgets (to avoid memory leak)
+			self.FTConnectorOutAspect.Deactivate(Widgets=self.FTConnectorOutAspect.VariableWidgetList)
 			for ThisWidget in self.FTConnectorOutAspect.VariableWidgetList: ThisWidget.Widget.Destroy()
 			self.FTConnectorOutAspect.VariableWidgetList = []
 			# make a name widget and 'remove' button for each connector-in
@@ -1556,7 +1554,6 @@ class ControlFrame(wx.Frame):
 
 		def SetWidgetVisibilityforFTConnectorOutAspect(self, **Args): # set IsVisible attrib for each widget
 			# set IsVisible attribs for all fixed and variable widgets
-			print('FT1559 setting visibility for %d widgets in Connector Out aspect' % len(self.FTConnectorOutAspect.WidgetList))
 			for ThisWidget in self.FTConnectorOutAspect.WidgetList: ThisWidget.IsVisible = True
 
 		def FTConnectorOutAspect_OnConnectorNameTextWidget(self, Event, **Args): pass
@@ -1602,10 +1599,10 @@ class ControlFrame(wx.Frame):
 			def Activate(self, **Args): # activate widgets for this aspect
 				Proj = self.ParentFrame.CurrentProj
 				self.TopLevelFrame.ActivateWidgetsInPanel(Widgets=self.WidgetList, Sizer=self.MySizer,
-					ActiveWidgetList=self.ParentFrame.WidgActive, **Args)
+					ActiveWidgetList=[w for w in self.WidgetList if w.IsVisible], **Args)
 
-			def Deactivate(self, **Args): # deactivate widgets for this aspect
-				self.TopLevelFrame.DeactivateWidgetsInPanel(self.WidgetList, **Args)
+			def Deactivate(self, Widgets=[], **Args): # deactivate widgets for this aspect
+				self.TopLevelFrame.DeactivateWidgetsInPanel(Widgets=Widgets, **Args)
 
 			def Prefill(self, **Args): # initialise value of each appropriate widget in self.WidgetList
 				self.PrefillMethod(**Args)
@@ -2331,7 +2328,6 @@ class ControlFrame(wx.Frame):
 
 	def PostProcessNewViewport_Redo(self, XMLRoot=None):
 		# finish handling redo of "new Viewport"
-		print("CF1700 starting PostProcessNewViewport_Redo")
 		global UndoChainWaiting, RedoChainWaiting
 		Proj = utilities.ObjectWithID(self.Projects, XMLRoot.find(info.ProjIDTag).text)
 		# set trial Viewport (created in PostProcessNewPHAModel_Redo) as the current Viewport
