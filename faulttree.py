@@ -1814,6 +1814,44 @@ class FTElementInCore(object): # superclass used to contain common methods for F
 		else: # not an attrib that needs checking
 			return core_classes.NumProblemValue_NoProblem
 
+	def GetValueOriginObject(self, RR, **Args): # return element that yields value for this element
+		assert isinstance(self.Value, core_classes.AutoNumValueItem)
+		# find event connected to this one (should be only one; we find them all for bug trapping)
+		ConnectFrom = JoinedFrom(self.FT, self, FirstOnly=False)
+		assert len(ConnectFrom) == 1
+		assert isinstance(ConnectFrom[0], (FTEventInCore, FTGateItemInCore, FTConnectorItemInCore))
+		return ConnectFrom[0].Value # where to get the value from
+
+	def GetEventValue(self, RR, **Args): # return event value (float) if value kind is Auto
+		# this gets called by the NumValue instance's Calculate() call
+		assert isinstance(self.Value, core_classes.AutoNumValueItem)
+		# find event connected to this one (should be only one; we find them all for bug trapping)
+		ValueOriginObject = self.GetValueOriginObject(RR, **Args)
+		if ValueOriginObject.Status(RR=RR) == core_classes.NumProblemValue_NoProblem:
+			# fetch value from connected object
+			ConnectedObjectValue = ValueOriginObject.GetMyValue(RR=RR)
+			# check if this element's unit has ever been set; if not, set to the same as the connected object
+			if self.Value.GetMyUnit() == core_classes.NullUnit:
+				self.SetEventUnit(TargetUnit=ValueOriginObject.GetMyUnit())
+			# convert value according to event's unit
+			return ValueOriginObject.GetMyValue(RR=RR) * ValueOriginObject.GetMyUnit().Conversion[self.Value.GetMyUnit()]
+		else: return None # can't get value
+
+	def GetEventValueStatus(self, RR): # return event value status as a NumProblemValue instance, if value kind is Auto
+		# this gets called by the NumValue instance's StatusGetter() call
+		assert isinstance(self.Value, core_classes.AutoNumValueItem)
+		ConnectFrom = JoinedFrom(self.FT, self, FirstOnly=False)
+		if ConnectFrom: # is any event connected to this one? get status from the connected one
+			assert len(ConnectFrom) == 1
+			assert isinstance(ConnectFrom[0], (FTEventInCore, FTGateItemInCore, FTConnectorItemInCore))
+			return ConnectFrom[0].Value.Status(RR=RR)
+		else: # not connected
+			return core_classes.NumProblemValue_FTNotConnected
+
+	def SetEventUnit(self, TargetUnit): # set unit of event
+		assert isinstance(TargetUnit, core_classes.UnitItem)
+		self.Value.SetMyUnit(TargetUnit)
+
 class FTEventInCore(FTElementInCore): # FT event object used in DataCore by FTObjectInCore
 	# Used for causes, SIF failure events (a single bottom level event used in high demand and continuous modes),
 	# IPLs, intermediate events, final events, connectors in/out but not gates
@@ -2118,32 +2156,32 @@ class FTEventInCore(FTElementInCore): # FT event object used in DataCore by FTOb
 		else: # not an attrib that needs checking
 			return core_classes.NumProblemValue_NoProblem
 
-	def GetValueOriginObject(self, RR, **Args): # return element that yields value for this element
-		assert isinstance(self.Value, core_classes.AutoNumValueItem)
-		# find event connected to this one (should be only one; we find them all for bug trapping)
-		ConnectFrom = JoinedFrom(self.FT, self, FirstOnly=False)
-		assert len(ConnectFrom) == 1
-		assert isinstance(ConnectFrom[0], (FTEventInCore, FTGateItemInCore, FTConnectorItemInCore))
-		return ConnectFrom[0].Value # where to get the value from
+#	def GetValueOriginObject(self, RR, **Args): # return element that yields value for this element
+#		assert isinstance(self.Value, core_classes.AutoNumValueItem)
+#		# find event connected to this one (should be only one; we find them all for bug trapping)
+#		ConnectFrom = JoinedFrom(self.FT, self, FirstOnly=False)
+#		assert len(ConnectFrom) == 1
+#		assert isinstance(ConnectFrom[0], (FTEventInCore, FTGateItemInCore, FTConnectorItemInCore))
+#		return ConnectFrom[0].Value # where to get the value from
 
-	def GetEventValue(self, RR, **Args): # return event value (float) if value kind is Auto
-		# this gets called by the NumValue instance's Calculate() call
-		assert isinstance(self.Value, core_classes.AutoNumValueItem)
-		# find event connected to this one (should be only one; we find them all for bug trapping)
-		ValueOriginObject = self.GetValueOriginObject(RR, **Args)
-		if ValueOriginObject.Status(RR=RR) == core_classes.NumProblemValue_NoProblem:
-			# fetch value from connected object
-			ConnectedObjectValue = ValueOriginObject.GetMyValue(RR=RR)
-			# check if this element's unit has ever been set; if not, set to the same as the connected object
-			if self.Value.GetMyUnit() == core_classes.NullUnit:
-				self.SetEventUnit(TargetUnit=ValueOriginObject.GetMyUnit())
-			# convert value according to event's unit
-			return ValueOriginObject.GetMyValue(RR=RR) * ValueOriginObject.GetMyUnit().Conversion[self.Value.GetMyUnit()]
-		else: return None # can't get value
+#	def GetEventValue(self, RR, **Args): # return event value (float) if value kind is Auto
+#		# this gets called by the NumValue instance's Calculate() call
+#		assert isinstance(self.Value, core_classes.AutoNumValueItem)
+#		# find event connected to this one (should be only one; we find them all for bug trapping)
+#		ValueOriginObject = self.GetValueOriginObject(RR, **Args)
+#		if ValueOriginObject.Status(RR=RR) == core_classes.NumProblemValue_NoProblem:
+#			# fetch value from connected object
+#			ConnectedObjectValue = ValueOriginObject.GetMyValue(RR=RR)
+#			# check if this element's unit has ever been set; if not, set to the same as the connected object
+#			if self.Value.GetMyUnit() == core_classes.NullUnit:
+#				self.SetEventUnit(TargetUnit=ValueOriginObject.GetMyUnit())
+#			# convert value according to event's unit
+#			return ValueOriginObject.GetMyValue(RR=RR) * ValueOriginObject.GetMyUnit().Conversion[self.Value.GetMyUnit()]
+#		else: return None # can't get value
 
-	def SetEventUnit(self, TargetUnit): # set unit of event
-		assert isinstance(TargetUnit, core_classes.UnitItem)
-		self.Value.SetMyUnit(TargetUnit)
+#	def SetEventUnit(self, TargetUnit): # set unit of event
+#		assert isinstance(TargetUnit, core_classes.UnitItem)
+#		self.Value.SetMyUnit(TargetUnit)
 
 #	def GetEventUnit(self, RR, **Args): # return event unit if value kind is Auto
 #		# this is intended as a UnitGetter method for the number kind class. Not currently used
@@ -2155,16 +2193,16 @@ class FTEventInCore(FTElementInCore): # FT event object used in DataCore by FTOb
 #			return ValueOriginObject.GetMyUnit()
 #		else: return None # can't get value
 
-	def GetEventValueStatus(self, RR): # return event value status as a NumProblemValue instance, if value kind is Auto
-		# this gets called by the NumValue instance's StatusGetter() call
-		assert isinstance(self.Value, core_classes.AutoNumValueItem)
-		ConnectFrom = JoinedFrom(self.FT, self, FirstOnly=False)
-		if ConnectFrom: # is any event connected to this one? get status from the connected one
-			assert len(ConnectFrom) == 1
-			assert isinstance(ConnectFrom[0], (FTEventInCore, FTGateItemInCore, FTConnectorItemInCore))
-			return ConnectFrom[0].Value.Status(RR=RR)
-		else: # not connected
-			return core_classes.NumProblemValue_FTNotConnected
+#	def GetEventValueStatus(self, RR): # return event value status as a NumProblemValue instance, if value kind is Auto
+#		# this gets called by the NumValue instance's StatusGetter() call
+#		assert isinstance(self.Value, core_classes.AutoNumValueItem)
+#		ConnectFrom = JoinedFrom(self.FT, self, FirstOnly=False)
+#		if ConnectFrom: # is any event connected to this one? get status from the connected one
+#			assert len(ConnectFrom) == 1
+#			assert isinstance(ConnectFrom[0], (FTEventInCore, FTGateItemInCore, FTConnectorItemInCore))
+#			return ConnectFrom[0].Value.Status(RR=RR)
+#		else: # not connected
+#			return core_classes.NumProblemValue_FTNotConnected
 
 	def AcceptableUnits(self): # return list of units (UnitItem instances) this event can offer
 		if self.EventType in self.EventTypesWithFreqValue:
@@ -2480,7 +2518,7 @@ class FTConnectorItemInCore(FTElementInCore): # in- and out-connectors (CX's) to
 	ConnectorStyles = ['Default'] # future, will define various connector appearances (squares, arrows, circles etc)
 	MaxElementsConnectedToThis = 100 # arbitrary limit on connectivity of out-CX
 	InternalName = 'FTConnectorInCore'
-	AcceptableNumberKinds = [core_classes.UserNumValueItem, core_classes.ConstNumValueItem,
+	AcceptableValueKinds = [core_classes.UserNumValueItem, core_classes.ConstNumValueItem,
 		core_classes.AutoNumValueItem,
 		core_classes.LookupNumValueItem, core_classes.ParentNumValueItem, core_classes.UseParentValueItem]
 	ComponentEnglishNames = {'Value': 'Value'}
@@ -3111,7 +3149,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 				El.text = FTConn.RelatedCX.ID
 			# add options for value kind
 			print('FT3039 populating connector value kinds: ', type(FTConn.Value))
-			for (ThisValueKindIndex, ThisValueKind) in enumerate(FTConn.AcceptableNumberKinds):
+			for (ThisValueKindIndex, ThisValueKind) in enumerate(FTConn.AcceptableValueKinds):
 				ValueKindEl = ElementTree.SubElement(ConnEl, info.ValueKindOptionTag)
 				# set human name for number kind option to internal name of option
 				ValueKindEl.text = ThisValueKind.XMLName
@@ -3760,14 +3798,14 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			# NewNumberKind (NumValueItem subclass or None): the number kind changed to, or None if number kind wasn't changed
 		assert isinstance(StoreUndoRecord, bool)
 		if StoreUndoRecord: assert Viewport is not None
-		AcceptableNumberKinds = FTElement.AcceptableValueKinds() # TODO maybe we have 2 separate lists of number kinds, should consolidate
+#		AcceptableNumberKinds = FTElement.AcceptableValueKinds()
 		# find the applicable attrib in FTElement
 		if not ValueAttribName: ValueAttribNameToUse = 'Value'
 		else: ValueAttribNameToUse = ValueAttribName
 		ValueAttrib = getattr(FTElement, ValueAttribNameToUse)
 		# check if requested number kind is acceptable
-		if NewNumberKindXMLName in [NK.XMLName for NK in AcceptableNumberKinds]: # it's recognised
-			NewNumberKind = [NK for NK in AcceptableNumberKinds if NK.XMLName == NewNumberKindXMLName][0]
+		if NewNumberKindXMLName in [NK.XMLName for NK in FTElement.AcceptableValueKinds]: # it's recognised
+			NewNumberKind = [NK for NK in FTElement.AcceptableValueKinds if NK.XMLName == NewNumberKindXMLName][0]
 			NumberKindChanged = True
 		else: # requested number kind is not acceptable
 			NewNumberKind = None
