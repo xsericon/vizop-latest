@@ -1539,6 +1539,15 @@ class FTConnectorOut(FTConnector):
 		FTConnector.__init__(self, FT, Column, **Args)
 		self.ConnectorIns = [] # list of Choice items, each representing a Connector-In to which this connector is
 			# connected. Expected attribs in the items: HumanName (str), ID (str)
+		self.ConnectorInsAvailable = [] # list of human-readable texts describing Connectors-In in the project that are
+			# available for connection to this Connector-Out
+
+	def NewConnectorInsAvailable(self):
+		# returns list of human-readable texts describing Connectors-In in the project that are available for connection
+		# to this Connector-Out.
+		# They are available if they have no existing connection, and would not create a circularity if connected to
+		# this Connector-Out
+		return self.ConnectorInsAvailable
 
 class FTCollapseGroup(object): # depiction of a group of FT objects that have been collapsed to a single display object
 	# The CollapseGroup is not actually an FT object in itself, and is not stored in any column.
@@ -2543,7 +2552,6 @@ class FTConnectorItemInCore(FTElementInCore): # in- and out-connectors (CX's) to
 		self.HumanName = core_classes.UpperCaseLetterNumberSystem.HumanValue(1 + len([El
 			for ThisFT in [p for p in FT.Proj.PHAObjs if isinstance(p, FTObjectInCore)] for El in WalkOverAllFTObjs(ThisFT)
 			if isinstance(El, FTConnectorItemInCore)]))
-		print('FT2506 assigned HumanName: ', self.HumanName)
 		self.ConnectorDescription = '' # text shown in the CX, if it's an out-CX. Also shown in in-CX if RelatedCX is None.
 		self.ConnectorDescriptionComments = [] # list of AssociatedTextItem instances
 		self.ShowDescriptionComments = False # whether description comments are visible
@@ -2563,6 +2571,32 @@ class FTConnectorItemInCore(FTElementInCore): # in- and out-connectors (CX's) to
 			self.Value.SetMyValue(FTEventInCore.DefaultLikelihood, RR=ThisRR)
 			self.Value.SetMyStatus(NewStatus='ValueStatus_Unset', RR=ThisRR)
 		self.Value.SetMyUnit(FTEventInCore.DefaultFreqUnit)
+
+	def AvailableConnectorsInTexts(self):
+		# returns list of human-readable texts describing Connectors-In in the project that are available for connection
+		# to this Connector-Out.
+		# They are available if they have no existing connection, are not in the same FT,
+		# and would not create a circularity if connected to this Connector-Out
+		AvailableConnectorsIn = []
+		# search over all other FTs in the project
+		for ThisFT in [p for p in self.FT.Proj.PHAObjs if isinstance(p, FTObjectInCore) if not (p is self.FT)]:
+			# search over all connectors-in in the FT
+			for ThisCXIn in [e for e in WalkOverAllFTObjs(ThisFT) if isinstance(e, FTConnectorItemInCore) if not e.Out
+				if (e.RelatedCX is None)]:
+				# do circularity check: check that any CX-out on the FT hosting the candidate CX-in has no connection
+				# to a CX-in on my own FT
+				HasCircularity = False
+				# check all CX-in's in my FT
+				for MyCXIn in [e for e in WalkOverAllFTObjs(self.FT) if isinstance(e, FTConnectorItemInCore) if not e.Out]:
+					# check all CX-out's in the FT containing the candidate CX-in
+					for ThisCXOut in [e for e in WalkOverAllFTObjs(ThisFT) if isinstance(e, FTConnectorItemInCore) if e.Out]:
+						HasCircularity |= self.FT.HasPathBetween(ThisCXOut, MyCXIn)
+
+				print('FT2587 found available CX-in. Circularity check: ', HasCircularity)
+				if not HasCircularity: # candidate CX-in is acceptable; add a descriptor to the list
+					AvailableConnectorsIn.append(_("'%s' in Fault Tree '%s'") % (ThisCXIn.HumanName, ThisFT.HumanName))
+		print('FT2598 AvailableConnectorsIn:', AvailableConnectorsIn)
+		return AvailableConnectorsIn
 
 #	def GetMyValue(self, RiskReceptor=core_classes.DefaultRiskReceptor):
 #		# calculate and return output value of the connector for specified risk receptor
@@ -2960,7 +2994,6 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			# put FT event data into XML element El
 			# EventListForNumbering: list containing all FTEvents to consider when numbering this one
 			# FT: FTObjectInCore containing FT event
-			print('FT2871 in PopulateFTEventData')
 			if __debug__ == 1: # do type checks
 				assert isinstance(FT, FTObjectInCore)
 				TypeChecks = [ (El, ElementTree.Element), (FTEvent.ID, str), (FTEvent.IsIPL, bool),
@@ -2970,8 +3003,6 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 					(FTEvent.ValueComments, list), (FTEvent.ShowDescriptionComments, bool),
 					(FTEvent.ShowValueComments, bool), (FTEvent.ActionItems, list),
 					(FTEvent.ConnectTo, list), (FTEvent.CollapseGroups, list)]
-#					(FTEvent.ConnectTo, list), (FTEvent.LinkedTo, list), (FTEvent.CollapseGroups, list)]
-#				IterableChecks = [(FTEvent.LinkedTo, core_classes.LinkItem), (FTEvent.LinkedFrom, core_classes.LinkItem),
 				IterableChecks = [(FTEvent.LinkedFrom, core_classes.LinkItem),
 					(FTEvent.CollapseGroups, FTCollapseGroup), (FTEvent.EventDescriptionComments, core_classes.AssociatedTextItem),
 					(FTEvent.ValueComments, core_classes.AssociatedTextItem),
@@ -3139,7 +3170,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 				for Item in ListName:
 					El = ElementTree.SubElement(ConnEl, Tag)
 					El.text = Item.ID
-			# elements with special handling: RelatedCX
+			# attribs with special handling: RelatedCX, ConnectorInsAvailable
 			El = ElementTree.SubElement(ConnEl, 'RelatedConnector')
 			if FTConn.RelatedCX is None:
 				El.text = '-1'
@@ -3147,6 +3178,9 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 				assert isinstance(FTConn.RelatedCX, FTConnectorItemInCore)
 				assert isinstance(FTConn.RelatedCX.ID, str)
 				El.text = FTConn.RelatedCX.ID
+			for AvailConnectorInText in FTConn.AvailableConnectorsInTexts():
+				El = ElementTree.SubElement(ConnEl, info.ConnectorInsAvailableTag)
+				El.text = AvailConnectorInText
 			# add options for value kind
 			print('FT3039 populating connector value kinds: ', type(FTConn.Value))
 			for (ThisValueKindIndex, ThisValueKind) in enumerate(FTConn.AcceptableValueKinds):
@@ -4260,7 +4294,6 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		def PopulateFTConnector(XMLObj, Column):
 			# create an FTConnector, get data for FTConnector from XMLObj (XML element). Return the FTConnector
 			assert isinstance(Column, FTColumn)
-			print('FT4045 making connector with connectivity: ', XMLObj.findtext('Connectivity'))
 			# First, find out if it's in- or out-connector from 'Connectivity' tag, and create appropriate object
 			NewConnector = {'In': FTConnectorIn, 'Out': FTConnectorOut}[XMLObj.findtext('Connectivity')]\
 				(FT=self, Column=Column)
@@ -4276,7 +4309,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 				setattr(NewConnector, Attrib, bool(XMLObj.findtext(Tag, default='False')))
 			# DataInfoAsList: (Tag of each item in a list, name of the list to put the tag's text into)
 			DataInfoAsList = [ ('DescriptionComments', 'DescriptionComments'), ('ConnectTo', 'ConnectToIDs'),
-				('CollapseGroups', 'CollapseGroups') ]
+				('CollapseGroups', 'CollapseGroups'), (info.ConnectorInsAvailableTag, 'ConnectorInsAvailable') ]
 			for Tag, Attrib in DataInfoAsList:
 				setattr(NewConnector, Attrib, [El.text for El in XMLObj.findall(Tag)])
 			# populate connector type name: internal name and human name

@@ -119,6 +119,7 @@ FTElementContainingComponentToHighlight = 'ElContainingCptToHighlight'
 FTComponentToHighlight = 'CptToHighlight'
 TolFreqTag = 'TolFreq'
 TolFreqUnitTag = 'TolFreqUnit'
+ConnectorInsAvailableTag = 'ConnectorInsAvailable'
 
 # XML tags for project files
 ProjectRootTag = 'vizop_project'

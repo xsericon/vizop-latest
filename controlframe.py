@@ -1517,13 +1517,21 @@ class ControlFrame(wx.Frame):
 					ConnectorIn=ThisConnectorIn))
 				self.FTConnectorOutAspect.VariableWidgetList.append(DisconnectButtonWidget)
 				DisconnectButtonWidget.Widget.SetBitmap(self.TopLevelFrame.ButtonBitmap(wx.ART_MINUS))
-			# add 'add' button at the bottom of the list of connector-ins
-			ConnectButtonWidget = UIWidgetItem(wx.Button(NotebookPage,
-				size=self.StandardImageButtonSize),
-				RowOffset=len(ConnectorOut.ConnectorIns), ColOffset=1, ColSpan=1, Events=[wx.EVT_BUTTON],
-				Handler=self.FTConnectorOutAspect_OnConnectorInConnectButton)
-			self.FTConnectorOutAspect.VariableWidgetList.append(ConnectButtonWidget)
-			ConnectButtonWidget.Widget.SetBitmap(self.TopLevelFrame.ButtonBitmap(wx.ART_PLUS))
+			# find out whether any connector-ins are available as possible new connections for this connector-out
+			NewConnectorInsAvailable = ConnectorOut.NewConnectorInsAvailable()
+			if NewConnectorInsAvailable:
+				# add 'add' button at the bottom of the list of connector-ins
+				ConnectButtonWidget = UIWidgetItem(wx.Button(NotebookPage,
+					size=self.StandardImageButtonSize),
+					RowOffset=len(ConnectorOut.ConnectorIns), ColOffset=1, ColSpan=1, Events=[wx.EVT_BUTTON],
+					Handler=self.FTConnectorOutAspect_OnConnectorInConnectButton)
+				self.FTConnectorOutAspect.VariableWidgetList.append(ConnectButtonWidget)
+				ConnectButtonWidget.Widget.SetBitmap(self.TopLevelFrame.ButtonBitmap(wx.ART_PLUS))
+			else: # no new connector-ins available; add static text
+				NoNewConnectorsMessage = UIWidgetItem(wx.StaticText(NotebookPage, -1,
+					_('(No unused inward connectors available)')), RowOffset=len(ConnectorOut.ConnectorIns),
+					ColOffset=1, ColSpan=1)
+				self.FTConnectorOutAspect.VariableWidgetList.append(NoNewConnectorsMessage)
 			# insert connector-in widgets into widget list, based on RowOffset and ColOffset
 			self.FTConnectorOutAspect.WidgetList = self.InsertVariableWidgets(TargetPlaceholderName='ConnectorIn',
 				FixedWidgets=self.FTConnectorOutAspect.FixedWidgetList,
