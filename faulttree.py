@@ -2572,31 +2572,38 @@ class FTConnectorItemInCore(FTElementInCore): # in- and out-connectors (CX's) to
 			self.Value.SetMyStatus(NewStatus='ValueStatus_Unset', RR=ThisRR)
 		self.Value.SetMyUnit(FTEventInCore.DefaultFreqUnit)
 
-	def AvailableConnectorsInTexts(self):
-		# returns list of human-readable texts describing Connectors-In in the project that are available for connection
+	def AvailableConnectorsIn(self):
+		# returns list of Connectors-In in the project that are available for connection
 		# to this Connector-Out.
 		# They are available if they have no existing connection, are not in the same FT,
 		# and would not create a circularity if connected to this Connector-Out
-		AvailableConnectorsIn = []
-		# search over all other FTs in the project
-		for ThisFT in [p for p in self.FT.Proj.PHAObjs if isinstance(p, FTObjectInCore) if not (p is self.FT)]:
-			# search over all connectors-in in the FT
-			for ThisCXIn in [e for e in WalkOverAllFTObjs(ThisFT) if isinstance(e, FTConnectorItemInCore) if not e.Out
-				if (e.RelatedCX is None)]:
-				# do circularity check: check that any CX-out on the FT hosting the candidate CX-in has no connection
-				# to a CX-in on my own FT
-				HasCircularity = False
-				# check all CX-in's in my FT
-				for MyCXIn in [e for e in WalkOverAllFTObjs(self.FT) if isinstance(e, FTConnectorItemInCore) if not e.Out]:
-					# check all CX-out's in the FT containing the candidate CX-in
-					for ThisCXOut in [e for e in WalkOverAllFTObjs(ThisFT) if isinstance(e, FTConnectorItemInCore) if e.Out]:
-						HasCircularity |= self.FT.HasPathBetween(ThisCXOut, MyCXIn)
+		if self.Out: # make sure this is a Connector-Out
+			AvailableConnectorsIn = []
+			# search over all other FTs in the project
+			for ThisFT in [p for p in self.FT.Proj.PHAObjs if isinstance(p, FTObjectInCore) if not (p is self.FT)]:
+				# search over all connectors-in in the FT
+				for ThisCXIn in [e for e in WalkOverAllFTObjs(ThisFT) if isinstance(e, FTConnectorItemInCore) if not e.Out
+					if (e.RelatedCX is None)]:
+					# do circularity check: check that any CX-out on the FT hosting the candidate CX-in has no connection
+					# to a CX-in on my own FT
+					HasCircularity = False
+					# check all CX-in's in my FT
+					for MyCXIn in [e for e in WalkOverAllFTObjs(self.FT) if isinstance(e, FTConnectorItemInCore) if not e.Out]:
+						# check all CX-out's in the FT containing the candidate CX-in
+						for ThisCXOut in [e for e in WalkOverAllFTObjs(ThisFT) if isinstance(e, FTConnectorItemInCore) if e.Out]:
+							HasCircularity |= self.FT.HasPathBetween(ThisCXOut, MyCXIn)
 
-				print('FT2587 found available CX-in. Circularity check: ', HasCircularity)
-				if not HasCircularity: # candidate CX-in is acceptable; add a descriptor to the list
-					AvailableConnectorsIn.append(_("'%s' in Fault Tree '%s'") % (ThisCXIn.HumanName, ThisFT.HumanName))
-		print('FT2598 AvailableConnectorsIn:', AvailableConnectorsIn)
-		return AvailableConnectorsIn
+					print('FT2587 found available CX-in. Circularity check: ', HasCircularity)
+					if not HasCircularity: # candidate CX-in is acceptable; add it to the list
+						AvailableConnectorsIn.append(ThisCXIn)
+			print('FT2598 AvailableConnectorsIn:', AvailableConnectorsIn)
+			return AvailableConnectorsIn
+		else: # it's a connector-in; return empty list
+			return []
+
+	def DescriptorText(self):
+		# return human-readable text describing this Connector
+		return _("'%s' in Fault Tree '%s'") % (self.HumanName, self.FT.HumanName)
 
 #	def GetMyValue(self, RiskReceptor=core_classes.DefaultRiskReceptor):
 #		# calculate and return output value of the connector for specified risk receptor
@@ -3178,9 +3185,11 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 				assert isinstance(FTConn.RelatedCX, FTConnectorItemInCore)
 				assert isinstance(FTConn.RelatedCX.ID, str)
 				El.text = FTConn.RelatedCX.ID
-			for AvailConnectorInText in FTConn.AvailableConnectorsInTexts():
+			# make a tag for each connector-in in the project that can be connected to this connector-out
+			for AvailConnectorIn in FTConn.AvailableConnectorsIn():
 				El = ElementTree.SubElement(ConnEl, info.ConnectorInsAvailableTag)
-				El.text = AvailConnectorInText
+				El.text = AvailConnectorIn.DescriptorText() # XML element text is the connector-in's human descriptor
+				El.set(info.IDTag, AvailConnectorIn.ID) # add XML attrib containing the connector-in's ID
 			# add options for value kind
 			print('FT3039 populating connector value kinds: ', type(FTConn.Value))
 			for (ThisValueKindIndex, ThisValueKind) in enumerate(FTConn.AcceptableValueKinds):
@@ -4309,7 +4318,8 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 				setattr(NewConnector, Attrib, bool(XMLObj.findtext(Tag, default='False')))
 			# DataInfoAsList: (Tag of each item in a list, name of the list to put the tag's text into)
 			DataInfoAsList = [ ('DescriptionComments', 'DescriptionComments'), ('ConnectTo', 'ConnectToIDs'),
-				('CollapseGroups', 'CollapseGroups'), (info.ConnectorInsAvailableTag, 'ConnectorInsAvailable') ]
+				('CollapseGroups', 'CollapseGroups') ]
+#				('CollapseGroups', 'CollapseGroups'), (info.ConnectorInsAvailableTag, 'ConnectorInsAvailable') ]
 			for Tag, Attrib in DataInfoAsList:
 				setattr(NewConnector, Attrib, [El.text for El in XMLObj.findall(Tag)])
 			# populate connector type name: internal name and human name
@@ -4327,6 +4337,10 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 				MasterOptionsList=core_classes.UnitItem.UserSelectableUnits)
 			NewConnector.ConnValueUnitComponent.ObjectChoices = [core_classes.ChoiceItem(XMLName=u.XMLName,
 				HumanName=u.HumanName, Applicable=u.Applicable) for u in NewConnector.UnitOptions]
+			# populate list of connector-in's available to connect to this connector-out
+			for El in XMLObj.findall(info.ConnectorInsAvailableTag):
+				NewConnector.ConnectorInsAvailable.append(core_classes.ChoiceItem(HumanName=El.text, Applicable=False,
+					ID=El.get(info.IDTag)))
 			# retrieve data from ProblemIndicatorTag: decide whether to show problem button
 			ProblemTag = XMLObj.find(info.ProblemIndicatorTag)
 			if ProblemTag is None:
@@ -5082,6 +5096,11 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 							   Element=ElementID, TextComponent=EditComponentInternalName, NewValue=NewValue)
 
 
+	def RequestNewConnectionToConnectorIn(self, ElementID, TargetConnectorID):
+		# send request to Datacore to create a new connection from a connector-out with ID=ElementID to a connector-in
+		# with ID=TargetConnectorID
+		print('FT5100 in RequestNewConnectionToConnectorIn')
+
 	def ConnectButtonsCanConnectTo(self, StartButton):
 		# find and return list of connect buttons that StartButton (a connect button object) can connect to.
 		# Include any button it's already connected to
@@ -5112,7 +5131,8 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		return StripCentreXInPx, StripMinXInPx, StripMinYInPx, StripMaxXInPx, StripMaxYInPx
 
 	def ReleaseDisplayDevice(self, DisplDevice, **Args):  # wrap-up actions needed when display device is no longer showing FT
-		pass # no specific actions needed (later, might need to store any unstored user inputs, and kill any active widgets)
+		self.DisplDevice = None
+		# later, might need to store any unstored user inputs, and kill any active widgets
 
 	def SetElementAsCurrent(self, TargetFTElement, UnsetPrevious=False):
 		# set TargetFTElement (FTElement or FTGate instance) as the current one. This will be reflected in Control Panel and

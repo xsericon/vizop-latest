@@ -70,7 +70,7 @@ class ProjectItem(object): # class of PHA project instances
 		self.PHAObjs = [] # list of PHA objects existing locally, in order created; empty if datacore is remote
 		self.PHAObjShadows = [] # list of info about PHA objects; used by control frame, as the project datacore may be
 			# remote, so it may not have access to self.PHAObjs; same order as self.PHAObjs
-		self.ActiveViewports = [] # list of all currently active Viewports, in order created
+		self.ActiveViewports = [] # list of all Viewports currently displayed in a display device
 		self.AllViewportShadows = [] # list of all Viewport shadows (belonging to datacore)
 		self.IPLKinds = []
 		self.CauseKinds = []

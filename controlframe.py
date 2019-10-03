@@ -1495,12 +1495,7 @@ class ControlFrame(wx.Frame):
 		def LineupVariableWidgetsForFTConnectorOutAspect(self, ConnectorOut, NotebookPage):
 			# adjust variable widgets in FT Connector-out aspect of Control Panel
 			# depending on number of connector-in's to which this Connector-Out is connected
-#			# StartRow, StartCol (2 x int): sizer position to insert the first connector-in-related widget
 			# NotebookPage: parent window for the variable widgets
-#			assert isinstance(StartRow, int)
-#			assert StartRow >= 0
-#			assert isinstance(StartCol, int)
-#			assert StartCol >= 0
 			# first, deactivate and destroy all existing variable widgets (to avoid memory leak)
 			self.FTConnectorOutAspect.Deactivate(Widgets=self.FTConnectorOutAspect.VariableWidgetList)
 			for ThisWidget in self.FTConnectorOutAspect.VariableWidgetList: ThisWidget.Widget.Destroy()
@@ -1520,13 +1515,23 @@ class ControlFrame(wx.Frame):
 			# find out whether any connector-ins are available as possible new connections for this connector-out
 			NewConnectorInsAvailable = ConnectorOut.NewConnectorInsAvailable()
 			if NewConnectorInsAvailable:
-				# add 'add' button at the bottom of the list of connector-ins
-				ConnectButtonWidget = UIWidgetItem(wx.Button(NotebookPage,
-					size=self.StandardImageButtonSize),
-					RowOffset=len(ConnectorOut.ConnectorIns), ColOffset=1, ColSpan=1, Events=[wx.EVT_BUTTON],
-					Handler=self.FTConnectorOutAspect_OnConnectorInConnectButton)
-				self.FTConnectorOutAspect.VariableWidgetList.append(ConnectButtonWidget)
-				ConnectButtonWidget.Widget.SetBitmap(self.TopLevelFrame.ButtonBitmap(wx.ART_PLUS))
+#				# add 'add' button at the bottom of the list of connector-ins
+#				ConnectButtonWidget = UIWidgetItem(wx.Button(NotebookPage,
+#					size=self.StandardImageButtonSize),
+#					RowOffset=len(ConnectorOut.ConnectorIns), ColOffset=1, ColSpan=1, Events=[wx.EVT_BUTTON],
+#					Handler=self.FTConnectorOutAspect_OnConnectorInConnectButton)
+#				self.FTConnectorOutAspect.VariableWidgetList.append(ConnectButtonWidget)
+#				ConnectButtonWidget.Widget.SetBitmap(self.TopLevelFrame.ButtonBitmap(wx.ART_PLUS))
+				# add choice widget to add connection, with label
+				NewConnectLabelWidget = UIWidgetItem(wx.StaticText(NotebookPage, -1,
+					_('Add connection to:')), RowOffset=len(ConnectorOut.ConnectorIns),
+					ColOffset=1, ColSpan=1)
+				NewConnectChoiceWidget = UIWidgetItem(wx.Choice(MyNotebookPage, -1, size=(100, 30),
+					choices=[NewConnectorInsAvailable]),
+					Handler=self.NumericalValueAspect_OnNewConnectChoiceWidget, Events=[wx.EVT_CHOICE],
+					RowOffset=len(ConnectorOut.ConnectorIns), ColOffset=2, ColSpan=1)
+				self.FTConnectorOutAspect.VariableWidgetList.append(NewConnectLabelWidget)
+				self.FTConnectorOutAspect.VariableWidgetList.append(NewConnectChoiceWidget)
 			else: # no new connector-ins available; add static text
 				NoNewConnectorsMessage = UIWidgetItem(wx.StaticText(NotebookPage, -1,
 					_('(No unused inward connectors available)')), RowOffset=len(ConnectorOut.ConnectorIns),
@@ -1568,6 +1573,22 @@ class ControlFrame(wx.Frame):
 		def FTConnectorOutAspect_OnConnectorDescriptionWidget(self, Event, **Args): pass
 		def FTConnectorOutAspect_OnConnectorInDisconnectButton(self, Event, ConnectorIn): pass
 		def FTConnectorOutAspect_OnConnectorInConnectButton(self, Event, ConnectorIn): pass
+
+		def NumericalValueAspect_OnNewConnectChoiceWidget(self, Event, **Args):
+			# handle user selection of Connector-In to connect to
+			# get option selected by user
+			EventWidget = Event.GetEventObject()
+			UserSelection = EventWidget.GetSelection()
+			if UserSelection != wx.NOT_FOUND: # is any item selected?
+				# find widget object and attrib containing value kind options
+				ThisWidgetObj = [w for w in self.FTConnectorOutAspect.WidgetList if w.Widget == EventWidget][0]
+				OptionsAttrib = getattr(ThisWidgetObj.PHAObj, ThisWidgetObj.DataAttrib) if ThisWidgetObj.DataAttrib\
+					else ThisWidgetObj.PHAObj
+				# find XML name (= ID) of Connector-In requested
+				TargetConnectorID = OptionsAttrib.ConnectorInsAvailable[EventWidget.GetSelection()].ID
+				# get Viewport to request new connection
+				self.TopLevelFrame.CurrentViewport.RequestNewConnectionToConnectorIn(ElementID=ThisWidgetObj.PHAObj.ID,
+					TargetConnectorID=TargetConnectorID)
 
 		class ControlPanelAspectItem(object): # class whose instances are aspects of the Control panel
 			# attribs:
@@ -1720,7 +1741,7 @@ class ControlFrame(wx.Frame):
 			# execute actions needed when display device is changing from one Viewport to another
 			# first, do wrap-up actions in the Viewport
 			self.ViewportOwner.CurrentViewport.ReleaseDisplayDevice(DisplDevice=self)
-			self.TopLevelFrame.CurrentViewport = None
+			self.TopLevelFrame.CurrentViewport = None # this probably isn't used, redundant
 			# clear graphics
 			self.ShowEmptyPanel()
 			self.EditPanelMode(Viewport=None, NewMode='Blocked') # block user interaction with display device
@@ -2101,6 +2122,7 @@ class ControlFrame(wx.Frame):
 		Handler = {'RP_NewViewport': self.PostProcessNewViewport,
 			'RP_SwitchToViewport': self.PostProcessSwitchToViewport,
 			'RP_NewPHAModel': self.PostProcessNewPHAModel,
+			'RP_StopDisplayingViewport': self.PostProcessNoActionRequired
 			}[XMLRoot.tag.strip()]
 		# call handler, and return its reply
 		Reply = Handler(XMLRoot)
@@ -2116,11 +2138,12 @@ class ControlFrame(wx.Frame):
 		ProjIDTagInXML = ParsedMsgRoot.find(info.ProjIDTag)
 		# find the project with the ID provided
 		Proj = self.Projects[ [p.ID for p in self.Projects].index(ProjIDTagInXML.text) ]
-		# handlers for all possible requests from Control Frame
+		# handlers for all possible requests from Control Frame. Handlers must return an XML reply message
 		Handler = {'RQ_NewViewport': self.DatacoreDoNewViewport,
 			'RQ_SwitchToViewport': self.DatacoreSwitchToViewport,
 			'RQ_NewFTEventNotIPL': self.DatacoreDoNewFTEventNotIPL,
-			'RQ_NewPHAObject': DatacoreDoNewPHAObj}[
+			'RQ_NewPHAObject': DatacoreDoNewPHAObj,
+			'RQ_StopDisplayingViewport': DatacoreStopDisplayingViewport}[
 			ParsedMsgRoot.tag.strip()]
 		# call handler and collect reply XML tree to send back to Control Frame
 		ReplyXML = Handler(Proj=Proj, XMLRoot=ParsedMsgRoot)
@@ -2231,7 +2254,10 @@ class ControlFrame(wx.Frame):
 			PHAModel=utilities.ObjectWithID(core_classes.PHAModelBaseClass.AllPHAModelObjects,
 			utilities.TextAsString(XMLRoot.find(info.PHAModelIDTag))))
 		return vizop_misc.MakeXMLMessage('Null', 'Null')
-#		return {'Success': True, 'Notification': vizop_misc.MakeXMLMessage('Null', 'Null')}
+
+	def PostProcessNoActionRequired(self, XMLRoot=None):
+		# handle incoming RP_ message to Control Frame where no action is required
+		return vizop_misc.MakeXMLMessage('Null', 'Null')
 
 	def DoSwitchToViewportCommand(self, Proj, PHAObj, Viewport, Redoing=False, Chain=False, **Args):
 		# handle request to switch to existing Viewport in project Proj
@@ -2372,9 +2398,15 @@ class ControlFrame(wx.Frame):
 		assert isinstance(ViewportToShow, display_utilities.ViewportBaseClass)
 		# release any existing Viewport from PHA panel
 		if self.CurrentViewport:
-			# remove old Viewport from ActiveViewports
+			print('CF2397 self.CurrentViewport: ', self.CurrentViewport, type(self.CurrentViewport))
+			# remove old Viewport from local ActiveViewports list
 			Proj.ActiveViewports.remove(self.CurrentViewport)
+			# tell datacore the Viewport is no longer on display%%%
+			AttribDict = {info.ProjIDTag: Proj.ID, 'ControlFrame': self.ID, info.ViewportTag: self.CurrentViewport.ID}
 			self.MyEditPanel.ReleaseViewportFromDisplDevice()
+			# request datacore to create new PHA object
+			ReplyReceived = vizop_misc.SendRequest(self.zmqOutwardSocket, Command='RQ_StopDisplayingViewport',
+				FetchReply=False, **AttribDict)
 		# add target Viewport
 		Proj.ActiveViewports.append(ViewportToShow)
 		# set Viewport as current in Control Frame
@@ -2564,6 +2596,7 @@ class ControlFrame(wx.Frame):
 #				NewViewport.PHAObj = ExistingPHAObj
 #				ExistingPHAObj.Viewports.append(NewViewport)  # add Viewport to list in the PHA object
 		# make reply message to send to control frame
+		TargetViewport.IsOnDisplay = True
 		Reply = self.MakeXMLMessageForDrawViewport(MessageHead='RP_SwitchToViewport', PHAObj=ExistingPHAObj,
 			Viewport=TargetViewport, ViewportID=TargetViewportID)
 		# send the info back to control frame as a reply message (via ListenToSocket)
@@ -2878,19 +2911,26 @@ class ControlFrame(wx.Frame):
 		self.DisplayDevices.append(NewDisplayDevice)
 
 	def UpdateAllViewports(self, Proj=None, Message=None):
-		# refresh Viewports after change to data in datacore. For now, we just redraw all Viewports.
-		# Message (str): XML message received requesting update to Viewports
-		# ignore Message if it's just 'OK'
-		for ThisViewport in Proj.AllViewportShadows:
-			# get refresh data from corresponding PHA object
-			RedrawXMLData = ThisViewport.PHAObj.GetFullRedrawData(Viewport=ThisViewport, ViewportClass=ThisViewport.MyClass)
-			# make XML message with ID of PHA object, followed by full redraw data
-			FullXMLData = vizop_misc.MakeXMLMessage(RootName='RQ_RedrawViewport', RootText=ThisViewport.ID,
-				Elements={info.IDTag: ThisViewport.PHAObj.ID})
-			FullXMLData.append(RedrawXMLData)
-			# send it to Viewport
-			vizop_misc.SendRequest(Socket=ThisViewport.D2CSocketREQObj.Socket, Command='RQ_RedrawViewport',
-				XMLRoot=FullXMLData)
+		# this is a Datacore function.
+		# refresh Viewports after change to data in datacore. For now, we just redraw all Viewports currently shown
+		# in a display device.
+		# Message (str): XML message received requesting update to Viewports (currently not used)
+		# Check with all Viewports that datacore knows about
+		for ThisViewportShadow in Proj.AllViewportShadows:
+			print('CF2906 UpdateAllViewports: processing Viewport: ', ThisViewportShadow.HumanName)
+			# check if ThisViewportShadow is displayed in any display device, local or remote
+			if ThisViewportShadow.IsOnDisplay:
+				# find Viewport shadow corresponding to
+				# get refresh data from corresponding PHA object
+	#			RedrawXMLData = ThisViewport.PHAObj.GetFullRedrawData(Viewport=ThisViewport, ViewportClass=ThisViewport.MyClass)
+				RedrawXMLData = ThisViewport.PHAObj.GetFullRedrawData(Viewport=ThisViewport, ViewportClass=type(ThisViewport))
+				# make XML message with ID of PHA object, followed by full redraw data
+				FullXMLData = vizop_misc.MakeXMLMessage(RootName='RQ_RedrawViewport', RootText=ThisViewport.ID,
+					Elements={info.IDTag: ThisViewport.PHAObj.ID})
+				FullXMLData.append(RedrawXMLData)
+				# send it to Viewport
+				vizop_misc.SendRequest(Socket=ThisViewport.D2CSocketREQObj.Socket, Command='RQ_RedrawViewport',
+					XMLRoot=FullXMLData)
 
 class ControlFramePersistent(object):
 	# a persistent object used for returning data from control frame after it is Destroy()ed.
@@ -2976,6 +3016,15 @@ def DatacoreDoNewPHAObj(Proj, XMLRoot=None, ViewportID=None, **NewPHAObjArgs):
 		info.PHAModelTypeTag: NewPHAObjType.InternalName})
 	return Reply
 
+def DatacoreStopDisplayingViewport(Proj, XMLRoot=None):
+	# handle request to datacore informing that a Viewport is no longer on display in any display device
+	# first, find the corresponding Viewport shadow
+	TargetViewport = utilities.ObjectWithID(Proj.AllViewportShadows, XMLRoot.find(info.ViewportTag).text)
+	TargetViewport.IsOnDisplay = False
+	print('CF3019 in datacore, set viewport %s as not visible' % TargetViewport.ID)
+	return vizop_misc.MakeXMLMessage(RootName='RP_StopDisplayingViewport', RootText=TargetViewport.ID,
+		Elements={})
+
 class ViewportShadow(object): # defines objects that represent Viewports in the datacore.
 	# These are not the actual (visible) Viewports - those live in the controlframe (local or remote) and aren't
 	# directly accessible by the datacore.
@@ -2997,6 +3046,7 @@ class ViewportShadow(object): # defines objects that represent Viewports in the 
 		self.ID = ID
 		self.MyClass = MyClass
 		self.HumanName = HumanName
+		self.IsOnDisplay = False # whether the Viewport shadow is currently displayed on any display device
 		# set up sockets using socket numbers provided
 		self.C2DSocketREP, self.C2DSocketREPObj, C2DSocketNumberReturned = vizop_misc.SetupNewSocket(SocketType='REP',
 			SocketLabel='C2DREP_' + self.ID,

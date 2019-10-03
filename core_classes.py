@@ -1775,7 +1775,7 @@ class Bookmark(object):
 
 class ChoiceItem(object): # represents an item in a group of items the user can select from, in an instance of
 	# FTForDisplay (such as a risk receptor) or an instance of a PHA object shadow or an FT element
-	def __init__(self, XMLName='', HumanName='', Applicable=True):
+	def __init__(self, XMLName='', HumanName='', Applicable=True, **Args):
 		# XMLName (str): stores the 'Serial' tag value received from FTObjectInCore
 		# Applicable (bool): whether the item applies to this instance (ie whether this is the "current" one)
 		assert isinstance(HumanName, str)
@@ -1786,5 +1786,6 @@ class ChoiceItem(object): # represents an item in a group of items the user can 
 		self.HumanName = HumanName
 		self.XMLName = XMLName
 		self.Applicable = Applicable
+		self.__dict__.update(Args) # extract any other attribs supplied
 
 del _ # remove dummy definition

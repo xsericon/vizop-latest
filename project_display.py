@@ -696,6 +696,7 @@ class ProjectInfoModelForDisplay(display_utilities.ViewportBaseClass): # object 
 	def ReleaseDisplayDevice(self, DisplDevice, **Args): # wrap-up actions needed when display device is no longer
 		# showing this Viewport
 		self.RemoveWidgets()
+		self.DisplDevice = None
 #		self.MyNotebook.Hide()
 
 def AddPHAObjsTags(Proj, XMLRoot, CurrentPHAObj=None):

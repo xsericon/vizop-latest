@@ -205,8 +205,11 @@ def SendRequest(Socket=None, Command='RQ_Null', FetchReply=False, XMLRoot=None, 
 	# convert the XML tree to a string
 	XMLString = ElementTree.tostring(RootElement, encoding='UTF-8')
 	# submit the string via zmq
-	print('VM209 sending request on socket: ',
-		  [(s.SocketNo, s.SocketLabel) for s in RegisterSocket.Register if s.Socket == Socket])
+	# next line is for debugging only
+	ThisSocketNo, ThisSocketLabel =  [(s.SocketNo, s.SocketLabel) for s in RegisterSocket.Register if s.Socket == Socket][0]
+	print('VM209 sending request on socket: ', ThisSocketNo, ThisSocketLabel)
+	if ThisSocketLabel == 'C2VREQ_1': raise ValueError
+
 	Socket.send(XMLString, copy=True)
 	if FetchReply: # this path not currently used?
 		ReplyReceived = None
