@@ -2608,6 +2608,17 @@ class FTConnectorItemInCore(FTElementInCore): # in- and out-connectors (CX's) to
 	def AcceptableValueKinds(self): # return list of value kinds (subclasses of NumValueItem) for connector
 		return self.FTConnAcceptableValueKinds
 
+	def MakeConnectionWith(self, ConnectorOut, Viewport):
+		# set up connection from this connector-in to the specified Connector-Out
+		assert not self.Out # make sure we are a connector-in
+		assert isinstance(ConnectorOut, FTConnectorItemInCore)
+		assert ConnectorOut.Out # make sure ConnectorOut is -out
+		self.RelatedCX = ConnectorOut
+		# change my number type to UseParent (i.e. linked)
+		self.FT.ChangeNumberKind(FTElement=self, NewNumberKindXMLName='LinkedFrom', ValueAttribName='', Viewport=Viewport,
+			StoreUndoRecord=True, LinkedFromElement=ConnectorOut)
+
+
 #	def GetMyValue(self, RiskReceptor=core_classes.DefaultRiskReceptor):
 #		# calculate and return output value of the connector for specified risk receptor
 #		# returns (float, UnitItem instance, 1st NumProblemValue in calculation chain (or None),
@@ -3831,7 +3842,8 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			# TODO add data for the changed component to the Save On Fly data
 		return {'Success': True}
 
-	def ChangeNumberKind(self, FTElement, NewNumberKindXMLName, ValueAttribName='', Viewport=None, StoreUndoRecord=True):
+	def ChangeNumberKind(self, FTElement, NewNumberKindXMLName, ValueAttribName='', Viewport=None, StoreUndoRecord=True,
+		LinkedFromElement=None):
 		# change number kind of numerical value
 		# FTElement: FT itself (for updating TolFreq value), or an FTEvent or FTGate instance (for updating event value)
 		# NewNumberKindXMLName: (str) XML name of number kind to change to
@@ -3839,11 +3851,14 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		#	should be '' if FTElement is not the FT itself
 		# Viewport: Viewport from which number change request was initiated - for undo; ignored if StoreUndoRecord is False
 		# StoreUndoRecord (bool): whether to store an undo record for the number kind change
+		# LinkedFromElement (any PHA element or None): if changing to UseParent (linked) number kind, which element to
+		#	link from
 		# return:
 			# NumberKindChanged (bool): whether the number kind was actually changed
 			# NewNumberKind (NumValueItem subclass or None): the number kind changed to, or None if number kind wasn't changed
 		assert isinstance(StoreUndoRecord, bool)
 		if StoreUndoRecord: assert Viewport is not None
+		if NewNumberKindXMLName is 'LinkedFrom': assert LinkedFromElement is not None
 		# find the applicable attrib in FTElement
 		if not ValueAttribName: ValueAttribNameToUse = 'Value'
 		else: ValueAttribNameToUse = ValueAttribName
@@ -3856,9 +3871,11 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			NewNumberKind = None
 			NumberKindChanged = False
 		if NumberKindChanged: # proceed to change number kind
-			# fetch args for MakeNewNumberKind call, to set methods for AutoNumValueItem, if appropriate
-			if NewNumberKind == core_classes.AutoNumValueItem:
+			# fetch args for MakeNewNumberKind call, if appropriate
+			if NewNumberKind == core_classes.AutoNumValueItem: # fetch methods for AutoNumValueItem
 				Args = {'AutoCalculator': FTElement.GetEventValue, 'AutoStatusGetter': FTElement.GetEventValueStatus}
+			elif NewNumberKind == core_classes.UseParentValueItem: # fetch element to link from
+				Args = {'LinkedFromElement': LinkedFromElement}
 			else: Args = {}
 			# keep a record of the old number object, make the new number object, and transfer attribs across
 			OldValueObj = ValueAttrib
@@ -3991,6 +4008,18 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			if ProblemFound:
 				Reply = vizop_misc.MakeXMLMessage(RootName='Problem', RootText=ProblemFound)
 			else: Reply = vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
+		elif Command == 'RQ_FT_JoinConnectors': # make connection from connector-out to connector-in
+			TargetCXOutID = XMLRoot.findtext('ConnectorOut')
+			TargetCXInID = XMLRoot.findtext('ConnectorIn')
+			# find the connector-out
+			ThisConnectorOut = [e for e in WalkOverAllFTObjs(self) if e.ID == TargetCXOutID][0]
+			# find the connector-in, in a different FT, by searching over all FTs in project other than this one
+			ThisConnectorIn = [e for ThisFT in self.Proj.PHAObjs if isinstance(ThisFT, FTObjectInCore)
+				if not (ThisFT is self)
+				for e in WalkOverAllFTObjs(ThisFT) if e.ID == TargetCXInID][0]
+			# set the connection at the CX-in end
+			ThisConnectorIn.MakeConnectionWith(ConnectorOut=ThisConnectorOut, Viewport=SourceViewport)
+			Reply = vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
 		elif Command == 'OK': # dummy for 'OK' responses - received only to clear the sockets
 			Reply = vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
 		return Reply
@@ -4080,7 +4109,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			# This is used so we can store the selection across a refresh - as datacore doesn't know which elements are
 			# "current" in our Viewport
 		self.ExistingElementIDsOnLastRefresh = [] # IDs of all elements existing in FT when it is redrawn.
-			# This is used so we can detect which IDs are new, so they can be made "current" (highlighted)%%%
+			# This is used so we can detect which IDs are new, so they can be made "current" (highlighted)
 
 	def Wipe(self): # wipe all data in the FT and re-initialize
 		self.Header.InitializeData()
@@ -4351,6 +4380,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 				NewConnector.ProblemHumanHelp = ProblemTag.text
 				NewConnector.ConnValueProblemButton.Visible = (ProblemTag.get(info.ProblemLevelAttribName, '') in
 					['Level7', 'Level10'])
+			print('FT4354 populated connector with value: ', NewConnector.Value)
 			return NewConnector
 
 		def PopulateFTGate(XMLObj, Column):
@@ -4455,7 +4485,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			# populate "existing elements" list
 			ExistingElementIDs.append(ThisEl.ID)
 		self.ExistingElementIDsOnLastRefresh = ExistingElementIDs
-		# request appropriate control panel aspect %%% working here
+		# request appropriate control panel aspect
 		self.SwitchToPreferredControlPanelAspect(CurrentElements=self.CurrentElements)
 
 	def RenderInDC(self, TargetDC, FullRefresh=True, **Args):
@@ -5102,6 +5132,10 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		# send request to Datacore to create a new connection from a connector-out with ID=ElementID to a connector-in
 		# with ID=TargetConnectorID
 		print('FT5100 in RequestNewConnectionToConnectorIn')
+		# check ElementID refers to a connector-out in this FT
+		assert ElementID in [e.ID for e in WalkOverAllFTObjs(self) if isinstance(e, FTConnectorOut)]
+		vizop_misc.SendRequest(Socket=self.C2DSocketREQ, Command='RQ_FT_JoinConnectors', ConnectorOut=ElementID,
+			ConnectorIn=TargetConnectorID, Viewport=self.ID)
 
 	def ConnectButtonsCanConnectTo(self, StartButton):
 		# find and return list of connect buttons that StartButton (a connect button object) can connect to.

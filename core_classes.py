@@ -569,13 +569,15 @@ class NumValueItem(object): # superclass of objects in Datacore having a numeric
 	# we use lambda in the property() args so that it will call the overridden methods in subclasses
 
 	def MakeNewNumberKind(self, NewNumberKind, AttribsToPreserve=[],
-			AutoCalculator=None, AutoStatusGetter=None, AutoUnitGetter=None):
+			AutoCalculator=None, AutoStatusGetter=None, AutoUnitGetter=None, LinkedFromElement=None):
 		# create an instance of NewNumberKind (a subclass of NumValueKind) and copy across all required attribs.
 		# return the new instance
 		# assumes caller has already checked that NewNumberKind is valid for the value
 		# AttribsToPreserve (list of str): any existing attribs of self listed here will be copied to the new instance
 		# AutoCalculator (etc): (3 x callable or None) if NewNumberKind is AutoNumValueItem,
 		# these 3 methods will be assigned to its methods, if they are not None
+		# LinkedFromElement (element in any PHA object): element to link from, if NewNumberKind is UseParentValueItem;
+		#	if None, we attempt to restore a previous LinkedFromElement (but without checking it still exists, FIXME)
 		assert issubclass(NewNumberKind, NumValueItem)
 		# First, find the existing number kind
 		OldNumberKind = type(self)
@@ -635,9 +637,12 @@ class NumValueItem(object): # superclass of objects in Datacore having a numeric
 				if hasattr(self, RestoreAttrib):
 					setattr(NewValueObj, OriginalAttrib, getattr(self, RestoreAttrib))
 		elif NewNumberKind == UseParentValueItem:
-			for (RestoreAttrib, OriginalAttrib) in [('UseParentParentPHAObj', 'ParentPHAObj')]:
-				if hasattr(self, RestoreAttrib):
-					setattr(NewValueObj, OriginalAttrib, getattr(self, RestoreAttrib))
+			if LinkedFromElement is None: # try to restore previously linked element
+				for (RestoreAttrib, OriginalAttrib) in [('UseParentParentPHAObj', 'ParentPHAObj')]:
+					if hasattr(self, RestoreAttrib):
+						setattr(NewValueObj, OriginalAttrib, getattr(self, RestoreAttrib))
+			else: # make link to supplied element
+				self.ParentPHAObj = LinkedFromElement
 		return NewValueObj
 
 class UserNumValueItem(NumValueItem): # class of NumValues for which user supplies a numeric value
