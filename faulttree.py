@@ -4319,7 +4319,6 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			# DataInfoAsList: (Tag of each item in a list, name of the list to put the tag's text into)
 			DataInfoAsList = [ ('DescriptionComments', 'DescriptionComments'), ('ConnectTo', 'ConnectToIDs'),
 				('CollapseGroups', 'CollapseGroups') ]
-#				('CollapseGroups', 'CollapseGroups'), (info.ConnectorInsAvailableTag, 'ConnectorInsAvailable') ]
 			for Tag, Attrib in DataInfoAsList:
 				setattr(NewConnector, Attrib, [El.text for El in XMLObj.findall(Tag)])
 			# populate connector type name: internal name and human name
@@ -4340,7 +4339,8 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			# populate list of connector-in's available to connect to this connector-out
 			for El in XMLObj.findall(info.ConnectorInsAvailableTag):
 				NewConnector.ConnectorInsAvailable.append(core_classes.ChoiceItem(HumanName=El.text, Applicable=False,
-					ID=El.get(info.IDTag)))
+					XMLName=El.get(info.IDTag), ID=El.get(info.IDTag)))
+					# above, we populate the XMLName attrib because it's compulsory, but we intend to use the ID attrib
 			# retrieve data from ProblemIndicatorTag: decide whether to show problem button
 			ProblemTag = XMLObj.find(info.ProblemIndicatorTag)
 			if ProblemTag is None:

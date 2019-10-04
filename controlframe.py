@@ -1526,8 +1526,8 @@ class ControlFrame(wx.Frame):
 				NewConnectLabelWidget = UIWidgetItem(wx.StaticText(NotebookPage, -1,
 					_('Add connection to:')), RowOffset=len(ConnectorOut.ConnectorIns),
 					ColOffset=1, ColSpan=1)
-				NewConnectChoiceWidget = UIWidgetItem(wx.Choice(MyNotebookPage, -1, size=(100, 30),
-					choices=[NewConnectorInsAvailable]),
+				NewConnectChoiceWidget = UIWidgetItem(wx.Choice(NotebookPage, -1, size=(200, 30),
+					choices=[c.HumanName for c in NewConnectorInsAvailable]),
 					Handler=self.NumericalValueAspect_OnNewConnectChoiceWidget, Events=[wx.EVT_CHOICE],
 					RowOffset=len(ConnectorOut.ConnectorIns), ColOffset=2, ColSpan=1)
 				self.FTConnectorOutAspect.VariableWidgetList.append(NewConnectLabelWidget)
@@ -2398,10 +2398,9 @@ class ControlFrame(wx.Frame):
 		assert isinstance(ViewportToShow, display_utilities.ViewportBaseClass)
 		# release any existing Viewport from PHA panel
 		if self.CurrentViewport:
-			print('CF2397 self.CurrentViewport: ', self.CurrentViewport, type(self.CurrentViewport))
 			# remove old Viewport from local ActiveViewports list
 			Proj.ActiveViewports.remove(self.CurrentViewport)
-			# tell datacore the Viewport is no longer on display%%%
+			# tell datacore the Viewport is no longer on display
 			AttribDict = {info.ProjIDTag: Proj.ID, 'ControlFrame': self.ID, info.ViewportTag: self.CurrentViewport.ID}
 			self.MyEditPanel.ReleaseViewportFromDisplDevice()
 			# request datacore to create new PHA object
@@ -2411,6 +2410,8 @@ class ControlFrame(wx.Frame):
 		Proj.ActiveViewports.append(ViewportToShow)
 		# set Viewport as current in Control Frame
 		self.CurrentViewport = ViewportToShow
+		# set current display device in Viewport
+		ViewportToShow.DisplDevice = self.MyEditPanel
 		# store Viewport as shown in edit panel
 		if not (self.CurrentViewport in self.MyEditPanel.AllViewportsShown):
 			self.MyEditPanel.AllViewportsShown.append(self.CurrentViewport)
