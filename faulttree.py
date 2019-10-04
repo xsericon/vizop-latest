@@ -2527,7 +2527,7 @@ class FTConnectorItemInCore(FTElementInCore): # in- and out-connectors (CX's) to
 	ConnectorStyles = ['Default'] # future, will define various connector appearances (squares, arrows, circles etc)
 	MaxElementsConnectedToThis = 100 # arbitrary limit on connectivity of out-CX
 	InternalName = 'FTConnectorInCore'
-	AcceptableValueKinds = [core_classes.UserNumValueItem, core_classes.ConstNumValueItem,
+	FTConnAcceptableValueKinds = [core_classes.UserNumValueItem, core_classes.ConstNumValueItem,
 		core_classes.AutoNumValueItem,
 		core_classes.LookupNumValueItem, core_classes.ParentNumValueItem, core_classes.UseParentValueItem]
 	ComponentEnglishNames = {'Value': 'Value'}
@@ -2604,6 +2604,9 @@ class FTConnectorItemInCore(FTElementInCore): # in- and out-connectors (CX's) to
 	def DescriptorText(self):
 		# return human-readable text describing this Connector
 		return _("'%s' in Fault Tree '%s'") % (self.HumanName, self.FT.HumanName)
+
+	def AcceptableValueKinds(self): # return list of value kinds (subclasses of NumValueItem) for connector
+		return self.FTConnAcceptableValueKinds
 
 #	def GetMyValue(self, RiskReceptor=core_classes.DefaultRiskReceptor):
 #		# calculate and return output value of the connector for specified risk receptor
@@ -3192,7 +3195,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 				El.set(info.IDTag, AvailConnectorIn.ID) # add XML attrib containing the connector-in's ID
 			# add options for value kind
 			print('FT3039 populating connector value kinds: ', type(FTConn.Value))
-			for (ThisValueKindIndex, ThisValueKind) in enumerate(FTConn.AcceptableValueKinds):
+			for (ThisValueKindIndex, ThisValueKind) in enumerate(FTConn.FTConnAcceptableValueKinds):
 				ValueKindEl = ElementTree.SubElement(ConnEl, info.ValueKindOptionTag)
 				# set human name for number kind option to internal name of option
 				ValueKindEl.text = ThisValueKind.XMLName
@@ -3841,14 +3844,13 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			# NewNumberKind (NumValueItem subclass or None): the number kind changed to, or None if number kind wasn't changed
 		assert isinstance(StoreUndoRecord, bool)
 		if StoreUndoRecord: assert Viewport is not None
-#		AcceptableNumberKinds = FTElement.AcceptableValueKinds()
 		# find the applicable attrib in FTElement
 		if not ValueAttribName: ValueAttribNameToUse = 'Value'
 		else: ValueAttribNameToUse = ValueAttribName
 		ValueAttrib = getattr(FTElement, ValueAttribNameToUse)
 		# check if requested number kind is acceptable
-		if NewNumberKindXMLName in [NK.XMLName for NK in FTElement.AcceptableValueKinds]: # it's recognised
-			NewNumberKind = [NK for NK in FTElement.AcceptableValueKinds if NK.XMLName == NewNumberKindXMLName][0]
+		if NewNumberKindXMLName in [NK.XMLName for NK in FTElement.AcceptableValueKinds()]: # it's recognised
+			NewNumberKind = [NK for NK in FTElement.AcceptableValueKinds() if NK.XMLName == NewNumberKindXMLName][0]
 			NumberKindChanged = True
 		else: # requested number kind is not acceptable
 			NewNumberKind = None

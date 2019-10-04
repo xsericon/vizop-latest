@@ -1479,8 +1479,8 @@ class ControlFrame(wx.Frame):
 				Events=[wx.EVT_TEXT_ENTER], Handler=self.FTConnectorOutAspect_OnConnectorDescriptionWidget,
 				Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_LEFT | wx.EXPAND,
 				MinSizeX=200, ColLoc=7, ColSpan=2, DisplayMethod='StaticFromText')
-			self.FTConnectorOutAspect.ConnectToLabel = UIWidgetItem(wx.StaticText(MyNotebookPage, -1, _('Connect to:')),
-				ColLoc=3, ColSpan=1)
+			self.FTConnectorOutAspect.ConnectToLabel = UIWidgetItem(wx.StaticText(MyNotebookPage, -1,
+				_('Connected to:')), ColLoc=3, ColSpan=1)
 			self.FTConnectorOutAspect.ConnectorInPlaceholder = UIWidgetPlaceholderItem(Name='ConnectorIn')
 			# make list of all fixed widgets in this aspect
 			self.FTConnectorOutAspect.FixedWidgetList = [self.FTConnectorOutAspect.NavigateBackButton,
@@ -1506,7 +1506,7 @@ class ControlFrame(wx.Frame):
 				self.FTConnectorOutAspect.VariableWidgetList.append(UIWidgetItem(wx.StaticText(NotebookPage, -1,
 					ThisConnectorIn.HumanName), RowOffset=ThisConnectorInIndex, ColOffset=0, ColSpan=1))
 				DisconnectButtonWidget = UIWidgetItem(wx.Button(NotebookPage,
-					size=self.StandardImageButtonSize),
+					size=self.StandardImageButtonSize), PHAObj=self.TopLevelFrame.PHAObjInControlPanel,
 					RowOffset=ThisConnectorInIndex, ColOffset=1, ColSpan=1, Events=[wx.EVT_BUTTON],
 					Handler=lambda Event: self.FTConnectorOutAspect_OnConnectorInDisconnectButton(Event,
 					ConnectorIn=ThisConnectorIn))
@@ -1528,6 +1528,7 @@ class ControlFrame(wx.Frame):
 					ColOffset=1, ColSpan=1)
 				NewConnectChoiceWidget = UIWidgetItem(wx.Choice(NotebookPage, -1, size=(200, 30),
 					choices=[c.HumanName for c in NewConnectorInsAvailable]),
+					PHAObj=self.TopLevelFrame.PHAObjInControlPanel,
 					Handler=self.NumericalValueAspect_OnNewConnectChoiceWidget, Events=[wx.EVT_CHOICE],
 					RowOffset=len(ConnectorOut.ConnectorIns), ColOffset=2, ColSpan=1)
 				self.FTConnectorOutAspect.VariableWidgetList.append(NewConnectLabelWidget)
@@ -1557,11 +1558,12 @@ class ControlFrame(wx.Frame):
 			self.FTConnectorOutAspect.ConnectorNameText.Widget.ChangeValue(
 				self.TopLevelFrame.PHAObjInControlPanel.HumanName)
 			self.FTConnectorOutAspect.ConnectorNameText.Widget.SelectAll()
+			self.FTConnectorOutAspect.ConnectorNameText.PHAObj = self.TopLevelFrame.PHAObjInControlPanel
 			self.FTConnectorOutAspect.ConnectorDescriptionText.Widget.ChangeValue(
 				self.TopLevelFrame.PHAObjInControlPanel.Description)
 			self.FTConnectorOutAspect.ConnectorDescriptionText.Widget.SelectAll()
+			self.FTConnectorOutAspect.ConnectorDescriptionText.PHAObj = self.TopLevelFrame.PHAObjInControlPanel
 			# set up lineup of variable widgets
-			print('FT1548 setting up variable widgets')
 			self.LineupVariableWidgetsForFTConnectorOutAspect(ConnectorOut=self.TopLevelFrame.PHAObjInControlPanel,
 				NotebookPage=self.FTConnectorOutAspect.NotebookPage)
 
