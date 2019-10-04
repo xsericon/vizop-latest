@@ -2521,6 +2521,7 @@ class ControlFrame(wx.Frame):
 				C2DSocketNumber=int(XMLRoot.find(info.C2DSocketNoTag).text), PHAModel=ExistingPHAObj)
 			# attach existing PHA object to the Viewport
 			NewViewport.PHAObj = ExistingPHAObj
+			NewViewport.IsOnDisplay = True # set flag that ensures NewViewport will get redrawn
 			ExistingPHAObj.Viewports.append(NewViewport) # add Viewport to list in the PHA object
 			# make reply message to send to control frame
 			Reply = self.MakeXMLMessageForDrawViewport(MessageHead='RP_NewViewport', PHAObj=ExistingPHAObj,
@@ -2917,19 +2918,19 @@ class ControlFrame(wx.Frame):
 		# Message (str): XML message received requesting update to Viewports (currently not used)
 		# Check with all Viewports that datacore knows about
 		for ThisViewportShadow in Proj.AllViewportShadows:
-			print('CF2906 UpdateAllViewports: processing Viewport: ', ThisViewportShadow.HumanName)
+			print('CF2906 UpdateAllViewports: processing Viewport: ', ThisViewportShadow.HumanName, ThisViewportShadow.IsOnDisplay)
 			# check if ThisViewportShadow is displayed in any display device, local or remote
 			if ThisViewportShadow.IsOnDisplay:
 				# find Viewport shadow corresponding to
 				# get refresh data from corresponding PHA object
-	#			RedrawXMLData = ThisViewport.PHAObj.GetFullRedrawData(Viewport=ThisViewport, ViewportClass=ThisViewport.MyClass)
-				RedrawXMLData = ThisViewport.PHAObj.GetFullRedrawData(Viewport=ThisViewport, ViewportClass=type(ThisViewport))
+				RedrawXMLData = ThisViewportShadow.PHAObj.GetFullRedrawData(Viewport=ThisViewportShadow,
+					ViewportClass=ThisViewportShadow.MyClass)
 				# make XML message with ID of PHA object, followed by full redraw data
-				FullXMLData = vizop_misc.MakeXMLMessage(RootName='RQ_RedrawViewport', RootText=ThisViewport.ID,
-					Elements={info.IDTag: ThisViewport.PHAObj.ID})
+				FullXMLData = vizop_misc.MakeXMLMessage(RootName='RQ_RedrawViewport', RootText=ThisViewportShadow.ID,
+					Elements={info.IDTag: ThisViewportShadow.PHAObj.ID})
 				FullXMLData.append(RedrawXMLData)
 				# send it to Viewport
-				vizop_misc.SendRequest(Socket=ThisViewport.D2CSocketREQObj.Socket, Command='RQ_RedrawViewport',
+				vizop_misc.SendRequest(Socket=ThisViewportShadow.D2CSocketREQObj.Socket, Command='RQ_RedrawViewport',
 					XMLRoot=FullXMLData)
 
 class ControlFramePersistent(object):
