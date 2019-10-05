@@ -1836,6 +1836,7 @@ class FTElementInCore(object): # superclass used to contain common methods for F
 		assert isinstance(self.Value, core_classes.AutoNumValueItem)
 		# find event connected to this one (should be only one; we find them all for bug trapping)
 		ValueOriginObject = self.GetValueOriginObject(RR, **Args)
+		print('FT1839 in GetEventValue with ValueOriginObject, value, status: ', ValueOriginObject, ValueOriginObject.GetMyValue(RR=RR), ValueOriginObject.Status(RR=RR).InternalName)
 		if ValueOriginObject.Status(RR=RR) == core_classes.NumProblemValue_NoProblem:
 			# fetch value from connected object
 			ConnectedObjectValue = ValueOriginObject.GetMyValue(RR=RR)
@@ -3167,7 +3168,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 				else:
 					OutputValue = info.CantDisplayValueOnScreen # signifying value unobtainable
 
-		# make sub-elements for all the required attribs:
+			# make sub-elements for all the required attribs:
 			# elements where the text is the same as the FTConn attribute
 			# for EventType tag, tag name must be a key in FTEventTypeNameHash
 			DataInfo = [(info.IDTag, FTConn.ID), ('Connectivity', {True: 'Out', False: 'In'}[FTConn.Out]),
@@ -3205,7 +3206,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 				El.text = AvailConnectorIn.DescriptorText() # XML element text is the connector-in's human descriptor
 				El.set(info.IDTag, AvailConnectorIn.ID) # add XML attrib containing the connector-in's ID
 			# add options for value kind
-			print('FT3039 populating connector value kinds: ', type(FTConn.Value))
+			print('FT3039 populating connector value kinds: ', type(FTConn.Value), FTConn.Value.Value, FTConn.Out)
 			for (ThisValueKindIndex, ThisValueKind) in enumerate(FTConn.FTConnAcceptableValueKinds):
 				ValueKindEl = ElementTree.SubElement(ConnEl, info.ValueKindOptionTag)
 				# set human name for number kind option to internal name of option
