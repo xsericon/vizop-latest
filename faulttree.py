@@ -1836,7 +1836,6 @@ class FTElementInCore(object): # superclass used to contain common methods for F
 		assert isinstance(self.Value, core_classes.AutoNumValueItem)
 		# find event connected to this one (should be only one; we find them all for bug trapping)
 		ValueOriginObject = self.GetValueOriginObject(RR, **Args)
-		print('FT1839 in GetEventValue with ValueOriginObject, value, status: ', ValueOriginObject, ValueOriginObject.GetMyValue(RR=RR), ValueOriginObject.Status(RR=RR).InternalName)
 		if ValueOriginObject.Status(RR=RR) == core_classes.NumProblemValue_NoProblem:
 			# fetch value from connected object
 			ConnectedObjectValue = ValueOriginObject.GetMyValue(RR=RR)
@@ -3055,7 +3054,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 				ProblemTag.text = ValueStatus.HumanHelp
 				ProblemTag.set(info.ProblemLevelAttribName, ProblemLevel) # indicating the seriousness of the problem
 			EventUnit = FTEvent.Value.GetMyUnit()
-			ProblemValue = FTEvent.Value.Status(RR=FT.RiskReceptorGroupOnDisplay[0])
+			ProblemValue = FTEvent.Value.Status(RR=RRToDisplay)
 			ProblemObj = None # TODO work out how to fetch this from the NumValueItem instance; also in FTConnectorInCore
 			# make sub-elements for all the required attribs:
 			# elements where the text is the same as the FTEvent attribute in str form
@@ -3149,7 +3148,9 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			ConnEl = ElementTree.SubElement(El, 'FTConnector')
 			# get value and unit for display
 			RRToDisplay = self.RiskReceptorGroupOnDisplay[0]
+			print('FT3154 doing status check. Num type: ', type(FTConn.Value))
 			ProblemValue = FTConn.Value.Status(RR=RRToDisplay)
+			print('FT3155 setting connector value: RR,  ProblemValue: ', RRToDisplay.HumanName, ProblemValue.InternalName)
 			ProblemObj = None # TODO get this from ProblemValue
 			if ProblemValue == core_classes.NumProblemValue_NoProblem:
 				# get the output value of the ConnEl, and format for display
@@ -3206,7 +3207,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 				El.text = AvailConnectorIn.DescriptorText() # XML element text is the connector-in's human descriptor
 				El.set(info.IDTag, AvailConnectorIn.ID) # add XML attrib containing the connector-in's ID
 			# add options for value kind
-			print('FT3039 populating connector value kinds: ', type(FTConn.Value), FTConn.Value.Value, FTConn.Out)
+			print('FT3211 populating connector value kinds: ', type(FTConn.Value), FTConn.Value.GetMyValue(RR=FTConn.FT.RiskReceptorGroupOnDisplay[0]), FTConn.Out)
 			for (ThisValueKindIndex, ThisValueKind) in enumerate(FTConn.FTConnAcceptableValueKinds):
 				ValueKindEl = ElementTree.SubElement(ConnEl, info.ValueKindOptionTag)
 				# set human name for number kind option to internal name of option
@@ -4381,7 +4382,6 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 				NewConnector.ProblemHumanHelp = ProblemTag.text
 				NewConnector.ConnValueProblemButton.Visible = (ProblemTag.get(info.ProblemLevelAttribName, '') in
 					['Level7', 'Level10'])
-			print('FT4354 populated connector with value: ', NewConnector.Value)
 			return NewConnector
 
 		def PopulateFTGate(XMLObj, Column):
@@ -5132,9 +5132,10 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 	def RequestNewConnectionToConnectorIn(self, ElementID, TargetConnectorID):
 		# send request to Datacore to create a new connection from a connector-out with ID=ElementID to a connector-in
 		# with ID=TargetConnectorID
-		print('FT5100 in RequestNewConnectionToConnectorIn')
 		# check ElementID refers to a connector-out in this FT
 		assert ElementID in [e.ID for e in WalkOverAllFTObjs(self) if isinstance(e, FTConnectorOut)]
+		# set the connector to be selected on next redraw
+		self.CurrentElementIDsToSetOnRefresh = [ElementID]
 		vizop_misc.SendRequest(Socket=self.C2DSocketREQ, Command='RQ_FT_JoinConnectors', ConnectorOut=ElementID,
 			ConnectorIn=TargetConnectorID, Viewport=self.ID)
 

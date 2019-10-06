@@ -531,14 +531,13 @@ class NumValueItem(object): # superclass of objects in Datacore having a numeric
 
 	def Status(self, RR=DefaultRiskReceptor): # return NumProblemValue item indicating status of value
 		# This method doesn't check the value is within valid range. For that, call CheckValue() in module FaultTree
-		print('CC534 checking status of value with RR, self.ValueFamily[RR], self.IsSetFlagFamily[RR]: ',
-			RR, RR.HumanName, self.ValueFamily[RR], self.IsSetFlagFamily[RR])
 		if not (RR in self.ValueFamily):  # requested risk receptor not defined for this value object
 			print("Warning, missing '%s' key in NumValueItem risk receptors (problem code: CC390)" % RR.HumanName)
 			if DefaultRiskReceptor in self.ValueFamily:
 				RR = DefaultRiskReceptor
 			else:  # DefaultRiskReceptor key is missing
-				print("Oops, missing DefaultRiskReceptor key in NumValueItem risk receptors (problem code: CC394). This is a bug; please report it")
+				print("Oops, missing DefaultRiskReceptor key in NumValueItem risk receptors (problem code: CC394). ",
+					"This is a bug; please report it")
 				return NumProblemValue_Bug
 		# check if value is set
 		if (self.ValueFamily[RR] is None) or (self.IsSetFlagFamily[RR] != 'ValueStatus_OK'):
@@ -639,13 +638,11 @@ class NumValueItem(object): # superclass of objects in Datacore having a numeric
 				if hasattr(self, RestoreAttrib):
 					setattr(NewValueObj, OriginalAttrib, getattr(self, RestoreAttrib))
 		elif NewNumberKind == UseParentValueItem:
-			print('CC640 detected change to linked number kind with LinkedFromElement = ', LinkedFromElement)
 			if LinkedFromElement is None: # try to restore previously linked element
 				for (RestoreAttrib, OriginalAttrib) in [('UseParentParentPHAObj', 'ParentPHAObj')]:
 					if hasattr(self, RestoreAttrib):
 						setattr(NewValueObj, OriginalAttrib, getattr(self, RestoreAttrib))
 			else: # make link to supplied element
-				print('CC646 setting ParentPHAObj of num object: ', NewValueObj)
 				NewValueObj.ParentPHAObj = LinkedFromElement
 		return NewValueObj
 
@@ -995,7 +992,6 @@ class AutoNumValueItem(NumValueItem): # class of values that are calculated by a
 		self.DefaultValue = None
 
 	def GetMyValue(self, RR=DefaultRiskReceptor, FormulaAntecedents=[], **Args):  # return value of object
-		print('CC996 in autonum GetMyValue with Calculator, DefaultValue, self: ', self.Calculator, self.DefaultValue, self)
 		if self.Calculator is None:
 			if self.DefaultValue is None: # we hit a bug, the calculator and default value haven't been defined
 				return NumProblemValue_Bug
@@ -1014,11 +1010,8 @@ class AutoNumValueItem(NumValueItem): # class of values that are calculated by a
 
 	def Status(self, RR=DefaultRiskReceptor, FormulaAntecedents=[], **args):
 		# return NumProblemValue item indicating status of value
+		if RR.HumanName == 'Default': print('CC1013 warning, checking AutoNumValue status with default RR') # for debugging
 		return self.StatusGetter(RR, **args)
-#		# get item's value to check if it is available
-#		Value = self.GetMyValue(RR=RR, FormulaAntecedents=FormulaAntecedents, **args)
-#		if isinstance(Value, NumProblemValue): return Value # if we got a problem report, return the report
-#		else: return NumProblemValue_NoProblem # value obtained successfully
 
 class ParentNumValueItem(NumValueItem): # a NumValueItem whose value was copied from a parent, but is not linked to it
 	HumanName = _('Copied from another value')
@@ -1062,6 +1055,11 @@ class ParentNumValueItem(NumValueItem): # a NumValueItem whose value was copied 
 		raise TypeError('CC1050 Not allowed to set units of ParentNumValueItem')
 #		return False
 
+	def Status(self, RR=DefaultRiskReceptor, **Args): # return NumProblemValue item indicating status of value
+		# status is derived from the parent number object
+		if self.ParentPHAObj is None: return NumProblemValue_BrokenLink
+		else: return self.ParentPHAObj.Value.Status(RR=RR, **Args)
+
 class UseParentValueItem(NumValueItem):
 	# class indicating values are to be linked from a parent PHA object, such as a cause or a calculated value
 	HumanName = _('Linked from another value')
@@ -1073,10 +1071,8 @@ class UseParentValueItem(NumValueItem):
 		self.ParentPHAObj = None  # parent object (eg a PHA cause) containing the NumValueItem that this item is linked to
 
 	def GetMyValue(self, RR=DefaultRiskReceptor, FormulaAntecedents=[], **Args): # return value of object
-		print('CC1071 in link.GetMyValue with self, self.ParentPHAObj = ', self, self.ParentPHAObj, self.ParentPHAObj.Value)
 		if self.ParentPHAObj is None:
 			return NumProblemValue_BrokenLink # parent object not defined, can't follow link
-		print('CC1076 linked value: ', self.ParentPHAObj.Value.GetMyValue(RR, FormulaAntecedents, **Args))
 		return self.ParentPHAObj.Value.GetMyValue(RR, FormulaAntecedents, **Args)
 
 	def SetMyValue(self, NewValue, RR=DefaultRiskReceptor): # attempting to set value of this class directly is evil
@@ -1103,6 +1099,11 @@ class UseParentValueItem(NumValueItem):
 		# Access this function through self.AcceptableUnits, via the property() statement in the superclass.
 		raise TypeError('CC1090 Not allowed to set units of UseParentNumValueItem')
 #		return False
+
+	def Status(self, RR=DefaultRiskReceptor, **Args): # return NumProblemValue item indicating status of value
+		# status is derived from the parent number object
+		if self.ParentPHAObj is None: return NumProblemValue_BrokenLink
+		else: return self.ParentPHAObj.Value.Status(RR=RR, **Args)
 
 NumValueClasses = [UserNumValueItem, ConstNumValueItem, CalcNumValueItem, NumProblemValue, LookupNumValueItem,
 	AutoNumValueItem, ParentNumValueItem, UseParentValueItem]
