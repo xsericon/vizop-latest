@@ -1459,8 +1459,6 @@ class ControlFrame(wx.Frame):
 				TopLevelFrame=self.TopLevelFrame, PrefillMethod=self.PrefillWidgetsForFTConnectorOutAspect,
 				SetWidgetVisibilityMethod=self.SetWidgetVisibilityforFTConnectorOutAspect, NotebookPage=MyNotebookPage,
 				TabText=MyTabText)
-#			self.FTConnectorOutAspect.NotebookPage = MyNotebookPage # keep a record, used as parent for variable widgets
-#			(# (redundant, as the aspect's __init__() already does this)
 			# make fixed widgets (this aspect also has variable widgets depending on the number of associated connector-ins)
 			self.MakeStandardWidgets(Scope=self.FTConnectorOutAspect, NotebookPage=MyNotebookPage)
 			self.FTConnectorOutAspect.HeaderLabel = UIWidgetItem(wx.StaticText(MyNotebookPage, -1, _('Outward connector:')),
@@ -1503,8 +1501,9 @@ class ControlFrame(wx.Frame):
 			# make a name widget and 'remove' button for each connector-in
 			# RowOffset and ColOffset are offsets from the position of the placeholder in FixedWidgetList
 			for (ThisConnectorInIndex, ThisConnectorIn) in enumerate(ConnectorOut.ConnectorIns):
-				self.FTConnectorOutAspect.VariableWidgetList.append(UIWidgetItem(wx.StaticText(NotebookPage, -1,
-					ThisConnectorIn.HumanName), RowOffset=ThisConnectorInIndex, ColOffset=0, ColSpan=1))
+				self.FTConnectorOutAspect.VariableWidgetList.append(UIWidgetItem(wx.TextCtrl(NotebookPage, -1,
+					ThisConnectorIn.HumanName, style=wx.TE_READONLY), RowOffset=ThisConnectorInIndex, ColOffset=0,
+					ColSpan=1))
 				DisconnectButtonWidget = UIWidgetItem(wx.Button(NotebookPage,
 					size=self.StandardImageButtonSize), PHAObj=self.TopLevelFrame.PHAObjInControlPanel,
 					RowOffset=ThisConnectorInIndex, ColOffset=1, ColSpan=1, Events=[wx.EVT_BUTTON],
@@ -1573,7 +1572,11 @@ class ControlFrame(wx.Frame):
 
 		def FTConnectorOutAspect_OnConnectorNameTextWidget(self, Event, **Args): pass
 		def FTConnectorOutAspect_OnConnectorDescriptionWidget(self, Event, **Args): pass
-		def FTConnectorOutAspect_OnConnectorInDisconnectButton(self, Event, ConnectorIn): pass
+
+		def FTConnectorOutAspect_OnConnectorInDisconnectButton(self, Event, ConnectorIn):
+			# handle click on [-] button to disconnect a connector-in from a connector-out%%%
+			pass
+
 		def FTConnectorOutAspect_OnConnectorInConnectButton(self, Event, ConnectorIn): pass
 
 		def NumericalValueAspect_OnNewConnectChoiceWidget(self, Event, **Args):

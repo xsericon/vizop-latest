@@ -2618,24 +2618,21 @@ class FTConnectorItemInCore(FTElementInCore): # in- and out-connectors (CX's) to
 		self.FT.ChangeNumberKind(FTElement=self, NewNumberKindXMLName='LinkedFrom', ValueAttribName='', Viewport=Viewport,
 			StoreUndoRecord=True, LinkedFromElement=ConnectorOut)
 
-
-#	def GetMyValue(self, RiskReceptor=core_classes.DefaultRiskReceptor):
-#		# calculate and return output value of the connector for specified risk receptor
-#		# returns (float, UnitItem instance, 1st NumProblemValue in calculation chain (or None),
-#		# 1st PHAObject yielding a problem value (or None).
-#		assert isinstance(RiskReceptor, core_classes.RiskReceptorItem)
-#		if self.Out: # if this is an out-CX, its value is obtained from joined-from object
-#			JoinedFromObj = JoinedFrom(self.FT, self, FirstOnly=True)[0]
-#			if not JoinedFromObj: # not connected; return problem indicator
-#				return 0, core_classes.NullUnit, core_classes.NumProblemValue_BrokenLink, self
-#			return JoinedFromObj.Value # return tuple received from .Value method
-#		else: # it's an in-CX: get value from the out-CX it's related to
-#			if self.RelatedCX is None: # not connected; return problem indicator
-#				return 0, core_classes.NullUnit, core_classes.NumProblemValue_BrokenLink, self
-#			assert isinstance(self.RelatedCX, FTConnectorItemInCore)
-#			return self.RelatedCX.Value
-#
-#	Value = property(fget=GetMyValue, fset=SetMyValue)
+	def ConnectedToConnectorsIn(self):
+		# return list of PHA elements in the entire project that this Connector-Out is already connected to
+		if self.Out: # make sure this is a Connector-Out
+			AlreadyConnectorsIn = []
+			# search over all FTs in the project (other than this one, as connecting within same FT is not allowed)
+			for ThisFT in [p for p in self.FT.Proj.PHAObjs if isinstance(p, FTObjectInCore) if not (p is self.FT)]:
+				# search over all connectors-in in the FT
+				for ThisCXIn in [e for e in WalkOverAllFTObjs(ThisFT) if isinstance(e, FTConnectorItemInCore)
+					if not e.Out]:
+					if (ThisCXIn.RelatedCX is self): # is it connected to this connector-out?
+						AlreadyConnectorsIn.append(ThisCXIn)
+			print('FT2642 AlreadyConnectorsIn:', AlreadyConnectorsIn)
+			return AlreadyConnectorsIn
+		else: # it's a connector-in; return empty list
+			return []
 
 class FTCollapseGroupInCore(object): # collapse group containing one or more FT elements that can be shown collapsed
 	# into a single object for more compact display
@@ -3206,6 +3203,11 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 				El = ElementTree.SubElement(ConnEl, info.ConnectorInsAvailableTag)
 				El.text = AvailConnectorIn.DescriptorText() # XML element text is the connector-in's human descriptor
 				El.set(info.IDTag, AvailConnectorIn.ID) # add XML attrib containing the connector-in's ID
+			# make a tag for each connector-in in the project already connected to this connector-out
+			for ThisConnectorIn in FTConn.ConnectedToConnectorsIn():
+				El = ElementTree.SubElement(ConnEl, info.ConnectorInsTag)
+				El.text = ThisConnectorIn.DescriptorText() # XML element text is the connector-in's human descriptor
+				El.set(info.IDTag, ThisConnectorIn.ID) # add XML attrib containing the connector-in's ID
 			# add options for value kind
 			print('FT3211 populating connector value kinds: ', type(FTConn.Value), FTConn.Value.GetMyValue(RR=FTConn.FT.RiskReceptorGroupOnDisplay[0]), FTConn.Out)
 			for (ThisValueKindIndex, ThisValueKind) in enumerate(FTConn.FTConnAcceptableValueKinds):
@@ -4372,6 +4374,12 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			# populate list of connector-in's available to connect to this connector-out
 			for El in XMLObj.findall(info.ConnectorInsAvailableTag):
 				NewConnector.ConnectorInsAvailable.append(core_classes.ChoiceItem(HumanName=El.text, Applicable=False,
+					XMLName=El.get(info.IDTag), ID=El.get(info.IDTag)))
+					# above, we populate the XMLName attrib because it's compulsory, but we intend to use the ID attrib
+			# populate list of connector-in's already connected to this connector-out; a ChoiceItem instance for each
+			# the HumanName attrib contains a human descriptor of the connector-in, already translated
+			for El in XMLObj.findall(info.ConnectorInsTag):
+				NewConnector.ConnectorIns.append(core_classes.ChoiceItem(HumanName=El.text, Applicable=False,
 					XMLName=El.get(info.IDTag), ID=El.get(info.IDTag)))
 					# above, we populate the XMLName attrib because it's compulsory, but we intend to use the ID attrib
 			# retrieve data from ProblemIndicatorTag: decide whether to show problem button

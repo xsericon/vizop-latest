@@ -120,6 +120,7 @@ FTComponentToHighlight = 'CptToHighlight'
 TolFreqTag = 'TolFreq'
 TolFreqUnitTag = 'TolFreqUnit'
 ConnectorInsAvailableTag = 'ConnectorInsAvailable'
+ConnectorInsTag = 'ConnectorInsConnected'
 
 # XML tags for project files
 ProjectRootTag = 'vizop_project'
