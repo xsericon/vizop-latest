@@ -72,6 +72,7 @@ class ProjectItem(object): # class of PHA project instances
 			# remote, so it may not have access to self.PHAObjs; same order as self.PHAObjs
 		self.ActiveViewports = [] # list of all Viewports currently displayed in a display device
 		self.AllViewportShadows = [] # list of all Viewport shadows (belonging to datacore)
+		#	should be ViewportShadow instances, but might be Viewport instances, i.e. ViewportBaseClass subclass instances FIXME
 		self.IPLKinds = []
 		self.CauseKinds = []
 		self.RiskReceptors = [core_classes.RiskReceptorItem(XMLName='People', HumanName=_('People'))] # instances of RiskReceptorItem defined for this project

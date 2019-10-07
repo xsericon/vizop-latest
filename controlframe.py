@@ -2106,19 +2106,19 @@ class ControlFrame(wx.Frame):
 		# handle incoming messages from datacore to control frame. Called from ListenToSockets() in module vizop_misc
 		# parse incoming message to XML tree
 		XMLRoot = ElementTree.fromstring(MessageReceived)
-		# handlers for all possible notifications to Control Frame
+		# handlers for all possible notifications to Control Frame. Handler must send a reply
 		Handler = {
 			'NO_NewPHAModel_Undo': self.PostProcessNewPHAModel_Undo,
 			'NO_NewPHAModel_Redo': self.PostProcessNewPHAModel_Redo,
 			'NO_NewViewport_Undo': self.PostProcessNewViewport_Undo,
 			'NO_NewViewport_Redo': self.PostProcessNewViewport_Redo,
 			'NO_FT_ChangeText_Undo': self.UpdateAllViewportsAfterUndo,
-			'NO_ShowViewport': self.SwitchToViewport
+			'NO_ShowViewport': self.ProcessSwitchToViewport
 			}[XMLRoot.tag.strip()]
 			# this is a placeholder only - RP_ commands are replies, handled in HandleIncomingReplyToControlFrame()
 		# call handler, and return its reply
 		Reply = Handler(XMLRoot=XMLRoot)
-		assert Reply is not None, Handler.__name__
+		assert Reply is not None, Handler.__name__ + ' sent no reply'
 		return Reply
 
 	def HandleIncomingReplyToControlFrame(self, MessageReceived='', **Args):
@@ -2398,11 +2398,13 @@ class ControlFrame(wx.Frame):
 		# TargetViewport is supplied directly as an arg, or (if it's None) via ViewportTag in XMLRoot
 		# first, find which Viewport to show
 		Proj = self.CurrentProj
-		if TargetViewport is None:
+		if TargetViewport is None: # don't use this route - requested viewport may not exist in Proj.ActiveViewports
 			ViewportToShow = utilities.ObjectWithID(Objects=Proj.ActiveViewports,
 				TargetID=XMLRoot.find(info.ViewportTag).text)
 		else: ViewportToShow = TargetViewport
-		assert isinstance(ViewportToShow, display_utilities.ViewportBaseClass)
+		assert isinstance(ViewportToShow, (ViewportShadow, display_utilities.ViewportBaseClass))
+		if isinstance(ViewportToShow, display_utilities.ViewportBaseClass):
+			print('CF2406 Warning: Viewport shadow is Viewport class, should be ViewportShadow class')
 		# release any existing Viewport from PHA panel
 		if self.CurrentViewport:
 			# remove old Viewport from local ActiveViewports list
@@ -2410,7 +2412,6 @@ class ControlFrame(wx.Frame):
 			# tell datacore the Viewport is no longer on display
 			AttribDict = {info.ProjIDTag: Proj.ID, 'ControlFrame': self.ID, info.ViewportTag: self.CurrentViewport.ID}
 			self.MyEditPanel.ReleaseViewportFromDisplDevice()
-			# request datacore to create new PHA object
 			ReplyReceived = vizop_misc.SendRequest(self.zmqOutwardSocket, Command='RQ_StopDisplayingViewport',
 				FetchReply=False, **AttribDict)
 		# add target Viewport
@@ -2626,7 +2627,16 @@ class ControlFrame(wx.Frame):
 		UndoChainWaiting = utilities.Bool2Str(XMLRoot.find(info.ChainWaitingTag).text)
 		return vizop_misc.MakeXMLMessage('Null', 'Null')
 
+	def ProcessSwitchToViewport(self, XMLRoot=None):
+		# handle request in incoming message to switch to a Viewport
+		print('CF2631 in ProcessSwitchToViewport. TargetID, Viewport IDs: ', XMLRoot.findtext(info.ViewportTag), [v.ID for v in self.CurrentProj.AllViewportShadows])
+		print('CF2632 viewport classes: ', [type(v) for v in self.CurrentProj.AllViewportShadows])
+		self.SwitchToViewport(TargetViewport=utilities.ObjectWithID(Objects=self.Viewports,
+			TargetID=XMLRoot.findtext(info.ViewportTag)), XMLRoot=XMLRoot)
+		return vizop_misc.MakeXMLMessage('Null', 'Null')
+
 	def DatacoreDoNewFTEventNotIPL(self, Root): # handle request to datacore for new FT event that's not an IPL
+		# probably not currently used; redundant?
 		# find out which project to work in
 		ThisProj = utilities.ObjectWithID(OpenProjects, Root.find('Proj').text)
 		if ThisProj.EditAllowed:
@@ -3027,10 +3037,12 @@ def DatacoreDoNewPHAObj(Proj, XMLRoot=None, ViewportID=None, **NewPHAObjArgs):
 
 def DatacoreStopDisplayingViewport(Proj, XMLRoot=None):
 	# handle request to datacore informing that a Viewport is no longer on display in any display device
-	# first, find the corresponding Viewport shadow
-	TargetViewport = utilities.ObjectWithID(Proj.AllViewportShadows, XMLRoot.find(info.ViewportTag).text)
-	TargetViewport.IsOnDisplay = False
-	return vizop_misc.MakeXMLMessage(RootName='RP_StopDisplayingViewport', RootText=TargetViewport.ID,
+	# first, find the corresponding Viewport shadow - if it's just been deleted, it won't exist
+	TargetViewportID = XMLRoot.findtext(info.ViewportTag)
+	if TargetViewportID in [v.ID for v in Proj.AllViewportShadows]: # it still exists
+		TargetViewport = utilities.ObjectWithID(Proj.AllViewportShadows, TargetViewportID)
+		TargetViewport.IsOnDisplay = False
+	return vizop_misc.MakeXMLMessage(RootName='RP_StopDisplayingViewport', RootText=TargetViewportID,
 		Elements={})
 
 class ViewportShadow(object): # defines objects that represent Viewports in the datacore.

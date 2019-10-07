@@ -2592,11 +2592,8 @@ class FTConnectorItemInCore(FTElementInCore): # in- and out-connectors (CX's) to
 						# check all CX-out's in the FT containing the candidate CX-in
 						for ThisCXOut in [e for e in WalkOverAllFTObjs(ThisFT) if isinstance(e, FTConnectorItemInCore) if e.Out]:
 							HasCircularity |= self.FT.HasPathBetween(ThisCXOut, MyCXIn)
-
-					print('FT2587 found available CX-in. Circularity check: ', HasCircularity)
 					if not HasCircularity: # candidate CX-in is acceptable; add it to the list
 						AvailableConnectorsIn.append(ThisCXIn)
-			print('FT2598 AvailableConnectorsIn:', AvailableConnectorsIn)
 			return AvailableConnectorsIn
 		else: # it's a connector-in; return empty list
 			return []
@@ -2621,10 +2618,11 @@ class FTConnectorItemInCore(FTElementInCore): # in- and out-connectors (CX's) to
 	def RemoveConnection(self, Viewport):
 		# remove connection from this connector-in to its related Connector-Out
 		assert not self.Out # make sure we are a connector-in
+		# do the disconnection
 		self.RelatedCX = None
 		# change my number type to User (i.e. entered manually)
 		self.FT.ChangeNumberKind(FTElement=self, NewNumberKindXMLName='User', ValueAttribName='', Viewport=Viewport,
-			StoreUndoRecord=True)
+			StoreUndoRecord=True, UndoChained=True)
 
 	def ConnectedToConnectorsIn(self):
 		# return list of PHA elements in the entire project that this Connector-Out is already connected to
@@ -2637,7 +2635,6 @@ class FTConnectorItemInCore(FTElementInCore): # in- and out-connectors (CX's) to
 					if not e.Out]:
 					if (ThisCXIn.RelatedCX is self): # is it connected to this connector-out?
 						AlreadyConnectorsIn.append(ThisCXIn)
-			print('FT2642 AlreadyConnectorsIn:', AlreadyConnectorsIn)
 			return AlreadyConnectorsIn
 		else: # it's a connector-in; return empty list
 			return []
@@ -3666,7 +3663,6 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		#	Args already contains Viewport, which is the Viewport ID)
 		# Args contains all tags:texts supplied in the change request
 		# returns XML tree with information about the update
-		print('FT3476 in ChangeChoice')
 		assert isinstance(Proj, projects.ProjectItem)
 		assert isinstance(ElementID, str)
 		assert isinstance(TextComponentName, str)
@@ -3855,7 +3851,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		return {'Success': True}
 
 	def ChangeNumberKind(self, FTElement, NewNumberKindXMLName, ValueAttribName='', Viewport=None, StoreUndoRecord=True,
-		LinkedFromElement=None):
+		UndoChained=True, LinkedFromElement=None):
 		# change number kind of numerical value
 		# FTElement: FT itself (for updating TolFreq value), or an FTEvent or FTGate instance (for updating event value)
 		# NewNumberKindXMLName: (str) XML name of number kind to change to
@@ -3863,6 +3859,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		#	should be '' if FTElement is not the FT itself
 		# Viewport: Viewport from which number change request was initiated - for undo; ignored if StoreUndoRecord is False
 		# StoreUndoRecord (bool): whether to store an undo record for the number kind change
+		# UndoChained (bool): if storing undo record, whether to mark it as chained from the preceding record
 		# LinkedFromElement (any PHA element or None): if changing to UseParent (linked) number kind, which element to
 		#	link from
 		# return:
@@ -3903,16 +3900,16 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			if StoreUndoRecord:
 				self.DoChangeNumberKind_PostActions(ValueAttrib=ValueAttrib, ValueAttribName=ValueAttribNameToUse,
 					FTElement=FTElement, NewNumberObj=NewValueObj, OldNumberObj=OldValueObj,
-					ViewportID=Viewport.ID, ViewportClass=type(Viewport),
+					ViewportID=Viewport.ID, ViewportClass=type(Viewport), Chained=UndoChained,
 					Zoom=Viewport.Zoom, PanX=Viewport.PanX, PanY=Viewport.PanY, Redoing=False)
 		return NumberKindChanged, NewNumberKind
 
 	def DoChangeNumberKind_PostActions(self, ValueAttrib, ValueAttribName, FTElement, NewNumberObj, OldNumberObj,
-			ViewportID, ViewportClass,
+			ViewportID, ViewportClass, Chained,
 			Zoom, PanX, PanY, Redoing=False):
 		undo.AddToUndoList(Proj=self.Proj, Redoing=Redoing, UndoObj=undo.UndoItem(UndoHandler=self.ChangeNumberKind_Undo,
 			RedoHandler=self.ChangeNumberKind_Redo,
-			Chain='NoChain', ComponentHost=FTElement,
+			Chain={False: 'NoChain', True: 'Avalanche'}[Chained], ComponentHost=FTElement,
 			ViewportID=ViewportID,
 			ViewportClass=ViewportClass,
 			ElementID=FTElement.ID,
@@ -3920,6 +3917,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			OldNumberObj=OldNumberObj, NewNumberObj=NewNumberObj,
 			HumanText=_('Change number basis for %s') % _(self.ComponentEnglishNames[ValueAttribName]),
 			Zoom=Zoom, PanX=PanX, PanY=PanY))
+		# TODO add data for the changed component to the Save On Fly data
 
 	def ChangeNumberKind_Undo(self, Proj, UndoRecord, **Args):
 		assert isinstance(Proj, projects.ProjectItem)
@@ -3944,7 +3942,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		self.DoChangeNumberKind_PostActions(ValueAttrib=getattr(RedoRecord.ComponentHost, RedoRecord.ComponentName),
 			ValueAttribName=RedoRecord.ComponentName, FTElement=RedoRecord.ComponentHost,
 			NewNumberObj=RedoRecord.NewNumberObj, OldNumberObj=RedoRecord.OldNumberObj,
-			ViewportID=RedoRecord.ViewportID, ViewportClass=RedoRecord.ViewportClass,
+			ViewportID=RedoRecord.ViewportID, ViewportClass=RedoRecord.ViewportClass, Chained=RedoRecord.Chain,
 			Zoom=RedoRecord.Zoom, PanX=RedoRecord.PanX, PanY=RedoRecord.PanY, Redoing=True)
 		self.RedrawAfterUndoOrRedo(RedoRecord, SocketFromDatacore=vizop_misc.SocketWithName(
 			TargetName=Args['SocketFromDatacoreName']))
@@ -3952,6 +3950,38 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			Elements={info.IDTag: self.ID, info.ComponentHostIDTag: RedoRecord.ComponentHost.ID}))
 			# TODO add data for the changed component to the Save On Fly data
 		return {'Success': True}
+
+	def DisconnectConnector(self, Proj, ElementID, CXInID, Viewport):
+		# handle request to disconnect connector-in with ID=CXInID from its related connector-out.
+		# ElementID: ID of connector-out to redisplay on undo/redo (to show that the connection is changed)
+		assert isinstance(Proj, projects.ProjectItem)
+		assert isinstance(ElementID, str)
+		assert isinstance(CXInID, str)
+		# find the connector-out to redisplay after undo/redo
+		ThisConnectorOut = [e for e in WalkOverAllFTObjs(self) if e.ID == ElementID][0]
+		assert isinstance(ThisConnectorOut, FTConnectorItemInCore)
+		# find the connector-in, in a different FT, by searching over all FTs in project other than this one
+		ThisConnectorIn = [e for ThisFT in Proj.PHAObjs if isinstance(ThisFT, FTObjectInCore)
+						   if not (ThisFT is self)
+						   for e in WalkOverAllFTObjs(ThisFT) if e.ID == CXInID][0]
+		assert isinstance(ThisConnectorIn, FTConnectorItemInCore)
+		# remove the connection at the CX-in end, and store Undo record
+		self.DoDisconnectConnector(Proj, ThisConnectorOut, ThisConnectorIn, Viewport)
+		Reply = vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
+
+	def DoDisconnectConnector(self, Proj, ThisConnectorOut, ThisConnectorIn, Viewport,
+			Redoing=False, ChainUndo=False):
+		# execute the disconnection, and store Undo record
+		assert isinstance(Redoing, bool)
+		assert isinstance(ChainUndo, bool)
+		undo.AddToUndoList(Proj=Proj, Redoing=Redoing, UndoObj=undo.UndoItem(UndoHandler=self.DisconnectConnector_Undo,
+			RedoHandler=self.DisconnectConnector_Redo,
+			Chain={False: 'NoChain', True: 'Avalanche'}[ChainUndo], ConnectorOutID=ThisConnectorOut.ID,
+			ConnectorInID=ThisConnectorIn.ID, ViewportID=Viewport.ID,
+			ViewportClass=type(Viewport),
+			HumanText=_('disconnect inward connector'),
+			Zoom=Viewport.Zoom, PanX=Viewport.PanX, PanY=Viewport.PanY))
+		ThisConnectorIn.RemoveConnection(Viewport=Viewport)
 
 	def HandleIncomingRequest(self, MessageReceived=None, MessageAsXMLTree=None, **Args):
 		# handle request received by FT model in datacore from a Viewport. Request can be to edit data (eg add new element)
@@ -3989,7 +4019,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 				**dict([(ThisTag.tag, ThisTag.text) for ThisTag in XMLRoot.iter()]))
 			# The ** arg sends a dict of all tags and their texts, allowing ChangeChoice to pick up case-specific tags
 			# Attribs NewValue and Viewport are already in the ** arg, so no need to include it explicitly
-		elif Command == 'RQ_FT_DescriptionCommentsVisible':  # make description comments in/visible in an FT element
+		elif Command == 'RQ_FT_DescriptionCommentsVisible': # make description comments in/visible in an FT element
 			ThisElementID = XMLRoot.findtext('Element')
 			ThisFTElement = [e for e in WalkOverAllFTObjs(self) if e.ID == ThisElementID][0]
 			Reply = ThisFTElement.ShowCommentsOnOff(CommentKind='Description',
@@ -4032,15 +4062,9 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			# set the connection at the CX-in end
 			ThisConnectorIn.MakeConnectionWith(ConnectorOut=ThisConnectorOut, Viewport=SourceViewport)
 			Reply = vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
-		elif Command == 'RQ_FT_DisconnectConnectors': # disconnect connector-in from its related connector-out
-			TargetCXInID = XMLRoot.findtext('ConnectorIn')
-			# find the connector-in, in a different FT, by searching over all FTs in project other than this one
-			ThisConnectorIn = [e for ThisFT in self.Proj.PHAObjs if isinstance(ThisFT, FTObjectInCore)
-				if not (ThisFT is self)
-				for e in WalkOverAllFTObjs(ThisFT) if e.ID == TargetCXInID][0]
-			# remove the connection at the CX-in end
-			ThisConnectorIn.RemoveConnection(Viewport=SourceViewport)
-			Reply = vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
+		elif Command == 'RQ_FT_DisconnectConnectors': # disconnect connector-in from its related connector-out%%%
+			Reply = self.DisconnectConnector(Proj=Proj, ElementID=XMLRoot.findtext('ConnectorOut'),
+				CXInID = XMLRoot.findtext('ConnectorIn'), Viewport=SourceViewport)
 
 		elif Command == 'OK': # dummy for 'OK' responses - received only to clear the sockets
 			Reply = vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
