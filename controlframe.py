@@ -1438,12 +1438,9 @@ class ControlFrame(wx.Frame):
 			# first, find out which FT was requested
 			FTIndex = Event.GetEventObject().GetSelection()
 			if FTIndex != wx.NOT_FOUND: # is any item selected?
-				print('CF1425 Proj.PHAObjShadows:', Proj.PHAObjShadows)
 				FTRequestedID = [p for p in Proj.PHAObjShadows if type(p) is faulttree.FTObjectInCore][FTIndex].ID
 				# requested different FT from the one on display?
-				print('CF1426 checking whether to switch PHAObj')
 				if FTRequestedID != self.TopLevelFrame.CurrentViewport.PHAObj.ID:
-					print('CF1428 switching to another PHAObj')
 					self.TopLevelFrame.SwitchToPHAObj(Proj=Proj, TargetPHAObjID=FTRequestedID)
 
 		def FaultTreeAspect_OnGoToViewChoice(self, Event, **Args): pass
@@ -1503,12 +1500,11 @@ class ControlFrame(wx.Frame):
 			for (ThisConnectorInIndex, ThisConnectorIn) in enumerate(ConnectorOut.ConnectorIns):
 				self.FTConnectorOutAspect.VariableWidgetList.append(UIWidgetItem(wx.TextCtrl(NotebookPage, -1,
 					ThisConnectorIn.HumanName, style=wx.TE_READONLY), RowOffset=ThisConnectorInIndex, ColOffset=0,
-					ColSpan=1))
+					ColSpan=1, ConnectorInID=ThisConnectorIn.ID))
 				DisconnectButtonWidget = UIWidgetItem(wx.Button(NotebookPage,
 					size=self.StandardImageButtonSize), PHAObj=self.TopLevelFrame.PHAObjInControlPanel,
 					RowOffset=ThisConnectorInIndex, ColOffset=1, ColSpan=1, Events=[wx.EVT_BUTTON],
-					Handler=lambda Event: self.FTConnectorOutAspect_OnConnectorInDisconnectButton(Event,
-					ConnectorIn=ThisConnectorIn))
+					Handler=self.FTConnectorOutAspect_OnConnectorInDisconnectButton, ConnectorInID=ThisConnectorIn.ID)
 				self.FTConnectorOutAspect.VariableWidgetList.append(DisconnectButtonWidget)
 				DisconnectButtonWidget.Widget.SetBitmap(self.TopLevelFrame.ButtonBitmap(wx.ART_MINUS))
 			# find out whether any connector-ins are available as possible new connections for this connector-out
@@ -1573,9 +1569,15 @@ class ControlFrame(wx.Frame):
 		def FTConnectorOutAspect_OnConnectorNameTextWidget(self, Event, **Args): pass
 		def FTConnectorOutAspect_OnConnectorDescriptionWidget(self, Event, **Args): pass
 
-		def FTConnectorOutAspect_OnConnectorInDisconnectButton(self, Event, ConnectorIn):
-			# handle click on [-] button to disconnect a connector-in from a connector-out%%%
-			pass
+		def FTConnectorOutAspect_OnConnectorInDisconnectButton(self, Event):
+			# handle click on [-] button to disconnect a connector-in from a connector-out
+			# find which connector-in to disconnect
+			EventWidget = Event.GetEventObject()
+			ThisWidgetObj = [w for w in self.FTConnectorOutAspect.WidgetList if w.Widget == EventWidget][0]
+			ConnectorInToDisconnect = ThisWidgetObj.ConnectorInID
+			# get Viewport to request disconnection
+			self.TopLevelFrame.CurrentViewport.RequestDisconnectConnectorIn(ElementID=ThisWidgetObj.PHAObj.ID,
+				ConnectorInToDisconnectID=ConnectorInToDisconnect)
 
 		def FTConnectorOutAspect_OnConnectorInConnectButton(self, Event, ConnectorIn): pass
 
@@ -3028,7 +3030,6 @@ def DatacoreStopDisplayingViewport(Proj, XMLRoot=None):
 	# first, find the corresponding Viewport shadow
 	TargetViewport = utilities.ObjectWithID(Proj.AllViewportShadows, XMLRoot.find(info.ViewportTag).text)
 	TargetViewport.IsOnDisplay = False
-	print('CF3019 in datacore, set viewport %s as not visible' % TargetViewport.ID)
 	return vizop_misc.MakeXMLMessage(RootName='RP_StopDisplayingViewport', RootText=TargetViewport.ID,
 		Elements={})
 

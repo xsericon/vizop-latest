@@ -2614,9 +2614,17 @@ class FTConnectorItemInCore(FTElementInCore): # in- and out-connectors (CX's) to
 		assert isinstance(ConnectorOut, FTConnectorItemInCore)
 		assert ConnectorOut.Out # make sure ConnectorOut is -out
 		self.RelatedCX = ConnectorOut
-		# change my number type to UseParent (i.e. linked)
-		self.FT.ChangeNumberKind(FTElement=self, NewNumberKindXMLName='LinkedFrom', ValueAttribName='', Viewport=Viewport,
-			StoreUndoRecord=True, LinkedFromElement=ConnectorOut)
+		# change my number type to User (i.e. provided manually by user)
+		self.FT.ChangeNumberKind(FTElement=self, NewNumberKindXMLName='LinkedFrom', ValueAttribName='',
+			Viewport=Viewport, StoreUndoRecord=True, LinkedFromElement=ConnectorOut)
+
+	def RemoveConnection(self, Viewport):
+		# remove connection from this connector-in to its related Connector-Out
+		assert not self.Out # make sure we are a connector-in
+		self.RelatedCX = None
+		# change my number type to User (i.e. entered manually)
+		self.FT.ChangeNumberKind(FTElement=self, NewNumberKindXMLName='User', ValueAttribName='', Viewport=Viewport,
+			StoreUndoRecord=True)
 
 	def ConnectedToConnectorsIn(self):
 		# return list of PHA elements in the entire project that this Connector-Out is already connected to
@@ -4024,6 +4032,16 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			# set the connection at the CX-in end
 			ThisConnectorIn.MakeConnectionWith(ConnectorOut=ThisConnectorOut, Viewport=SourceViewport)
 			Reply = vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
+		elif Command == 'RQ_FT_DisconnectConnectors': # disconnect connector-in from its related connector-out
+			TargetCXInID = XMLRoot.findtext('ConnectorIn')
+			# find the connector-in, in a different FT, by searching over all FTs in project other than this one
+			ThisConnectorIn = [e for ThisFT in self.Proj.PHAObjs if isinstance(ThisFT, FTObjectInCore)
+				if not (ThisFT is self)
+				for e in WalkOverAllFTObjs(ThisFT) if e.ID == TargetCXInID][0]
+			# remove the connection at the CX-in end
+			ThisConnectorIn.RemoveConnection(Viewport=SourceViewport)
+			Reply = vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
+
 		elif Command == 'OK': # dummy for 'OK' responses - received only to clear the sockets
 			Reply = vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
 		return Reply
@@ -5146,6 +5164,17 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		self.CurrentElementIDsToSetOnRefresh = [ElementID]
 		vizop_misc.SendRequest(Socket=self.C2DSocketREQ, Command='RQ_FT_JoinConnectors', ConnectorOut=ElementID,
 			ConnectorIn=TargetConnectorID, Viewport=self.ID)
+
+	def RequestDisconnectConnectorIn(self, ElementID, ConnectorInToDisconnectID):
+		# send request to Datacore to disconnect ConnectorInToDisconnectID (str) from its related
+		# connector-out
+		assert isinstance(ConnectorInToDisconnectID, str)
+		# check ElementID refers to a connector-out in this FT
+		assert ElementID in [e.ID for e in WalkOverAllFTObjs(self) if isinstance(e, FTConnectorOut)]
+		# set the connector-out to be selected on next redraw
+		self.CurrentElementIDsToSetOnRefresh = [ElementID]
+		vizop_misc.SendRequest(Socket=self.C2DSocketREQ, Command='RQ_FT_DisconnectConnectors', ConnectorOut=ElementID,
+			ConnectorIn=ConnectorInToDisconnectID, Viewport=self.ID)
 
 	def ConnectButtonsCanConnectTo(self, StartButton):
 		# find and return list of connect buttons that StartButton (a connect button object) can connect to.
