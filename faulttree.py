@@ -2605,15 +2605,17 @@ class FTConnectorItemInCore(FTElementInCore): # in- and out-connectors (CX's) to
 	def AcceptableValueKinds(self): # return list of value kinds (subclasses of NumValueItem) for connector
 		return self.FTConnAcceptableValueKinds
 
-	def MakeConnectionWith(self, ConnectorOut, Viewport):
+	def MakeConnectionWith(self, ConnectorOut, Viewport, Undoing=False):
 		# set up connection from this connector-in to the specified Connector-Out
+		# Undoing (bool): True if this connection is the undo of a "remove connection"
 		assert not self.Out # make sure we are a connector-in
 		assert isinstance(ConnectorOut, FTConnectorItemInCore)
 		assert ConnectorOut.Out # make sure ConnectorOut is -out
+		assert isinstance(Undoing, bool)
 		self.RelatedCX = ConnectorOut
 		# change my number type to User (i.e. provided manually by user)
 		self.FT.ChangeNumberKind(FTElement=self, NewNumberKindXMLName='LinkedFrom', ValueAttribName='',
-			Viewport=Viewport, StoreUndoRecord=True, LinkedFromElement=ConnectorOut)
+			Viewport=Viewport, StoreUndoRecord=not Undoing, LinkedFromElement=ConnectorOut)
 
 	def RemoveConnection(self, Viewport):
 		# remove connection from this connector-in to its related Connector-Out
@@ -3577,20 +3579,6 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		setattr(UndoRecord.ComponentHost, UndoRecord.ComponentName, UndoRecord.OldValue)
 		# request Control Frame to switch to the Viewport that was visible when the original edit was made
 		self.RedrawAfterUndoOrRedo(UndoRecord, SocketFromDatacore)
-		#		# instruct Control Frame to switch the requesting control frame to the Viewport that was visible when the original
-		#		# text change was made, with the original zoom and pan restored (so that the text field is on screen)
-		#		# and the changed component highlighted (so that the undo is visible to the user)
-		#		# prepare data about zoom, pan, highlight etc.
-		#		DisplayAttribTag = self.FetchDisplayAttribsFromUndoRecord(UndoRecord)
-		#		RedrawDataXML = self.GetFullRedrawData(ViewportClass=UndoRecord.ViewportClass,
-		#			ExtraXMLTagsAsTags=DisplayAttribTag)
-		#		MsgToControlFrame = ElementTree.Element(info.NO_ShowViewport)
-		#		# add a ViewportID tag to the message, so that Control Frame knows which Viewport to redraw
-		#		ViewportTag = ElementTree.Element(info.ViewportTag)
-		#		ViewportTag.text = UndoRecord.ViewportID
-		#		MsgToControlFrame.append(ViewportTag)
-		#		MsgToControlFrame.append(RedrawDataXML)
-		#		vizop_misc.SendRequest(Socket=SocketFromDatacore.Socket, Command=info.NO_ShowViewport, XMLRoot=MsgToControlFrame)
 		projects.SaveOnFly(Proj, UpdateData=vizop_misc.MakeXMLMessage(RootName=info.FTTag,
 			Elements={info.IDTag: self.ID, info.ComponentHostIDTag: UndoRecord.ComponentHost.ID}))
 		# TODO add data for the changed component to the Save On Fly data
@@ -3967,7 +3955,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		assert isinstance(ThisConnectorIn, FTConnectorItemInCore)
 		# remove the connection at the CX-in end, and store Undo record
 		self.DoDisconnectConnector(Proj, ThisConnectorOut, ThisConnectorIn, Viewport)
-		Reply = vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
+		return vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
 
 	def DoDisconnectConnector(self, Proj, ThisConnectorOut, ThisConnectorIn, Viewport,
 			Redoing=False, ChainUndo=False):
@@ -3976,12 +3964,32 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		assert isinstance(ChainUndo, bool)
 		undo.AddToUndoList(Proj=Proj, Redoing=Redoing, UndoObj=undo.UndoItem(UndoHandler=self.DisconnectConnector_Undo,
 			RedoHandler=self.DisconnectConnector_Redo,
-			Chain={False: 'NoChain', True: 'Avalanche'}[ChainUndo], ConnectorOutID=ThisConnectorOut.ID,
+			Chain={False: 'NoChain', True: 'Avalanche'}[ChainUndo], ConnectorOut=ThisConnectorOut,
 			ConnectorInID=ThisConnectorIn.ID, ViewportID=Viewport.ID,
 			ViewportClass=type(Viewport),
 			HumanText=_('disconnect inward connector'),
 			Zoom=Viewport.Zoom, PanX=Viewport.PanX, PanY=Viewport.PanY))
 		ThisConnectorIn.RemoveConnection(Viewport=Viewport)
+
+	def DisconnectConnector_Undo(self, Proj, UndoRecord, **Args): # handle undo for DisconnectConnector
+		assert isinstance(Proj, projects.ProjectItem)
+		assert isinstance(UndoRecord, undo.UndoItem)
+		# find out which datacore socket to send messages on
+		SocketFromDatacore = vizop_misc.SocketWithName(TargetName=Args['SocketFromDatacoreName'])
+		# undo the change to the connection; find the connector-in (searching over all other FTs in the project)
+		ThisConnectorIn = [e for ThisFT in Proj.PHAObjs if isinstance(ThisFT, FTObjectInCore)
+						   if not (ThisFT is self)
+						   for e in WalkOverAllFTObjs(ThisFT) if e.ID == UndoRecord.ConnectorInID][0]
+#		ThisConnectorOut = utilities.ObjectWithID(WalkOverAllFTObjs(self), TargetID=UndoRecord.ConnectorOutID)
+		ThisConnectorIn.MakeConnectionWith(UndoRecord.ConnectorOut, Viewport=None, Undoing=True)
+		# request Control Frame to switch to the Viewport that was visible when the original edit was made
+#		self.RedrawAfterUndoOrRedo(UndoRecord, SocketFromDatacore)
+		projects.SaveOnFly(Proj, UpdateData=vizop_misc.MakeXMLMessage(RootName=info.FTTag,
+			Elements={info.IDTag: self.ID}))
+		# TODO add data for the restored connection to the Save On Fly data
+		return {'Success': True}
+
+	def DisconnectConnector_Redo(self): pass
 
 	def HandleIncomingRequest(self, MessageReceived=None, MessageAsXMLTree=None, **Args):
 		# handle request received by FT model in datacore from a Viewport. Request can be to edit data (eg add new element)
@@ -4062,7 +4070,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			# set the connection at the CX-in end
 			ThisConnectorIn.MakeConnectionWith(ConnectorOut=ThisConnectorOut, Viewport=SourceViewport)
 			Reply = vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
-		elif Command == 'RQ_FT_DisconnectConnectors': # disconnect connector-in from its related connector-out%%%
+		elif Command == 'RQ_FT_DisconnectConnectors': # disconnect connector-in from its related connector-out
 			Reply = self.DisconnectConnector(Proj=Proj, ElementID=XMLRoot.findtext('ConnectorOut'),
 				CXInID = XMLRoot.findtext('ConnectorIn'), Viewport=SourceViewport)
 
