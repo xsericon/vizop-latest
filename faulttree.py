@@ -2012,6 +2012,7 @@ class FTEventInCore(FTElementInCore): # FT event object used in DataCore by FTOb
 		# ChangingOpMode (bool): whether we're changing event type due to a change of operating mode
 		assert isinstance(ChangingOpMode, bool)
 		assert (NewEventType in self.AvailEventTypes) or (ChangingOpMode and (NewEventType is None))
+		assert isinstance(Redoing, bool)
 		if ChangingOpMode: NewEventTypeToApply = self.DefaultEventType
 		else: NewEventTypeToApply = NewEventType
 		# are we changing from SIFFailureEvent? If so, don't store the old value (it was calculated, not manual)
@@ -2040,6 +2041,12 @@ class FTEventInCore(FTElementInCore): # FT event object used in DataCore by FTOb
 		# restore old probability value
 		if ChangingFromProbToFreqEvent or ((ChangingFromSIFFailureEvent or ChangeToUserValueKind) and ChangingToFreqEvent):
 			self.Value = copy.copy(self.OldFreqValue)
+		# do event type change. TODO undo for SetAsSIFFailureEvent
+		if NewEventTypeToApply == 'SIFFailureEvent': self.SetAsSIFFailureEvent() # set this event as the SIF failure event
+		else: self.DoChangeEventType(NewEventType=NewEventTypeToApply, Viewport=Viewport,
+			ViewportID=ViewportID, ViewportClass=ViewportClass, Zoom=Zoom, PanX=PanX, PanY=PanY, Redoing=Redoing,
+			ChainUndo=ChangingOpMode)
+#			self.EventType = NewEventTypeToApply # now donw in DoChangeEventType
 		# change to derived value kind (Auto) or user value kind if necessary
 		if ChangeToDerivedValueKind:
 			print('FT2045 changing value to ', FTEventInCore.DefaultValueKind[NewEventType])
@@ -2051,8 +2058,45 @@ class FTEventInCore(FTElementInCore): # FT event object used in DataCore by FTOb
 			self.FT.ChangeNumberKind(FTElement=self, NewNumberKindXMLName='User',
 				Viewport=Viewport, ViewportID=ViewportID, ViewportClass=ViewportClass, Zoom=Zoom, PanX=PanX, PanY=PanY,
 				StoreUndoRecord=True, Redoing=Redoing, UndoChained=True)
-		if NewEventTypeToApply == 'SIFFailureEvent': self.SetAsSIFFailureEvent() # set this event as the SIF failure event
-		else: self.EventType = NewEventTypeToApply
+
+	def DoChangeEventType(self, NewEventType, Viewport,
+		ViewportID, ViewportClass, Zoom, PanX, PanY, Redoing=False, ChainUndo=False):
+		# execute event type change%%%
+		undo.AddToUndoList(Proj=self.Proj, Redoing=Redoing, UndoObj=undo.UndoItem(UndoHandler=self.ChangeEventType_Undo,
+			  RedoHandler=self.ChangeEventType_Redo,
+			  Chain={False: 'NoChain', True: 'Avalanche'}[ChainUndo],
+			  ViewportID=ViewportID, ViewportClass=ViewportClass,
+			  ElementID=self.ID,
+			  OldEventType=self.EventType, NewEventType=NewEventType,
+			  HumanText=_('change FT element to %s' % FTEventTypeNameHash[NewEventType]),
+			  Zoom=Zoom, PanX=PanX, PanY=PanY))
+		self.EventType = NewEventType
+
+	def ChangeEventType_Undo(self, Proj, UndoRecord, **Args): # handle undo for change event type
+		assert isinstance(Proj, projects.ProjectItem)
+		assert isinstance(UndoRecord, undo.UndoItem)
+#		# find out which datacore socket to send messages on
+#		SocketFromDatacore = vizop_misc.SocketWithName(TargetName=Args['SocketFromDatacoreName'])
+		# undo the change to the event type
+		print('FT2081 changing event type to: ', UndoRecord.OldEventType, self.ID)
+		self.EventType = UndoRecord.OldEventType
+		# request Control Frame to switch to the Viewport that was visible when the original edit was made
+#		self.RedrawAfterUndoOrRedo(UndoRecord, SocketFromDatacore)
+		projects.SaveOnFly(Proj, UpdateData=vizop_misc.MakeXMLMessage(RootName=info.FTTag,
+			Elements={info.IDTag: self.ID}))
+		# TODO add data for the restored connection to the Save On Fly data
+		return {'Success': True}
+
+	def ChangeEventType_Redo(self, Proj, RedoRecord, **Args): # handle redo for change event type
+		self.DoChangeEventType(self, NewEventType=RedoRecord.NewEventType, Viewport=None,
+			ViewportID=RedoRecord.ViewportID, ViewportClass=RedoRecord.ViewportClass, Zoom=RedoRecord.Zoom,
+			PanX=RedoRecord.PanX, PanY=RedoRecord.PanY, Redoing=True, ChainUndo=Args['ChainUndo'])
+		self.RedrawAfterUndoOrRedo(RedoRecord, SocketFromDatacore=vizop_misc.SocketWithName(
+			TargetName=Args['SocketFromDatacoreName']))
+		projects.SaveOnFly(Proj, UpdateData=vizop_misc.MakeXMLMessage(RootName=info.FTTag,
+			Elements={info.IDTag: self.ID}))
+			# TODO add data for the changed component to the Save On Fly data
+		return {'Success': True}
 
 	def ChangeValueKind(self, NewValueKind=None):
 		# change this FTEvent's value kind to NewValueKind (a NumValueItem subclass).
@@ -3110,6 +3154,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			for Tag, Attrib in FTEvent.TextComponentHash.items():
 				El = ElementTree.SubElement(EventEl, Tag)
 				El.text = str(Attrib)
+			print('FT3157 sending event type as: ', FTEvent.ID, FTEvent.EventType)
 			# elements for lists of AssociatedTextItems: comments and action items
 			DataInfo = [ (info.DescriptionCommentTag, FTEvent.EventDescriptionComments, FTEvent.ShowDescriptionComments),
 				(info.ValueCommentTag, FTEvent.ValueComments, FTEvent.ShowValueComments),
@@ -4059,7 +4104,6 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		Proj = Args['Proj'] # get ProjectItem object to which the current FT belongs
 		# get the command - it's the tag of the root element
 		Command = XMLRoot.tag
-#		print('FT3088 FT handling incoming request with command: ', Command)
 		# get the Viewport from which the command was issued
 		SourceViewport = utilities.ObjectWithID(Objects=Proj.ActiveViewports, TargetID=XMLRoot.findtext('Viewport'))
 		# prepare default reply if command unknown
@@ -4424,6 +4468,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 #				Applicable=utilities.Bool2Str(ThisTag.get(info.ApplicableAttribName)))
 #					for ThisTag in XMLObj.findall(info.NumberKindTag)]
 			# populate value kind with HumanName of number kind marked as applicable
+			print('FT4468 ID, eventkind, valuekindoptions: ', NewEvent.ID, NewEvent.EventType, [(c.HumanName, c.Applicable) for c in NewEvent.ValueKindOptions])
 			NewEvent.ValueKind = [c.HumanName for c in NewEvent.ValueKindOptions
 				if c.Applicable][0]
 			# retrieve data from ProblemIndicatorTag: decide whether to show problem button
@@ -5230,9 +5275,8 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		# at this stage, NewValue has not been validated - could be unacceptable
 		assert AttribName in ['Unit', 'NumberKind']
 		vizop_misc.SendRequest(Socket=self.C2DSocketREQ, Command='RQ_FT_ChangeChoice', Attrib=AttribName,
-#							   Proj=self.Proj.ID, PHAObj=self.PHAObj.ID, Viewport=self.ID,
-							   PHAObj=self.PHAObj.ID, Viewport=self.ID,
-							   Element=ElementID, TextComponent=EditComponentInternalName, NewValue=NewValue)
+			PHAObj=self.PHAObj.ID, Viewport=self.ID,
+			Element=ElementID, TextComponent=EditComponentInternalName, NewValue=NewValue)
 
 
 	def RequestNewConnectionToConnectorIn(self, ElementID, TargetConnectorID):
