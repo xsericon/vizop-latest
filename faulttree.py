@@ -2617,14 +2617,17 @@ class FTConnectorItemInCore(FTElementInCore): # in- and out-connectors (CX's) to
 		self.FT.ChangeNumberKind(FTElement=self, NewNumberKindXMLName='LinkedFrom', ValueAttribName='',
 			Viewport=Viewport, StoreUndoRecord=not Undoing, LinkedFromElement=ConnectorOut)
 
-	def RemoveConnection(self, Viewport):
+	def RemoveConnection(self, Viewport=None, ViewportID=None, ViewportClass=None, Zoom=None, PanX=None, PanY=None,
+			Redoing=False):
 		# remove connection from this connector-in to its related Connector-Out
+		# must supply either Viewport or other Viewport attribs
 		assert not self.Out # make sure we are a connector-in
 		# do the disconnection
 		self.RelatedCX = None
 		# change my number type to User (i.e. entered manually)
 		self.FT.ChangeNumberKind(FTElement=self, NewNumberKindXMLName='User', ValueAttribName='', Viewport=Viewport,
-			StoreUndoRecord=True, UndoChained=True)
+			ViewportID=ViewportID, ViewportClass=ViewportClass, Zoom=Zoom, PanX=PanX, PanY=PanY, StoreUndoRecord=True,
+			UndoChained=True, Redoing=Redoing)
 
 	def ConnectedToConnectorsIn(self):
 		# return list of PHA elements in the entire project that this Connector-Out is already connected to
@@ -3838,7 +3841,8 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			# TODO add data for the changed component to the Save On Fly data
 		return {'Success': True}
 
-	def ChangeNumberKind(self, FTElement, NewNumberKindXMLName, ValueAttribName='', Viewport=None, StoreUndoRecord=True,
+	def ChangeNumberKind(self, FTElement, NewNumberKindXMLName, ValueAttribName='', Viewport=None,
+		ViewportID=None, ViewportClass=None, Zoom=None, PanX=None, PanY=None, StoreUndoRecord=True, Redoing=False,
 		UndoChained=True, LinkedFromElement=None):
 		# change number kind of numerical value
 		# FTElement: FT itself (for updating TolFreq value), or an FTEvent or FTGate instance (for updating event value)
@@ -3846,6 +3850,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		# ValueAttribName: (str) Name of value attrib in FTElement to change; 'TolFreq' or 'Value';
 		#	should be '' if FTElement is not the FT itself
 		# Viewport: Viewport from which number change request was initiated - for undo; ignored if StoreUndoRecord is False
+		# Other Viewport attribs incl zoom, pan: can be supplied instead of Viewport, if needed for storing undo record
 		# StoreUndoRecord (bool): whether to store an undo record for the number kind change
 		# UndoChained (bool): if storing undo record, whether to mark it as chained from the preceding record
 		# LinkedFromElement (any PHA element or None): if changing to UseParent (linked) number kind, which element to
@@ -3854,7 +3859,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			# NumberKindChanged (bool): whether the number kind was actually changed
 			# NewNumberKind (NumValueItem subclass or None): the number kind changed to, or None if number kind wasn't changed
 		assert isinstance(StoreUndoRecord, bool)
-		if StoreUndoRecord: assert Viewport is not None
+		if StoreUndoRecord: assert (Viewport is not None) or (ViewportID is not None)
 		if NewNumberKindXMLName is 'LinkedFrom': assert LinkedFromElement is not None
 		# find the applicable attrib in FTElement
 		if not ValueAttribName: ValueAttribNameToUse = 'Value'
@@ -3883,21 +3888,24 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 				NewValueObj.UnitGetter = NewValueObj.GetMyUserDefinedUnit
 			# overwrite the old Value with the new number object
 			setattr(FTElement, ValueAttribNameToUse, NewValueObj)
-			print('FT3601 set element IDs numberkind to:', FTElement.ID, )
 			# store undo record
 			if StoreUndoRecord:
 				self.DoChangeNumberKind_PostActions(ValueAttrib=ValueAttrib, ValueAttribName=ValueAttribNameToUse,
 					FTElement=FTElement, NewNumberObj=NewValueObj, OldNumberObj=OldValueObj,
-					ViewportID=Viewport.ID, ViewportClass=type(Viewport), Chained=UndoChained,
-					Zoom=Viewport.Zoom, PanX=Viewport.PanX, PanY=Viewport.PanY, Redoing=False)
+					ViewportID=getattr(Viewport, 'ID', ViewportID),
+					ViewportClass=ViewportClass if Viewport is None else type(Viewport),
+					Chained=UndoChained,
+					Zoom=getattr(Viewport, 'Zoom', Zoom), PanX=getattr(Viewport, 'PanX', PanX),
+					PanY=getattr(Viewport, 'PanY', PanY), Redoing=Redoing)
 		return NumberKindChanged, NewNumberKind
 
 	def DoChangeNumberKind_PostActions(self, ValueAttrib, ValueAttribName, FTElement, NewNumberObj, OldNumberObj,
 			ViewportID, ViewportClass, Chained,
 			Zoom, PanX, PanY, Redoing=False):
+		# Chained: bool (from original action) or 'Avalanche' (from redo)
 		undo.AddToUndoList(Proj=self.Proj, Redoing=Redoing, UndoObj=undo.UndoItem(UndoHandler=self.ChangeNumberKind_Undo,
 			RedoHandler=self.ChangeNumberKind_Redo,
-			Chain={False: 'NoChain', True: 'Avalanche'}[Chained], ComponentHost=FTElement,
+			Chain={False: 'NoChain', True: 'Avalanche', 'Avalanche': 'Avalanche'}[Chained], ComponentHost=FTElement,
 			ViewportID=ViewportID,
 			ViewportClass=ViewportClass,
 			ElementID=FTElement.ID,
@@ -3905,6 +3913,8 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			OldNumberObj=OldNumberObj, NewNumberObj=NewNumberObj,
 			HumanText=_('Change number basis for %s') % _(self.ComponentEnglishNames[ValueAttribName]),
 			Zoom=Zoom, PanX=PanX, PanY=PanY))
+		projects.SaveOnFly(self.Proj, UpdateData=vizop_misc.MakeXMLMessage(RootName=info.FTTag,
+			Elements={info.IDTag: self.ID}))
 		# TODO add data for the changed component to the Save On Fly data
 
 	def ChangeNumberKind_Undo(self, Proj, UndoRecord, **Args):
@@ -3932,8 +3942,6 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			NewNumberObj=RedoRecord.NewNumberObj, OldNumberObj=RedoRecord.OldNumberObj,
 			ViewportID=RedoRecord.ViewportID, ViewportClass=RedoRecord.ViewportClass, Chained=RedoRecord.Chain,
 			Zoom=RedoRecord.Zoom, PanX=RedoRecord.PanX, PanY=RedoRecord.PanY, Redoing=True)
-		self.RedrawAfterUndoOrRedo(RedoRecord, SocketFromDatacore=vizop_misc.SocketWithName(
-			TargetName=Args['SocketFromDatacoreName']))
 		projects.SaveOnFly(Proj, UpdateData=vizop_misc.MakeXMLMessage(RootName=info.FTTag,
 			Elements={info.IDTag: self.ID, info.ComponentHostIDTag: RedoRecord.ComponentHost.ID}))
 			# TODO add data for the changed component to the Save On Fly data
@@ -3954,34 +3962,36 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 						   for e in WalkOverAllFTObjs(ThisFT) if e.ID == CXInID][0]
 		assert isinstance(ThisConnectorIn, FTConnectorItemInCore)
 		# remove the connection at the CX-in end, and store Undo record
-		self.DoDisconnectConnector(Proj, ThisConnectorOut, ThisConnectorIn, Viewport)
+		self.DoDisconnectConnector(Proj, ThisConnectorOut, ThisConnectorIn, ViewportID=Viewport.ID,
+			ViewportClass=type(Viewport), Zoom=Viewport.Zoom, PanX=Viewport.PanX, PanY=Viewport.PanY)
 		return vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
 
-	def DoDisconnectConnector(self, Proj, ThisConnectorOut, ThisConnectorIn, Viewport,
-			Redoing=False, ChainUndo=False):
+	def DoDisconnectConnector(self, Proj, ThisConnectorOut, ThisConnectorIn, ViewportID,
+			ViewportClass, Zoom, PanX, PanY, Redoing=False, ChainUndo=False):
 		# execute the disconnection, and store Undo record
 		assert isinstance(Redoing, bool)
 		assert isinstance(ChainUndo, bool)
 		undo.AddToUndoList(Proj=Proj, Redoing=Redoing, UndoObj=undo.UndoItem(UndoHandler=self.DisconnectConnector_Undo,
 			RedoHandler=self.DisconnectConnector_Redo,
 			Chain={False: 'NoChain', True: 'Avalanche'}[ChainUndo], ConnectorOut=ThisConnectorOut,
-			ConnectorInID=ThisConnectorIn.ID, ViewportID=Viewport.ID,
-			ViewportClass=type(Viewport),
-			HumanText=_('disconnect inward connector'),
-			Zoom=Viewport.Zoom, PanX=Viewport.PanX, PanY=Viewport.PanY))
-		ThisConnectorIn.RemoveConnection(Viewport=Viewport)
+			ConnectorIn=ThisConnectorIn, ViewportID=ViewportID,
+			ViewportClass=ViewportClass,
+			HumanText=_('disconnect inward connector'), Zoom=Zoom, PanX=PanX, PanY=PanY))
+		ThisConnectorIn.RemoveConnection(ViewportID=ViewportID, ViewportClass=ViewportClass, Zoom=Zoom, PanX=PanX,
+			PanY=PanY, Redoing=Redoing)
 
 	def DisconnectConnector_Undo(self, Proj, UndoRecord, **Args): # handle undo for DisconnectConnector
 		assert isinstance(Proj, projects.ProjectItem)
 		assert isinstance(UndoRecord, undo.UndoItem)
 		# find out which datacore socket to send messages on
 		SocketFromDatacore = vizop_misc.SocketWithName(TargetName=Args['SocketFromDatacoreName'])
-		# undo the change to the connection; find the connector-in (searching over all other FTs in the project)
-		ThisConnectorIn = [e for ThisFT in Proj.PHAObjs if isinstance(ThisFT, FTObjectInCore)
-						   if not (ThisFT is self)
-						   for e in WalkOverAllFTObjs(ThisFT) if e.ID == UndoRecord.ConnectorInID][0]
+		# undo the change to the connection
+#		# find the connector-in (searching over all other FTs in the project)
+#		ThisConnectorIn = [e for ThisFT in Proj.PHAObjs if isinstance(ThisFT, FTObjectInCore)
+#						   if not (ThisFT is self)
+#						   for e in WalkOverAllFTObjs(ThisFT) if e.ID == UndoRecord.ConnectorInID][0]
 #		ThisConnectorOut = utilities.ObjectWithID(WalkOverAllFTObjs(self), TargetID=UndoRecord.ConnectorOutID)
-		ThisConnectorIn.MakeConnectionWith(UndoRecord.ConnectorOut, Viewport=None, Undoing=True)
+		UndoRecord.ConnectorIn.MakeConnectionWith(UndoRecord.ConnectorOut, Viewport=None, Undoing=True)
 		# request Control Frame to switch to the Viewport that was visible when the original edit was made
 #		self.RedrawAfterUndoOrRedo(UndoRecord, SocketFromDatacore)
 		projects.SaveOnFly(Proj, UpdateData=vizop_misc.MakeXMLMessage(RootName=info.FTTag,
@@ -3989,7 +3999,17 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		# TODO add data for the restored connection to the Save On Fly data
 		return {'Success': True}
 
-	def DisconnectConnector_Redo(self): pass
+	def DisconnectConnector_Redo(self, Proj, RedoRecord, **Args): # handle redo for DisconnectConnector
+		self.DoDisconnectConnector(Proj=Proj, ThisConnectorOut=RedoRecord.ConnectorOut,
+			ThisConnectorIn=RedoRecord.ConnectorIn, ViewportID=RedoRecord.ViewportID,
+			ViewportClass=RedoRecord.ViewportClass, Zoom=RedoRecord.Zoom, PanX=RedoRecord.PanX, PanY=RedoRecord.PanY,
+			Redoing=True)
+		self.RedrawAfterUndoOrRedo(RedoRecord, SocketFromDatacore=vizop_misc.SocketWithName(
+			TargetName=Args['SocketFromDatacoreName']))
+		projects.SaveOnFly(Proj, UpdateData=vizop_misc.MakeXMLMessage(RootName=info.FTTag,
+			Elements={info.IDTag: self.ID}))
+			# TODO add data for the changed component to the Save On Fly data
+		return {'Success': True}
 
 	def HandleIncomingRequest(self, MessageReceived=None, MessageAsXMLTree=None, **Args):
 		# handle request received by FT model in datacore from a Viewport. Request can be to edit data (eg add new element)
@@ -5261,8 +5281,6 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			# is CurrentElements non-empty, and are all current elements of the same type?
 			if len(set([type(e) for e in CurrentElements])) == 1:
 				# does the type have a preferred control panel aspect?
-				print('FT4811 trying to switch to relevant control aspect: ',
-					type(CurrentElements[0]), getattr(CurrentElements[0], 'ControlPanelAspect', None))
 				if getattr(CurrentElements[0], 'ControlPanelAspect', None):
 					self.DisplDevice.GotoControlPanelAspect(AspectName=CurrentElements[0].ControlPanelAspect,
 						PHAObjInControlPanel=CurrentElements[0], ComponentInControlPanel='')
