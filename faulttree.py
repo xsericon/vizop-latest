@@ -55,7 +55,7 @@ def SILTarget(Mode='', RiskRed=1.0):
 			if MinRiskRed >= RiskRed: break
 		else: # 'else' statement executes if 'for' loop runs without being 'break'd
 			ThisSILTarget = 'b' # RRF is beyond SIL 4 range
-	return ThisSILTarget
+	return 'SIL ' + ThisSILTarget
 
 class ButtonElement(object): # object containing a button and attributes and methods needed to render it
 	# class ButtonObjectNotInElement is a subclass of this
@@ -2005,7 +2005,9 @@ class FTEventInCore(FTElementInCore): # FT event object used in DataCore by FTOb
 		AvailEventTypesForDisplay = [t for t in self.EventTypes if t in AvailEventTypes]
 		return AvailEventTypesForDisplay, AvailEventTypesForDisplay[0]
 
-	def ChangeEventType(self, NewEventType=None, ChangingOpMode=False): # change this FTEvent's type to NewEventType
+	def ChangeEventType(self, NewEventType=None, ChangingOpMode=False, Viewport=None,
+			ViewportID=None, ViewportClass=None, Zoom=None, PanX=None, PanY=None, Redoing=False):
+		# change this FTEvent's type to NewEventType
 		# NewEventType (str): new event type to apply. Ignored if ChangingOpMode is True (will use DefaultEventType)
 		# ChangingOpMode (bool): whether we're changing event type due to a change of operating mode
 		assert isinstance(ChangingOpMode, bool)
@@ -2021,9 +2023,11 @@ class FTEventInCore(FTElementInCore): # FT event object used in DataCore by FTOb
 		ChangingFromProbToFreqEvent = (self.EventType in self.EventTypesWithProbValue) and ChangingToFreqEvent
 		# decide if we need to change value kind
 		ChangeToUserValueKind = (NewEventType in FTEventInCore.EventTypesWithUserValues) and\
-			(type(self.Value) not in FTEventInCore.UserSuppliedNumberKinds)
+			not isinstance(self.Value, core_classes.UserNumValueItem)
+#			(type(self.Value) not in FTEventInCore.UserSuppliedNumberKinds)
 		ChangeToDerivedValueKind = (NewEventType in FTEventInCore.EventTypesWithDerivedValues) and\
-			(type(self.Value) not in FTEventInCore.DerivedNumberKinds)
+			not isinstance(self.Value, core_classes.AutoNumValueItem)
+#			(type(self.Value) not in FTEventInCore.DerivedNumberKinds)
 		# is the existing value kind 'user defined'? If so, store the value for later use
 		if isinstance(self.Value, core_classes.UserNumValueItem):
 			# keep old probability value to restore
@@ -2036,9 +2040,17 @@ class FTEventInCore(FTElementInCore): # FT event object used in DataCore by FTOb
 		# restore old probability value
 		if ChangingFromProbToFreqEvent or ((ChangingFromSIFFailureEvent or ChangeToUserValueKind) and ChangingToFreqEvent):
 			self.Value = copy.copy(self.OldFreqValue)
-		# change to derived value kind if necessary
+		# change to derived value kind (Auto) or user value kind if necessary
 		if ChangeToDerivedValueKind:
-			self.ChangeValueKind(NewValueKind=FTEventInCore.DefaultValueKind[NewEventType]) # TODO change to ChangeNumberKind()
+			print('FT2045 changing value to ', FTEventInCore.DefaultValueKind[NewEventType])
+			self.FT.ChangeNumberKind(FTElement=self, NewNumberKindXMLName=FTEventInCore.DefaultValueKind[NewEventType].XMLName,
+				Viewport=Viewport,
+				ViewportID=ViewportID, ViewportClass=ViewportClass, Zoom=Zoom, PanX=PanX, PanY=PanY,
+				StoreUndoRecord=True, Redoing=Redoing, UndoChained=True)
+		elif ChangeToUserValueKind:
+			self.FT.ChangeNumberKind(FTElement=self, NewNumberKindXMLName='User',
+				Viewport=Viewport, ViewportID=ViewportID, ViewportClass=ViewportClass, Zoom=Zoom, PanX=PanX, PanY=PanY,
+				StoreUndoRecord=True, Redoing=Redoing, UndoChained=True)
 		if NewEventTypeToApply == 'SIFFailureEvent': self.SetAsSIFFailureEvent() # set this event as the SIF failure event
 		else: self.EventType = NewEventTypeToApply
 
@@ -2762,29 +2774,39 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 					yield ThisElement
 		return
 
-	def GetOutcome(self):
+	def GetOutcome(self, RR, ForDisplay=False):
 		# Get FT outcome value. In Low Demand mode, this is the value of the top event; else, value of SIFFailureEvent object
+		# If ForDisplay, the value returned is a formatted string at the correct precision; else it is float at full precision
 		# Returns ValueInfoItem instance
 		assert self.OpMode in core_classes.OpModes
+		assert isinstance(ForDisplay, bool)
 		# find event(s) flagged as top event or SIF Failure event depending on OpMode
 		if self.OpMode == core_classes.LowDemandMode:
 			OutcomeEvents = [e for e in WalkOverAllFTObjs(self) if getattr(e, 'EventType', None) == 'TopEvent']
 		else:
 			OutcomeEvents = [e for e in WalkOverAllFTObjs(self) if getattr(e, 'EventType', None) == 'SIFFailureEvent']
 		assert len(OutcomeEvents) <= 1 # should be only one such event; if not, it's a bug
-		if OutcomeEvents: return OutcomeEvents[0].Value
+		if OutcomeEvents:
+			# check if outcome value is available
+			OutcomeStatus = OutcomeEvents[0].Value.GetMyStatus(RR=RR)
+			if OutcomeStatus is core_classes.NumProblemValue_NoProblem:
+				if ForDisplay: OutcomeValue = display_utilities.StringFromNum(OutcomeEvents[0].Value, RR=RR)
+				else: OutcomeValue = OutcomeEvents[0].Value.GetMyValue(RR=RR)
+				return core_classes.ValueInfoItem(Value=OutcomeValue, Unit=OutcomeEvents[0].Value.GetMyUnit(),
+					Problem=core_classes.NumProblemValue_NoProblem, ProblemObj=None)
+			else: return core_classes.ValueInfoItem(Value=0.0, Unit=core_classes.NullUnit,
+					Problem=OutcomeStatus, ProblemObj=None)
 		else: # no event flagged; return problem indicator
 			return core_classes.ValueInfoItem(Value=0.0, Unit=core_classes.NullUnit,
 				Problem=core_classes.NumProblemValue_FTOutcomeUndef, ProblemObj=None)
 
-	Outcome = property(fget=GetOutcome)
-
-	def TargetRiskRed(self, RR):
+	def TargetRiskRed(self, RR, ForDisplay=False):
 		# return target risk reduction requirement value (ValueInfoItem instance) from the SIF analysed in the FT.
-		# Also sets self.SILTargetValue (str), which can be retrieved immediately after calling Outcome().
-		# If Outcome() reports a problem, the same problem should be considered to apply to SILTargetValue, and
+		# Also sets self.SILTargetValue (str), which can be retrieved immediately after calling GetOutcome().
+		# If GetOutcome() reports a problem, the same problem should be considered to apply to SILTargetValue, and
 		# SILTargetValue will be set to ''.
 		# RR is risk receptor instance
+		# ForDisplay (bool): whether to return value as formatted str for display; if not, will return float
 		assert self.OpMode in core_classes.OpModes
 		assert self.TargetRiskRedMeasure in FTObjectInCore.RiskRedMeasures
 		assert isinstance(RR, core_classes.RiskReceptorItem)
@@ -2815,6 +2837,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 				return core_classes.ValueInfoItem(Value=0.0, Unit=core_classes.NullUnit,
 					Problem=core_classes.NumProblemValue_FTSFEUndef, ProblemObj=None)
 		else: # Low Demand mode: get the value of the FT Event flagged as top event
+			# code below may be duplicated in self.GetOutcome()
 			OutcomeEvents = [e for e in WalkOverAllFTObjs(self) if getattr(e, 'EventType', None) == 'TopEvent']
 			assert len(OutcomeEvents) <= 1 # should be no more than 1 object flagged; if >1, it's a bug
 			if OutcomeEvents: # an OutcomeEvent is flagged; get its status to see if the frequency value is available
@@ -2835,7 +2858,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 						assert isinstance(TolFreqUnit, core_classes.UnitItem)
 						assert TolFreqUnit in OutcomeUnit.Conversion # ensure unit conversion factor defined
 						assert self.TargetRiskRedMeasure in ['RRF', 'PFD']
-						if utilities.IsEffectivelyZero(TolFreqUnit): # tol freq is zero, can't calculate
+						if utilities.IsEffectivelyZero(TolFreqValue): # tol freq is zero, can't calculate
 							return core_classes.ValueInfoItem(Value=0.0, Unit=core_classes.NullUnit,
 								Problem=core_classes.NumProblemValue_DivisionByZero, ProblemObj=None)
 						elif TolFreqUnit.QtyKind != 'Frequency': # tol freq isn't a frequency, can't calculate
@@ -2846,14 +2869,22 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 								Problem=core_classes.NumProblemValue_TolRiskUnitMismatch,
 								ProblemObj=OutcomeEvents[0])
 						else: # all good, calculate RRF target
-							RRFTarget = max(1.0, OutcomeValue * OutcomeUnit.Conversion(TolFreqUnit) / TolFreqValue)
+							OutcomeInTolFreqUnits = OutcomeValue * OutcomeUnit.Conversion[TolFreqUnit]
+							RRFTarget = max(1.0, OutcomeInTolFreqUnits / TolFreqValue)
 							self.SILTargetValue = SILTarget(Mode=self.OpMode, RiskRed=RRFTarget)
+							print('FT2863 outcome, RRF, SIL: ', OutcomeValue, OutcomeUnit.HumanName, RRFTarget, self.SILTargetValue)
 							assert isinstance(self.SILTargetValue, str)
 							if self.TargetRiskRedMeasure == 'RRF':
-								return core_classes.ValueInfoItem(Value=RRFTarget, Unit=core_classes.DimensionlessUnit,
+								if ForDisplay: DisplayValue, Decimals = utilities.RoundToSigFigs(InputValue=RRFTarget,
+									SigFigs=info.OutcomeValueSigFigs)
+								else: DisplayValue = RRFTarget
+								return core_classes.ValueInfoItem(Value=DisplayValue, Unit=core_classes.DimensionlessUnit,
 									Problem=core_classes.NumProblemValue_NoProblem, ProblemObj=None)
 							else: # return PFDavg target
-								return core_classes.ValueInfoItem(Value=1.0 / RRFTarget,
+								if ForDisplay: DisplayValue, Decimals = utilities.RoundToSigFigs(InputValue=1.0 / RRFTarget,
+									SigFigs=info.OutcomeValueSigFigs)
+								else: DisplayValue = 1.0 / RRFTarget
+								return core_classes.ValueInfoItem(Value=DisplayValue,
 									Unit=core_classes.ProbabilityUnit, Problem=core_classes.NumProblemValue_NoProblem,
 									ProblemObj=None)
 					else: # tol freq can't be obtained for some reason
@@ -2865,6 +2896,8 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			else: # no OutcomeEvent flagged
 				return core_classes.ValueInfoItem(Value=0.0, Unit=core_classes.NullUnit,
 					Problem=core_classes.NumProblemValue_FTOutcomeUndef, ProblemObj=None)
+
+				(TruncatedValue, Decimals) = utilities.RoundToSigFigs(MyValue, SigFigs)
 
 	def WorkOutRiskReceptorGrouping(self, GroupingOption='Grouped'):
 		# if GroupingOption  == 'Grouped',
@@ -2971,16 +3004,15 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 				El = ElementTree.SubElement(HeaderEl, Tag)
 				El.text = Attrib.HumanName
 			# elements where the FT attribute is a ValueInfoItem instance
-			DataInfo = [ ('UEL', self.Outcome), ('TargetRiskRed', self.TargetRiskRed(RRForCalc)) ]
+			DataInfo = [ ('UEL', self.GetOutcome(RR=RRForCalc, ForDisplay=True)),
+				('TargetRiskRed', self.TargetRiskRed(RRForCalc, ForDisplay=True)) ]
 			for Tag, Attrib in DataInfo:
 				El = ElementTree.SubElement(HeaderEl, Tag)
 				El.text = str(Attrib.Value)
-			# elements where the FT attribute is a NumValueItem (or subclass) instance
+			# elements where the FT attribute is a NumValueItem (or subclass) instance representing a user-settable value
 			DataInfo = [ ('TolFreq', self.TolFreq) ]
 			for Tag, Attrib in DataInfo:
 				AttribEl = ElementTree.SubElement(HeaderEl, Tag)
-#				AttribEl.text = str(Attrib.GetMyValue(RR=RRForCalc))
-#				AttribEl.text = Attrib.GetDisplayValue(RR=RRForCalc, InvalidResult=info.CantDisplayValueOnScreen)
 				# get correctly formatted string representation of numerical value
 				AttribEl.text = display_utilities.StringFromNum(InputNumber=Attrib, RR=RRForCalc)
 				V = display_utilities.StringFromNum(InputNumber=Attrib, RR=RRForCalc)
@@ -3012,7 +3044,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 				El.text = getattr(self, Tag)
 			# elements where the text is the HumanName of the Unit of the FT attribute
 #			DataInfo = [ ('TolFreqUnit', self.TolFreq), ('OutcomeUnit', self.Outcome) ]
-			DataInfo = [ ('OutcomeUnit', self.Outcome) ]
+			DataInfo = [ ('OutcomeUnit', self.GetOutcome(RR=RRForCalc)) ]
 			for Tag, Attrib in DataInfo:
 				El = ElementTree.SubElement(HeaderEl, Tag)
 				El.text = str(Attrib.Unit.HumanName)
@@ -3128,9 +3160,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 				NumValueClassesToShow = FTEvent.DerivedNumberKinds
 			elif FTEvent.EventType in FTEvent.EventTypesUserOrDerivedValues:
 				NumValueClassesToShow = FTEvent.UserSuppliedNumberKinds + FTEvent.DerivedNumberKinds
-				print('FT2979 making value kind options: NumValueClassesToShow, this one: ', type(FTEvent.Value), NumValueClassesToShow)
 			for (ThisValueKindIndex, ThisValueKind) in enumerate(NumValueClassesToShow):
-#				ValueKindEl = ElementTree.SubElement(EventEl, info.NumberKindTag)
 				ValueKindEl = ElementTree.SubElement(EventEl, info.ValueKindOptionTag)
 				# set human name for number kind option to internal name of option
 				ValueKindEl.text = ThisValueKind.XMLName
@@ -3688,11 +3718,13 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 				if isinstance(ThisEvent, FTEventInCore):
 					ThisEvent.AvailEventTypes, ThisEvent.DefaultEventType = ThisEvent.SetAvailableEventTypes()
 					if ThisEvent.EventType not in ThisEvent.AvailEventTypes:
-						ThisEvent.ChangeEventType(ChangingOpMode=True)
+						ThisEvent.ChangeEventType(ChangingOpMode=True, Viewport=ViewportObj)
 		elif ComponentToUpdate == 'EventType': # update FTEvent type
+			print('FT3699 changing event type to: ', NewValue)
 			# find the FTEvent to update
 			ThisFTEvent = [e for e in WalkOverAllFTObjs(self) if e.ID == ElementID][0]
-			ThisFTEvent.ChangeEventType(NewEventType=NewValue) # update the event type
+			# update the event type
+			ThisFTEvent.ChangeEventType(NewEventType=NewValue, ChangingOpMode=False, Viewport=ViewportObj)
 		elif ComponentToUpdate in ('EventValueUnit', 'GateValueUnit'):
 			# update value unit of FTEvent or FTGate
 			# find the FTEvent/FTGate to update
@@ -4273,8 +4305,8 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			DataInfo = [ ('HumanName', info.SIFNameTag), ('Description', 'Description'), ('OpMode', 'OpMode'), ('Rev', 'Rev'),
 				('TargetRiskRedMeasure', 'TargetUnit'), ('BackgColour', 'BackgColour'),
 				('TextColour', 'TextColour'), ('Severity', 'Severity'),
-				('UEL', 'UEL'), ('TargetRiskRed', 'RRF'),
-				('SIL', 'SIL'), ('OutcomeUnit', 'OutcomeUnit') ]
+				('UEL', 'UEL'), ('RRF', 'TargetRiskRed'),
+				('SIL', 'SILTargetValue'), ('OutcomeUnit', 'OutcomeUnit') ]
 			assert ComponentNameToHighlight in [a for (a, b) in DataInfo] + ['TolFreq'] or (ComponentNameToHighlight == '')
 			for Attrib, XMLTag in DataInfo:
 				setattr(HeaderEl, Attrib, HeaderXMLRoot.findtext(XMLTag, default=''))
@@ -4392,7 +4424,6 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 #				Applicable=utilities.Bool2Str(ThisTag.get(info.ApplicableAttribName)))
 #					for ThisTag in XMLObj.findall(info.NumberKindTag)]
 			# populate value kind with HumanName of number kind marked as applicable
-#			NewEvent.ValueKind = [c.HumanName for c in NewEvent.EventValueKindComponent.ObjectChoices
 			NewEvent.ValueKind = [c.HumanName for c in NewEvent.ValueKindOptions
 				if c.Applicable][0]
 			# retrieve data from ProblemIndicatorTag: decide whether to show problem button
@@ -5160,8 +5191,6 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			elif CurrentEditBehaviour == 'Choice': # it was a choice editing operation
 				# get the option selected by the user
 				TextSelected = self.CurrentEditChoice.GetStringSelection()
-				print('FT4866 handling choice with TextSelected:', TextSelected)
-				print('FT4867 AcceptEditsThisTime, self.CurrentEditElement.Text.Content:', AcceptEditsThisTime, self.CurrentEditElement.Text.Content)
 				# check if any changes made
 				if AcceptEditsThisTime and (TextSelected != self.CurrentEditElement.Text.Content):
 					if isinstance(self.CurrentEditElement.HostObject, FTHeader):
@@ -5171,7 +5200,6 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 					EditComponentInternalName = self.CurrentEditElement.InternalName
 					# get matching XMLName of user's selection
 					ChosenXMLName = [i.XMLName for i in self.CurrentEditElement.ObjectChoices if i.HumanName == TextSelected][0]
-					print('FT4876 EditComponentInternalName, ElementID, ChosenXMLName: ', EditComponentInternalName, ElementID, ChosenXMLName)
 					# destroy the Choice widget (to avoid memory leak) (do this before SendRequest() so that the FT gets fully
 					# refreshed by ControlFrame's OnPaint() afterwards)
 					self.CurrentEditChoice.Destroy()

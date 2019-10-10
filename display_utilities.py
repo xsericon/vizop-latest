@@ -609,14 +609,17 @@ class UIWidgetPlaceholderItem(object):
 def StringFromNum(InputNumber, RR):
 	# returns correctly formatted string representation of InputNumber
 	# (NumValueItem instance), taking the number object's attribs Sci and Decimals into account
-	# SciThreshold (int, float or None): if the absolute value of InputNumber ≥ SciThreshold, scientific notation will be used
-	# First, check if value is defined
+	# Uses info.SciThresholdUpper/Lower (int, float or None): if the absolute value of InputNumber ≥ SciThreshold,
+	# scientific notation will be used
+	# First, check if value is available
 	ValueStatus = InputNumber.GetMyStatus(RR=RR)
-	if ValueStatus == core_classes.NumProblemValue_NoProblem: # it's defined
+	if ValueStatus == core_classes.NumProblemValue_NoProblem: # it's available
 		return InputNumber.GetDisplayValue(RR=RR, SciThresholdUpper=info.SciThresholdUpper,
 			SciThresholdLower=info.SciThresholdLower)
 	elif ValueStatus == core_classes.NumProblemValue_UndefNumValue: # it's not defined
 		return _('Not set')
+	else: # return 'cannot get value' indicator
+		return info.CantDisplayValueOnScreen
 
 class SIFListGridTable(wx.grid.PyGridTableBase): # object containing data table for SIF list display
 

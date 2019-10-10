@@ -501,7 +501,7 @@ class NumValueItem(object): # superclass of objects in Datacore having a numeric
 			MyValue = self.GetMyValue(RR=RR, InvalidResult=InvalidResult, **Args)
 			if MyValue == InvalidResult:
 				return InvalidResult
-			else:
+			else: # result is valid; proceed to apply rounding, formatting etc.
 				# the line below allows us to define number of sig figs per unit; not used anywhere in Vizop yet
 				SigFigs = self.SigFigs.get(self.GetMyUnit(), self.SigFigs[DefaultRiskReceptor])
 				# round MyValue to required number of sig figs
@@ -855,7 +855,7 @@ class ValueInfoItem(object): # defines an object used as a wrapper to pass value
 
 	def __init__(self, Value=0.0, Unit=NullUnit, Problem=NumProblemValue_NoProblem, ProblemObj=None):
 		object.__init__(self)
-		assert isinstance(Value, float)
+		assert isinstance(Value, (str, float)) # str is used when the value is meant for display
 		assert isinstance(Unit, UnitItem)
 		assert isinstance(Problem, NumProblemValue)
 		self.Value = Value
