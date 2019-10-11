@@ -2113,9 +2113,8 @@ class ControlFrame(wx.Frame):
 			'NO_NewViewport_Undo': self.PostProcessNewViewport_Undo,
 			'NO_NewViewport_Redo': self.PostProcessNewViewport_Redo,
 			'NO_FT_ChangeText_Undo': self.UpdateAllViewportsAfterUndo,
-			'NO_ShowViewport': self.ProcessSwitchToViewport
+			info.NO_ShowViewport: self.ProcessSwitchToViewport
 			}[XMLRoot.tag.strip()]
-			# this is a placeholder only - RP_ commands are replies, handled in HandleIncomingReplyToControlFrame()
 		# call handler, and return its reply
 		Reply = Handler(XMLRoot=XMLRoot)
 		assert Reply is not None, Handler.__name__ + ' sent no reply'
@@ -2629,8 +2628,6 @@ class ControlFrame(wx.Frame):
 
 	def ProcessSwitchToViewport(self, XMLRoot=None):
 		# handle request in incoming message to switch to a Viewport
-		print('CF2631 in ProcessSwitchToViewport. TargetID, Viewport IDs: ', XMLRoot.findtext(info.ViewportTag), [v.ID for v in self.CurrentProj.AllViewportShadows])
-		print('CF2632 viewport classes: ', [type(v) for v in self.CurrentProj.AllViewportShadows])
 		self.SwitchToViewport(TargetViewport=utilities.ObjectWithID(Objects=self.Viewports,
 			TargetID=XMLRoot.findtext(info.ViewportTag)), XMLRoot=XMLRoot)
 		return vizop_misc.MakeXMLMessage('Null', 'Null')
@@ -2936,7 +2933,6 @@ class ControlFrame(wx.Frame):
 		# Message (str): XML message received requesting update to Viewports (currently not used)
 		# Check with all Viewports that datacore knows about
 		for ThisViewportShadow in Proj.AllViewportShadows:
-			print('CF2906 UpdateAllViewports: processing Viewport: ', ThisViewportShadow.HumanName, ThisViewportShadow.IsOnDisplay)
 			# check if ThisViewportShadow is displayed in any display device, local or remote
 			if ThisViewportShadow.IsOnDisplay:
 				# find Viewport shadow corresponding to
