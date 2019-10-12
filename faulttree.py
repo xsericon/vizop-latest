@@ -1201,7 +1201,6 @@ class FTGate(FTBoxyObject): # object containing FT gates for display. These belo
 				FillColour = tuple(list(FillColour) + [0xff])
 				# First, get the bitmap data and split into a list of lists (per row) of tuples (RGB per point)
 				AllData = bytes(BitmapX * BitmapY * 4) # fixed length string of bytes to put bitmap data into
-#				AllData = bytes('x' * BitmapX * BitmapY * 4) # string to put bitmap data into
 				Bitmap.CopyToBuffer(data=AllData, format=wx.BitmapBufferFormat_RGBA)
 				# split into rows
 				AllDataPerRow = [AllData[ThisRowStart:ThisRowStart + (4 * BitmapX)]
@@ -1209,7 +1208,6 @@ class FTGate(FTBoxyObject): # object containing FT gates for display. These belo
 				# split each row into RGB sublists
 				AllDataRGB = []
 				for ThisRow in AllDataPerRow:
-#					AllDataRGB.append( [tuple([ord(x) for x in ThisRow[ThisPixelStart:ThisPixelStart + 4]])
 					AllDataRGB.append( [tuple(ThisRow[ThisPixelStart:ThisPixelStart + 4])
 						for ThisPixelStart in range(0, 4 * BitmapX, 4)])
 				for RowIncrement in [-1, 1]: # work upwards (increment -1) then downwards (+1)
@@ -1253,10 +1251,10 @@ class FTGate(FTBoxyObject): # object containing FT gates for display. These belo
 			BubbleRadiusInPx = int(round(BubbleRadiusInCU * Zoom))
 			TextPointSizeNoZoom = 30
 			PenWidth = max(1, int(round(Zoom)))  # width of pen for drawing border
-			if self.Style == 'IEC 60617-12': # boxes with annotations inside
+			if self.Style == 'IEC 60617-12': # boxes with annotations inside; not tested yet
 				BoxSizeXInCU = 60
 				self.SizeYInCU = 100
-				if self.Algorithm in AlgorithmsWithBubble: self.SizeXInCU = BoxSizeXInCU + 2 * BubbleRadiusInCU
+				if self.Algorithm in AlgorithmsWithBubble: self.SizeXInCU = BoxSizeXInCU + 2 * BubbleRadiusInCU + 1
 				else: self.SizeXInCU = BoxSizeXInCU
 				self.SizeXInPx = int(round(self.SizeXInCU * Zoom))
 				self.SizeYInPx = int(round(self.SizeYInCU * Zoom))
@@ -1283,7 +1281,8 @@ class FTGate(FTBoxyObject): # object containing FT gates for display. These belo
 				else: SymbolSizeXInCU = 100 # target size of symbol without bubble or 'XOR' line on left
 				self.SizeYInCU = 60
 				XORLineAllowanceXInCU = 10 # extra X allowance on left side for XOR line
-				if self.Algorithm in AlgorithmsWithBubble: self.SizeXInCU = SymbolSizeXInCU + 2 * BubbleRadiusInCU
+				# extra X size on right for bubble; the +1 is a fudge to make it look better at lower zooms
+				if self.Algorithm in AlgorithmsWithBubble: self.SizeXInCU = SymbolSizeXInCU + 2 * BubbleRadiusInCU + 1
 				else: self.SizeXInCU = SymbolSizeXInCU
 				if self.Algorithm == 'MutExcOR':
 					self.SizeXInCU += XORLineAllowanceXInCU
@@ -2414,6 +2413,7 @@ class FTGateItemInCore(object): # logic gate in a Fault Tree, used in DataCore
 		# assumes we have already run GetMyStatus() to confirm value is valid
 		# returns value as float
 		# 1st PHAObject yielding a problem value (or None)).
+		# This function contains safety critical code
 		assert isinstance(self.FT, FTObjectInCore)
 		# make list of input NumValueItem objects, and of numerical values with units
 		InputNumObjs = [Input.Value for Input in JoinedFrom(self.FT, self, FirstOnly=False)]
@@ -2431,15 +2431,16 @@ class FTGateItemInCore(object): # logic gate in a Fault Tree, used in DataCore
 			# if all inputs are frequencies, calculate the total frequency, converting units as required
 			if ProbCount == 0:
 				return sum([v * u.Conversion[TargetFreqUnit] for v, u in InputValuesAndUnits], 0.0)
-			# (FIXME this doesn't account for "overlaps" where 2 events occur simultaneously)
+			# (FIXME this doesn't account for "overlaps" where 2 events occur simultaneously. To do that, we'd have to
+			#  consider the MTTR of the events, so we can work out their probability of being in failed state)
 			# if all inputs are probabilities, calculate the combined non-mutually-exclusive probability
 			else:
 				Result = 1.0
 				# multiply 1-prob(event) for each input event. Convert values to probability (not %) for calculation
 				for ThisValue, ThisUnit in InputValuesAndUnits:
 					Result *= (1.0 - (ThisValue * ThisUnit.Conversion[core_classes.ProbabilityUnit]))
-				# convert units back if necessary
-				return Result * core_classes.ProbabilityUnit.Conversion[TargetProbUnit]
+				# calculate final result, and convert units back if necessary
+				return (1.0 - Result) * core_classes.ProbabilityUnit.Conversion[TargetProbUnit]
 
 		# MutExcOR gate: return sum(inputs)
 		elif self.Algorithm == 'MutExcOR':
@@ -2483,25 +2484,27 @@ class FTGateItemInCore(object): # logic gate in a Fault Tree, used in DataCore
 		elif self.Algorithm == 'NAND':
 			Result = 1.0
 			for ThisValue, ThisUnit in InputValuesAndUnits:
-				# convert values to probability (not %) for calculation, then convert back if necessary
-				Result *= (1.0 - (ThisValue * ThisUnit.Conversion[core_classes.ProbabilityUnit]))
-			# convert to final required unit
-			return core_classes.ProbabilityUnit.Conversion[TargetProbUnit] * Result
+				# convert values to probability (not %) for calculation
+				Result *= ThisValue * ThisUnit.Conversion[core_classes.ProbabilityUnit]
+			# calculate final result, and convert to final required unit
+			return core_classes.ProbabilityUnit.Conversion[TargetProbUnit] * (1.0 - Result)
 
 		elif self.Algorithm in ['2ooN', '3ooN']:
 			# convert input values to probability
-			InputsAsProb = [(1.0 - (v * u.Conversion[core_classes.ProbabilityUnit])) for v, u in InputValuesAndUnits]
+			InputsAsProb = [(v * u.Conversion[core_classes.ProbabilityUnit]) for v, u in InputValuesAndUnits]
 			NoOfInputs = len(InputValuesAndUnits)
 			# get how many inputs required True as a minimum
 			MinTrueInputs = {'2ooN': 2, '3ooN': 3}[self.Algorithm]
 			# add up the probabilities of all combinations of inputs with >= MinTrueInputs True
-			ProbResult = 0
+			ProbResult = 0.0
 			for NoOfTrueInputs in range(MinTrueInputs, NoOfInputs + 1):
 				ThisCombinationGenerator = NextCombination(Length=NoOfInputs, PassMark=NoOfTrueInputs)
 				for ThisCombination in ThisCombinationGenerator: # go through combinations with NoOfTrueInputs True
 					ThisProb = 1.0
 					for InputIndex, ThisValue in enumerate(InputsAsProb):
-						if ThisCombination(InputIndex): ThisProb *= ThisValue
+						# calculate product of input probabilities; for inputs that are False, use 1-P(input)
+						# to avoid double counting cases when these inputs are True in combinations with more True inputs
+						ThisProb *= ThisValue if ThisCombination[InputIndex] else 1.0 - ThisValue
 					ProbResult += ThisProb
 			# convert to user requested unit
 			return core_classes.ProbabilityUnit.Conversion[TargetProbUnit] * ProbResult
@@ -3297,7 +3300,6 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 				El.text = ThisConnectorIn.DescriptorText() # XML element text is the connector-in's human descriptor
 				El.set(info.IDTag, ThisConnectorIn.ID) # add XML attrib containing the connector-in's ID
 			# add options for value kind
-			print('FT3211 populating connector value kinds: ', type(FTConn.Value), FTConn.Value.GetMyValue(RR=FTConn.FT.RiskReceptorGroupOnDisplay[0]), FTConn.Out)
 			for (ThisValueKindIndex, ThisValueKind) in enumerate(FTConn.FTConnAcceptableValueKinds):
 				ValueKindEl = ElementTree.SubElement(ConnEl, info.ValueKindOptionTag)
 				# set human name for number kind option to internal name of option
@@ -4720,8 +4722,10 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			self.MarkObjectsWithPos() # set Pos attribs of all FT objects (must be done after rendering them, so we can get their size)
 			# set column positions (needed for making inter-column strips)
 			for ThisColumn in self.Columns:
-				# get pixel coordinates of the top right corner of the column
-				ThisColumn.EndXInPx, ThisColumn.PosYInPx = utilities.ScreenCoords(ThisColumn.PosXInCU + ThisColumn.SizeXInCU, 0,
+				# get pixel coordinates of the top right corner of the column. Y-coord is the PosY of the 0th element,
+				# which is currently always 0 as we put builder buttons at the top of the column
+				ThisColumn.EndXInPx, ThisColumn.PosYInPx = utilities.ScreenCoords(
+					ThisColumn.PosXInCU + ThisColumn.SizeXInCU, 0,
 					Zoom=self.Zoom, PanX=self.PanX, PanY=self.PanY)
 			self.SetupInterColumnStrips() # set up and draw strips containing connecting lines between columns
 			# make an overall bitmap, ready to blit constituent bitmaps into
@@ -4805,9 +4809,23 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			for ElIndex, ThisElement in enumerate(Col.FTElements):
 				# each element starts at left edge of column (except builder button, already set in own __init__)
 				if not isinstance(ThisElement, FTBuilder): ThisElement.PosXInCU = 0
-				ThisElement.PosYInCU = LastPosY
+				# if this element is a gate, calculate a Y-gap above the gate so that its input is centred on the outputs
+				# of the elements it is connected to
+				if isinstance(ThisElement, FTGate):
+					ConnectedElementMidYInCU = [El.PosYInCU + (0.5 * El.SizeYInCU)
+						for El in JoinedFrom(FT=self, FTObj=ThisElement, FirstOnly=False)]
+					# calculate average of centre Y of connected elements, and subtract half the height of this element
+					# to get target Y of this element
+					# Then subtract LastPosY to find required gap, and ensure it's >=0
+					if ConnectedElementMidYInCU: # any connected input elements found?
+						GapYAboveInCU = max(0, int(round((sum(ConnectedElementMidYInCU) / len(ConnectedElementMidYInCU))\
+							- (0.5 * ThisElement.SizeYInCU) - LastPosY)))
+					else: GapYAboveInCU = 0 # no connected input elements found
+				else: # for other types of element, no extra Y-gap above
+					GapYAboveInCU = 0
+				ThisElement.PosYInCU = LastPosY + GapYAboveInCU
 				ThisElement.PosXInPx, ThisElement.PosYInPx = utilities.ScreenCoords(ThisColOffsetXInCU + ThisElement.PosXInCU,
-					LastPosY, self.Zoom, PanX=self.PanX, PanY=self.PanY)
+					ThisElement.PosYInCU, self.Zoom, PanX=self.PanX, PanY=self.PanY)
 				# set PosX/Y of components within elements
 				if hasattr(ThisElement, 'AllElements'):
 					for ThisComponent in ThisElement.AllElements:
@@ -4815,12 +4833,12 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 						ThisComponent.PosYInPx = ThisElement.PosYInPx + (ThisComponent.PosYInCU * self.Zoom)
 				# set overall column width
 				ColWidthInCU = max(ColWidthInCU, ThisElement.PosXInCU + ThisElement.SizeXInCU)
-				# get Y-coord of next item, if any
+				# calculate Y-coord of next item in this column, if any
 				if ElIndex + 1 < len(Col.FTElements):
 					NextItem = Col.FTElements[ElIndex + 1]
 					# increment Y unless this and next items are builder buttons (so that they appear on the same row)
 					if not (isinstance(NextItem, FTBuilder) and isinstance(ThisElement, FTBuilder)):
-						LastPosY += ThisElement.SizeYInCU +\
+						LastPosY += GapYAboveInCU + ThisElement.SizeYInCU +\
 							self.YGapBetweenItemsInCU(ThisElement, Col.FTElements[ElIndex + 1])
 			# store finalised column PosX and width
 			Col.PosXInCU = ThisColOffsetXInCU
@@ -5396,7 +5414,6 @@ def JoinedFrom(FT, FTObj, FirstOnly=True): # return list of object(s) connected 
 	# walk over all objects in the FT until we hit one that's connected to FTObj
 	FoundObjs = [] # the FT objects connected to FTObj
 	for ThisObj in WalkOverAllFTObjs(FT):
-#		print("FT3940 JoinedFrom: matching: ", FTObj, ThisObj.ConnectTo)
 		if FTObj in ThisObj.ConnectTo:
 			FoundObjs.append(ThisObj)
 			if FirstOnly:
