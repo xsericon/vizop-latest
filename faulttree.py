@@ -1190,7 +1190,8 @@ class FTGate(FTBoxyObject): # object containing FT gates for display. These belo
 				# Add alpha channel to FillColour
 				FillColour = tuple(list(FillColour) + [0xff])
 				# First, get the bitmap data and split into a list of lists (per row) of tuples (RGB per point)
-				AllData = 'x' * BitmapX * BitmapY * 4 # string to put bitmap data into
+				AllData = bytes(BitmapX * BitmapY * 4) # fixed length string of bytes to put bitmap data into
+#				AllData = bytes('x' * BitmapX * BitmapY * 4) # string to put bitmap data into
 				Bitmap.CopyToBuffer(data=AllData, format=wx.BitmapBufferFormat_RGBA)
 				# split into rows
 				AllDataPerRow = [AllData[ThisRowStart:ThisRowStart + (4 * BitmapX)]
@@ -1198,7 +1199,8 @@ class FTGate(FTBoxyObject): # object containing FT gates for display. These belo
 				# split each row into RGB sublists
 				AllDataRGB = []
 				for ThisRow in AllDataPerRow:
-					AllDataRGB.append( [tuple([ord(x) for x in ThisRow[ThisPixelStart:ThisPixelStart + 4]])
+#					AllDataRGB.append( [tuple([ord(x) for x in ThisRow[ThisPixelStart:ThisPixelStart + 4]])
+					AllDataRGB.append( [tuple(ThisRow[ThisPixelStart:ThisPixelStart + 4])
 						for ThisPixelStart in range(0, 4 * BitmapX, 4)])
 				for RowIncrement in [-1, 1]: # work upwards (increment -1) then downwards (+1)
 					FillingY = StartY # row currently being filled; start from starting row
@@ -1231,11 +1233,9 @@ class FTGate(FTBoxyObject): # object containing FT gates for display. These belo
 							FillingY += RowIncrement # ready for next row
 							ThisRowLStart = ThisRowRStart = NextRowLStart
 						else: MoreToFill = False # reached edge of bitmap
-				# return all data as a bitmap. First way is old way using reduce()
-				# Bitmap.CopyFromBuffer(data=reduce(lambda a, b: a+b, [chr(c) for r in AllDataRGB for p in r for c in p]),
-				#	format=wx.BitmapBufferFormat_RGBA)
-				Bitmap.CopyFromBuffer(data=''.join([chr(c) for r in AllDataRGB for p in r for c in p]),
-					format=wx.BitmapBufferFormat_RGBA)
+				# return all data as a bitmap
+				Bitmap.CopyFromBuffer(data=b''.join([bytes(ThisPixel) for ThisRow2 in AllDataRGB
+					for ThisPixel in ThisRow2]), format=wx.BitmapBufferFormat_RGBA)
 				return Bitmap
 
 			AlgorithmsWithBubble = ['NOR', 'NAND']  # which algorithms need a bubble (little circle) on the output
