@@ -449,13 +449,13 @@ class FTBoxyObject(object): # superclass of vaguely box-like FT components for u
 
 	def __init__(self, **Args):
 		object.__init__(self)
-		self.HostFT = Args.get('HostFT', None)
+		self.FT = Args.get('FT', None)
 		self.ConnectTo = [] # object instances connected horizontally to the right of this instance
 		self.Clickable = True # bool; whether instance is intended to respond to user clicks
 		self.Visible = True # bool; whether instance would be visible if currently panned onto the display device
 		self.Connectable = True # whether instances of this class can be connected
 		self.Selected = False # bool; whether currently user-selected i.e. highlighted
-		self.ColNo = Args.get('ColNo') # (int) column number (index in HostFT.Columns) in which this instance lives
+		self.ColNo = Args.get('ColNo') # (int) column number (index in self.FT.Columns) in which this instance lives
 		self.BorderColour = (0x35, 0x6d, 0x5f) # darker green
 		self.BackgroundColourUnselected = (0x54, 0xae, 0x97) # green, slightly darker than text entry boxes
 		self.BackgroundColourSelected = (0xf2, 0xc5, 0xab) # coral-orange
@@ -485,6 +485,13 @@ class FTBoxyObject(object): # superclass of vaguely box-like FT components for u
 		assert isinstance(VisibleOnly, bool)
 		return [El for El in self.AllElements if El.IsClickable
 			if (El.Selected or not SelectedOnly) if (El.Visible or not VisibleOnly)]
+
+	def RecoverPreservedAttribs(self):
+		# fetch attribs for this object that were preserved from the last time the FT was displayed, and reinstate them
+		# first, check if this object has a value in PreservedAttribs
+		if self.ID in self.FT.PreservedAttribs.keys():
+			# overwrite all preservable attribs with the preserved values (oops, no type checking)
+			self.__dict__.update(self.FT.PreservedAttribs[self.ID])
 
 class TextElement(FTBoxyObject): # object containing a text object and other attributes and methods needed to render it
 	# Consists of a single text inside a coloured box. It's a component of an FTHeader, FTConnector or FTEvent.
@@ -712,10 +719,10 @@ class FTEvent(FTBoxyObject): # FT event object. Rendered by drawing text into bi
 	def __init__(self, Column, **Args):
 		# Args must include FT (the FTForDisplay instance containing this element)
 		assert isinstance(Column, FTColumn)
-		assert 'FT' in Args
+		assert 'FT' in Args # used by superclass
 		FTBoxyObject.__init__(self, **Args)
 		self.Column = Column # the FTColumn instance hosting the FTEvent instance
-		self.FT = Args['FT']
+#		self.FT = Args['FT']
 		self.InitializeData()
 		(self.TopFixedEls, self.ValueFixedEls) = self.CreateFixedTextElements()
 		# colour definitions such as BorderColour are in FTBoxyObject's __init__
@@ -961,8 +968,11 @@ class FTGate(FTBoxyObject): # object containing FT gates for display. These belo
 	Attribs = [(info.IDTag, int, False), ('Algorithm', str, False), ('BackgColour', 'rgb', False), ('Style', str, False), ('Numbering', str, False),
 		('Description', str, False), ('Value', str, False), ('ValueUnit', str, False), ('Status', int, False), ('CanEdit', bool, False),
 		('DescriptionComment', str, True), ('ValueComment', str, True), ('ValueUnitComment', str, True), ('ConnectTo', int, True)]
+	# human readable names per algorithm
 	GateKindHash = {'AND': _('AND gate'), 'OR': _('OR gate'), 'MutExcOR': _('Mutually exclusive'),
-		'NAND': _('NAND gate'), 'NOR': _('NOR gate'), '2ooN': _(u'≥2 out of N'), '3ooN': _(u'≥3 out of N')} # human readable names per algorithm
+		'NAND': _('NAND gate'), 'NOR': _('NOR gate'), '2ooN': _(u'≥2 out of N'), '3ooN': _(u'≥3 out of N')}
+	# attribs to be reinstated after a redraw
+	AttribsToPreserve = ['DetailedView']
 
 	def __init__(self, **Args): # attribs marked * below are named in quotes elsewhere: be careful if names changed
 		FTBoxyObject.__init__(self, **Args)
@@ -972,7 +982,7 @@ class FTGate(FTBoxyObject): # object containing FT gates for display. These belo
 		self.Algorithm = '' # *
 		self.BackgColour = '0,0,0'
 		self.Style = ''
-		self.DetailedView = True # whether we are showing the detailed gate, or just a gate symbol
+		self.DetailedView = True # * (bool) whether we are showing the detailed gate, or just a gate symbol
 		self.Numbering = ''
 		self.GateDescription = ''
 		self.Value = ''
@@ -1562,8 +1572,8 @@ class FTBuilder(FTBoxyObject): # 'add' button object within an FTColumn.
 	# Created and managed within Viewport, so no data <--> DataCore.
 	Hotspots = ['Whole'] # hotspot names for mouse hits
 
-	def __init__(self, **Args): # Args must include: HostFT (handled by superclass), ObjTypeRequested, OffsetXInCU
-		assert 'HostFT' in Args
+	def __init__(self, **Args): # Args must include: FT (handled by superclass), ObjTypeRequested, OffsetXInCU
+		assert 'FT' in Args
 		assert Args['ObjTypeRequested'] in [FTEventInCore, FTGateItemInCore, FTConnectorItemInCore]
 		assert isinstance(Args['OffsetXInCU'], int) # X offset relative to column
 		# ObjTypeRequested: which type of FT object will be created when user selects this FTBuilder - must be an element class
@@ -1622,12 +1632,12 @@ class FTBuilder(FTBoxyObject): # 'add' button object within an FTColumn.
 		# request DataCore to create new FT object, and get back confirmation
 		# If user has clicked on a builder button, IndexInCol is the index at which the new item is to be inserted,
 		# not counting builder buttons. This is found by counting the number of non-builder items above the builder button
-		AllElsInColumn = self.HostFT.Columns[self.ColNo].FTElements
+		AllElsInColumn = self.FT.Columns[self.ColNo].FTElements
 		IndexInCol = len([El for El in AllElsInColumn[:AllElsInColumn.index(self)] if not isinstance(El, FTBuilder)])
 		# request PHA object to add new element by sending message through zmq
-#		print('FT1494 FT sending request on socket: ',  [(s.SocketNo, s.SocketLabel) for s in vizop_misc.RegisterSocket.Register if s.Socket == self.HostFT.C2DSocketREQ])
-		vizop_misc.SendRequest(Socket=self.HostFT.C2DSocketREQ, Command='RQ_FT_NewElement',
-			Proj=self.HostFT.Proj.ID, PHAObj=self.HostFT.PHAObj.ID, Viewport=self.HostFT.ID,
+#		print('FT1494 FT sending request on socket: ',  [(s.SocketNo, s.SocketLabel) for s in vizop_misc.RegisterSocket.Register if s.Socket == self.FT.C2DSocketREQ])
+		vizop_misc.SendRequest(Socket=self.FT.C2DSocketREQ, Command='RQ_FT_NewElement',
+			Proj=self.FT.Proj.ID, PHAObj=self.FT.PHAObj.ID, Viewport=self.FT.ID,
 			ObjKindRequested=self.ObjTypeRequested.InternalName, ColNo=str(self.ColNo), IndexInCol=str(IndexInCol))
 
 	def AllClickableObjects(self, SelectedOnly=False, VisibleOnly=True):
@@ -4265,8 +4275,19 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			# "current" in our Viewport
 		self.ExistingElementIDsOnLastRefresh = [] # IDs of all elements existing in FT when it is redrawn.
 			# This is used so we can detect which IDs are new, so they can be made "current" (highlighted)
+		self.PreservedAttribs = {} # keys are element IDs, values are dict of {attrib name, attrib value} for any attribs
+			# that should be preserved when the FT is redrawn with updated data
+			# TODO eventually, these attribs need to be sent to the ViewportShadow and stored in the project file,
+			# so that they can be reinstated when the project file is opened
 
-	def Wipe(self): # wipe all data in the FT and re-initialize
+	def Wipe(self): # preserve any attribs that need to be preserved. Then wipe all data in the FT and re-initialize
+		# first, preserve display-related attribs. Check all elements in the "old" (previously displayed) FT
+		self.PreservedAttribs = {}
+		for ThisElement in WalkOverAllFTObjs(self):
+			# check if this type of element needs to preserve any attribs
+			if hasattr(ThisElement, 'AttribsToPreserve'):
+				self.PreservedAttribs[ThisElement.ID] = dict( [(ThisAttrib, getattr(ThisElement, ThisAttrib))
+					for ThisAttrib in ThisElement.AttribsToPreserve] )
 		self.Header.InitializeData()
 		self.Columns = []
 		self.ConnectButtons = []
@@ -4480,6 +4501,8 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 				NewEvent.ProblemHumanHelp = ProblemTag.text
 				NewEvent.ValueProblemButton.Visible = (ProblemTag.get(info.ProblemLevelAttribName, '') in
 					['Level7', 'Level10'])
+			# recover preserved attribs from previous Viewport layout
+			NewEvent.RecoverPreservedAttribs()
 			return NewEvent
 
 		def PopulateFTConnector(XMLObj, Column):
@@ -4537,6 +4560,8 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 				NewConnector.ProblemHumanHelp = ProblemTag.text
 				NewConnector.ConnValueProblemButton.Visible = (ProblemTag.get(info.ProblemLevelAttribName, '') in
 					['Level7', 'Level10'])
+			# recover preserved attribs from previous Viewport layout
+			NewConnector.RecoverPreservedAttribs()
 			return NewConnector
 
 		def PopulateFTGate(XMLObj, Column):
@@ -4580,6 +4605,8 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 				NewGate.ProblemHumanHelp = ProblemTag.text
 				NewGate.ValueProblemButton.Visible = (ProblemTag.get(info.ProblemLevelAttribName, '') in
 					['Level7', 'Level10'])
+			# recover preserved attribs from previous Viewport layout
+			NewGate.RecoverPreservedAttribs()
 			return NewGate
 
 		def PopulateDisplayAttribs(FT, DisplayAttribData):
@@ -4731,7 +4758,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			ColContent = [] # build list of builders and objects, with extra builder button set on the end (hence [None])
 			for Obj in Col.FTElements + [None]:
 				for ThisBuilderIndex, ThisBuilderKind in enumerate(BuildersNeeded): # add builder button family
-					ColContent.append(FTBuilder(HostFT=self, ColNo=ColNo, ObjTypeRequested=ThisBuilderKind,
+					ColContent.append(FTBuilder(FT=self, ColNo=ColNo, ObjTypeRequested=ThisBuilderKind,
 						OffsetXInCU=BuilderButtonOffsetInCU * ThisBuilderIndex))
 				if Obj: ColContent.append(Obj) # add the object to the list, ignoring the final None
 			Col.FTElements = ColContent[:] # put copy of new list in column
@@ -4753,7 +4780,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			else: BuildersNeeded.extend( [FTGateItemInCore, FTConnectorItemInCore] )
 			# make builder buttons in the column
 			for ThisBuilderIndex, ThisBuilderKind in enumerate(BuildersNeeded): # add builder button family
-				ThisCol.FTElements.append(FTBuilder(HostFT=self, ColNo=ExtraColNumber, ObjTypeRequested=ThisBuilderKind,
+				ThisCol.FTElements.append(FTBuilder(FT=self, ColNo=ExtraColNumber, ObjTypeRequested=ThisBuilderKind,
 					OffsetXInCU = BuilderButtonOffsetInCU * ThisBuilderIndex))
 
 	def PopulateConnectTo(self):
@@ -4877,16 +4904,15 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 				# returns list of new button widget objects
 				ConnectButtonWidgets = []
 				for ThisElement in ThisColumn.FTElements:
-					# check max connectivity not yet reached (for right elements)
-					if (IsLeft or (len(JoinedFrom(self, ThisElement)) < getattr(ThisElement,
-							'MaxElementsConnectedToThis', 0))) and ThisElement.Connectable:
-						# old version - bitmap button (keep in case we revert to bitmap)
-#						NewButtonWidget = ButtonObjectNotInElement(FT=ThisColumn.FT, InternalName='ConnectButton',
-#							PosYInCU=0, Toggle=False, HostObject=ThisElement,
-#							ArtProvider=self.ArtProvider, ColIndex=ColIndex, ObjID=ThisElement.ID, IsLeft=True)
+#					# check max connectivity not yet reached (for right elements) - no longer done, as we still need to
+					# draw right connect buttons to allow disconnection
+#					if (IsLeft or (len(JoinedFrom(self, ThisElement)) < getattr(ThisElement,
+#							'MaxElementsConnectedToThis', 0))) and ThisElement.Connectable:
+					# check if ThisElement is supposed to get connect buttons
+					if ThisElement.Connectable:
 						NewButtonWidget = ButtonObjectNotInElement(FT=ThisColumn.FT, InternalName='ConnectButton',
 							PosYInCU=0, Toggle=False, HostObject=ThisElement,
-							ArtProvider=None, ColIndex=ColIndex, ObjID=ThisElement.ID, IsLeft=True)
+							ArtProvider=None, ColIndex=ColIndex, ObjID=ThisElement.ID, IsLeft=IsLeft) # was IsLeft=True
 						ConnectButtonWidgets.append(NewButtonWidget)
 						# set PosXInCU. For right connect buttons, this needs to know the button size
 						if IsLeft:
