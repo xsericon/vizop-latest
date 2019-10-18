@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# This file is part of Vizop. Copyright xSeriCon, 2018
+# This file is part of Vizop. Copyright xSeriCon, 2019
 import os, os.path, re, sys, wx, wx.adv, zmq
 import xml.etree.ElementTree as ElementTree
 
@@ -75,6 +75,16 @@ def IsWritableLocation(Path):
 	"""
 	return (os.path.isdir(Path) and os.access(Path, os.W_OK))
 
+def IsWriteableAsNewFile(Path):
+	# checks that Path is not an existent object; if it is, returns False
+	# Then, tries to create a file with Path. If it works, deletes it and returns True. Otherwise returns False
+	if os.path.isfile(Path) or os.path.isdir(Path) or os.path.islink(Path): return False
+	try:
+		TestFile = open(Path, 'w+')
+		TestFile.close()
+		os.remove(Path)
+		return True
+	except (IOError, OSError): return False
 
 def get_usr_runtime_files_dir():
 	"""

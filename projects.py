@@ -87,9 +87,9 @@ class ProjectItem(object): # class of PHA project instances
 		TestConstant.SetMyUnit(core_classes.ProbabilityUnit)
 		self.Constants.append(TestConstant)
 		self.ProcessUnits = [ProcessUnit(Proj=self, UnitNumber='120', ShortName='Wash', LongName='Plastic washing area'),
-							 ProcessUnit(Proj=self, UnitNumber='565', ShortName='Pyrolysis 1', LongName='Pyrolysis reactor no. 1')]
+			ProcessUnit(Proj=self, UnitNumber='565', ShortName='Pyrolysis 1', LongName='Pyrolysis reactor no. 1')]
 		self.Collaborators = [Collaborator(Proj=self, ShortName='Mary', LongName='Mary Simmons'),
-							  Collaborator(Proj=self, ShortName='Rupert', LongName='Rupert McTavish')]
+			Collaborator(Proj=self, ShortName='Rupert', LongName='Rupert McTavish')]
 		self.RenderingForDisplay = [ [] ] # list of lists of FTDisplayObject; current hierarchy of fault tree as displayed
 		self.Selected = [] # list of lists of currently selected PHA items, in reverse order of selection, per Viewport
 		self.NextFTItemBackgroundColour = (0,0,255) # colour of next FT object to be created
@@ -106,8 +106,10 @@ class ProjectItem(object): # class of PHA project instances
 		self.SandboxStatus = 'SandboxInactive' # str; whether sandbox is active
 		self.OutputFilename = '' # str; full pathname of last file last used to save project in this Vizop instance.
 			# If we are saving on fly, this contains the pathname of the project file to update
+		self.FTFullExportFilename = '' # str; last used full pathname for exporting full FT, including any extension
+		self.FTFullExportFileType = '' # str; must be '' or the Extension attrib of an instance of core_classes.ImageFileType
 
-		#Actual file
+		# Actual file
 		self.VizopVersion = CurrentProjDocType #str; Vizop Version
 		self.ShortTitle = 'CHAZOP with chocolate sauce'  # project short title for display
 		self.ProjNumber = 141688 # int; user's project reference number
@@ -116,7 +118,6 @@ class ProjectItem(object): # class of PHA project instances
 		self.TeamMembers = [core_classes.TeamMember(1, 'Amy Stone', 'Consultant','Amy'),
 			core_classes.TeamMember(2, 'Ben Smith', 'Project Manager','Ben')] # list of team members
 		self.RiskMatrices = [core_classes.LookupTableItem()] # list of risk matrix
-		self.Constants = [] # list of constants
 
 	def GetNewID(self):
 		# get and return ID for new object in self (str)

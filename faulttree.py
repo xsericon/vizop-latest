@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Module faulttree: part of Vizop, (c) 2017 xSeriCon
+# Module faulttree: part of Vizop, (c) 2019 xSeriCon
 
 # library modules
 from __future__ import division # makes a/b yield exact, not truncated, result. Must be 1st import
@@ -1277,7 +1277,7 @@ class FTGate(FTBoxyObject): # object containing FT gates for display. These belo
 				DC.DrawText(MyText, int(round(0.5 * (BoxSizeXInCU * Zoom - TextXSizeInPx))),
 					int(round(0.2 * (self.SizeYInPx - TextYSizeInPx))))
 			elif self.Style == 'IEEE 91': # traditional distinctive shapes
-				if self.Algorithm in ['AND', 'NAND']: SymbolSizeXInCU = 60
+				if self.Algorithm in ['AND', 'NAND']: SymbolSizeXInCU = 100
 				else: SymbolSizeXInCU = 100 # target size of symbol without bubble or 'XOR' line on left
 				self.SizeYInCU = 60
 				XORLineAllowanceXInCU = 10 # extra X allowance on left side for XOR line
@@ -1329,7 +1329,30 @@ class FTGate(FTBoxyObject): # object containing FT gates for display. These belo
 					DC.Destroy() # so that FillSymbol() has exclusive access to self.Bitmap
 					self.Bitmap = FillSymbol(self.Bitmap, self.SizeXInPx, self.SizeYInPx, HalfwayAlongSymbolInPx, HalfHeightInPx,
 						GateBaseColour, GateBorderColour[0])
-			elif self.Style == 'DIN 40700': pass
+			elif self.Style == 'DIN 40700': # semicircles with annotation inside
+				SymbolSizeXInCU = 100 # target size of symbol without bubble
+				self.SizeYInCU = 60
+				# extra X size on right for bubble; the +1 is a fudge to make it look better at lower zooms
+				if self.Algorithm in AlgorithmsWithBubble: self.SizeXInCU = SymbolSizeXInCU + BubbleRadiusInCU + 1
+				else: self.SizeXInCU = SymbolSizeXInCU
+				XStartInPx = 0
+				self.SizeXInPx = int(round(self.SizeXInCU * Zoom))
+				self.SizeYInPx = int(round(self.SizeYInCU * Zoom))
+				SymbolEndXInPx = XStartInPx + int(round(SymbolSizeXInCU * Zoom))
+				HalfHeightInPx = int(round(0.5 * self.SizeYInPx))
+				DC = SetupDC(PenWidth)
+				DC.SetBrush(wx.Brush(colour='black', style=wx.TRANSPARENT)) # no shape fill
+				# draw left part of symbol: straight vertical line
+				DC.DrawLine(XStartInPx, self.SizeYInPx, XStartInPx, 0)
+				# draw right part of symbol: 1 circular arc
+				DC.DrawArc(XStartInPx, self.SizeYInPx - 1, XStartInPx, 1, XStartInPx, HalfHeightInPx)
+				# for NAND and NOR gates, draw a bubble on the output
+				if self.Algorithm in AlgorithmsWithBubble:
+					DC.SetBrush(wx.Brush(GateBaseColour)) # bubble fill colour
+					DC.DrawCircle(SymbolEndXInPx, HalfHeightInPx, radius=BubbleRadiusInPx)
+				# for OR and NOR gate, draw horizontal line inside gate
+				# for XOR gate, draw circled + inside gate
+				# for MooN, write MooN inside gate
 
 		# start of main procedure for RenderIntoBitmap()
 		if self.DetailedView: # show detailed version of gate

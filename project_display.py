@@ -755,3 +755,45 @@ def ExtractPHAObjsTags(Proj, XMLRoot, DatacoreIsLocal):
 				Applicable=utilities.Bool2Str(ThisPHAObjTag.get(info.ApplicableAttribName))))
 		# overwrite the old shadows list with the new list
 		Proj.PHAObjShadows = NewPHAObjList
+
+class EditPanelAspectItem(object): # class whose instances are aspects of the Edit panel in the Control Frame
+	# This is used for dialogues that are too big for the control panel
+	# Unlike Control panel aspects, it doesn't use notebook tabs
+	# attribs:
+	# WidgetList (list): UIWidgetItem instances - widgets visible in the aspect
+	# InternalName (str): name for debugging
+	# ParentFrame (wx.Frame): reference to Edit panel
+	# TopLevelFrame (wx.Frame): reference to ControlFrame (needed for access to top level methods)
+	# PrefillMethod (callable): method that prefills widget values for an instance
+	# SetWidgetVisibilityMethod (callable): method that sets IsVisible flag for each widget
+
+	def __init__(self, WidgetList=[], InternalName='', ParentFrame=None, TopLevelFrame=None):
+		assert isinstance(WidgetList, list) # can be empty at this stage
+		assert isinstance(InternalName, str)
+		assert isinstance(ParentFrame, wx.Panel)
+		assert isinstance(TopLevelFrame, wx.Frame)
+		assert callable(PrefillMethod)
+		assert callable(SetWidgetVisibilityMethod)
+		object.__init__(self)
+		self.WidgetList = WidgetList[:]
+		self.InternalName = InternalName
+		self.ParentFrame = ParentFrame
+		self.TopLevelFrame = TopLevelFrame
+		self.PrefillMethod = None # a callable needs to be defined after initialization
+		self.SetWidgetVisibilityMethod = None # a callable needs to be defined after initialization
+		# make a sizer for the widgets (to be populated later)
+		self.MySizer = wx.GridBagSizer(vgap=0, hgap=0) # make sizer for widgets
+
+	def Activate(self, **Args): # activate widgets for this aspect
+		Proj = self.ParentFrame.CurrentProj
+		self.TopLevelFrame.ActivateWidgetsInPanel(Widgets=self.WidgetList, Sizer=self.MySizer,
+			ActiveWidgetList=[w for w in self.WidgetList if w.IsVisible], **Args)
+
+	def Deactivate(self, Widgets=[], **Args): # deactivate widgets for this aspect
+		self.TopLevelFrame.DeactivateWidgetsInPanel(Widgets=Widgets, **Args)
+
+	def Prefill(self, **Args): # initialise value of each appropriate widget in self.WidgetList
+		self.PrefillMethod(**Args)
+
+	def SetWidgetVisibility(self, **Args): # set IsVisible attrib of each widget in self.WidgetList
+		self.SetWidgetVisibilityMethod(**Args)

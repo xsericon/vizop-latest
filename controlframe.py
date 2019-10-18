@@ -1724,6 +1724,13 @@ class ControlFrame(wx.Frame):
 				# can be 'NotDragging', 'ReadyToDrag' (L button held down, but not enough motion yet),
 				# 'NotAllowed' (L button held down, but can't drag this object), 'Dragging' (dragging in progress)
 
+			# set up dialogue aspects
+			print('CF1728 need to uncomment a line here')
+#			ft_full_report.MakeFTFullExportAspect(MyEditPanel=self, Fonts=self.TopLevelFrame.Fonts,
+#				SystemFontNames=self.TopLevelFrame.SystemFontNames, DateChoices=self.TopLevelFrame.DateChoices)
+			self.EditPanelCurrentAspect = None # which dialogue aspect is currently active, if any
+
+
 		def Redraw(self, FullRefresh=True):
 			# full redraw of Viewport. FullRefresh (bool): whether to request redraw from scratch
 			assert isinstance(FullRefresh, bool)
@@ -1892,6 +1899,9 @@ class ControlFrame(wx.Frame):
 		Savemitem = FileMenu.Append(-1, _('&Save Vizop project'), '')
 		self.Bind(wx.EVT_MENU, projects.SaveEntireProjectRequest, Savemitem)
 		FileMenu.AppendSeparator() # add a separating line in the menu
+		FTFullReportmitem = FileMenu.Append(-1, _('Export full Fault Tree...'), '')
+		self.Bind(wx.EVT_MENU, self.OnExportFullFTRequest, FTFullReportmitem)
+		FileMenu.AppendSeparator()
 		Aboutmitem = FileMenu.Append(-1, _('About &Vizop...'), '')
 		self.Bind(wx.EVT_MENU, vizop_misc.OnAboutRequest, Aboutmitem) # OnAboutRequest is shared with welcome frame
 		Quitmitem = FileMenu.Append(-1, _('E&xit Vizop'), '')
@@ -2392,6 +2402,18 @@ class ControlFrame(wx.Frame):
 		return vizop_misc.MakeXMLMessage('Null', 'Null')
 #		return {'Success': True, 'Notification': vizop_misc.MakeXMLMessage('Null', 'Null')}
 
+	def ReleaseCurrentViewport(self, Proj):
+		# release any Viewport currently showing in edit panel
+		if self.CurrentViewport:
+			# remove old Viewport from local ActiveViewports list
+			Proj.ActiveViewports.remove(self.CurrentViewport)
+			# tell datacore the Viewport is no longer on display
+			AttribDict = {info.ProjIDTag: Proj.ID, 'ControlFrame': self.ID, info.ViewportTag: self.CurrentViewport.ID}
+			self.MyEditPanel.ReleaseViewportFromDisplDevice()
+			ReplyReceived = vizop_misc.SendRequest(self.zmqOutwardSocket, Command='RQ_StopDisplayingViewport',
+				FetchReply=False, **AttribDict)
+			self.CurrentViewport = None
+
 	def SwitchToViewport(self, TargetViewport=None, XMLRoot=None):
 		# switch PHA panel display (in local ControlFrame) to show TargetViewport
 		# TargetViewport is supplied directly as an arg, or (if it's None) via ViewportTag in XMLRoot
@@ -2405,14 +2427,7 @@ class ControlFrame(wx.Frame):
 		if isinstance(ViewportToShow, display_utilities.ViewportBaseClass):
 			print('CF2406 Warning: Viewport shadow is Viewport class, should be ViewportShadow class')
 		# release any existing Viewport from PHA panel
-		if self.CurrentViewport:
-			# remove old Viewport from local ActiveViewports list
-			Proj.ActiveViewports.remove(self.CurrentViewport)
-			# tell datacore the Viewport is no longer on display
-			AttribDict = {info.ProjIDTag: Proj.ID, 'ControlFrame': self.ID, info.ViewportTag: self.CurrentViewport.ID}
-			self.MyEditPanel.ReleaseViewportFromDisplDevice()
-			ReplyReceived = vizop_misc.SendRequest(self.zmqOutwardSocket, Command='RQ_StopDisplayingViewport',
-				FetchReply=False, **AttribDict)
+		self.ReleaseCurrentViewport(Proj=Proj)
 		# add target Viewport
 		Proj.ActiveViewports.append(ViewportToShow)
 		# set Viewport as current in Control Frame
@@ -2721,6 +2736,44 @@ class ControlFrame(wx.Frame):
 			Fonts['BoldWidgetFont'] = core_classes.FontInstance(Size=11, Bold=True)
 		return Fonts
 
+	def OnExportFullFTRequest(self): # handle menu request to produce FT export%%%
+		# first, detach any Viewport from the edit panel
+		ViewportToRevertTo = self.CurrentViewport
+		self.ReleaseCurrentViewport(Proj=self.CurrentProj)
+		# invoke "FT export" aspect for dialogue with user
+		self.GotoEditPanelAspect(NewAspect='EPAspect_ExportFullFT', ViewportToRevertTo=ViewportToRevertTo)
+
+	def GotoEditPanelAspect(self, NewAspect, **Args):
+		# switch to a dialogue aspect in edit panel.
+		# Assumes any Viewport has already been cleared from edit panel by calling Detach...
+
+		# main procedure for GotoEditPanelAspect
+		assert isinstance(NewAspect, (project_display.EditPanelAspectItem, str))
+		global KeyPressHash
+		Proj = self.CurrentProj
+		# deactivate previous aspect, if any %%% working here
+		if self.MyEditPanel.EditPanelCurrentAspect:
+			self.MyEditPanel.EditPanelCurrentAspect.Deactivate(Widgets=self.MyEditPanel.EditPanelCurrentAspect.WidgetList)
+		# get target aspect, if supplied as a string
+		if isinstance(NewAspect, str):
+			TargetAspect = {'EPAspect_ExportFullFT': self.NumericalValueAspect}.get(NewAspect, None)
+		else:
+			TargetAspect = NewAspect
+		if TargetAspect: # any recognised aspect supplied?
+			self.MyEditPanel.EditPanelCurrentAspect = TargetAspect  # store new aspect
+			TargetAspect.CurrentArgs = Args  # store for repeating on next call
+#			self.PHAObjInControlPanel = Args.get('PHAObjInControlPanel', None)
+			# fetch UndoOnCancel value to store in undo record for any tasks that should be undone when Cancel pressed
+			self.UndoOnCancel = Args.get('UndoOnCancel', None)
+			# prefill widgets in new aspect and activate it
+			TargetAspect.Prefill(Proj, **Args)
+			TargetAspect.SetWidgetVisibility(**Args)
+			TargetAspect.Activate(**Args)
+			# display aspect's sizer (containing all the visible widgets) in the edit panel
+			self.MyEditPanel.SetSizer(TargetAspect.MySizer)
+		else:
+			print('CF2771 warning, unrecognised edit panel aspect "%s" requested' % str(NewAspect))
+
 	# ControlFrame main body
 	def __init__(self, parent=None, ID=None, title='', Projects=[], FirstProject=None, Viewport=None,
 				 ColScheme=None, zmqContext=None, DatacoreIsLocal=True):
@@ -2759,6 +2812,17 @@ class ControlFrame(wx.Frame):
 			BoldWidgetFont = core_classes.FontInstance(Size=11, Bold=True)
 			self.SmallHeadingFont = core_classes.FontInstance(Size=13, Bold=True)
 		self.Fonts = self.SetupFonts() # must call before making MyControlPanel
+		# generate list of system fonts
+		e = wx.FontEnumerator()
+		e.EnumerateFacenames()
+		self.SystemFontNames = e.GetFacenames()
+
+		# set up date choices
+		ProjCreationDate = core_classes.ChoiceItem(XMLName='ProjCreation', HumanName='Project created')
+		FTCreationDate = core_classes.ChoiceItem(XMLName='FTCreation', HumanName='Fault tree created')
+		LastEditDate = core_classes.ChoiceItem(XMLName='LastEdit', HumanName='Last edited')
+		TodayDate = core_classes.ChoiceItem(XMLName='Today', HumanName='Today')
+		self.DateChoices = [ProjCreationDate, FTCreationDate, LastEditDate, TodayDate]
 
 		# set up list of existing Viewports in this instance of Vizop
 		if Viewport:

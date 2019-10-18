@@ -1801,4 +1801,42 @@ class ChoiceItem(object): # represents an item in a group of items the user can 
 		self.Applicable = Applicable
 		self.__dict__.update(Args) # extract any other attribs supplied
 
+class ImageFileType(object): # type of file that can be offered for image export
+
+	def __init__(self, HumanName='', Extension=''):
+		assert isinstance(HumanName, str)
+		assert isinstance(Extension, str)
+		object.__init__(self)
+		self.HumanName = HumanName
+		self.Extension = Extension
+
+PDFFileType = ImageFileType(HumanName='PDF', Extension='pdf')
+JPGFileType = ImageFileType(HumanName='JPG', Extension='jpg')
+PNGFileType = ImageFileType(HumanName='PNG', Extension='png')
+TIFFFileType = ImageFileType(HumanName='TIFF', Extension='tiff')
+# file types to be offered for image file exports
+ImageFileTypesSupported = [PDFFileType, JPGFileType, PNGFileType, TIFFFileType]
+# check default is one of these
+assert info.DefaultImageFileType in [t.Extension for t in ImageFileTypesSupported]
+
+class PaperSize(object): # paper size that can be offered for image export
+	# In future, see if we can use wx.PaperSize instead (haven't figured it out yet)
+
+	def __init__(self, HumanName='', SizeX=0, SizeY=0): # sizes are in mm
+		assert isinstance(HumanName, str)
+		assert isinstance(SizeX, int)
+		assert isinstance(SizeY, int)
+		assert SizeX <= SizeY # must be portrait aspect
+		object.__init__(self)
+		self.HumanName = HumanName
+		self.SizeX = SizeX
+		self.SizeY = SizeY
+
+	def HumanDescriptor(self): # return str containing HumanName and size, e.g. 'A4 (210 x 297mm)'
+		return '%s (%d x %d mm)' % (self.HumanName, self.SizeX, self.SizeY)
+
+PaperSizeA4 = PaperSize(HumanName='A4', SizeX=210, SizeY=297)
+PaperSizeA5 = PaperSize(HumanName='A5', SizeX=148, SizeY=210)
+PaperSizes = [PaperSizeA4, PaperSizeA5]
+
 del _ # remove dummy definition
