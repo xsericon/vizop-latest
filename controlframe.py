@@ -1808,7 +1808,7 @@ class ControlFrame(wx.Frame):
 				# TODO set PaintNeeded to False during text editing (seems like the blinking cursor in the TextCtrl triggers paint events)
 				if getattr(self.ViewportOwner.CurrentViewport, 'PaintNeeded', True):
 					MyPaintDC = wx.PaintDC(self)
-					self.DoRedraw(MyPaintDC, FullRefresh=True)
+					self.DoRedraw(MyPaintDC, FullRefresh=True) 
 
 		def OnMouseLClickEdit(self, event, Viewport, CanStartDrag=True, CanSelect=True, **Args):
 			# handle mouse left button click inside EditPanel
