@@ -564,7 +564,8 @@ class ProjectInfoModelForDisplay(display_utilities.ViewportBaseClass): # object 
 				# put widgets in "currently visible" list (for use in CheckTextCtrlFocus)
 				self.WidgActive.append(w)
 				# make widgets visible
-				w.Widget.Show()
+				w.ShowMe()
+#				w.Widget.Show()
 				# populate widgets with values and set fonts
 				if w.DisplayMethod:
 					getattr(w, w.DisplayMethod)(DataObj=self, Font=w.Font) # calls method of class UIWidget with string name w.DisplayMethod
@@ -767,7 +768,8 @@ class EditPanelAspectItem(object): # class whose instances are aspects of the Ed
 	# PrefillMethod (callable): method that prefills widget values for an instance
 	# SetWidgetVisibilityMethod (callable): method that sets IsVisible flag for each widget
 
-	def __init__(self, WidgetList=[], InternalName='', ParentFrame=None, TopLevelFrame=None):
+	def __init__(self, WidgetList=[], InternalName='', ParentFrame=None, TopLevelFrame=None, PrefillMethod=None,
+			SetWidgetVisibilityMethod=None):
 		assert isinstance(WidgetList, list) # can be empty at this stage
 		assert isinstance(InternalName, str)
 		assert isinstance(ParentFrame, wx.Panel)
@@ -785,8 +787,8 @@ class EditPanelAspectItem(object): # class whose instances are aspects of the Ed
 		self.MySizer = wx.GridBagSizer(vgap=0, hgap=0) # make sizer for widgets
 
 	def Activate(self, **Args): # activate widgets for this aspect
-		Proj = self.ParentFrame.CurrentProj
-		self.TopLevelFrame.ActivateWidgetsInPanel(Widgets=self.WidgetList, Sizer=self.MySizer,
+#		Proj = self.ParentFrame.CurrentProj
+		self.TopLevelFrame.ActivateWidgetsInPanel(Widgets=self.WidgetList[:], Sizer=self.MySizer,
 			ActiveWidgetList=[w for w in self.WidgetList if w.IsVisible], **Args)
 
 	def Deactivate(self, Widgets=[], **Args): # deactivate widgets for this aspect

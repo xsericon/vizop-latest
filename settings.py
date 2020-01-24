@@ -85,7 +85,25 @@ _configs = [
 			VizopConfig('CanvasMinY', 'int', 'Interface_Behaviour', '-10000',
 					   'Arbitrary limit on y coordinate of graphical objects'),
 			VizopConfig('NewProjDir', 'str', 'File_Handling', '',
-					   'Default directory shown in file open/store dialogues')
+					   'Default directory shown in file open/store dialogues'),
+			VizopConfig('ExportPaperSize', 'str', 'Export', '',
+					   'Default paper size for export'),
+			VizopConfig('ExportPaperOrientation', 'str', 'Export', '',
+					   'Default paper orientation for export'),
+			VizopConfig('ExportPageNumberPos', 'str', 'Export', '',
+					   'Default page number position for export'),
+			VizopConfig('ExportPaperTopMargin', 'str', 'Export', '',
+					   'Default top margin for export, in mm'),
+			VizopConfig('ExportPaperBottomMargin', 'str', 'Export', '',
+					   'Default bottom margin for export, in mm'),
+			VizopConfig('ExportPaperLeftMargin', 'str', 'Export', '',
+					   'Default left margin for export, in mm'),
+			VizopConfig('ExportPaperRightMargin', 'str', 'Export', '',
+					   'Default right margin for export, in mm'),
+			VizopConfig('ExportDateToShow', 'str', 'Export', '',
+					   'Default kind of date to show in export'),
+			VizopConfig('ExportFontName', 'str', 'Export', '',
+					   'Default font for export')
 			]
 
 

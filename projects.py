@@ -18,6 +18,8 @@ The projects module contains functions for handling entire Vizop projects, inclu
 UsableProjDocTypes = ['VizopProject0.1'] # project doc types parsable by this version of Vizop
 CurrentProjDocType = 'VizopProject0.1' # doc type written by this version of Vizop
 HighestProjID = 0 # highest ID of all projects currently open (int)
+def _(DummyArg): return DummyArg # dummy definition of _(); the real definition is elsewhere
+	# TODO this won't translate for one-time calls when an object is created. Need a 'Translate' function in vizop_misc?
 
 class ProcessUnit(object): # object representing an area of the plant, e.g. "gas dryer"
 
@@ -108,9 +110,25 @@ class ProjectItem(object): # class of PHA project instances
 			# If we are saving on fly, this contains the pathname of the project file to update
 		self.FTFullExportFilename = '' # str; last used full pathname for exporting full FT, including any extension
 		self.FTFullExportFileType = '' # str; must be '' or the Extension attrib of an instance of core_classes.ImageFileType
+		self.FTFullExportZoom = 100 # int; last zoom level used for exporting FT
+		self.FTConnectorsAcrossPages = True # in FT export, whether to draw connecting arrows at page breaks
+		self.FTExportShowPeripheral = ('Comments','Actions','Parking') # in FT export, which additional data to show
+		self.FTExportCannotCalculateText = _('Not calculated') # in FT export, what to show when value cannot be calc'd
+		self.FTExportCombineRRs = True # in FT export, combine RRs into a single FT where possible (if False, show a
+			# separate FT for each risk receptor, even if the resulting FTs are identical)
+		self.FTExportExpandGates = True # in FT export, whether to show full data in logic gates (if False, a small
+			# logic gate depiction will be shown instead)
+		self.FTExportShowHeader = True # in FT export, whether to show header block with overall data about the FT
+		self.FTExportShowFT = True # in FT export, whether to show the FT itself
+		self.FTExportShowOnlySelected = False # in FT export, whether to show only the selected elements in the FT
+		self.FTExportNewPagePerRR = False # in FT export, whether to start a new page for each risk receptor
+		self.LastExportBlackAndWhite = False # bool; whether last export was in black and white
+		self.LastExportFontName = '' # str; system name of font used for last export, e.g. 'Arial'
+		self.LastExportPreferredDateToShow = None # ChoiceItem or None; one of the items in core_classes.DateChoices;
+			# represents date choice used for last export, e.g. today or last edited date
 
 		# Actual file
-		self.VizopVersion = CurrentProjDocType #str; Vizop Version
+		self.VizopVersion = CurrentProjDocType # str; Vizop Version
 		self.ShortTitle = 'CHAZOP with chocolate sauce'  # project short title for display
 		self.ProjNumber = 141688 # int; user's project reference number
 		self.Description = 'A great excuse to spend 4 weeks in Seoul'  # longer description of project
@@ -479,6 +497,8 @@ def GetAllNumberingSystems(Proj):
 				NumSystems.append(ThisElement.Numbering)
 				NumSystemsUsageLists.append( [ThisElement] )
 	return NumSystemsUsageLists
+
+del _ # remove dummy definition
 
 """[----------TESTING AREA---------- """
 

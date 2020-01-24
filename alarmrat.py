@@ -362,7 +362,7 @@ class ARObjectInCore(core_classes.PHAModelBaseClass):
 	# defines alarm rationalization object as stored in DataCore. This represents an entire AR dataset.
 	# It's handled and accessed only by DataCore, not by Viewports.
 	IsBaseClass = False # must do this for every PHAModelBaseClass subclass
-	PreferredKbdShortcut = 'a'
+	PreferredKbdShortcut = 'A'
 	HumanName = _('Alarm rationalization')
 	InternalName = 'AR'
 	AllARObjects = [] # register of all instances defined
@@ -826,6 +826,7 @@ class AlarmList(display_utilities.ViewportBaseClass): # object containing all da
 #	NewPHAObjRequired = ARObjectInCore  # which datacore PHA object class this Viewport spawns on creation.
 #	# Should be None if the model shouldn't create a PHA object
 	ImageSizeNoZoom = (20, 20)  # initial no-zoom size of all button images
+	InitialEditPanelMode = 'Select'
 
 	def __init__(self, **Args): # Alarm list initiation. Args must include Proj and can include DisplDevice and ParentWindow
 		display_utilities.ViewportBaseClass.__init__(self, **Args)

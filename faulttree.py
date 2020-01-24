@@ -2759,7 +2759,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 	# defines Fault Tree object as stored in DataCore. This represents an entire fault tree.
 	# It's handled and accessed only by DataCore, not by Viewports.
 	IsBaseClass = False # must do this for every PHAModelBaseClass subclass
-	PreferredKbdShortcut = 'f'
+	PreferredKbdShortcut = 'F'
 	HumanName = _('Fault Tree')
 	InternalName = 'FT'
 	AllFTObjects = [] # register of all instances defined
@@ -4238,6 +4238,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 	ConnectButtonBufferBorderX = ConnectButtonBufferBorderY = 5 # pixel allowance on each edge of connect button buffer
 	MinZoom = 0.1 # min and max zoom factors allowed for display of this Viewport
 	MaxZoom = 10.0
+	InitialEditPanelMode = 'Select'
 
 	class SeverityCatInFT(object): # represents a severity category in FTForDisplay instance
 		# (so far, it's identical to ChoiceItem class)
@@ -4254,10 +4255,11 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			self.Applicable = Applicable
 
 	def __init__(self, PHAObj, **Args): # FT object initiation. Args must include Proj and can include DisplDevice and ParentWindow
+		# self.PHAObj, Zoom, PanX, PanY, OffsetX, OffsetY defined in base class
 		display_utilities.ViewportBaseClass.__init__(self, **Args)
 		assert isinstance(PHAObj, core_classes.PHAModelBaseClass)
 		self.Proj = Args['Proj']
-		self.PHAObj = PHAObj # instance of FTObjectInCore shown in this Viewport (set in datacore.DoNewViewport())
+#		self.PHAObj = PHAObj # instance of FTObjectInCore shown in this Viewport (set in datacore.DoNewViewport())
 		self.ID = None # assigned in display_utilities.CreateViewport()
 		self.HumanName = '' # default name is assigned in Proj.AssignDefaultNameToViewport()
 		self.DisplDevice = Args.get('DisplDevice', None)
@@ -4267,10 +4269,10 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		self.Header = FTHeader(FT=self)
 		self.Columns = [] # this will be FTColumn objects
 		self.InterColumnStripWidth = 100 # in canvas coords
-		self.Zoom = 1.0 # ratio of canvas coords to screen coords (absolute ratio, not %)
-		self.PanX = self.PanY = 0 # offset of drawing origin, in screen coords
-		self.OffsetX = self.OffsetY = 0 # offset of Viewport in display panel, in screen coords;
-			# referenced in utilities.CanvasCoordsViewport() but not currently used
+#		self.Zoom = 1.0 # ratio of canvas coords to screen coords (absolute ratio, not %)
+#		self.PanX = self.PanY = 0 # offset of drawing origin, in screen coords
+#		self.OffsetX = self.OffsetY = 0 # offset of Viewport in display panel, in screen coords;
+#			# referenced in utilities.CanvasCoordsViewport() but not currently used
 		self.ElementIDContainingComponentToHighlight = None # ID of element containing a highlighted component;
 			# if highlighted component is in FT header, value is same as self.ID
 		self.ComponentNameToHighlight = '' # Name of component to highlight in specified element
@@ -4655,7 +4657,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 					setattr(FT, AttribName, AttribType(ThisElement.text))
 
 		# main procedure for PrepareFullDisplay()
-#		print('FT3441 starting PrepareFullDisplay using the following XML data:')
+		print('FT3441 starting PrepareFullDisplay using the following XML data:')
 #		ElementTree.dump(XMLData)
 		self.Wipe() # start with a blank FT
 		# find the outer tag containing the FT data
@@ -4735,6 +4737,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 				source=BufferDC, xsrc=0, ysrc=0)
 
 		# main procedure for RenderInDC()
+		print('FT4739 starting RenderInDC')
 		assert isinstance(FullRefresh, bool)
 		HostPanelSizeX, HostPanelSizeY = self.DisplDevice.GetSize()
 		if FullRefresh:

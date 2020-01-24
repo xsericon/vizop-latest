@@ -40,12 +40,19 @@ class ViewportBaseClass(object, metaclass=ViewportMetaClass): # base class for a
 		self.DisplDevice = None # which wx.Window object the Viewport is displayed on (needs to take a wx.DC)
 		self.ID = None # assigned in CreateViewport()
 		self.Proj = Args['Proj']
+		self.PHAObj = Args.get('PHAObj', None)
+		self.Zoom = 1.0 # ratio of canvas coords to screen coords (absolute ratio, not %)
+		self.PanX = self.PanY = 0 # offset of drawing origin, in screen coords
+		self.OffsetX = self.OffsetY = 0 # offset of Viewport in display panel, in screen coords;
+			# referenced in utilities.CanvasCoordsViewport() but not currently used
 		self.C2DSocketREQ    = self.D2CSocketREP = None # zmq sockets for communication; set in CreateViewport()
 		self.C2DSocketREQObj = self.D2CSocketREPObj = None # SocketInRegister instances matching In/OutwardSocket;
 			# set in CreateViewport()
+		# store Viewport to restore when this one is destroyed
+		self.ViewportToRevertTo = Args.get('ViewportToRevertTo', None)
 #		self.GotoMilestoneOnUndoCreate = None # a milestone instance to revert to, if creation of this Viewport is undone
 
-def CreateViewport(Proj, ViewportClass, DisplDevice=None, PHAObj=None, DatacoreIsLocal=True, Fonts=[]):
+def CreateViewport(Proj, ViewportClass, DisplDevice=None, PHAObj=None, DatacoreIsLocal=True, Fonts=[], **Args):
 	# create new Viewport instance of class ViewportClass in project Proj, and attach it to DisplDevice.
 	# PHAObj: PHA object shadow to which the Viewport belongs
 	# DatacoreIsLocal (bool): whether datacore is in this instance of Vizop
@@ -53,7 +60,11 @@ def CreateViewport(Proj, ViewportClass, DisplDevice=None, PHAObj=None, DatacoreI
 	# Return the Viewport instance, and D2C and C2D socket numbers (2 x int)
 	# Also returns VizopTalksArgs (dict of attrib: value; these are args to controlframe.SubmitVizopTalksMessage)
 	assert isinstance(DatacoreIsLocal, bool)
-	NewViewport = ViewportClass(Proj=Proj, PHAObj=PHAObj, DisplDevice=DisplDevice, Fonts=Fonts)
+	# prepare dict of args to send to new Viewport
+	ArgsToSupply = Args
+	ArgsToSupply.update({'DateChoices': core_classes.DateChoices})
+	NewViewport = ViewportClass(Proj=Proj, PHAObj=PHAObj, ParentWindow=DisplDevice, DisplDevice=DisplDevice,
+		Fonts=Fonts, **ArgsToSupply)
 	# append the Viewport to the project's list
 	NewViewport.ID = str(utilities.NextID(Proj.ActiveViewports)) # generate unique ID; stored as str
 	# ID is assigned this way (rather than with master lists per class, as for other objects) to avoid memory leaks
@@ -110,6 +121,7 @@ class GUIWidget(object): # superclass of all widgets that can be shown in iWindo
 		self.Visible = False # whether visible and assigned to a sizer
 
 	def MakeVisible(self, Visible=True, Sizer=None): # make widget in/visible and add to/remove from Sizer, unless Sizer is None
+		# currently not used
 		if Visible:
 			self.Visible = True
 			if Sizer: Sizer.add(self.Widget, pos=self.SizerPos, span=self.SizerSpan, flag=self.SizerFlag)
@@ -464,8 +476,10 @@ def SetPointer(Viewport, DisplayDevice, Event, Mode='Select'): # set required mo
 		if (ObjOver is None): # set default mouse pointer
 			wx.SetCursor(wx.Cursor(StockCursors['Normal']))
 		else: # set mouse pointer according to hotspot
-			if (Mode == 'Select'):
+			if (Mode in ['Select', 'Edit']):
 				wx.SetCursor(wx.Cursor(StockCursors[ObjOver.BestMousePointerForSelecting]))
+			elif (Mode == 'Widgets'): # set normal pointer for interaction with wx widgets
+				wx.SetCursor(wx.Cursor(StockCursors['Normal']))
 			elif (Mode == 'Blocked'): # user cannot interact with the Viewport
 				wx.SetCursor(wx.Cursor(StockCursors['Stop']))
 			else: print("Oops, invalid mouse move mode '%s' requested (problem code DU356). This is a bug; please report it" % Mode)
@@ -524,9 +538,13 @@ class FloatLayer(object):  # floating layer objects containing parts of the View
 
 
 class UIWidgetItem(object):
-	# These objects contain widgets for display, with associated info needed for use in sizers
+	# These objects contain widgets for display, with associated info needed for use in flex grid sizers
 	# Optional attributes for instances:
 	#	SkipLoseFocus (bool): (for TextCtrl and ExpandoTextCtrl widgets) Ignore me when I lose focus, i.e. don't call my handler
+	#	HideMethod (callable): method to hide self.Widget. Defaults to Widget.Hide
+	#	ShowMethod (callable): method to show (unhide) self.Widget. Defaults to Widget.Show
+	#	SetFontMethod (callable): method to set widget's font. Defaults to Widget.SetFont
+	#	IsInSizer (bool): whether to add the widget to the main sizer for the panel. Defaults to True
 
 	def __init__(self, Widget, **Attrs):
 		object.__init__(self)
@@ -559,7 +577,14 @@ class UIWidgetItem(object):
 		self.PHAObj = None # PHA object containing DataAttrib (below)
 		self.DataAttrib = None # (None or str) name of attrib in related PHA object whose data this widget displays
 		self.Font = None
-		self.Widget.Hide()
+		self.HideMe = Attrs.get('HideMethod', getattr(self.Widget, 'Hide', None)) # get method to hide widget. Certain widgets such as
+			# sizers need a method other than self.Hide(). The getattr is needed because, unfortunately,
+			# get() evaluates its 2nd arg even when not required
+		self.ShowMe = Attrs.get('ShowMethod', getattr(self.Widget, 'Show', None)) # get method to show widget
+		if isinstance(self.Widget, wx.StaticBoxSizer): print('DU580 has arg SetFontMethod', 'SetFontMethod' in Attrs, Attrs.get('SetFontMethod'))
+		self.SetFontMethod = Attrs.get('SetFontMethod', getattr(self.Widget, 'SetFont', None))
+		self.HideMe()
+		self.IsInSizer = Attrs.get('IsInSizer', True)
 		# set values of attributes provided
 		for (Attr, Value) in Attrs.items():
 			setattr(self, Attr, Value)
@@ -569,10 +594,10 @@ class UIWidgetItem(object):
 	def SetMyFont(self, DefaultFont=None): # set font used to display widget value
 		if getattr(self, 'Font', None) is not None:
 			assert isinstance(self.Font, wx.Font)
-			self.Widget.SetFont(self.Font)
+			self.SetFontMethod(self.Font)
 		elif DefaultFont: # use default font, if provided
 			assert isinstance(DefaultFont, wx.Font)
-			self.Widget.SetFont(DefaultFont)
+			self.SetFontMethod(DefaultFont)
 
 	def StaticHeader(self, **Args): # rendering method for UIWidgets containing headers that don't need to be populated
 		self.SetMyFont(DefaultFont=Args.get('Font', None))
@@ -757,32 +782,37 @@ def PopulateSizer(Sizer=None, Widgets=[], ActiveWidgetList=[], DefaultFont=None,
 		assert isinstance(ThisWidget.IsVisible, bool)
 		ShowThisWidget = ThisWidget.IsVisible
 		if ShowThisWidget:
-			if ThisWidget.NewRow or GapYAdded: # start a new row (sizer also treats y-gap as a row)
-				RowBase += ThisRowSpan  # skip forward the required number of rows
-				if GapYAdded:
-					RowBase += 1 # leave an empty sizer row for the GapY
-					GapYAdded = False # reset flag
-				ThisRowSpan = 1 # reset for new row
-			# put widgets in sizer. wx.LEFT flag assigns the margin space to the left side only
-			Sizer.Add(ThisWidget.Widget, pos=(RowBase + ThisWidget.RowOffset, ThisWidget.ColLoc + ThisWidget.ColOffset),
-				span=(ThisWidget.RowSpan, ThisWidget.ColSpan), flag=wx.ALIGN_RIGHT | wx.LEFT, border=ThisWidget.LeftMargin)
-#				span=(ThisWidget.RowSpan, ThisWidget.ColSpan), flag=ThisWidget.Flags | wx.LEFT, border=ThisWidget.LeftMargin)
-			# set widget minimum size, if required
-			if (ThisWidget.MinSizeX is not None) and (ThisWidget.MinSizeY is not None):
-				Sizer.SetItemMinSize(ThisWidget.Widget, (ThisWidget.MinSizeX, ThisWidget.MinSizeY))
-			ThisRowSpan = max(ThisRowSpan, ThisWidget.RowSpan)
-			# set font
-			if getattr(ThisWidget, 'Font', None):
-				ThisWidget.Widget.SetFont(ThisWidget.Font)
-			else: # use default font
-				ThisWidget.Widget.SetFont(DefaultFont)
-			# set foreground and background colours
-			ThisWidget.Widget.SetForegroundColour(wx.NullColour)
-			if ThisWidget.NeedsHighlight:
-				ThisWidget.Widget.SetBackgroundColour(HighlightBkgColour)
-				ThisWidget.NeedsHighlight = False # to ensure no highlight next time widget is drawn
-			else:
-				ThisWidget.Widget.SetBackgroundColour(wx.NullColour)
+			if ThisWidget.IsInSizer:
+				if ThisWidget.NewRow or GapYAdded: # start a new row (sizer also treats y-gap as a row)
+#					RowBase += ThisRowSpan  # skip forward the required number of rows
+					RowBase += 1 # skip forward the required number of rows
+					if GapYAdded:
+						RowBase += 1 # leave an empty sizer row for the GapY
+						GapYAdded = False # reset flag
+					ThisRowSpan = 1 # reset for new row
+				# put widgets in sizer. wx.LEFT flag assigns the margin space to the left side only
+				Sizer.Add(ThisWidget.Widget, pos=(RowBase + ThisWidget.RowOffset, ThisWidget.ColLoc + ThisWidget.ColOffset),
+					span=(ThisWidget.RowSpan, ThisWidget.ColSpan), flag=ThisWidget.Flags | wx.LEFT, border=ThisWidget.LeftMargin)
+				ThisRowSpan = max(ThisRowSpan, ThisWidget.RowSpan)
+				# set widget minimum size in sizer, if required
+				if (ThisWidget.MinSizeX is not None) and (ThisWidget.MinSizeY is not None):
+					Sizer.SetItemMinSize(ThisWidget.Widget, (ThisWidget.MinSizeX, ThisWidget.MinSizeY))
+			# set font to any font specified in widget (or DefaultFont), if any set font method is available
+			ThisWidget.SetMyFont(DefaultFont=DefaultFont)
+#			getattr(ThisWidget.Widget, 'SetFont', lambda f: None)\
+#				(DefaultFont if getattr(ThisWidget, 'Font', None) is None else ThisWidget.Font)
+#			if getattr(ThisWidget, 'Font', None):
+#				ThisWidget.Widget.SetFont(ThisWidget.Font)
+#			else: # use default font
+#				ThisWidget.Widget.SetFont(DefaultFont)
+			# set foreground and background colours, if any method is available
+			getattr(ThisWidget.Widget, 'SetForegroundColour', lambda c: None)(wx.NullColour)
+			if hasattr(ThisWidget.Widget, 'SetBackgroundColour'):
+				if ThisWidget.NeedsHighlight:
+					ThisWidget.Widget.SetBackgroundColour(HighlightBkgColour)
+					ThisWidget.NeedsHighlight = False # to ensure no highlight next time widget is drawn
+				else:
+					ThisWidget.Widget.SetBackgroundColour(wx.NullColour)
 			# add y-gap in sizer, if required
 			if ThisWidget.GapY > 0:
 				Sizer.Add((10, ThisWidget.GapY),
@@ -790,16 +820,14 @@ def PopulateSizer(Sizer=None, Widgets=[], ActiveWidgetList=[], DefaultFont=None,
 				GapYAdded = True # flag to ensure we start new row and skip over sizer row containing gap
 			# put widget in "currently visible" list (to enable us to remove it from keyboard shortcut list when no longer needed)
 			ActiveWidgetList.append(ThisWidget)
-#				ThisWidget.DataObj = DataObj # store DataObj in UIWidget item, so that we know where to write changes
-#				# populate widgets with values
-#				if ThisWidget.DataAttrib and ThisWidget.DisplayMethod and DataObj:
-#					getattr(ThisWidget, ThisWidget.DisplayMethod)(DataObj) # calls method with string name w.DisplayMethod
-			# binding widget event handlers is now done in ActivateWidgetsInPanel
+			# binding widget event handlers is now done in ActivateWidgetsInPanel, not here
 			if getattr(ThisWidget, 'GapX', 0): # add empty space to the left of this widget
 				Sizer.Add((ThisWidget.GapX, 10),
 					pos=(RowBase + ThisWidget.RowOffset, ThisWidget.ColLoc + ThisWidget.ColOffset - 1))
-		# make widgets in/visible
-		ThisWidget.Widget.Show(ThisWidget.IsVisible)
+		# make widgets in/visible, using widget's ShowMe/HideMe method (in UIWidgetItem class)
+		if ThisWidget.IsVisible: ThisWidget.ShowMe()
+		else: ThisWidget.HideMe()
+#		ThisWidget.Widget.Show(ThisWidget.IsVisible)
 	Sizer.Layout() # refresh sizer
 
 def ChangeZoomAndPanValues(Viewport=None, Zoom=None, PanX=None, PanY=None):

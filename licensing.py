@@ -145,7 +145,7 @@ def StoreLicenseKeyInConfigData(LicenseKey):
 	ce.apply_changes() # save config changes in SettingsManager
 
 def InternetAvailable():
-	# check if SILability can reach the internet. Return bool (True if internet reached)
+	# check if Vizop can reach the internet. Return bool (True if internet reached)
 	# following method at http://stackoverflow.com/questions/3764291/checking-network-connection
 	# it works by trying to set up a socket connection to a DNS, 8.8.8.8 over port 53/tcp.
 	# This will time out in 1 second if not available.

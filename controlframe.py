@@ -14,7 +14,7 @@ import xml.etree.ElementTree as ElementTree
 from platform import system
 # vizop modules needed:
 import settings, text, vizop_misc, art, display_utilities, info, utilities, core_classes, projects, project_display
-import undo, faulttree
+import undo, faulttree, ft_full_report
 from display_utilities import UIWidgetItem, UIWidgetPlaceholderItem
 
 # ColourSwatchButtonSize = (60,20) # size for 'change colour' buttons. Not applied in all cases, yet
@@ -1040,7 +1040,7 @@ class ControlFrame(wx.Frame):
 			self.PHAModelsAspect.NewPHAModelTypesLabel = UIWidgetItem(wx.StaticText(MyNotebookPage, -1, _('Select a type of PHA model:')),
 				ColLoc=3, ColSpan=3, GapX=20)
 			self.PHAModelsAspect.NewPHAModelTypesList = UIWidgetItem(wx.ListBox(MyNotebookPage, -1,
-				choices=self.ViewportsCanBeCreatedManuallyWithShortcuts,
+				choices=self.PHAModelsCanBeCreatedManuallyWithShortcuts,
 				style=wx.LB_SINGLE), Handler=self.OnNewPHAModelListbox, Events=[wx.EVT_LISTBOX], ColLoc=3, ColSpan=4)
 			# make list of widgets in this aspect
 			self.PHAModelsAspect.WidgetList = [self.PHAModelsAspect.NavigateBackButton,
@@ -1668,6 +1668,7 @@ class ControlFrame(wx.Frame):
 
 	def DeactivateWidgetsInPanel(self, Widgets=[], **Args):
 		# deactivate widgets that are ceasing to be displayed in a panel of the Control Frame
+		# TODO: do we need to delete any variable widgets?
 		# unbind widget event handlers
 		assert isinstance(Widgets, list)
 		global KeyPressHash
@@ -1725,11 +1726,9 @@ class ControlFrame(wx.Frame):
 				# 'NotAllowed' (L button held down, but can't drag this object), 'Dragging' (dragging in progress)
 
 			# set up dialogue aspects
-			print('CF1728 need to uncomment a line here')
 #			ft_full_report.MakeFTFullExportAspect(MyEditPanel=self, Fonts=self.TopLevelFrame.Fonts,
-#				SystemFontNames=self.TopLevelFrame.SystemFontNames, DateChoices=self.TopLevelFrame.DateChoices)
-			self.EditPanelCurrentAspect = None # which dialogue aspect is currently active, if any
-
+#				SystemFontNames=self.TopLevelFrame.SystemFontNames, DateChoices=core_classes.DateChoices)
+#			self.EditPanelCurrentAspect = None # which dialogue aspect is currently active, if any
 
 		def Redraw(self, FullRefresh=True):
 			# full redraw of Viewport. FullRefresh (bool): whether to request redraw from scratch
@@ -1753,6 +1752,7 @@ class ControlFrame(wx.Frame):
 
 		def ReleaseViewportFromDisplDevice(self):
 			# execute actions needed when display device is changing from one Viewport to another
+			print('CF1755 clearing Viewport from display device')
 			# first, do wrap-up actions in the Viewport
 			self.ViewportOwner.CurrentViewport.ReleaseDisplayDevice(DisplDevice=self)
 			self.TopLevelFrame.CurrentViewport = None # this probably isn't used, redundant
@@ -1764,12 +1764,14 @@ class ControlFrame(wx.Frame):
 			# set up mode for user interaction with Viewport panel. NewMode can be:
 			# 'Edit', 'Select'
 			# 'Blocked' (user cannot interact with Viewport contents)
+			# 'Widgets' (Viewport contains only wx widgets, no clickable graphical objects)
 			# If NewMode == 'Blocked', Viewport arg isn't required
 
-			def OnMouseEntersViewportPanelBlocked(event):
-#				print("CF1204 in OnMouseEntersViewportPanelBlocked")
-				wx.SetCursor(wx.Cursor(display_utilities.StockCursors['Stop']))
-				# 'blocked' mouse pointer when inside content window
+			def OnMouseEntersViewportPanel(Event, Mode):
+				assert Mode in info.EditPanelModes
+				# define initial cursor type for each EditPanelMode. Values are keys in StockCursors
+				CursorHash = {'Edit': 'Normal', 'Select': 'Normal', 'Blocked': 'Stop', 'Widgets': 'Normal'}
+				wx.SetCursor(wx.Cursor(display_utilities.StockCursors[CursorHash[Mode]]))
 
 			def OnMouseLeavesViewportPanel(event):
 				wx.SetCursor(wx.Cursor(display_utilities.StockCursors['Normal']))
@@ -1781,6 +1783,7 @@ class ControlFrame(wx.Frame):
 				KeyPressHash = vizop_misc.RegisterKeyPressHandler(KeyPressHash, wx.WXK_F2, self.OnMouseDoubleLClick)
 
 			# main procedure for EditPanelMode()
+			assert NewMode in info.EditPanelModes
 			self.Bind(wx.EVT_LEAVE_WINDOW, OnMouseLeavesViewportPanel) # change pointer when leaving display mode panel
 			if (NewMode == 'Select'):
 				self.Bind(wx.EVT_MOTION, lambda Event: self.OnMouseMoveEdit(Event, NewMode))
@@ -1790,15 +1793,12 @@ class ControlFrame(wx.Frame):
 				SetUp4EditText()
 				wx.SetCursor(wx.Cursor(display_utilities.StockCursors['Normal'])) # normal mouse pointer
 				self.Unbind(wx.EVT_ENTER_WINDOW)
-			elif (NewMode == 'Blocked'):
+			elif (NewMode in ['Blocked', 'Widgets']):
 				self.Unbind(wx.EVT_MOTION)
 				self.Unbind(wx.EVT_LEFT_DOWN)
 				self.Unbind(wx.EVT_LEFT_DCLICK)
-				self.Bind(wx.EVT_ENTER_WINDOW, OnMouseEntersViewportPanelBlocked) # change mouse pointer when mouse enters display mode panel
-			else:
-				print(("Oops, invalid Viewport panel mode '%s' requested (problem code CF4892). " % NewMode) +
-					"This is a bug; please report it")
-				return None # jump out to prevent execution of following line
+				self.Bind(wx.EVT_ENTER_WINDOW, lambda Event: OnMouseEntersViewportPanel(Event=Event, Mode=NewMode))
+					# bind method that changes mouse pointer when mouse enters display mode panel
 			# set required mouse pointer style for current screen position
 			display_utilities.SetPointer(Viewport, self, Event=None, Mode=NewMode)
 
@@ -2172,6 +2172,8 @@ class ControlFrame(wx.Frame):
 		#	PHAModel (instance) to attach the Viewport to,
 		#	Chain (bool): whether this new Viewport creation call is chained from another event (e.g. new PHA model)
 		#	ViewportInRedoRecord (Viewport instance) if Redoing
+		# Optional Args:
+		#	ViewportToRevertTo (Viewport instance): Viewport to redisplay when this Viewport is destroyed
 		assert isinstance(Redoing, bool)
 		assert 'PHAModel' in Args
 		assert isinstance(Args['Chain'], bool)
@@ -2187,8 +2189,14 @@ class ControlFrame(wx.Frame):
 			NewViewport = Args['ViewportInRedoRecord']
 			RequestToDatacore = 'RQ_NewViewport_Redo'
 		else:
+			# prepare dict of additional args for Viewport creation
+			ArgsToSend = {}
+			if Args.get('ViewportToRevertTo', None) is not None:
+				ArgsToSend['ViewportToRevertTo'] = Args['ViewportToRevertTo']
+			# create the Viewport
 			NewViewport, D2CSocketNo, C2DSocketNo, VizopTalksArgs = display_utilities.CreateViewport(Proj,
-				Args['ViewportClass'], DisplDevice=self.MyEditPanel, PHAObj=Args['PHAModel'], Fonts=self.Fonts)
+				Args['ViewportClass'], DisplDevice=self.MyEditPanel, PHAObj=Args['PHAModel'], Fonts=self.Fonts,
+				SystemFontNames=self.SystemFontNames, **ArgsToSend)
 			RequestToDatacore = 'RQ_NewViewport'
 		self.Viewports.append(NewViewport) # add it to the register for Control Frame
 		self.TrialViewport = NewViewport # set as temporary current viewport, confirmed after successful creation
@@ -2345,6 +2353,7 @@ class ControlFrame(wx.Frame):
 		# TODO need to handle 'CantComply' sub-element in XMLRoot, indicating that Viewport can't be created.
 		# (also in redo?)
 		# In this instance, also need to delete the navigation history milestone that was added in DoNewViewportCommand()
+		print('CF2348 starting PostProcessNewViewport')
 		assert isinstance(XMLRoot, ElementTree.Element)
 		# find the new PHA object from the ID returned from datacore
 		PHAObjIDTag = XMLRoot.find(info.IDTag)
@@ -2415,7 +2424,7 @@ class ControlFrame(wx.Frame):
 			self.CurrentViewport = None
 
 	def SwitchToViewport(self, TargetViewport=None, XMLRoot=None):
-		# switch PHA panel display (in local ControlFrame) to show TargetViewport
+		# switch edit panel display (in local ControlFrame) to show TargetViewport
 		# TargetViewport is supplied directly as an arg, or (if it's None) via ViewportTag in XMLRoot
 		# first, find which Viewport to show
 		Proj = self.CurrentProj
@@ -2520,6 +2529,7 @@ class ControlFrame(wx.Frame):
 		# return reply data (XML tree) to send back to respective Control Frame
 		# This function might be better placed outside Control Frame class, but currently we can't because it needs
 		# access to ControlFrame's self.Projects
+		print('CF2523 starting DatacoreDoNewViewport')
 		# First, get the attribs needed to make the Viewport in the datacore
 		if XMLRoot is None: # this branch is not currently used
 			ThisProj = Proj
@@ -2546,15 +2556,10 @@ class ControlFrame(wx.Frame):
 			NewViewport.PHAObj = ExistingPHAObj
 			NewViewport.IsOnDisplay = True # set flag that ensures NewViewport will get redrawn
 			ExistingPHAObj.Viewports.append(NewViewport) # add Viewport to list in the PHA object
-			# make reply message to send to control frame
+			# fetch full redraw data of new PHA object, and include in reply message to send to control frame
+			print('CF2550 fetching redraw data')
 			Reply = self.MakeXMLMessageForDrawViewport(MessageHead='RP_NewViewport', PHAObj=ExistingPHAObj,
 				Viewport=NewViewport, ViewportID=NewViewportID)
-#			# fetch full redraw data of new PHA object (code below is moved to MakeXMLMessageForDrawViewport())
-#			RedrawXMLData = ExistingPHAObj.GetFullRedrawData(Viewport=NewViewport, ViewportClass=NewViewport.MyClass)
-#			# send ID of PHA model, followed by full redraw data, as reply to ControlFrame
-#			Reply = vizop_misc.MakeXMLMessage(RootName='RP_NewViewport', RootText=NewViewportID,
-#				Elements={info.IDTag: ExistingPHAObj.ID})
-#			Reply.append(RedrawXMLData)
 			undo.AddToUndoList(Proj, UndoObj=undo.UndoItem(UndoHandler=self.DatacoreDoNewViewport_Undo,
 				RedoHandler=self.DatacoreDoNewViewport_Redo, ViewportShadow=NewViewport, Chain=Chain,
 				MilestoneID=XMLRoot.find(info.MilestoneIDTag).text,
@@ -2715,7 +2720,8 @@ class ControlFrame(wx.Frame):
 			XMLTree = ElementTree.fromstring(MessageReceived)
 		# First, tell Viewport to prepare for display, with data from PHA model
 		self.CurrentViewport.PrepareFullDisplay(XMLTree)
-		self.MyEditPanel.EditPanelMode(self.CurrentViewport, 'Select') # set up mouse pointer and bindings (needs OffsetX/Y)
+		self.MyEditPanel.EditPanelMode(self.CurrentViewport, NewMode=self.CurrentViewport.InitialEditPanelMode)
+			# set up initial mouse pointer and mouse bindings
 		self.Refresh() # trigger OnPaint() so that the panel rendering is refreshed
 		return vizop_misc.MakeXMLMessage(RootName='RP_ShowViewport', RootText='Null')
 
@@ -2736,16 +2742,20 @@ class ControlFrame(wx.Frame):
 			Fonts['BoldWidgetFont'] = core_classes.FontInstance(Size=11, Bold=True)
 		return Fonts
 
-	def OnExportFullFTRequest(self): # handle menu request to produce FT export%%%
+	def OnExportFullFTRequest(self, Event): # handle menu request to produce FT export%%%
 		# first, detach any Viewport from the edit panel
-		ViewportToRevertTo = self.CurrentViewport
-		self.ReleaseCurrentViewport(Proj=self.CurrentProj)
-		# invoke "FT export" aspect for dialogue with user
-		self.GotoEditPanelAspect(NewAspect='EPAspect_ExportFullFT', ViewportToRevertTo=ViewportToRevertTo)
+#		ViewportToRevertTo = self.CurrentViewport
+#		self.ReleaseCurrentViewport(Proj=self.CurrentProj)
+#		# invoke "FT export" aspect for dialogue with user
+#		self.GotoEditPanelAspect(NewAspect='EPAspect_ExportFullFT', ViewportToRevertTo=ViewportToRevertTo,
+#			SystemFontNames=self.SystemFontNames, FT=self.CurrentViewport)
+		# make a FTFullExport Viewport. DoNewViewportCommand() provides the new Viewport as self.TrialViewport
+		self.DoNewViewportCommand(Proj=self.CurrentProj, ViewportClass=ft_full_report.FTFullExportViewport,
+			Chain=True, PHAModel=self.CurrentViewport.PHAObj, ViewportToRevertTo=self.CurrentViewport)
 
 	def GotoEditPanelAspect(self, NewAspect, **Args):
 		# switch to a dialogue aspect in edit panel.
-		# Assumes any Viewport has already been cleared from edit panel by calling Detach...
+		# Assumes any Viewport has already been cleared from edit panel by calling ReleaseCurrentViewport()
 
 		# main procedure for GotoEditPanelAspect
 		assert isinstance(NewAspect, (project_display.EditPanelAspectItem, str))
@@ -2756,7 +2766,7 @@ class ControlFrame(wx.Frame):
 			self.MyEditPanel.EditPanelCurrentAspect.Deactivate(Widgets=self.MyEditPanel.EditPanelCurrentAspect.WidgetList)
 		# get target aspect, if supplied as a string
 		if isinstance(NewAspect, str):
-			TargetAspect = {'EPAspect_ExportFullFT': self.NumericalValueAspect}.get(NewAspect, None)
+			TargetAspect = {'EPAspect_ExportFullFT': self.MyEditPanel.FTFullExportAspect}.get(NewAspect, None)
 		else:
 			TargetAspect = NewAspect
 		if TargetAspect: # any recognised aspect supplied?
@@ -2816,13 +2826,6 @@ class ControlFrame(wx.Frame):
 		e = wx.FontEnumerator()
 		e.EnumerateFacenames()
 		self.SystemFontNames = e.GetFacenames()
-
-		# set up date choices
-		ProjCreationDate = core_classes.ChoiceItem(XMLName='ProjCreation', HumanName='Project created')
-		FTCreationDate = core_classes.ChoiceItem(XMLName='FTCreation', HumanName='Fault tree created')
-		LastEditDate = core_classes.ChoiceItem(XMLName='LastEdit', HumanName='Last edited')
-		TodayDate = core_classes.ChoiceItem(XMLName='Today', HumanName='Today')
-		self.DateChoices = [ProjCreationDate, FTCreationDate, LastEditDate, TodayDate]
 
 		# set up list of existing Viewports in this instance of Vizop
 		if Viewport:

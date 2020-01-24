@@ -429,3 +429,19 @@ def UndefinedCategoryAmong(Categories):
 	UndefinedFlags = [getattr(c, 'IsUndefined', False) for c in Categories]
 	if True in UndefinedFlags: return Categories[UndefinedFlags.index(True)]
 	else: return None
+
+def GetValueFromUserConfig(ConfigName):
+	# retrieve and return config value for ConfigName (str) from the user's config data (stored in config file)
+	# returns default (see settings module) if no key has been stored
+	sm = SettingsManager()
+	return sm.get_config(ConfigName)
+
+def StoreValueInUserConfig(ConfigName, Value):
+	# store Value (str) in user's config data for ConfigName (str)
+	assert isinstance(ConfigName, str)
+	assert isinstance(Value, str)
+	sm = SettingsManager()
+	ce = sm.get_config_editor()
+	ce.set_config(ConfigName, Value)
+	ce.apply_changes() # save config changes in SettingsManager
+

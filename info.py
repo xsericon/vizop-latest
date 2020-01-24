@@ -46,6 +46,16 @@ SciThresholdUpper = 1e5 - 1 # thresholds for displaying numbers in scientific no
 SciThresholdLower = 9.9999e-4
 ZeroThreshold = 1e-20 # numbers with absolute value less than this are treated as zero
 CantDisplayValueOnScreen = '- - -' # undisplayable values are shown on screen like this
+EditPanelModes = ['Edit', 'Select', 'Blocked', 'Widgets'] # modes defining mouse pointer and bindings
+
+# export-related constants
+DefaultPaperSize = 'A4'
+DefaultPaperOrientation = 'Portrait'
+DefaultPaperTopMargin = '10' # in mm
+DefaultPaperBottomMargin = '10'
+DefaultPaperLeftMargin = '10'
+DefaultPaperRightMargin = '10'
+DefaultPaperPageNumberPos = 'Top,Right'
 
 # XML tags and attrib names for internal communication. Those marked #f are also used in project files
 IDTag = 'ID' #f

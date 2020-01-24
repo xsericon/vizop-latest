@@ -1822,21 +1822,34 @@ assert info.DefaultImageFileType in [t.Extension for t in ImageFileTypesSupporte
 class PaperSize(object): # paper size that can be offered for image export
 	# In future, see if we can use wx.PaperSize instead (haven't figured it out yet)
 
-	def __init__(self, HumanName='', SizeX=0, SizeY=0): # sizes are in mm
+	def __init__(self, HumanName='', HumanDescription='', SizeShortAxis=0, SizeLongAxis=0): # sizes are in mm
 		assert isinstance(HumanName, str)
-		assert isinstance(SizeX, int)
-		assert isinstance(SizeY, int)
-		assert SizeX <= SizeY # must be portrait aspect
+		assert isinstance(HumanDescription, str)
+		assert isinstance(SizeShortAxis, (int, float))
+		assert isinstance(SizeLongAxis, (int, float))
+		assert SizeShortAxis <= SizeLongAxis # must be portrait aspect
 		object.__init__(self)
 		self.HumanName = HumanName
-		self.SizeX = SizeX
-		self.SizeY = SizeY
+		self.HumanDescription = HumanDescription
+		self.SizeShortAxis = SizeShortAxis
+		self.SizeLongAxis = SizeLongAxis
+
+	def GetFullNameForDisplay(self):
+		return self.HumanName + ' (' + self.HumanDescription + ')'
+	FullNameForDisplay = property(fget=GetFullNameForDisplay)
 
 	def HumanDescriptor(self): # return str containing HumanName and size, e.g. 'A4 (210 x 297mm)'
 		return '%s (%d x %d mm)' % (self.HumanName, self.SizeX, self.SizeY)
 
-PaperSizeA4 = PaperSize(HumanName='A4', SizeX=210, SizeY=297)
-PaperSizeA5 = PaperSize(HumanName='A5', SizeX=148, SizeY=210)
+PaperSizeA4 = PaperSize(HumanName='A4', HumanDescription='210 x 297mm', SizeShortAxis=210, SizeLongAxis=297)
+PaperSizeA5 = PaperSize(HumanName='A5', HumanDescription='148.5 x 210mm', SizeShortAxis=148.5, SizeLongAxis=210)
 PaperSizes = [PaperSizeA4, PaperSizeA5]
+
+# set up date choices; at least one must have 'Default' attrib
+ProjCreationDate = ChoiceItem(XMLName='ProjCreation', HumanName='Project created')
+FTCreationDate = ChoiceItem(XMLName='FTCreation', HumanName='Fault tree created')
+LastEditDate = ChoiceItem(XMLName='LastEdit', HumanName='Last edited', Default=True)
+TodayDate = ChoiceItem(XMLName='Today', HumanName='Today')
+DateChoices = [ProjCreationDate, FTCreationDate, LastEditDate, TodayDate]
 
 del _ # remove dummy definition
