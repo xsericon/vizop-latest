@@ -126,7 +126,7 @@ def select_file_from_all(message='', default_path=None,
 
 	dialogue = wx.FileDialog(message=message, defaultDir=default_path,
 							 wildcard=wildcard,
-							 style=((wx.MULTIPLE * allow_multi_files) | wx.OPEN),
+							 style=((wx.FD_MULTIPLE * allow_multi_files) | wx.FD_OPEN),
 							 parent=parent_frame, pos=(100, 100))
 
 	if dialogue.ShowModal() == wx.ID_OK: # dialogue box exited with OK button
@@ -160,7 +160,7 @@ def GetFilenameForSave(DialogueParentFrame, DialogueTitle='', DefaultDir='', Def
 		Returns: (ProceedToSave, Full path name of target file)
 		ProceedToSave is boolean: True if file write can proceed """
 	Dialogue = wx.FileDialog(parent=DialogueParentFrame, message=DialogueTitle, defaultDir=DefaultDir,
-							 defaultFile=DefaultFile, wildcard=Wildcard, style= wx.SAVE | wx.OVERWRITE_PROMPT ) # Rappin p166
+							 defaultFile=DefaultFile, wildcard=Wildcard, style= wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT ) # Rappin p166
 	if Dialogue.ShowModal() == wx.ID_OK: # we got a filename and user didn't cancel
 		ProceedToSave = True
 		SaveFilename = EnsureFilenameHasExtension(Dialogue.GetPath(), DefaultExtension, Separator=os.extsep)
