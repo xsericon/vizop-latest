@@ -1992,10 +1992,10 @@ class ControlFrame(wx.Frame):
 
 	def OnClose(self, event):
 		# do cleanup tasks when Control frame is closed. Called when EVT_CLOSE is raised
-		sm = settings.SettingsManager()
-		sm.set_value('main_frame_layout', self.layout_manager.SavePerspective())
-		# deinitialize the frame manager
-		self.layout_manager.UnInit()
+#		sm = settings.SettingsManager()
+#		sm.set_value('main_frame_layout', self.layout_manager.SavePerspective())
+#		# deinitialize the frame manager
+#		self.layout_manager.UnInit()
 		# delete the frame, returns control to main program in module heart for cleaning up
 		self.Destroy()
 
@@ -2377,7 +2377,6 @@ class ControlFrame(wx.Frame):
 		# TODO need to handle 'CantComply' sub-element in XMLRoot, indicating that Viewport can't be created.
 		# (also in redo?)
 		# In this instance, also need to delete the navigation history milestone that was added in DoNewViewportCommand()
-		print('CF2348 starting PostProcessNewViewport')
 		assert isinstance(XMLRoot, ElementTree.Element)
 		# find the new PHA object from the ID returned from datacore
 		PHAObjIDTag = XMLRoot.find(info.IDTag)
@@ -2487,7 +2486,6 @@ class ControlFrame(wx.Frame):
 		# draw the Viewport
 		self.ShowViewport(MessageAsXMLTree=XMLRoot)
 		# update other GUI elements
-		print('CF2477 calling RefreshGUIAfterDataChange')
 		self.RefreshGUIAfterDataChange(Proj=Proj)
 		# show appropriate aspect in Control Panel
 		self.MyControlPanel.GotoControlPanelAspect(NewAspect=self.CurrentViewport.PreferredControlPanelAspect,
@@ -2554,7 +2552,6 @@ class ControlFrame(wx.Frame):
 		# return reply data (XML tree) to send back to respective Control Frame
 		# This function might be better placed outside Control Frame class, but currently we can't because it needs
 		# access to ControlFrame's self.Projects
-		print('CF2523 starting DatacoreDoNewViewport')
 		# First, get the attribs needed to make the Viewport in the datacore
 		if XMLRoot is None: # this branch is not currently used
 			ThisProj = Proj
@@ -2582,7 +2579,6 @@ class ControlFrame(wx.Frame):
 			NewViewport.IsOnDisplay = True # set flag that ensures NewViewport will get redrawn
 			ExistingPHAObj.Viewports.append(NewViewport) # add Viewport to list in the PHA object
 			# fetch full redraw data of new PHA object, and include in reply message to send to control frame
-			print('CF2550 fetching redraw data')
 			Reply = self.MakeXMLMessageForDrawViewport(MessageHead='RP_NewViewport', PHAObj=ExistingPHAObj,
 				Viewport=NewViewport, ViewportID=NewViewportID)
 			undo.AddToUndoList(Proj, UndoObj=undo.UndoItem(UndoHandler=self.DatacoreDoNewViewport_Undo,
@@ -2878,7 +2874,8 @@ class ControlFrame(wx.Frame):
 			print('CF1978 need to set up self.SocketFromDatacoreName')
 		screenx1, screeny1, screenx2, screeny2 = wx.Display().GetGeometry() # get max size of primary display device
 		TaskBarYAllowance = 0 # allows for window manager taskbar, assumed y axis only
-		# set Control Frame size on first run. On subsequent runs, layout_manager resets frame to its previous size
+		# set Control Frame size on first run.
+		# On subsequent runs, layout_manager resets frame to its previous size (obsolete - no longer using layout_manager)
 		ControlFrameSize = wx.Size(screenx2 - screenx1, screeny2 - screeny1 - TaskBarYAllowance)
 		# set first-run sizes for the panels inside control frame
 		MenuBarAllowance = 50 # y-allowance needed for menu bar at top of control frame
@@ -2891,56 +2888,67 @@ class ControlFrame(wx.Frame):
 		ViewPanelSize = wx.Size(screenx2 - screenx1 - VTPanelDefaultSizeX, ViewPanelDefaultSizeY)
 		VTPanelSize = wx.Size(VTPanelDefaultSizeX, ControlPanelDefaultSizeY + ViewPanelDefaultSizeY)
 		wx.Frame.__init__(self, parent, wx.ID_ANY, title, size=ControlFrameSize, pos=(screenx1, screeny1))
-		self.layout_manager = wx.aui.AuiManager(self)
+#		self.layout_manager = wx.aui.AuiManager(self)
 		# set up layout for panels
-		EditPanelLayout = wx.aui.AuiPaneInfo()
-		EditPanelLayout.Dockable(True).Floatable(False).CloseButton(False)
-		EditPanelLayout.CaptionVisible(False).Top().Name("EditPanel")
-		EditPanelLayout.dock_proportion = 10
-		EditPanelLayout.MinSize(EditPanelSize)
+#		EditPanelLayout = wx.aui.AuiPaneInfo()
+#		EditPanelLayout.Dockable(True).Floatable(False).CloseButton(False)
+#		EditPanelLayout.CaptionVisible(False).Top().Name("EditPanel")
+#		EditPanelLayout.dock_proportion = 10
+#		EditPanelLayout.MinSize(EditPanelSize)
 
-		ControlPanelLayout = wx.aui.AuiPaneInfo()
-		ControlPanelLayout.Dockable(True).Floatable(False).CloseButton(False)
-		ControlPanelLayout.CaptionVisible(False).Centre().Left()
-		ControlPanelLayout.MinSize(ControlPanelSize).Name("ControlPanel")
-		ControlPanelLayout.dock_proportion = 3
+#		ControlPanelLayout = wx.aui.AuiPaneInfo()
+#		ControlPanelLayout.Dockable(True).Floatable(False).CloseButton(False)
+#		ControlPanelLayout.CaptionVisible(False).Centre().Left()
+#		ControlPanelLayout.MinSize(ControlPanelSize).Name("ControlPanel")
+#		ControlPanelLayout.dock_proportion = 3
 
-		ViewPanelLayout = wx.aui.AuiPaneInfo()
-		ViewPanelLayout.Dockable(True).Floatable(False).CloseButton(False)
-		ViewPanelLayout.CaptionVisible(False).Bottom().Left()
-		ViewPanelLayout.MinSize(ViewPanelSize).Name("ViewPanel")
-		ViewPanelLayout.dock_proportion = 1
+#		ViewPanelLayout = wx.aui.AuiPaneInfo()
+#		ViewPanelLayout.Dockable(True).Floatable(False).CloseButton(False)
+#		ViewPanelLayout.CaptionVisible(False).Bottom().Left()
+#		ViewPanelLayout.MinSize(ViewPanelSize).Name("ViewPanel")
+#		ViewPanelLayout.dock_proportion = 1
 
-		VizopTalksPanelLayout = wx.aui.AuiPaneInfo()
-		VizopTalksPanelLayout.MinSize(VTPanelSize)
-		VizopTalksPanelLayout.Dockable(True).Floatable(False).CloseButton(False)
-		VizopTalksPanelLayout.CaptionVisible(False).Bottom().Right().Name("VizopTalks")
-		VizopTalksPanelLayout.dock_proportion = 4
+#		VizopTalksPanelLayout = wx.aui.AuiPaneInfo()
+#		VizopTalksPanelLayout.MinSize(VTPanelSize)
+#		VizopTalksPanelLayout.Dockable(True).Floatable(False).CloseButton(False)
+#		VizopTalksPanelLayout.CaptionVisible(False).Bottom().Right().Name("VizopTalks")
+#		VizopTalksPanelLayout.dock_proportion = 4
 		# create the panels to go into the main window
-		SizeX = ControlFrameSize[0] - ControlPanelSize[0]
-		SizeY = ControlFrameSize[1] - MenuBarAllowance
-		self.MyEditPanel = self.EditPanel(wxParent=self, size=(SizeX, SizeY), ViewportOwner=self,
+#		SizeX = ControlFrameSize[0] - ControlPanelSize[0]
+#		SizeY = ControlFrameSize[1] - MenuBarAllowance
+		self.MyEditPanel = self.EditPanel(wxParent=self, size=EditPanelSize, ViewportOwner=self,
 			ColScheme=self.ColScheme)
+#		self.MyEditPanel.SetMinSize( (SizeX, SizeY) )
 		self.MyEditPanel.EditPanelMode(self.CurrentViewport, 'Select') # set up mouse pointer and bindings (needs OffsetX/Y)
 		self.MyVTPanel = self.VTPanel(self, size=VTPanelSize)
 		self.MyControlPanel = self.ControlPanel(self, size=ControlPanelSize, VTWindow=self.MyVTPanel,
 			FirstProject=FirstProject, ColScheme=ColScheme)
 		self.MyViewPanel = self.ViewPanel(self, size=ViewPanelSize, VTPanel=self.MyVTPanel, ColScheme=ColScheme)
+
+		# make and populate master sizer for panels
+		self.TopLevelSizer = wx.GridBagSizer()
+		self.TopLevelSizer.Add(self.MyEditPanel, pos=(0,0), span=(1,2), flag=wx.FIXED_MINSIZE)
+		self.TopLevelSizer.Add(self.MyControlPanel, pos=(1,0), span=(1,1))
+		self.TopLevelSizer.Add(self.MyViewPanel, pos=(2,0), span=(1,1))
+		self.TopLevelSizer.Add(self.MyVTPanel, pos=(1,1), span=(2,1))
+		self.SetSizer(self.TopLevelSizer)
+		self.TopLevelSizer.Layout()
+
 		self.AddDisplayDevice(NewDisplayDevice=self.MyViewPanel)
 		# put panels under layout management. Order of AddPane calls is important
-		self.layout_manager.AddPane(self.MyViewPanel, ViewPanelLayout)
-		self.layout_manager.AddPane(self.MyEditPanel, EditPanelLayout)
-		self.layout_manager.AddPane(self.MyControlPanel, ControlPanelLayout)
-		self.layout_manager.AddPane(self.MyVTPanel, VizopTalksPanelLayout)
+#		self.layout_manager.AddPane(self.MyViewPanel, ViewPanelLayout)
+#		self.layout_manager.AddPane(self.MyEditPanel, EditPanelLayout)
+#		self.layout_manager.AddPane(self.MyControlPanel, ControlPanelLayout)
+#		self.layout_manager.AddPane(self.MyVTPanel, VizopTalksPanelLayout)
 
-		try:
-			# load the previous layout of the panels
-			print("CF1402 reloading of screen layout from cache is commented out") # %%%
-			layout = sm.get_value('main_frame_layout')
+#		try:
+#			# load the previous layout of the panels
+#			print("CF1402 reloading of screen layout from cache is commented out") # %%%
+#			layout = sm.get_value('main_frame_layout')
 #			self.layout_manager.LoadPerspective(layout, True)
-		except KeyError:
-			# tell the manager to 'commit' all the changes just made
-			self.layout_manager.Update()
+#		except KeyError:
+#			# tell the manager to 'commit' all the changes just made
+#			self.layout_manager.Update()
 		self.MyControlPanel.SetFocus() # enable ControlPanel to handle Tab, Space, Enter keys
 		self.Bind(wx.EVT_CLOSE, self.OnClose)
 		self.Bind(wx.EVT_IDLE, self.OnIdle)
