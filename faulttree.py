@@ -4239,6 +4239,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 	MinZoom = 0.1 # min and max zoom factors allowed for display of this Viewport
 	MaxZoom = 10.0
 	InitialEditPanelMode = 'Select'
+	MenuCommandsAvailable = ['FTFullExport'] # InternalNames of menu commands to enable when this Viewport is visible
 
 	class SeverityCatInFT(object): # represents a severity category in FTForDisplay instance
 		# (so far, it's identical to ChoiceItem class)

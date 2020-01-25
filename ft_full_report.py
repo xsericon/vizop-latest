@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Module ft_full_report: part of Vizop, (c) 2019 xSeriCon
+# Module ft_full_report: part of Vizop, (c) 2020 xSeriCon
 # produces full export of a fault tree
 
 # library modules

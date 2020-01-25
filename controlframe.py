@@ -1808,7 +1808,7 @@ class ControlFrame(wx.Frame):
 				# TODO set PaintNeeded to False during text editing (seems like the blinking cursor in the TextCtrl triggers paint events)
 				if getattr(self.ViewportOwner.CurrentViewport, 'PaintNeeded', True):
 					MyPaintDC = wx.PaintDC(self)
-					self.DoRedraw(MyPaintDC, FullRefresh=True) 
+					self.DoRedraw(MyPaintDC, FullRefresh=True)
 
 		def OnMouseLClickEdit(self, event, Viewport, CanStartDrag=True, CanSelect=True, **Args):
 			# handle mouse left button click inside EditPanel
@@ -1892,6 +1892,8 @@ class ControlFrame(wx.Frame):
 		self.Destroy() # kills Control frame, raises EVT_CLOSE which calls self.OnClose()
 
 	def SetupMenus(self): # initialize menus at the top of the screen
+		# Any menu item which should be enabled/disabled depending on the current state of the Viewport should have
+		# attributes "HostMenu" (wx.Menu instance) and  "InternalName" (str). Used in UpdateMenuStatus()
 		# Set up the "File" menu
 		FileMenu = wx.Menu()
 		Openmitem = FileMenu.Append(-1, _('&Open Vizop project...'), '')
@@ -1899,9 +1901,13 @@ class ControlFrame(wx.Frame):
 		Savemitem = FileMenu.Append(-1, _('&Save Vizop project'), '')
 		self.Bind(wx.EVT_MENU, projects.SaveEntireProjectRequest, Savemitem)
 		FileMenu.AppendSeparator() # add a separating line in the menu
-		FTFullReportmitem = FileMenu.Append(-1, _('Export full Fault Tree...'), '')
-		self.Bind(wx.EVT_MENU, self.OnExportFullFTRequest, FTFullReportmitem)
-		FileMenu.AppendSeparator()
+		self.FTFullReportmitem = FileMenu.Append(-1, _('Export full Fault Tree...'), '')
+		self.Bind(wx.EVT_MENU, self.OnExportFullFTRequest, self.FTFullReportmitem)
+		self.FTFullReportmitem.HostMenu = FileMenu
+		self.FTFullReportmitem.InternalName = 'FTFullExport'
+		self.FileMenuSeparatorAfterViewportCommands = FileMenu.AppendSeparator()
+		# InsertBeforeMe: list of  menu items to insert above this location
+		self.FileMenuSeparatorAfterViewportCommands.InsertBeforeMe = [self.FTFullReportmitem]
 		Aboutmitem = FileMenu.Append(-1, _('About &Vizop...'), '')
 		self.Bind(wx.EVT_MENU, vizop_misc.OnAboutRequest, Aboutmitem) # OnAboutRequest is shared with welcome frame
 		Quitmitem = FileMenu.Append(-1, _('E&xit Vizop'), '')
@@ -1922,6 +1928,7 @@ class ControlFrame(wx.Frame):
 		self.MenuBar.Append(FileMenu, _('&File'))
 		self.MenuBar.Append(EditMenu, _('&Edit'))
 		self.SetMenuBar(self.MenuBar) # Add MenuBar to ControlFrame
+		self.ViewportMenuItems = [self.FTFullReportmitem] #  menu items relating to Viewports that may need to be inserted/removed
 
 	def UpdateMenuStatus(self): # update texts and stati of menu items in control frame
 		Proj = self.CurrentProj
@@ -1945,6 +1952,23 @@ class ControlFrame(wx.Frame):
 		else: # nothing to redo
 			self.RedoMenuItem.SetText(_('(Nothing to redo)'))
 			self.MenuBar.Enable(self.RedoMenuItemID, False)
+		# remove any unnecessary menu commands depending on Viewport state
+		for (ThisMenu, ThisMenuLabel) in self.MenuBar.GetMenus():
+			for ThisMenuItem in ThisMenu.GetMenuItems():
+				# if the menu item has an InternalName, check if the InternalName is required by the current Viewporrt
+				if hasattr(ThisMenuItem, 'InternalName'):
+					if not (ThisMenuItem.InternalName in getattr(self.CurrentViewport, 'MenuCommandsAvailable', [])):
+						ThisMenuItem.HostMenu.Remove(ThisMenuItem)
+		# attach any necessary menu commands depending on Viewport state
+		for ThisMenuItem in self.ViewportMenuItems:
+			if (ThisMenuItem.InternalName in getattr(self.CurrentViewport, 'MenuCommandsAvailable', [])):
+				# attach the menu item if it's not already in its host menu
+				TargetMenu = ThisMenuItem.HostMenu
+				if not (ThisMenuItem in TargetMenu.GetMenuItems()):
+					# find the location to attach the menu item
+					TargetIndex = [ThisMenuItem in getattr(i, 'InsertBeforeMe', [])
+						for i in TargetMenu.GetMenuItems()].index(True)
+					TargetMenu.Insert(pos=TargetIndex, menuItem=ThisMenuItem)
 
 	def OnUndoRequest(self, Event): # handle Undo request from user
 		# first, clear UndoChainWaiting flag possibly left over from last undo action
@@ -2463,6 +2487,7 @@ class ControlFrame(wx.Frame):
 		# draw the Viewport
 		self.ShowViewport(MessageAsXMLTree=XMLRoot)
 		# update other GUI elements
+		print('CF2477 calling RefreshGUIAfterDataChange')
 		self.RefreshGUIAfterDataChange(Proj=Proj)
 		# show appropriate aspect in Control Panel
 		self.MyControlPanel.GotoControlPanelAspect(NewAspect=self.CurrentViewport.PreferredControlPanelAspect,
@@ -2910,7 +2935,7 @@ class ControlFrame(wx.Frame):
 
 		try:
 			# load the previous layout of the panels
-			print("CF1402 reloading of screen layout from cache is commented out")
+			print("CF1402 reloading of screen layout from cache is commented out") # %%%
 			layout = sm.get_value('main_frame_layout')
 #			self.layout_manager.LoadPerspective(layout, True)
 		except KeyError:
@@ -2976,6 +3001,7 @@ class ControlFrame(wx.Frame):
 			self.InviteUserToCreatePHAModel(Proj=ThisProj)
 			# set control panel to PHAModels aspect
 			self.MyControlPanel.GotoControlPanelAspect(NewAspect=self.MyControlPanel.PHAModelsAspect)
+			self.RefreshGUIAfterDataChange(Proj=ThisProj) # set menu status, and other GUI updates
 
 	def InviteUserToCreatePHAModel(self, Proj):
 		# invite user to create a new PHA model instance within project Proj (ProjectItem instance).
