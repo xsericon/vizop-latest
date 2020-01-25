@@ -59,7 +59,10 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 		def OnExpandGatesCheck(self, Event): pass
 		def OnDateChoice(self, Event): pass
 		def OnCancelButton(self, Event): pass
-		def OnGoButton(self, Event): pass
+
+		def OnGoButton(self, Event):
+			print('FR64 in go button handler')
+
 
 		def Prefill(self, Proj, FT, SystemFontNames):
 			# prefill widget values
@@ -73,8 +76,8 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 			self.FileTypeChoice.Widget.SetSelection(RecognisedExtensions.index(ExtensionToSelect))
 			# set overwrite checkbox
 			self.OverwriteCheck.Widget.SetValue(self.Overwrite)
-			# set filename status message
-			self.UpdateFilenameStatusMessage()
+#			# set filename status message
+#			self.UpdateFilenameStatusMessage()
 			# set scope checkboxes
 			self.ShowHeaderCheck.Widget.SetValue(Proj.FTExportShowHeader)
 			self.ShowFTCheck.Widget.SetValue(Proj.FTExportShowFT)
@@ -169,6 +172,7 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 			self.PagesAcrossText.Widget.SelectAll()
 			self.PagesDownText.Widget.ChangeValue(str(PageCountInfo['PagesDownCount']))
 			self.PagesDownText.Widget.SelectAll()
+			self.UpdateWidgetStatus()
 
 		def UpdateFilenameStatusMessage(self):
 			# update filename status message widget text
@@ -176,31 +180,47 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 			# 1. Filename text box empty, or whitespace only, or contains a directory path
 			if (not FilePathSupplied) or os.path.isdir(FilePathSupplied):
 				Message = _('Please provide a filename for the export')
+				FilenameStatus = 'NotFilename'
 			# 2. Path supplied is a writeable, nonexistent filename
 			elif vizop_misc.IsWriteableAsNewFile(FilePathSupplied):
 				Message = _('Ready to export to new file. Click Go')
+				FilenameStatus = 'ReadyToMakeNewFile'
 			# 3. Path points to an existent file that can be overwritten, and Overwrite check box is checked
 			elif os.path.isfile(FilePathSupplied) and os.access(FilePathSupplied, os.W_OK) and \
 					ThisAspect.OverwriteCheck.Widget.GetValue():
 				Message = _('Ready to export. File will be overwritten when you click Go')
+				FilenameStatus = 'ReadyToOverwrite'
 			# 4. Path points to an existent file that can be overwritten, and Overwrite check box is unchecked
 			elif os.path.isfile(FilePathSupplied) and os.access(FilePathSupplied, os.W_OK) and \
 					not ThisAspect.OverwriteCheck.Widget.GetValue():
 				Message = _('File exists. Click "Overwrite", then "Go"')
+				FilenameStatus = 'FileExists'
 			# 5. Path points to a writeable folder, but no extension is provided and it is needed (i.e. Windows)
 			elif vizop_misc.IsWritableLocation(FilePathSupplied) and os.path.splitext(FilePathSupplied)[1] in ['', '.'] \
 					and platform.system() == 'Windows':
 				Message = _('Please provide a valid file extension, e.g. .pdf')
+				FilenameStatus = 'NeedExtension'
 			# 6. Path points to a nonexistent folder, or a folder with no write access
 			elif not vizop_misc.IsWritableLocation(FilePathSupplied):
 				Message = _("%s can't write to that location") % info.PROG_SHORT_NAME
+				FilenameStatus = 'NoAccess'
 			# 99. Some other case we haven't thought of
-			else: Message = _('You should buy a lottery ticket today')
+			else:
+				Message = _('You should buy a lottery ticket today')
+				FilenameStatus = 'Other'
 			self.FilenameStatusMessage.Widget.SetLabel(Message)
+			return FilenameStatus
 
 		def SetWidgetVisibility(self, **Args):
 			# set IsVisible attribs for all fixed and variable widgets
 			for ThisWidget in self.WidgetList: ThisWidget.IsVisible = True
+
+		def UpdateWidgetStatus(self):
+			# update enabled/disabled status of all widgets
+			FilenameStatus = self.UpdateFilenameStatusMessage()
+			# set status of Go button
+			self.GoButton.Widget.Enable(FilenameStatus in ['ReadyToMakeNewFile', 'ReadyToOverwrite'])
+
 
 		def __init__(self, InternalName, ParentFrame, TopLevelFrame):
 			project_display.EditPanelAspectItem.__init__(self, WidgetList=[], InternalName=InternalName,

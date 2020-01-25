@@ -2763,7 +2763,7 @@ class ControlFrame(wx.Frame):
 			Fonts['BoldWidgetFont'] = core_classes.FontInstance(Size=11, Bold=True)
 		return Fonts
 
-	def OnExportFullFTRequest(self, Event): # handle menu request to produce FT export%%%
+	def OnExportFullFTRequest(self, Event): # handle menu request to produce FT export
 		# first, detach any Viewport from the edit panel
 #		ViewportToRevertTo = self.CurrentViewport
 #		self.ReleaseCurrentViewport(Proj=self.CurrentProj)

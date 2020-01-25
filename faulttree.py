@@ -4658,8 +4658,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 					setattr(FT, AttribName, AttribType(ThisElement.text))
 
 		# main procedure for PrepareFullDisplay()
-		print('FT3441 starting PrepareFullDisplay using the following XML data:')
-#		ElementTree.dump(XMLData)
+#		ElementTree.dump(XMLData) # print all data received, for debugging
 		self.Wipe() # start with a blank FT
 		# find the outer tag containing the FT data
 		FTData = [t for t in XMLData.iter(self.InternalName)][0]
@@ -4738,7 +4737,6 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 				source=BufferDC, xsrc=0, ysrc=0)
 
 		# main procedure for RenderInDC()
-		print('FT4739 starting RenderInDC')
 		assert isinstance(FullRefresh, bool)
 		HostPanelSizeX, HostPanelSizeY = self.DisplDevice.GetSize()
 		if FullRefresh:
