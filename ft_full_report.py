@@ -251,6 +251,9 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 		StyleBoxSizer = wx.StaticBoxSizer(orient=wx.VERTICAL, parent=MyEditPanel, label=_('Fault Tree style'))
 		StyleBoxSubSizer = wx.GridBagSizer(hgap=5, vgap=5)
 		StyleBoxSizer.Add(StyleBoxSubSizer)
+		ActionBoxSizer = wx.StaticBoxSizer(orient=wx.VERTICAL, parent=MyEditPanel, label=' ')
+		ActionBoxSubSizer = wx.GridBagSizer(hgap=5, vgap=5)
+		ActionBoxSizer.Add(ActionBoxSubSizer)
 		# make header widget
 		ThisAspect.HeaderLabel = UIWidgetItem(wx.StaticText(MyEditPanel, -1,
 			_('Export full Fault Tree report')),
@@ -399,7 +402,7 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 			ThisAspect.PagesDownLabel, ThisAspect.PagesDownText, ThisAspect.NewPagePerRRCheck])
 		# make Style box and widgets
 		ThisAspect.StyleBox = UIWidgetItem(StyleBoxSizer, HideMethod=lambda : StyleBoxSizer.ShowItems(False),
-			ShowMethod=lambda : StyleBoxSizer.ShowItems(True), ColLoc=0, ColSpan=10, NewRow=True, GapY=20,
+			ShowMethod=lambda : StyleBoxSizer.ShowItems(True), ColLoc=0, ColSpan=9, NewRow=True,
 			SetFontMethod=lambda f: StyleBoxSizer.GetStaticBox().SetFont, Font=Fonts['SmallHeadingFont'])
 #		ThisAspect.StyleLabel = UIWidgetItem(wx.StaticText(MyEditPanel, -1, _('Style')),
 #			YGap=20, ColLoc=0, ColSpan=2, Font=Fonts['SmallHeadingFont'], NewRow=True)
@@ -436,12 +439,17 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 			ThisAspect.DateLabel, ThisAspect.DateChoice, ThisAspect.CombineRRsCheck,
 			ThisAspect.CannotCalculateLabel, ThisAspect.CannotCalculateText,
 			ThisAspect.ExpandGatesCheck, ThisAspect.BlackWhiteCheck])
-		ThisAspect.CancelButton = UIWidgetItem(wx.Button(MyEditPanel, -1, _('Cancel')), GapX=100,
-			Handler=ThisAspect.OnCancelButton, Events=[wx.EVT_BUTTON], ColLoc=1, ColSpan=1, NewRow=True,
+		# make Action box and widgets
+		ThisAspect.ActionBox = UIWidgetItem(ActionBoxSizer, HideMethod=lambda : ActionBoxSizer.ShowItems(False),
+			ShowMethod=lambda : ActionBoxSizer.ShowItems(True), ColLoc=9, ColSpan=1,
+			SetFontMethod=lambda f: ActionBoxSizer.GetStaticBox().SetFont, Font=Fonts['SmallHeadingFont'])
+		ThisAspect.CancelButton = UIWidgetItem(wx.Button(MyEditPanel, -1, _('Cancel')), GapX=42, NewRow=True,
+			Handler=ThisAspect.OnCancelButton, Events=[wx.EVT_BUTTON], ColLoc=1, ColSpan=1, GapY=15,
 			Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_LEFT | wx.EXPAND)
-		ThisAspect.GoButton = UIWidgetItem(wx.Button(MyEditPanel, -1, _('Go')), GapX=20,
-			Handler=ThisAspect.OnGoButton, Events=[wx.EVT_BUTTON], ColLoc=3, ColSpan=1,
+		ThisAspect.GoButton = UIWidgetItem(wx.Button(MyEditPanel, -1, _('Go')), NewRow=True,
+			Handler=ThisAspect.OnGoButton, Events=[wx.EVT_BUTTON], ColLoc=1, ColSpan=1,
 			Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_LEFT | wx.EXPAND)
+		display_utilities.PopulateSizer(Sizer=ActionBoxSubSizer, Widgets=[ThisAspect.CancelButton, ThisAspect.GoButton])
 
 		# make list of widgets in this aspect
 		ThisAspect.WidgetList = [ThisAspect.HeaderLabel,
@@ -472,7 +480,8 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 #			ThisAspect.ConnectorsAcrossPagesCheck, ThisAspect.CommentsCheck, ThisAspect.ActionsCheck, ThisAspect.ParkingCheck,
 #			ThisAspect.CannotCalculateLabel, ThisAspect.CannotCalculateText, ThisAspect.CombineRRsCheck,
 #			ThisAspect.ExpandGatesCheck, ThisAspect.DateLabel, ThisAspect.DateChoice,
-			ThisAspect.CancelButton, ThisAspect.GoButton]
+			ThisAspect.ActionBox]
+#			ThisAspect.CancelButton, ThisAspect.GoButton]
 		return MyEditPanel.FTFullExportAspect
 
 	def GetPageCountInfo(self, Zoom, ShowHeader, ShowFT, ShowOnlySelected, PageSizeLongAxis, PageSizeShortAxis, Orientation,
