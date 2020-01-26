@@ -110,7 +110,7 @@ class ProjectItem(object): # class of PHA project instances
 			# If we are saving on fly, this contains the pathname of the project file to update
 		self.FTFullExportFilename = '' # str; last used full pathname for exporting full FT, including any extension
 		self.FTFullExportFileType = '' # str; must be '' or the Extension attrib of an instance of core_classes.ImageFileType
-		self.FTFullExportZoom = 100 # int; last zoom level used for exporting FT
+		self.FTFullExportZoom = 1.0 # float; last zoom level used for exporting FT
 		self.FTConnectorsAcrossPages = True # in FT export, whether to draw connecting arrows at page breaks
 		self.FTExportShowPeripheral = ('Comments','Actions','Parking') # in FT export, which additional data to show
 		self.FTExportCannotCalculateText = _('Not calculated') # in FT export, what to show when value cannot be calc'd

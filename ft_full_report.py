@@ -22,6 +22,8 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 	NewViewportVizopTalksArgs = {'Title': 'Fault tree full export',
 		'MainText': 'Enter the settings you require, then click Go'}
 	InitialEditPanelMode = 'Widgets'
+	MinZoom = 0.1 # min and max zoom factors allowed for this Viewport
+	MaxZoom = 9.99
 
 	class FTFullExportDialogueAspect(project_display.EditPanelAspectItem):
 
@@ -62,6 +64,7 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 
 		def OnGoButton(self, Event):
 			print('FR64 in go button handler')
+			self.DoExportFTToFile()
 
 
 		def Prefill(self, Proj, FT, SystemFontNames):
@@ -112,7 +115,7 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 			if PageNumberPos == '': PageNumberPos = info.DefaultPaperPageNumberPos
 			for ThisWidget, Pos in [ (self.PageNumberTopRadio, 'Top'), (self.PageNumberBottomRadio, 'Bottom'),
 					(self.PageNumberLeftRadio, 'Left'), (self.PageNumberRightRadio, 'Right'),
-					(self.PageNumberNoneRadio, 'None') ]:
+					(self.PageNumberNoneRadio, 'None'), (self.PageNumberCentreRadio, 'Centre') ]:
 				ThisWidget.Widget.SetValue(Pos in PageNumberPos)
 			# set black-and-white checkbox
 			self.BlackWhiteCheck.Widget.SetValue(Proj.LastExportBlackAndWhite)
@@ -161,7 +164,7 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 				'Orientation': PaperOrientation, 'TopMargin': Margins['ExportPaperTopMargin'],
 				'BottomMargin': Margins['ExportPaperBottomMargin'],
 				'LeftMargin': Margins['ExportPaperLeftMargin'], 'RightMargin': Margins['ExportPaperRightMargin'],
-				'PageNumberPos': PageNumberPos,
+				'PageNumberPos': PageNumberPos, 'FirstPageNumber': 1, 'PageCountToShow': 'Auto',
 				'NewPagePerRR': Proj.FTExportNewPagePerRR, 'Font': FontNameToUse,
 				'ConnectorsAcrossPages': Proj.FTConnectorsAcrossPages,
 				'ShowComments': ShowComments, 'ShowActions': ShowActions, 'ShowParking': ShowParking,
@@ -491,7 +494,8 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 #		# FT: a faulttree.FTForDisplay instance
 		# return dict with args: PagesAcrossCount, PagesDownCount (2 x int)
 #		assert type(FT).InternalName == 'FTTreeView' # confirming it's the correct class
-		assert isinstance(Zoom, int)
+		assert isinstance(Zoom, float)
+		assert self.MinZoom <= Zoom <= self.MaxZoom
 		assert isinstance(ShowHeader, bool)
 		assert isinstance(ShowFT, bool)
 		assert isinstance(ShowOnlySelected, bool)
@@ -515,6 +519,60 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 		assert DateKind in core_classes.DateChoices
 		print('FR372 GetPageCountInfo: not implemented yet')
 		return {'PagesAcrossCount': 2, 'PagesDownCount': 3}
+
+	def DoExportFTToFile(self, FilePath, FileType,
+		Zoom, ShowHeader, ShowFT, ShowOnlySelected, PageSizeLongAxis, PageSizeShortAxis,
+		Orientation,
+		TopMargin, BottomMargin, LeftMargin, RightMargin,
+		PageNumberPos, FirstPageNumber, PageCountToShow, NewPagePerRR, Font,
+		ConnectorsAcrossPages,
+		ShowComments, ShowActions, ShowParking, CannotCalculateText, CombineRRs, ExpandGates,
+		DateKind, **Args):
+		# Render the FT image in file(s)
+		# return:
+		# OK (bool) - whether export completed successfully without errors
+		# Problem (str) - description of any problems encountered
+		assert isinstance(FilePath, str)
+		assert FileType in core_classes.ImageFileTypesSupported
+		assert isinstance(Zoom, float)
+		assert self.MinZoom <= Zoom <= self.MaxZoom
+		assert isinstance(ShowHeader, bool)
+		assert isinstance(ShowFT, bool)
+		assert isinstance(ShowOnlySelected, bool)
+		assert isinstance(PageSizeLongAxis, (int, float))
+		assert 0 < PageSizeLongAxis
+		assert isinstance(PageSizeShortAxis, (int, float))
+		assert 0 < PageSizeShortAxis
+		assert Orientation in ['Portrait', 'Landscape']
+		assert isinstance(TopMargin, (int, float))
+		assert 0 <= TopMargin
+		assert isinstance(BottomMargin, (int, float))
+		assert 0 <= BottomMargin
+		assert isinstance(LeftMargin, (int, float))
+		assert 0 <= LeftMargin
+		assert isinstance(RightMargin, (int, float))
+		assert 0 <= RightMargin
+		if Orientation == 'Portrait':
+			assert PageSizeLongAxis > TopMargin + BottomMargin
+			assert PageSizeShortAxis > LeftMargin + RightMargin
+		else:
+			assert PageSizeShortAxis > TopMargin + BottomMargin
+			assert PageSizeLongAxis > LeftMargin + RightMargin
+		assert isinstance(PageNumberPos, str)
+		# confirm PageNumberPos contains exactly one of Top, Bottom, None; and exactly one of Left, Centre, Right
+		assert int('Top' in PageNumberPos) + int('Bottom' in PageNumberPos) + int('None' in PageNumberPos) == 1
+		assert int('Left' in PageNumberPos) + int('Centre' in PageNumberPos) + int('Right' in PageNumberPos) == 1
+		assert isinstance(NewPagePerRR, bool)
+		assert isinstance(Font, str)
+		assert isinstance(ConnectorsAcrossPages, bool)
+		assert isinstance(ShowComments, bool)
+		assert isinstance(ShowActions, bool)
+		assert isinstance(ShowParking, bool)
+		assert isinstance(CannotCalculateText, str)
+		assert isinstance(CombineRRs, bool)
+		assert isinstance(ExpandGates, bool)
+		assert DateKind in core_classes.DateChoices
+		print('FR575 DoExportFTToFile: not implemented yet')
 
 	def __init__(self, Proj, PHAObj, DisplDevice, ParentWindow, Fonts, SystemFontNames, **Args):
 		# __init__ for class FTFullExportViewport
