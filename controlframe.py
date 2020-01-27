@@ -881,7 +881,6 @@ class ControlFrame(wx.Frame):
 			MySizer.Add(self.MyNotebook, 1, wx.EXPAND)
 			self.SetSizer(MySizer)
 
-#			self.WidgActive = [] # list of widgets currently visible. Not used; use Visible attrib of widgets instead
 			# generate list of system fonts (not currently used)
 #			e = wx.FontEnumerator()
 #			e.EnumerateFacenames()
@@ -1633,7 +1632,7 @@ class ControlFrame(wx.Frame):
 				self.NotebookPage.SetSizer(self.MySizer)
 
 			def Activate(self, **Args): # activate widgets for this aspect
-				print('CF1636 in Activate')
+				print('CF1636 in Activate: received WidgetsToActivate: ', hasattr(Args, 'WidgetsToActivate'))
 				Proj = self.ParentFrame.CurrentProj
 				self.TopLevelFrame.ActivateWidgetsInPanel(Widgets=self.WidgetList, Sizer=self.MySizer,
 					ActiveWidgetList=[w for w in self.WidgetList if w.IsVisible], **Args)
@@ -1650,6 +1649,7 @@ class ControlFrame(wx.Frame):
 
 	def ActivateWidgetsInPanel(self, Widgets=[], Sizer=None, ActiveWidgetList=[], **Args):
 		# activate widgets that are about to be displayed in a panel of the Control Frame
+		# Args may contain TextWidgets (list of text widgets to check for loss of focus in OnIdle)
 		assert isinstance(Widgets, list)
 		assert isinstance(Sizer, wx.GridBagSizer)
 		assert isinstance(ActiveWidgetList, list)

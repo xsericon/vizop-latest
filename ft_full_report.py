@@ -28,14 +28,21 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 	class FTFullExportDialogueAspect(project_display.EditPanelAspectItem):
 
 		def OnFilenameTextWidget(self, Event):
+			# get filename stub provided by user
+			UserFilenameStub = self.FilenameText.Widget.GetValue().strip()
+			# get all actual filenames to use, based on this stub%%%
+			ActualFilenames = GetFilenamesForMultipageExport(BasePath=UserFilenameStub,
+				FileType=core_classes.ImageFileTypesSupported[self.FileTypeChoice.Widget.GetSelection()],
+				PagesAcross=self.PageCountInfo['PagesAcrossCount'], PagesDown=self.PageCountInfo['PagesDownCount'])
+			print('FR37 filenames to use: ', ActualFilenames)
+			# update filename status text
 			# for testing
-			print('FR32 filenames to use: ', GetFilenamesForMultipageExport(self.FilenameText.Widget.GetValue(),
-				core_classes.ImageFileTypesSupported.index(self.FileTypeChoice.Widget.GetSelection)), 3, 4)
 			# write name back into Proj.FTFullExportFilename
+
 		def OnSelectButton(self, Event):
 			# for testing
 			print('FR32 filenames to use: ', GetFilenamesForMultipageExport(self.FilenameText.Widget.GetValue(),
-				core_classes.ImageFileTypesSupported.index(self.FileTypeChoice.Widget.GetSelection)), 3, 4)
+				core_classes.ImageFileTypesSupported[self.FileTypeChoice.Widget.GetSelection()], 1, 1))
 
 		def OnFileTypeChoice(self, Event): pass # write name back into Proj.FTFullExportFileType
 		def OnOverwriteCheck(self, Event): # handle click on Overwrite checkbox: store overwrite option
@@ -178,41 +185,54 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 				'ShowComments': ShowComments, 'ShowActions': ShowActions, 'ShowParking': ShowParking,
 				'CannotCalculateText': Proj.FTExportCannotCalculateText, 'CombineRRs': Proj.FTExportCombineRRs,
 				'ExpandGates': Proj.FTExportExpandGates, 'DateKind': DateToShow }
-			PageCountInfo = FT.GetPageCountInfo(**PageCountInput)
-			self.PagesAcrossText.Widget.ChangeValue(str(PageCountInfo['PagesAcrossCount']))
+			self.PageCountInfo = FT.GetPageCountInfo(**PageCountInput)
+			self.PagesAcrossText.Widget.ChangeValue(str(self.PageCountInfo['PagesAcrossCount']))
 			self.PagesAcrossText.Widget.SelectAll()
-			self.PagesDownText.Widget.ChangeValue(str(PageCountInfo['PagesDownCount']))
+			self.PagesDownText.Widget.ChangeValue(str(self.PageCountInfo['PagesDownCount']))
 			self.PagesDownText.Widget.SelectAll()
 			self.UpdateWidgetStatus()
 
-		def UpdateFilenameStatusMessage(self):
-			# update filename status message widget text
-			FilePathSupplied = self.FilenameText.Widget.GetValue().strip()
+		def UpdateFilenameStatusMessage(self, UserFilePath='', ActualFilePathsToUse=[]):
+			# update filename status message widget text based UserFilePath (str; what's currently in the Filename
+			# text box) and ActualFilePathsToUse (list; all file paths to use for multipage export)
+			assert isinstance(UserFilePath, str)
+			# check status of each item in ActualFilePathsToUse, if any
+			PathStati = []
+			for ThisPath in ActualFilePathsToUse:
+				# is the path a writeable path with no existing file?
+				if vizop_misc.IsWriteableAsNewFile(ThisPath): ThisPathStatus = 'CanWrite'
+				# is the path a writeable path, with an existing file?
+				elif os.path.isfile(ThisPath) and os.access(ThisPath, os.W_OK): ThisPathStatus = 'NeedToOverwrite'
+				# is the path unusable?
+				else: ThisPathStatus = 'CannotWrite'
+				PathStati.append(ThisPathStatus)
 			# 1. Filename text box empty, or whitespace only, or contains a directory path
-			if (not FilePathSupplied) or os.path.isdir(FilePathSupplied):
+			if (not UserFilePath) or os.path.isdir(UserFilePath):
 				Message = _('Please provide a filename for the export')
 				FilenameStatus = 'NotFilename'
-			# 2. Path supplied is a writeable, nonexistent filename
-			elif vizop_misc.IsWriteableAsNewFile(FilePathSupplied):
-				Message = _('Ready to export to new file. Click Go')
+			# 2. Paths to use are all writeable, nonexistent filenames
+			elif PathStati.count('CanWrite') == len(PathStati):
+				if len(ActualFilePathsToUse) == 1: Message = _('Ready to export to 1 new file. Click Go')
+				else: Message = _('Ready to export to %d new files. Click Go') % len(ActualFilePathsToUse)
 				FilenameStatus = 'ReadyToMakeNewFile'
-			# 3. Path points to an existent file that can be overwritten, and Overwrite check box is checked
-			elif os.path.isfile(FilePathSupplied) and os.access(FilePathSupplied, os.W_OK) and \
+			# 3. Paths point to at least 1 existent file that can be overwritten, and Overwrite check box is checked
+			elif (PathStati.count('NeedToOverwrite') > 0) and ('CannotWrite' not in PathStati)  and \
 					ThisAspect.OverwriteCheck.Widget.GetValue():
-				Message = _('Ready to export. File will be overwritten when you click Go')
+				Message = _('Ready to export. Existing file(s) will be overwritten when you click Go')
 				FilenameStatus = 'ReadyToOverwrite'
 			# 4. Path points to an existent file that can be overwritten, and Overwrite check box is unchecked
-			elif os.path.isfile(FilePathSupplied) and os.access(FilePathSupplied, os.W_OK) and \
+			elif (PathStati.count('NeedToOverwrite') > 0) and ('CannotWrite' not in PathStati) and \
 					not ThisAspect.OverwriteCheck.Widget.GetValue():
-				Message = _('File exists. Click "Overwrite", then "Go"')
+				if len(ActualFilePathsToUse) == 1: Message = _('File exists. Click "Overwrite", then "Go"')
+				else: Message = _('One or more files already exist. Click "Overwrite", then "Go"')
 				FilenameStatus = 'FileExists'
 			# 5. Path points to a writeable folder, but no extension is provided and it is needed (i.e. Windows)
-			elif vizop_misc.IsWritableLocation(FilePathSupplied) and os.path.splitext(FilePathSupplied)[1] in ['', '.'] \
+			elif vizop_misc.IsWritableLocation(UserFilePath) and os.path.splitext(UserFilePath)[1] in ['', '.'] \
 					and platform.system() == 'Windows':
 				Message = _('Please provide a valid file extension, e.g. .pdf')
 				FilenameStatus = 'NeedExtension'
 			# 6. Path points to a nonexistent folder, or a folder with no write access
-			elif not vizop_misc.IsWritableLocation(FilePathSupplied):
+			elif not vizop_misc.IsWritableLocation(UserFilePath):
 				Message = _("%s can't write to that location") % info.PROG_SHORT_NAME
 				FilenameStatus = 'NoAccess'
 			# 99. Some other case we haven't thought of
@@ -227,8 +247,14 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 			for ThisWidget in self.WidgetList: ThisWidget.IsVisible = True
 
 		def UpdateWidgetStatus(self):
-			# update enabled/disabled status of all widgets
-			FilenameStatus = self.UpdateFilenameStatusMessage()
+			# update enabled/disabled status of all widgets%%%
+			# First, get a list of all actual filenames to use for multipage export
+			UserFilenameStub = self.FilenameText.Widget.GetValue().strip()
+			ActualFilenames = GetFilenamesForMultipageExport(BasePath=UserFilenameStub,
+				FileType=core_classes.ImageFileTypesSupported[self.FileTypeChoice.Widget.GetSelection()],
+				PagesAcross=self.PageCountInfo['PagesAcrossCount'], PagesDown=self.PageCountInfo['PagesDownCount'])
+			FilenameStatus = self.UpdateFilenameStatusMessage(UserFilePath=UserFilenameStub,
+				ActualFilePathsToUse=ActualFilenames)
 			# set status of Go button
 			self.GoButton.Widget.Enable(FilenameStatus in ['ReadyToMakeNewFile', 'ReadyToOverwrite'])
 
@@ -246,6 +272,7 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 		# DateChoices (list of ChoiceItem): options for date to show in FT
 		# return the aspect
 		# make basic attribs needed for the aspect
+		self.TextWidgets = []
 		MyEditPanel.FTFullExportAspect = FTFullExportViewport.FTFullExportDialogueAspect(InternalName='FTFullExport',
 			ParentFrame=MyEditPanel, TopLevelFrame=MyEditPanel.TopLevelFrame)
 		ThisAspect = MyEditPanel.FTFullExportAspect
@@ -273,10 +300,10 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 		ThisAspect.FileBox = UIWidgetItem(FileBoxSizer, HideMethod=lambda : FileBoxSizer.ShowItems(False),
 			ShowMethod=lambda : FileBoxSizer.ShowItems(True), ColLoc=0, ColSpan=5, NewRow=True,
 			SetFontMethod=lambda f: FileBoxSizer.GetStaticBox().SetFont, Font=Fonts['SmallHeadingFont'])
-		ThisAspect.FilenameLabel = UIWidgetItem(wx.StaticText(MyEditPanel, -1, _('Filename:')),
-			ColLoc=0, ColSpan=1, Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_RIGHT)
+		ThisAspect.FilenameLabel = UIWidgetItem(wx.StaticText(MyEditPanel, -1, _('Filename stub:'), style=wx.ALIGN_RIGHT),
+			ColLoc=0, ColSpan=1, RowSpan=2, Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_RIGHT)
 		ThisAspect.FilenameText = UIWidgetItem(wx.TextCtrl(MyEditPanel, -1, style=wx.TE_PROCESS_ENTER | wx.TE_MULTILINE),
-			MinSizeY=25, Events=[wx.EVT_TEXT_ENTER], Handler=ThisAspect.OnFilenameTextWidget, GapX=5,
+			MinSizeY=50, Events=[wx.EVT_TEXT_ENTER], Handler=ThisAspect.OnFilenameTextWidget, GapX=5,
 			Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_LEFT | wx.EXPAND,
 			MinSizeX=300, ColLoc=2, ColSpan=1, DisplayMethod='StaticFromText')
 		ThisAspect.SelectButton = UIWidgetItem(wx.Button(MyEditPanel, -1, _('Select')),
@@ -291,10 +318,10 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 			Handler=ThisAspect.OnOverwriteCheck, Events=[wx.EVT_CHECKBOX], ColLoc=2, ColSpan=1, NewRow=True)
 		ThisAspect.FilenameStatusMessage = UIWidgetItem(wx.StaticText(MyEditPanel, -1, ''),
 			ColLoc=2, ColSpan=3, Font=Fonts['BoldFont'], NewRow=True)
-		# add widgets to FileBoxSubSizer
-		display_utilities.PopulateSizer(Sizer=FileBoxSubSizer, Widgets=[ThisAspect.FilenameLabel,
+		# add widgets to FileBoxSubSizer, and populate list of text widgets
+		self.TextWidgets.extend(display_utilities.PopulateSizer(Sizer=FileBoxSubSizer, Widgets=[ThisAspect.FilenameLabel,
 			ThisAspect.FilenameText, ThisAspect.SelectButton, ThisAspect.FileTypeLabel, ThisAspect.FileTypeChoice,
-			ThisAspect.OverwriteCheck, ThisAspect.FilenameStatusMessage])
+			ThisAspect.OverwriteCheck, ThisAspect.FilenameStatusMessage]))
 		# widgets in "scope" box
 		ThisAspect.ScopeBox = UIWidgetItem(ScopeBoxSizer, HideMethod=lambda : ScopeBoxSizer.ShowItems(False),
 			ShowMethod=lambda : ScopeBoxSizer.ShowItems(True), ColLoc=0, ColSpan=5, NewRow=True,
@@ -316,9 +343,9 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 		ThisAspect.ParkingCheck = UIWidgetItem(wx.CheckBox(MyEditPanel, -1, _('Parking lot items')),
 			Handler=ThisAspect.OnParkingCheck, Events=[wx.EVT_CHECKBOX], ColLoc=3, ColSpan=1)
 		# add widgets to FileBoxSubSizer
-		display_utilities.PopulateSizer(Sizer=ScopeBoxSubSizer, Widgets=[ThisAspect.ExportWhatLabel,
+		self.TextWidgets.extend(display_utilities.PopulateSizer(Sizer=ScopeBoxSubSizer, Widgets=[ThisAspect.ExportWhatLabel,
 			ThisAspect.ShowHeaderCheck, ThisAspect.ShowFTCheck, ThisAspect.ShowOnlySelectedCheck,
-			ThisAspect.IncludeWhatLabel, ThisAspect.CommentsCheck, ThisAspect.ActionsCheck, ThisAspect.ParkingCheck])
+			ThisAspect.IncludeWhatLabel, ThisAspect.CommentsCheck, ThisAspect.ActionsCheck, ThisAspect.ParkingCheck]))
 		# widgets in "page layout" box
 		ThisAspect.PageLayoutBox = UIWidgetItem(PageLayoutBoxSizer, HideMethod=lambda : PageLayoutBoxSizer.ShowItems(False),
 			ShowMethod=lambda : PageLayoutBoxSizer.ShowItems(True), ColLoc=5, ColSpan=5, RowSpan=2,
@@ -399,7 +426,7 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 			Handler=ThisAspect.OnNewPagePerRRCheck, Events=[wx.EVT_CHECKBOX], ColLoc=3, ColSpan=3,
 			Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_RIGHT)
 		# add widgets to PageLayoutBoxSubSizer
-		display_utilities.PopulateSizer(Sizer=PageLayoutBoxSubSizer, Widgets=[ThisAspect.PageSizeLabel,
+		self.TextWidgets.extend(display_utilities.PopulateSizer(Sizer=PageLayoutBoxSubSizer, Widgets=[ThisAspect.PageSizeLabel,
 			ThisAspect.PageSizeChoice, ThisAspect.PortraitRadio, ThisAspect.LandscapeRadio,
 			ThisAspect.MarginLabel, ThisAspect.TopMarginLabel, ThisAspect.TopMarginText,
 			ThisAspect.BottomMarginLabel, ThisAspect.BottomMarginText, ThisAspect.PageNumberingLabel,
@@ -410,7 +437,7 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 				ThisAspect.PageNumberRightRadio,
 			ThisAspect.HowManyPagesLabel, ThisAspect.PagesAcrossLabel, ThisAspect.PagesAcrossText,
 				ThisAspect.ZoomLabel, ThisAspect.ZoomText,
-			ThisAspect.PagesDownLabel, ThisAspect.PagesDownText, ThisAspect.NewPagePerRRCheck])
+			ThisAspect.PagesDownLabel, ThisAspect.PagesDownText, ThisAspect.NewPagePerRRCheck]))
 		# make Style box and widgets
 		ThisAspect.StyleBox = UIWidgetItem(StyleBoxSizer, HideMethod=lambda : StyleBoxSizer.ShowItems(False),
 			ShowMethod=lambda : StyleBoxSizer.ShowItems(True), ColLoc=0, ColSpan=9, NewRow=True,
@@ -445,11 +472,11 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 #		ThisAspect.DepictionLabel = UIWidgetItem(wx.StaticText(MyEditPanel, -1,
 #			_('Fault tree depiction')),
 #			YGap=20, ColLoc=0, ColSpan=2, Font=Fonts['SmallHeadingFont'], NewRow=True)
-		display_utilities.PopulateSizer(Sizer=StyleBoxSubSizer, Widgets=[
+		self.TextWidgets.extend(display_utilities.PopulateSizer(Sizer=StyleBoxSubSizer, Widgets=[
 			ThisAspect.FontLabel, ThisAspect.FontChoice, ThisAspect.ConnectorsAcrossPagesCheck,
 			ThisAspect.DateLabel, ThisAspect.DateChoice, ThisAspect.CombineRRsCheck,
 			ThisAspect.CannotCalculateLabel, ThisAspect.CannotCalculateText,
-			ThisAspect.ExpandGatesCheck, ThisAspect.BlackWhiteCheck])
+			ThisAspect.ExpandGatesCheck, ThisAspect.BlackWhiteCheck]))
 		# make Action box and widgets
 		ThisAspect.ActionBox = UIWidgetItem(ActionBoxSizer, HideMethod=lambda : ActionBoxSizer.ShowItems(False),
 			ShowMethod=lambda : ActionBoxSizer.ShowItems(True), ColLoc=9, ColSpan=1,
@@ -622,8 +649,9 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 		# build the dialogue: prefill widgets in new aspect and activate it
 		self.DialogueAspect.Prefill(self.Proj, FT=self, SystemFontNames=self.SystemFontNames)
 		self.DialogueAspect.SetWidgetVisibility()
-		print('FR625 WidgetsToActivate: ', len(self.DialogueAspect.WidgetsToActivate))
 		self.DialogueAspect.Activate(WidgetsToActivate=self.DialogueAspect.WidgetsToActivate)
+#		self.DialogueAspect.Activate(WidgetsToActivate=self.DialogueAspect.WidgetsToActivate,
+#			TextWidgets=self.DialogueAspect.TextWidgets) %%% working here - uncomment and debug
 		# display aspect's sizer (containing all the visible widgets) in the edit panel
 		self.DisplDevice.SetSizer(self.DialogueAspect.MySizer)
 
@@ -658,8 +686,9 @@ def GetFilenamesForMultipageExport(BasePath, FileType, PagesAcross, PagesDown):
 			FieldWidth=RowsNumberingSystem.TargetFieldWidth(PagesDown))
 		for ThisCol in range(PagesAcross):
 			# if multiple columns, add sequential numbers (1, 2, 3... or 01, 02, 03...)
-			if PagesAcross > 1: SequentialPart += ColsNumberingSystem.HumanValue(TargetValue=ThisCol + 1,
+			if PagesAcross > 1: SequentialPartForCol = ColsNumberingSystem.HumanValue(TargetValue=ThisCol + 1,
 				FieldWidth=ColsNumberingSystem.TargetFieldWidth(PagesAcross))
+			else: SequentialPartForCol = ''
 			# make filepath and append to list
-			AllFilePaths.append(BasePath[:InsertIndex] + SequentialPart + BasePath[InsertIndex:])
+			AllFilePaths.append(BasePath[:InsertIndex] + SequentialPart + SequentialPartForCol + BasePath[InsertIndex:])
 	return AllFilePaths

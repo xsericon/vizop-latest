@@ -769,9 +769,11 @@ def PopulateSizer(Sizer=None, Widgets=[], ActiveWidgetList=[], DefaultFont=None,
 	# ActiveWidgetList: list to which all UIWidgetItem instances newly added to the sizer will be appended
 	# DefaultFont (wx.Font instance): font to apply to widgets, if not supplied in the UIWidgetItem
 	# HighlightBkgColour (rgb colour tuple): background colour to apply to widgets with NeedsHighlight == True
+	# returns list of text widgets to check for loss of focus in OnIdle
 	assert isinstance(Sizer, wx.GridBagSizer)
 	assert isinstance(Widgets, list)
 	assert isinstance(ActiveWidgetList, list)
+	TextWidgetsAdded = []
 	Sizer.Clear(delete_windows=False) # remove all existing widgets from sizer
 	RowBase = 0 # which row of widgets in Widgets we are filling
 	ThisRowSpan = 1 # how many sizer rows are taken up by this row of widgets
@@ -783,7 +785,6 @@ def PopulateSizer(Sizer=None, Widgets=[], ActiveWidgetList=[], DefaultFont=None,
 		if ShowThisWidget:
 			if ThisWidget.IsInSizer:
 				if ThisWidget.NewRow or GapYAdded: # start a new row (sizer also treats y-gap as a row)
-#					RowBase += ThisRowSpan  # skip forward the required number of rows
 					RowBase += 1 # skip forward the required number of rows
 					if GapYAdded:
 						RowBase += 1 # leave an empty sizer row for the GapY
@@ -819,6 +820,8 @@ def PopulateSizer(Sizer=None, Widgets=[], ActiveWidgetList=[], DefaultFont=None,
 				GapYAdded = True # flag to ensure we start new row and skip over sizer row containing gap
 			# put widget in "currently visible" list (to enable us to remove it from keyboard shortcut list when no longer needed)
 			ActiveWidgetList.append(ThisWidget)
+			# put widget in "check for loss of focus" list
+			if isinstance(ThisWidget.Widget, (wx.TextCtrl, ExpandoTextCtrl)): TextWidgetsAdded.append(ThisWidget)
 			# binding widget event handlers is now done in ActivateWidgetsInPanel, not here
 			if getattr(ThisWidget, 'GapX', 0): # add empty space to the left of this widget
 				Sizer.Add((ThisWidget.GapX, 10),
@@ -828,6 +831,7 @@ def PopulateSizer(Sizer=None, Widgets=[], ActiveWidgetList=[], DefaultFont=None,
 		else: ThisWidget.HideMe()
 #		ThisWidget.Widget.Show(ThisWidget.IsVisible)
 	Sizer.Layout() # refresh sizer
+	return TextWidgetsAdded
 
 def ChangeZoomAndPanValues(Viewport=None, Zoom=None, PanX=None, PanY=None):
 	# change the values of Zoom and Pan in Viewport (a Viewport object).
@@ -851,17 +855,17 @@ def CheckTextCtrlFocus(HostPanel):
 	# check which, if any, TextCtrl or ExpandoTextCtrl in HostPanel currently has focus, and call its handler if a TextCtrl has
 	# lost focus. We've tried using wx.EVT_KILL_FOCUS for this purpose, but Windows8.1 chokes
 	# when wx.EVT_KILL_FOCUS is raised (no similar problem in macOS since OS X 10.10).
-	# Uses HostPanel's iterable WidgActive containing UIWidget instances - no problem if WidgActive doesn't exist
+	# Uses HostPanel's iterable TextWidgActive containing UIWidget instances - no problem if TextWidgActive doesn't exist
 	# first, find out which TextCtrl or ExpandoTextCtrl is focused
-	ActiveWidgList = getattr(HostPanel, 'WidgActive', [])
-	NowFocused = ([w for w in ActiveWidgList if isinstance(w.Widget, (wx.TextCtrl, ExpandoTextCtrl))
-				   if w.Widget.HasFocus()] + [None])[0]
+	if hasattr(HostPanel, 'TextWidgActive'): print('DU860 in CheckTextCtrlFocus: panel has TextWidgActive')
+	ActiveWidgList = getattr(HostPanel, 'TextWidgActive', [])
+	NowFocused = ([w for w in ActiveWidgList if w.Widget.HasFocus()] + [None])[0]
 	# has a TextCtrl lost focus?
 	if hasattr(HostPanel, 'LastTextCtrlFocused'):
 		# get UIWidget item that had focus last time this procedure ran (only TextCtrl's)
 		LastWidget = HostPanel.LastTextCtrlFocused
 		if LastWidget: # a TextCtrl had focus before
-#			print('DU818 LastWidget, NowFocused: ', LastWidget, NowFocused)
+			print('DU818 LastWidget, NowFocused: ', LastWidget, NowFocused)
 			if (LastWidget != NowFocused) and (LastWidget in ActiveWidgList) and (LastWidget.Handler is not None)\
 					and not getattr(LastWidget, 'SkipLoseFocus', False):
 				# SkipLoseFocus means "ignore me when I lose focus"

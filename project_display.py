@@ -230,7 +230,7 @@ class ProjectInfoModelForDisplay(display_utilities.ViewportBaseClass): # object 
 		self.PaintNeeded = True # whether to execute DoRedraw() in display device's OnPaint() handler (bool)
 		self.Wipe() # initialize model-specific attribs
 		self.InitializeWidgets() # create all widgets required for display
-		self.WidgActive = [] # UIWidget objects currently on display (for use in CheckTextCtrlFocus handler)
+		self.TextWidgActive = [] # TextCtrl UIWidget objects currently on display (for use in CheckTextCtrlFocus handler)
 		self.CurrentAspect = ProjectInfoModelForDisplay.AvailAspects[0] # which set of information is currently displayed
 #		self.SetupNotebook() # set up notebook and put widgets into notebook pages
 		# set up sizer
@@ -408,10 +408,6 @@ class ProjectInfoModelForDisplay(display_utilities.ViewportBaseClass): # object 
 			getattr(WidgetObj, WidgetObj.DisplayMethod)(DataObj=self)
 
 		assert (Event is not None) or (WidgetObj is not None) # one of these args must be supplied
-		# find the data object associated with the wxwidget
-#		if Event: # these 3 lines kept in case we ever want to call this handler directly instead of via CheckTextCtrlFocus()
-#			wWidget = Event.GetEventObject()
-#			WidgetObj = [w for w in self.WidgActive if w.Widget is wWidget][0]
 		# check if value is locked
 		if WidgetObj.ReadOnly: self.HandleAttemptToWriteReadOnlyWidget(WidgetObj)
 		else: # not locked
@@ -432,7 +428,7 @@ class ProjectInfoModelForDisplay(display_utilities.ViewportBaseClass): # object 
 		if FromRowIndex != ToRowIndex:
 			# find out which grid was dragged (in case we have more than one on display)
 			GridwxWidgetID = Event.GetId()
-			GridWidget = [w for w in self.WidgActive if w.Widget.Id == GridwxWidgetID][0]
+			GridWidget = [w for w in self.WidgActive if w.Widget.Id == GridwxWidgetID][0] # FIXME not using self.WidgActive any longer
 			if GridWidget == self.UnitsGrid: # user dragged row in Units grid
 				UnitToMove = self.ProcessUnitsToDisplay[FromRowIndex]
 				# strip the unit out of its old position
@@ -479,7 +475,6 @@ class ProjectInfoModelForDisplay(display_utilities.ViewportBaseClass): # object 
 	def HandleAttemptToWriteReadOnlyWidget(self, WidgetObj): pass
 
 	def OnChangeNotebookTab(self, Event): pass
-		# don't forget to clear self.WidgActive and possibly remove bindings
 
 	def UpdateUnitListDisplay(self): # refresh unit list grid
 		self.PopulateUnitsGrid()
@@ -528,9 +523,10 @@ class ProjectInfoModelForDisplay(display_utilities.ViewportBaseClass): # object 
 					False: self.Fonts['NormalFont']}[ThisWidget.Aspect == self.CurrentAspect]
 				ThisWidget.Widget.SetFont(FontToUse)
 
-	def PopulateSizer(self, ThisSizer, WidgetList=[]):
+	def PopulateSizer(self, ThisSizer, WidgetList=[]): # currently not used
 		# populate MainSizer with widgets appropriate for the required aspect, and set values and event handlers
 		# assumes previous widgets in sizer have already been removed and hidden
+		print('DU534 in PopulateSizer')
 		RowBase = 0 # which row of widgets in WidgetList we are filling
 		ThisRowSpan = 1 # how many sizer rows are taken up by this row of widgets
 		GapYAdded = False
@@ -787,12 +783,13 @@ class EditPanelAspectItem(object): # class whose instances are aspects of the Ed
 		self.MySizer = wx.GridBagSizer(vgap=0, hgap=0) # make sizer for widgets
 
 	def Activate(self, **Args): # activate widgets for this aspect
-		print('PD790 received WidgetsToActivate: ', hasattr(Args, 'WidgetsToActivate'))
 		# if WidgetsToActivate arg is provided, activate (bind) these widgets; otherwise bind all visible widgets
-		WidgetsToActivate = getattr(Args, 'WidgetsToActivate', [w for w in self.WidgetList if w.IsVisible])
-		print('PD791 in Activate with Widgets, ActiveWidgetList: ', len(self.WidgetList), len(WidgetsToActivate))
+		# if TextWidgets arg is provided, set text widgets to check for loss of focus in OnIdle
+		WidgetsToActivate = Args.get('WidgetsToActivate', [w for w in self.WidgetList if w.IsVisible])
 		self.TopLevelFrame.ActivateWidgetsInPanel(Widgets=self.WidgetList[:], Sizer=self.MySizer,
 			ActiveWidgetList=WidgetsToActivate, **Args)
+		# set text widgets to check for loss of focus in OnIdle
+		if 'TextWidgets' in Args: self.ParentFrame.TextWidgActive = Args['TextWidgets'][:]
 
 	def Deactivate(self, Widgets=[], **Args): # deactivate widgets for this aspect
 		self.TopLevelFrame.DeactivateWidgetsInPanel(Widgets=Widgets, **Args)

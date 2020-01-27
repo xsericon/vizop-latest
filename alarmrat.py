@@ -892,7 +892,6 @@ class AlarmList(display_utilities.ViewportBaseClass): # object containing all da
 		Sizer1.Add(Sizer2)
 		Sizer1.Add(Sizer3)
 
-		self.WidgActive = [] # list of widgets currently visible in Sizer2. Not currently used
 		# Make all the widgets for Sizer2
 		# In Vizop, all widgets in sizers are in the form of a UIWidgetItem object
 		self.MainHeaderLabel = UIWidgetItem(wx.StaticText(self.DisplDevice, -1, ''),
@@ -922,7 +921,7 @@ class AlarmList(display_utilities.ViewportBaseClass): # object containing all da
 			self.FiltersLabel]
 		display_utilities.PopulateSizer(Sizer=Sizer2, Widgets=Sizer2Widgets, ActiveWidgetList=self.WidgActive,
 			DefaultFont=MyControlFrame.Fonts['NormalWidgetFont'],
-			HighlightBkgColour=self.ColScheme.BackHighlight)
+			HighlightBkgColour=self.ColScheme.BackHighlight) # TODO: put text widgets into self.TextWidgActive
 
 		# populate Sizer3
 		Sizer3.Add(Sizer4)
