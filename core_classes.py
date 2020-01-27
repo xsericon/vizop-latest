@@ -3,9 +3,9 @@
 # contains class definitions of basic objects used throughout Vizop
 
 # library modules
-from __future__ import division # makes a/b yield exact, not truncated, result. Must be 1st import
+# from __future__ import division # makes a/b yield exact, not truncated, result. Must be 1st import. No longer needed
 import wx # provides basic GUI functions
-import copy
+import copy, math
 import xml.etree.ElementTree as ElementTree # XML handling
 
 # other vizop modules required here
@@ -1464,13 +1464,22 @@ class SerialNumberChunkItem(object):  # a chunk in a NumberingItem instance, tha
 
 class NumberSystem(object):  # superclass of numbering systems such as 1/2/3, a/b/c, I/II/III
 	# Only classes are invoked, not instances, so there's no __init__ method
-	pass
+	@classmethod
+	def TargetFieldWidth(cls, MaxValue=0):
+		# returns no of digits corresponding to MaxValue. e.g. ArabicNumberSystem.TargetFieldWidth(10) returns 2.
+		# For MaxValue == 0, returns 1.
+		# If MaxValue < 0, considers abs(MaxValue) only, i.e. no allowance for '-' sign.
+		# Overridden for RomanNumberSystem
+		assert isinstance(MaxValue, int)
+		if MaxValue == 0: return 1
+		else: return int(math.log(abs(MaxValue) - int(not cls.HasZero)) // cls.LogDigits) + 1
 
 
 class ArabicNumberSystem(NumberSystem):  # decimal number system using 0/1/2...
 
 	HumanName = _('Arabic (1, 2...)')  # human-readable name of the numbering system
 	Digits = '0 1 2 3 4 5 6 7 8 9'.split()
+	LogDigits = math.log(len(Digits))
 	MinValue = 0  # min and max acceptable value in terms of int equivalent
 	MaxValue = 9999
 	StartIndex = 1  # digits in higher placeholders (not the 'units' digit) start from index 1 (eg ten = 10 not 00)
@@ -1511,12 +1520,14 @@ class SequenceNumberSystem(NumberSystem):  # number system using any sequence of
 class LowerCaseLetterNumberSystem(SequenceNumberSystem): # number system using a/b/c...
 	HumanName = _('Lower case (a, b...)')
 	Digits = [chr(x) for x in range(ord('a'), ord('z') + 1)]
+	LogDigits = math.log(len(Digits))
 	Base = len(Digits)
 	MinValue = 1
 
 class UpperCaseLetterNumberSystem(SequenceNumberSystem): # number system using A/B/C...
 	HumanName = _('Upper case (A, B...)')
 	Digits = [chr(x) for x in range(ord('A'), ord('Z') + 1)]
+	LogDigits = math.log(len(Digits))
 	Base = len(Digits)
 	MinValue = 1
 
@@ -1542,6 +1553,16 @@ class RomanNumberSystem(NumberSystem):
 		HowManyUnits = Remainder - (10 * HowManyTens)
 		Units = cls.UnitSequence[HowManyUnits]
 		return utilities.Pad(Thousands + Hundreds + Tens + Units, FieldWidth=FieldWidth, PadChar=cls.PadChar)
+
+	@classmethod
+	def TargetFieldWidth(cls, MaxValue=0):
+		# returns no of digits corresponding to MaxValue. e.g. TargetFieldWidth(16) returns 4, because the longest
+		# number in the range 1..16 is 8 (VIII), which has 4 digits.
+		# For MaxValue == 0, returns 1.
+		# If MaxValue < 0, considers abs(MaxValue) only, i.e. no allowance for '-' sign.
+		assert isinstance(MaxValue, int)
+		if MaxValue == 0: return 1
+		else: return max([len(cls.HumanValue(n)) for n in range(1, abs(MaxValue) + 1)])
 
 class UpperCaseRomanNumberSystem(RomanNumberSystem):
 	HumanName = _('Roman (I, II...)')
@@ -1803,17 +1824,20 @@ class ChoiceItem(object): # represents an item in a group of items the user can 
 
 class ImageFileType(object): # type of file that can be offered for image export
 
-	def __init__(self, HumanName='', Extension=''):
+	def __init__(self, HumanName='', Extension='', SupportsMultiPage=False):
+		# SupportsMultiPage: whether the file can contain more than one page
 		assert isinstance(HumanName, str)
 		assert isinstance(Extension, str)
+		assert isinstance(SupportsMultiPage, bool)
 		object.__init__(self)
 		self.HumanName = HumanName
 		self.Extension = Extension
+		self.SupportsMultiPage = SupportsMultiPage
 
-PDFFileType = ImageFileType(HumanName='PDF', Extension='pdf')
-JPGFileType = ImageFileType(HumanName='JPG', Extension='jpg')
-PNGFileType = ImageFileType(HumanName='PNG', Extension='png')
-TIFFFileType = ImageFileType(HumanName='TIFF', Extension='tiff')
+PDFFileType = ImageFileType(HumanName='PDF', Extension='pdf', SupportsMultiPage=True)
+JPGFileType = ImageFileType(HumanName='JPG', Extension='jpg', SupportsMultiPage=False)
+PNGFileType = ImageFileType(HumanName='PNG', Extension='png', SupportsMultiPage=False)
+TIFFFileType = ImageFileType(HumanName='TIFF', Extension='tiff', SupportsMultiPage=False)
 # file types to be offered for image file exports
 ImageFileTypesSupported = [PDFFileType, JPGFileType, PNGFileType, TIFFFileType]
 # check default is one of these

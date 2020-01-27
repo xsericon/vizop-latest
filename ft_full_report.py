@@ -27,8 +27,16 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 
 	class FTFullExportDialogueAspect(project_display.EditPanelAspectItem):
 
-		def OnFilenameTextWidget(self, Event): pass # write name back into Proj.FTFullExportFilename
-		def OnSelectButton(self, Event): pass
+		def OnFilenameTextWidget(self, Event):
+			# for testing
+			print('FR32 filenames to use: ', GetFilenamesForMultipageExport(self.FilenameText.Widget.GetValue(),
+				core_classes.ImageFileTypesSupported.index(self.FileTypeChoice.Widget.GetSelection)), 3, 4)
+			# write name back into Proj.FTFullExportFilename
+		def OnSelectButton(self, Event):
+			# for testing
+			print('FR32 filenames to use: ', GetFilenamesForMultipageExport(self.FilenameText.Widget.GetValue(),
+				core_classes.ImageFileTypesSupported.index(self.FileTypeChoice.Widget.GetSelection)), 3, 4)
+
 		def OnFileTypeChoice(self, Event): pass # write name back into Proj.FTFullExportFileType
 		def OnOverwriteCheck(self, Event): # handle click on Overwrite checkbox: store overwrite option
 			self.Overwrite = self.OverwriteCheck.Widget.GetValue()
@@ -485,6 +493,28 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 #			ThisAspect.ExpandGatesCheck, ThisAspect.DateLabel, ThisAspect.DateChoice,
 			ThisAspect.ActionBox]
 #			ThisAspect.CancelButton, ThisAspect.GoButton]
+		# make list of widgets that need to be bound to their handlers in ActivateWidgetsInPanel()
+		ThisAspect.WidgetsToActivate = [ThisAspect.FilenameLabel, ThisAspect.FilenameText, ThisAspect.SelectButton,
+			ThisAspect.FileTypeLabel,
+			ThisAspect.FileTypeChoice, ThisAspect.OverwriteCheck,
+			ThisAspect.FilenameStatusMessage,
+			ThisAspect.ExportWhatLabel, ThisAspect.ShowHeaderCheck, ThisAspect.ShowFTCheck, ThisAspect.ShowOnlySelectedCheck,
+			ThisAspect.PageSizeLabel, ThisAspect.PageSizeChoice, ThisAspect.PortraitRadio, ThisAspect.LandscapeRadio,
+			ThisAspect.MarginLabel, ThisAspect.TopMarginLabel, ThisAspect.TopMarginText, ThisAspect.PageNumberingLabel,
+			ThisAspect.PageNumberTopRadio, ThisAspect.PageNumberLeftRadio,
+			ThisAspect.BottomMarginLabel, ThisAspect.BottomMarginText, ThisAspect.PageNumberBottomRadio,
+			ThisAspect.PageNumberCentreRadio,
+			ThisAspect.LeftMarginLabel, ThisAspect.LeftMarginText, ThisAspect.PageNumberNoneRadio,
+			ThisAspect.PageNumberRightRadio,
+			ThisAspect.RightMarginLabel, ThisAspect.RightMarginText,
+			ThisAspect.HowManyPagesLabel, ThisAspect.PagesAcrossLabel, ThisAspect.PagesAcrossText,
+			ThisAspect.PagesDownLabel, ThisAspect.PagesDownText, ThisAspect.NewPagePerRRCheck,
+			ThisAspect.ZoomLabel, ThisAspect.ZoomText,
+			ThisAspect.BlackWhiteCheck, ThisAspect.FontLabel, ThisAspect.FontChoice,
+			ThisAspect.ConnectorsAcrossPagesCheck, ThisAspect.CommentsCheck, ThisAspect.ActionsCheck, ThisAspect.ParkingCheck,
+			ThisAspect.CannotCalculateLabel, ThisAspect.CannotCalculateText, ThisAspect.CombineRRsCheck,
+			ThisAspect.ExpandGatesCheck, ThisAspect.DateLabel, ThisAspect.DateChoice,
+			ThisAspect.CancelButton, ThisAspect.GoButton]
 		return MyEditPanel.FTFullExportAspect
 
 	def GetPageCountInfo(self, Zoom, ShowHeader, ShowFT, ShowOnlySelected, PageSizeLongAxis, PageSizeShortAxis, Orientation,
@@ -592,13 +622,44 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 		# build the dialogue: prefill widgets in new aspect and activate it
 		self.DialogueAspect.Prefill(self.Proj, FT=self, SystemFontNames=self.SystemFontNames)
 		self.DialogueAspect.SetWidgetVisibility()
-		self.DialogueAspect.Activate()
+		print('FR625 WidgetsToActivate: ', len(self.DialogueAspect.WidgetsToActivate))
+		self.DialogueAspect.Activate(WidgetsToActivate=self.DialogueAspect.WidgetsToActivate)
 		# display aspect's sizer (containing all the visible widgets) in the edit panel
 		self.DisplDevice.SetSizer(self.DialogueAspect.MySizer)
 
 	def RenderInDC(self, TargetDC, FullRefresh=True, **Args): pass
 		# nothing to do here - this Viewport doesn't draw in a DC - we need this stub to override the superclass's method
 
-# next to do:
-# Build "destroy Viewport" function so that we can revert to the previous Viewport.
-# Already added self.ViewportToRevertTo attrib to the Viewport object.
+def GetFilenamesForMultipageExport(BasePath, FileType, PagesAcross, PagesDown):
+	# return list of complete file paths (str) for a multipage export. See spec 392 for details
+	# BasePath (str): full path of the filename without the sequential part
+	# FileType (ImageFileType instance)
+	# PagesAcross, PagesDown (2 x int): how many filenames required in X and Y directions; at least one must be >1
+	assert isinstance(BasePath, str)
+	assert isinstance(FileType, core_classes.ImageFileType)
+	assert isinstance(PagesAcross, int)
+	assert isinstance(PagesDown, int)
+	assert PagesAcross > 0
+	assert PagesDown > 0
+	assert PagesAcross + PagesDown > 1
+	RowsNumberingSystem = core_classes.UpperCaseLetterNumberSystem
+	ColsNumberingSystem = core_classes.ArabicNumberSystem
+	# First, find out where to insert the sequential part into BasePath
+	# check if BasePath ends with its expected extension (e.g. jpg for a JPG file; case insensitive) preceded by
+	# extension separator (usually '.')
+	LenExtension = len(FileType.Extension)
+	HasExpectedExtension = BasePath[-(LenExtension + 1):].upper() == os.extsep + FileType.Extension.upper()
+	InsertIndex = len(BasePath) - len(FileType.Extension) - 1 if HasExpectedExtension else len(BasePath)
+	AllFilePaths = [] # to contain all resulting file paths
+	for ThisRow in range(PagesDown):
+		SequentialPart = '-'
+		# if multiple rows, add sequential letters (A, B, C... or AA, AB, AC...)
+		if PagesDown > 1: SequentialPart += RowsNumberingSystem.HumanValue(TargetValue=ThisRow + 1,
+			FieldWidth=RowsNumberingSystem.TargetFieldWidth(PagesDown))
+		for ThisCol in range(PagesAcross):
+			# if multiple columns, add sequential numbers (1, 2, 3... or 01, 02, 03...)
+			if PagesAcross > 1: SequentialPart += ColsNumberingSystem.HumanValue(TargetValue=ThisCol + 1,
+				FieldWidth=ColsNumberingSystem.TargetFieldWidth(PagesAcross))
+			# make filepath and append to list
+			AllFilePaths.append(BasePath[:InsertIndex] + SequentialPart + BasePath[InsertIndex:])
+	return AllFilePaths

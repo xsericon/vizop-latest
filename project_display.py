@@ -787,9 +787,12 @@ class EditPanelAspectItem(object): # class whose instances are aspects of the Ed
 		self.MySizer = wx.GridBagSizer(vgap=0, hgap=0) # make sizer for widgets
 
 	def Activate(self, **Args): # activate widgets for this aspect
-#		Proj = self.ParentFrame.CurrentProj
+		print('PD790 received WidgetsToActivate: ', hasattr(Args, 'WidgetsToActivate'))
+		# if WidgetsToActivate arg is provided, activate (bind) these widgets; otherwise bind all visible widgets
+		WidgetsToActivate = getattr(Args, 'WidgetsToActivate', [w for w in self.WidgetList if w.IsVisible])
+		print('PD791 in Activate with Widgets, ActiveWidgetList: ', len(self.WidgetList), len(WidgetsToActivate))
 		self.TopLevelFrame.ActivateWidgetsInPanel(Widgets=self.WidgetList[:], Sizer=self.MySizer,
-			ActiveWidgetList=[w for w in self.WidgetList if w.IsVisible], **Args)
+			ActiveWidgetList=WidgetsToActivate, **Args)
 
 	def Deactivate(self, Widgets=[], **Args): # deactivate widgets for this aspect
 		self.TopLevelFrame.DeactivateWidgetsInPanel(Widgets=Widgets, **Args)

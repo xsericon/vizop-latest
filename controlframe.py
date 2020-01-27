@@ -1633,6 +1633,7 @@ class ControlFrame(wx.Frame):
 				self.NotebookPage.SetSizer(self.MySizer)
 
 			def Activate(self, **Args): # activate widgets for this aspect
+				print('CF1636 in Activate')
 				Proj = self.ParentFrame.CurrentProj
 				self.TopLevelFrame.ActivateWidgetsInPanel(Widgets=self.WidgetList, Sizer=self.MySizer,
 					ActiveWidgetList=[w for w in self.WidgetList if w.IsVisible], **Args)

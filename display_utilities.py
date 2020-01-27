@@ -581,7 +581,6 @@ class UIWidgetItem(object):
 			# sizers need a method other than self.Hide(). The getattr is needed because, unfortunately,
 			# get() evaluates its 2nd arg even when not required
 		self.ShowMe = Attrs.get('ShowMethod', getattr(self.Widget, 'Show', None)) # get method to show widget
-		if isinstance(self.Widget, wx.StaticBoxSizer): print('DU580 has arg SetFontMethod', 'SetFontMethod' in Attrs, Attrs.get('SetFontMethod'))
 		self.SetFontMethod = Attrs.get('SetFontMethod', getattr(self.Widget, 'SetFont', None))
 		self.HideMe()
 		self.IsInSizer = Attrs.get('IsInSizer', True)
