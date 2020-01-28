@@ -27,7 +27,7 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 
 	class FTFullExportDialogueAspect(project_display.EditPanelAspectItem):
 
-		def OnFilenameTextWidget(self, Event):
+		def OnFilenameTextWidget(self, Event=None, WidgetObj=None):
 			# get filename stub provided by user
 			UserFilenameStub = self.FilenameText.Widget.GetValue().strip()
 			# get all actual filenames to use, based on this stub%%%
@@ -35,9 +35,11 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 				FileType=core_classes.ImageFileTypesSupported[self.FileTypeChoice.Widget.GetSelection()],
 				PagesAcross=self.PageCountInfo['PagesAcrossCount'], PagesDown=self.PageCountInfo['PagesDownCount'])
 			print('FR37 filenames to use: ', ActualFilenames)
-			# update filename status text
-			# for testing
-			# write name back into Proj.FTFullExportFilename
+			# update filename status text, Go button status etc
+			FilenameStatus = self.UpdateWidgetStatus()
+			# write name back into Proj.FTFullExportFilename, if filename is usable
+			if FilenameStatus not in ['CannotWrite', 'NoAccess', 'Other']:
+				pass # TODO; need to send a RQ
 
 		def OnSelectButton(self, Event):
 			# for testing
@@ -54,24 +56,24 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 		def OnPageSizeChoice(self, Event): pass
 		def OnPortraitRadio(self, Event): pass
 		def OnLandscapeRadio(self, Event): pass
-		def OnMarginTextCtrl(self, Event): pass
+		def OnMarginTextCtrl(self, Event=None, WidgetObj=None): pass
 		def OnPageNumberTopRadio(self, Event): pass
 		def OnPageNumberBottomRadio(self, Event): pass
 		def OnPageNumberNoneRadio(self, Event): pass
 		def OnPageNumberLeftRadio(self, Event): pass
 		def OnPageNumberCentreRadio(self, Event): pass
 		def OnPageNumberRightRadio(self, Event): pass
-		def OnPagesAcrossTextCtrl(self, Event): pass
-		def OnPagesDownTextCtrl(self, Event): pass
+		def OnPagesAcrossTextCtrl(self, Event=None, WidgetObj=None): pass
+		def OnPagesDownTextCtrl(self, Event=None, WidgetObj=None): pass
 		def OnNewPagePerRRCheck(self, Event): pass
-		def OnZoomTextCtrl(self, Event): pass
+		def OnZoomTextCtrl(self, Event=None, WidgetObj=None): pass
 		def OnBlackWhiteCheck(self, Event): pass
 		def OnFontChoice(self, Event): pass
 		def OnConnectorsAcrossPagesCheck(self, Event): pass
 		def OnCommentsCheck(self, Event): pass
 		def OnActionsCheck(self, Event): pass
 		def OnParkingCheck(self, Event): pass
-		def OnCannotCalculateTextCtrl(self, Event): pass
+		def OnCannotCalculateTextCtrl(self, Event=None, WidgetObj=None): pass
 		def OnCombineRRsCheck(self, Event): pass
 		def OnExpandGatesCheck(self, Event): pass
 		def OnDateChoice(self, Event): pass
@@ -195,6 +197,7 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 		def UpdateFilenameStatusMessage(self, UserFilePath='', ActualFilePathsToUse=[]):
 			# update filename status message widget text based UserFilePath (str; what's currently in the Filename
 			# text box) and ActualFilePathsToUse (list; all file paths to use for multipage export)
+			# return FilenameStatus (str)
 			assert isinstance(UserFilePath, str)
 			# check status of each item in ActualFilePathsToUse, if any
 			PathStati = []
@@ -257,6 +260,7 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 				ActualFilePathsToUse=ActualFilenames)
 			# set status of Go button
 			self.GoButton.Widget.Enable(FilenameStatus in ['ReadyToMakeNewFile', 'ReadyToOverwrite'])
+			return FilenameStatus
 
 
 		def __init__(self, InternalName, ParentFrame, TopLevelFrame):
@@ -272,10 +276,10 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 		# DateChoices (list of ChoiceItem): options for date to show in FT
 		# return the aspect
 		# make basic attribs needed for the aspect
-		self.TextWidgets = []
 		MyEditPanel.FTFullExportAspect = FTFullExportViewport.FTFullExportDialogueAspect(InternalName='FTFullExport',
 			ParentFrame=MyEditPanel, TopLevelFrame=MyEditPanel.TopLevelFrame)
 		ThisAspect = MyEditPanel.FTFullExportAspect
+		ThisAspect.TextWidgets = []
 		# make box sizers to contain groups of widgets
 		FileBoxSizer = wx.StaticBoxSizer(orient=wx.VERTICAL, parent=MyEditPanel, label=_('About the file to export'))
 		FileBoxSubSizer = wx.GridBagSizer(hgap=5, vgap=5)
@@ -300,10 +304,11 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 		ThisAspect.FileBox = UIWidgetItem(FileBoxSizer, HideMethod=lambda : FileBoxSizer.ShowItems(False),
 			ShowMethod=lambda : FileBoxSizer.ShowItems(True), ColLoc=0, ColSpan=5, NewRow=True,
 			SetFontMethod=lambda f: FileBoxSizer.GetStaticBox().SetFont, Font=Fonts['SmallHeadingFont'])
-		ThisAspect.FilenameLabel = UIWidgetItem(wx.StaticText(MyEditPanel, -1, _('Filename stub:'), style=wx.ALIGN_RIGHT),
-			ColLoc=0, ColSpan=1, RowSpan=2, Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_RIGHT)
-		ThisAspect.FilenameText = UIWidgetItem(wx.TextCtrl(MyEditPanel, -1, style=wx.TE_PROCESS_ENTER | wx.TE_MULTILINE),
-			MinSizeY=50, Events=[wx.EVT_TEXT_ENTER], Handler=ThisAspect.OnFilenameTextWidget, GapX=5,
+		ThisAspect.FilenameLabel = UIWidgetItem(wx.StaticText(MyEditPanel, -1, _('Filename stub:'),
+			style=wx.ALIGN_RIGHT | wx.ALIGN_CENTER_VERTICAL),
+			ColLoc=0, ColSpan=1, Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_RIGHT)
+		ThisAspect.FilenameText = UIWidgetItem(wx.TextCtrl(MyEditPanel, -1, style=wx.TE_PROCESS_ENTER),
+			MinSizeY=25, Events=[wx.EVT_TEXT_ENTER], Handler=ThisAspect.OnFilenameTextWidget, GapX=5,
 			Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_LEFT | wx.EXPAND,
 			MinSizeX=300, ColLoc=2, ColSpan=1, DisplayMethod='StaticFromText')
 		ThisAspect.SelectButton = UIWidgetItem(wx.Button(MyEditPanel, -1, _('Select')),
@@ -319,7 +324,7 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 		ThisAspect.FilenameStatusMessage = UIWidgetItem(wx.StaticText(MyEditPanel, -1, ''),
 			ColLoc=2, ColSpan=3, Font=Fonts['BoldFont'], NewRow=True)
 		# add widgets to FileBoxSubSizer, and populate list of text widgets
-		self.TextWidgets.extend(display_utilities.PopulateSizer(Sizer=FileBoxSubSizer, Widgets=[ThisAspect.FilenameLabel,
+		ThisAspect.TextWidgets.extend(display_utilities.PopulateSizer(Sizer=FileBoxSubSizer, Widgets=[ThisAspect.FilenameLabel,
 			ThisAspect.FilenameText, ThisAspect.SelectButton, ThisAspect.FileTypeLabel, ThisAspect.FileTypeChoice,
 			ThisAspect.OverwriteCheck, ThisAspect.FilenameStatusMessage]))
 		# widgets in "scope" box
@@ -343,7 +348,7 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 		ThisAspect.ParkingCheck = UIWidgetItem(wx.CheckBox(MyEditPanel, -1, _('Parking lot items')),
 			Handler=ThisAspect.OnParkingCheck, Events=[wx.EVT_CHECKBOX], ColLoc=3, ColSpan=1)
 		# add widgets to FileBoxSubSizer
-		self.TextWidgets.extend(display_utilities.PopulateSizer(Sizer=ScopeBoxSubSizer, Widgets=[ThisAspect.ExportWhatLabel,
+		ThisAspect.TextWidgets.extend(display_utilities.PopulateSizer(Sizer=ScopeBoxSubSizer, Widgets=[ThisAspect.ExportWhatLabel,
 			ThisAspect.ShowHeaderCheck, ThisAspect.ShowFTCheck, ThisAspect.ShowOnlySelectedCheck,
 			ThisAspect.IncludeWhatLabel, ThisAspect.CommentsCheck, ThisAspect.ActionsCheck, ThisAspect.ParkingCheck]))
 		# widgets in "page layout" box
@@ -426,7 +431,7 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 			Handler=ThisAspect.OnNewPagePerRRCheck, Events=[wx.EVT_CHECKBOX], ColLoc=3, ColSpan=3,
 			Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_RIGHT)
 		# add widgets to PageLayoutBoxSubSizer
-		self.TextWidgets.extend(display_utilities.PopulateSizer(Sizer=PageLayoutBoxSubSizer, Widgets=[ThisAspect.PageSizeLabel,
+		ThisAspect.TextWidgets.extend(display_utilities.PopulateSizer(Sizer=PageLayoutBoxSubSizer, Widgets=[ThisAspect.PageSizeLabel,
 			ThisAspect.PageSizeChoice, ThisAspect.PortraitRadio, ThisAspect.LandscapeRadio,
 			ThisAspect.MarginLabel, ThisAspect.TopMarginLabel, ThisAspect.TopMarginText,
 			ThisAspect.BottomMarginLabel, ThisAspect.BottomMarginText, ThisAspect.PageNumberingLabel,
@@ -472,7 +477,7 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 #		ThisAspect.DepictionLabel = UIWidgetItem(wx.StaticText(MyEditPanel, -1,
 #			_('Fault tree depiction')),
 #			YGap=20, ColLoc=0, ColSpan=2, Font=Fonts['SmallHeadingFont'], NewRow=True)
-		self.TextWidgets.extend(display_utilities.PopulateSizer(Sizer=StyleBoxSubSizer, Widgets=[
+		ThisAspect.TextWidgets.extend(display_utilities.PopulateSizer(Sizer=StyleBoxSubSizer, Widgets=[
 			ThisAspect.FontLabel, ThisAspect.FontChoice, ThisAspect.ConnectorsAcrossPagesCheck,
 			ThisAspect.DateLabel, ThisAspect.DateChoice, ThisAspect.CombineRRsCheck,
 			ThisAspect.CannotCalculateLabel, ThisAspect.CannotCalculateText,
@@ -649,9 +654,9 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 		# build the dialogue: prefill widgets in new aspect and activate it
 		self.DialogueAspect.Prefill(self.Proj, FT=self, SystemFontNames=self.SystemFontNames)
 		self.DialogueAspect.SetWidgetVisibility()
-		self.DialogueAspect.Activate(WidgetsToActivate=self.DialogueAspect.WidgetsToActivate)
-#		self.DialogueAspect.Activate(WidgetsToActivate=self.DialogueAspect.WidgetsToActivate,
-#			TextWidgets=self.DialogueAspect.TextWidgets) %%% working here - uncomment and debug
+#		self.DialogueAspect.Activate(WidgetsToActivate=self.DialogueAspect.WidgetsToActivate)
+		self.DialogueAspect.Activate(WidgetsToActivate=self.DialogueAspect.WidgetsToActivate,
+			TextWidgets=self.DialogueAspect.TextWidgets)
 		# display aspect's sizer (containing all the visible widgets) in the edit panel
 		self.DisplDevice.SetSizer(self.DialogueAspect.MySizer)
 
