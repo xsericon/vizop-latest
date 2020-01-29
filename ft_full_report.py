@@ -56,7 +56,7 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 		def OnPageSizeChoice(self, Event): pass
 		def OnPortraitRadio(self, Event): pass
 		def OnLandscapeRadio(self, Event): pass
-		def OnMarginTextCtrl(self, Event=None, WidgetObj=None): pass
+		def OnMarginTextCtrl(self, Event=None, WidgetObj=None): pass # need to write legal value into self.Margins{}
 		def OnPageNumberTopRadio(self, Event): pass
 		def OnPageNumberBottomRadio(self, Event): pass
 		def OnPageNumberNoneRadio(self, Event): pass
@@ -66,7 +66,7 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 		def OnPagesAcrossTextCtrl(self, Event=None, WidgetObj=None): pass
 		def OnPagesDownTextCtrl(self, Event=None, WidgetObj=None): pass
 		def OnNewPagePerRRCheck(self, Event): pass
-		def OnZoomTextCtrl(self, Event=None, WidgetObj=None): pass
+		def OnZoomTextCtrl(self, Event=None, WidgetObj=None): pass # need to write legal value to self.Zoom
 		def OnBlackWhiteCheck(self, Event): pass
 		def OnFontChoice(self, Event): pass
 		def OnConnectorsAcrossPagesCheck(self, Event): pass
@@ -82,7 +82,41 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 		def OnGoButton(self, Event):
 			print('FR64 in go button handler')
 			self.DoExportFTToFile()
+			self.StoreAttribsInProject()
 
+		def StoreAttribsInProject(self):
+			# send request to datacore to store parameters in project
+			ThisAspect = self.DisplDevice.MyEditPanel.FTFullExportAspect
+			# make string containing labels of parts of FT to be exported, e.g. 'Header,FT'
+			ShowWhat = ','.join([w.XMLLabel for w in [ThisAspect.ShowHeaderCheck, ThisAspect.ShowFTCheck,
+				ThisAspect.ShowOnlySelectedCheck] if w.Widget.IsChecked()])
+			# make string containing labels of page number positions, e.g. 'Top,Left'
+			PageNumberWhere = ','.join([w.XMLLabel for w in [ThisAspect.PageNumberBottomRadio, ThisAspect.PageNumberCentreRadio,
+				ThisAspect.PageNumberLeftRadio, ThisAspect.PageNumberRightRadio, ThisAspect.PageNumberTopRadio,
+				ThisAspect.PageNumberNoneRadio] if w.Widget.IsChecked()])
+			# make string containing labels of texts to be exported, e.g. 'Action,Parking'
+			ShowTexts = ','.join([w.XMLLabel for w in [ThisAspect.CommentsCheck, ThisAspect.ActionsCheck,
+				ThisAspect.ParkingCheck] if w.Widget.IsChecked()])
+			vizop_misc.SendRequest(Socket=self.C2DSocketREQ, Command='RQ_FT_UpdateFullExportAttribs',
+				Proj=self.Proj.ID, PHAObj=self.PHAObj.ID, Viewport=self.ID,
+				Filename=self.FilenameText.Widget.GetValue().strip(),
+				FileType=core_classes.ImageFileTypesSupported[self.FileTypeChoice.Widget.GetSelection()].XMLName,
+				ExportWhat=ShowWhat,
+				PageSize=core_classes.PaperSizes[ThisAspect.PageSizeChoice.Widget.GetSelection()].XMLName,
+				PaperOrientation='Portrait' if ThisAspect.PortraitRadio.IsChecked() else 'Landscape',
+				MarginLeft=self.Margins['ExportPaperLeftMargin'], MarginRight=self.Margins['ExportPaperRightMargin'],
+				MarginTop=self.Margins['ExportPaperTopMargin'], MarginBottom=self.Margins['ExportPaperBottomMargin'],
+				PageNumberLoc=PageNumberWhere,
+				Zoom=self.Zoom,
+				NewPagePerRR=utilities.Bool2Str(ThisAspect.NewPagePerRRCheck.IsChecked()),
+				Monochrome=utilities.Bool2Str(ThisAspect.BlackWhiteCheck.IsChecked()),
+				Font=self.SystemFontNames[ThisAspect.FontChoice.Widget.GetSelection()],
+				ConnectorsAcrossPageBreaks=utilities.Bool2Str(ThisAspect.ConnectorsAcrossPagesCheck.IsChecked()),
+				IncludeWhatTexts=ShowTexts,
+				CannotCalculateText=ThisAspect.CannotCalculateText.Widget.GetValue().Strip(),
+				CombineRRs=utilities.Bool2Str(ThisAspect.CombineRRsCheck.IsChecked()),
+				ExpandGates=utilities.Bool2Str(ThisAspect.ExpandGatesCheck.IsChecked()),
+				DateToShow=core_classes.DateChoices[ThisAspect.DateChoice.Widget.GetSelection()].XMLName)
 
 		def Prefill(self, Proj, FT, SystemFontNames):
 			# prefill widget values
@@ -99,9 +133,9 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 #			# set filename status message
 #			self.UpdateFilenameStatusMessage()
 			# set scope checkboxes
-			self.ShowHeaderCheck.Widget.SetValue(Proj.FTExportShowHeader)
-			self.ShowFTCheck.Widget.SetValue(Proj.FTExportShowFT)
-			self.ShowOnlySelectedCheck.Widget.SetValue(Proj.FTExportShowOnlySelected)
+			self.ShowHeaderCheck.Widget.SetValue('Header' in Proj.FTExportShowWhat)
+			self.ShowFTCheck.Widget.SetValue('FT' in Proj.FTExportShowWhat)
+			self.ShowOnlySelectedCheck.Widget.SetValue('OnlySelected' in Proj.FTExportShowWhat)
 			# set layout widget values
 			# get user's preferred paper size from config file
 			PaperSizeStr = vizop_misc.GetValueFromUserConfig('ExportPaperSize')
@@ -117,18 +151,21 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 			if PaperOrientation == 'Portrait': self.PortraitRadio.Widget.SetValue(True)
 			elif PaperOrientation == 'Landscape': self.LandscapeRadio.Widget.SetValue(True)
 			# set paper margin text boxes
-			Margins = {} # store margin values
+			self.Margins = {} # store margin values
 			for ThisWidget, ConfigName, Default in [
 					(self.TopMarginText, 'ExportPaperTopMargin', info.DefaultPaperTopMargin),
 					(self.BottomMarginText, 'ExportPaperBottomMargin', info.DefaultPaperBottomMargin),
 					(self.LeftMarginText, 'ExportPaperLeftMargin', info.DefaultPaperLeftMargin),
 					(self.RightMarginText, 'ExportPaperRightMargin', info.DefaultPaperRightMargin) ]:
-				ThisMarginStr = vizop_misc.GetValueFromUserConfig(ConfigName)
+#				ThisMarginStr = vizop_misc.GetValueFromUserConfig(ConfigName)
+				# converting to string, then back to real, to avoid problems with bad values in user-edited project file
+				ThisMarginStr = str(Proj.ExportPaperMargins.get(ConfigName, Default))
 				if ThisMarginStr == '': ThisMarginStr = Default
-				Margins[ConfigName] = utilities.str2real(ThisMarginStr, meaninglessvalue=12) # used for function call later
+				self.Margins[ConfigName] = utilities.str2real(ThisMarginStr, meaninglessvalue=12) # used for function call later
 				ThisWidget.Widget.ChangeValue(ThisMarginStr.strip())
 			# set page number location radio buttons. Expected PageNumberPos is e.g. 'Top,Left'
-			PageNumberPos = vizop_misc.GetValueFromUserConfig('ExportPageNumberPos')
+#			PageNumberPos = vizop_misc.GetValueFromUserConfig('ExportPageNumberPos')
+			PageNumberPos = Proj.ExportPageNumberLoc
 			if PageNumberPos == '': PageNumberPos = info.DefaultPaperPageNumberPos
 			for ThisWidget, Pos in [ (self.PageNumberTopRadio, 'Top'), (self.PageNumberBottomRadio, 'Bottom'),
 					(self.PageNumberLeftRadio, 'Left'), (self.PageNumberRightRadio, 'Right'),
@@ -172,15 +209,14 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 			self.NewPagePerRRCheck.Widget.SetValue(Proj.FTExportNewPagePerRR)
 			# set zoom and pages across/down value widgets. Zoom value is the last value used in this project;
 			# Pages across/down is the required number at this zoom level
-			Zoom = Proj.FTFullExportZoom
-			self.ZoomText.Widget.ChangeValue(str(Zoom))
+			self.Zoom = Proj.FTFullExportZoom
+			self.ZoomText.Widget.ChangeValue(str(self.Zoom * 100))
 			self.ZoomText.Widget.SelectAll()
-			PageCountInput = {'FT': FT, 'Zoom': Zoom, 'ShowHeader': Proj.FTExportShowHeader,
-				'ShowFT': Proj.FTExportShowFT, 'ShowOnlySelected': Proj.FTExportShowOnlySelected,
+			PageCountInput = {'FT': FT, 'Zoom': self.Zoom, 'ShowWhat': Proj.FTExportShowWhat,
 				'PageSizeLongAxis': TargetPaperSize.SizeLongAxis, 'PageSizeShortAxis': TargetPaperSize.SizeShortAxis,
-				'Orientation': PaperOrientation, 'TopMargin': Margins['ExportPaperTopMargin'],
-				'BottomMargin': Margins['ExportPaperBottomMargin'],
-				'LeftMargin': Margins['ExportPaperLeftMargin'], 'RightMargin': Margins['ExportPaperRightMargin'],
+				'Orientation': PaperOrientation, 'TopMargin': self.Margins['ExportPaperTopMargin'],
+				'BottomMargin': self.Margins['ExportPaperBottomMargin'],
+				'LeftMargin': self.Margins['ExportPaperLeftMargin'], 'RightMargin': self.Margins['ExportPaperRightMargin'],
 				'PageNumberPos': PageNumberPos, 'FirstPageNumber': 1, 'PageCountToShow': 'Auto',
 				'NewPagePerRR': Proj.FTExportNewPagePerRR, 'Font': FontNameToUse,
 				'ConnectorsAcrossPages': Proj.FTConnectorsAcrossPages,
@@ -250,7 +286,7 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 			for ThisWidget in self.WidgetList: ThisWidget.IsVisible = True
 
 		def UpdateWidgetStatus(self):
-			# update enabled/disabled status of all widgets%%%
+			# update enabled/disabled status of all widgets
 			# First, get a list of all actual filenames to use for multipage export
 			UserFilenameStub = self.FilenameText.Widget.GetValue().strip()
 			ActualFilenames = GetFilenamesForMultipageExport(BasePath=UserFilenameStub,
@@ -334,19 +370,19 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 		ThisAspect.ExportWhatLabel = UIWidgetItem(wx.StaticText(MyEditPanel, -1, _('Export what:')),
 			ColLoc=0, ColSpan=1, Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_RIGHT)
 		ThisAspect.ShowHeaderCheck = UIWidgetItem(wx.CheckBox(MyEditPanel, -1, _('Header block')),
-			Handler=ThisAspect.OnShowHeaderCheck, Events=[wx.EVT_CHECKBOX], ColLoc=1, ColSpan=1)
+			Handler=ThisAspect.OnShowHeaderCheck, Events=[wx.EVT_CHECKBOX], ColLoc=1, ColSpan=1, XMLLabel='Header')
 		ThisAspect.ShowFTCheck = UIWidgetItem(wx.CheckBox(MyEditPanel, -1, _('Fault tree')),
-			Handler=ThisAspect.OnShowFTCheck, Events=[wx.EVT_CHECKBOX], ColLoc=2, ColSpan=1)
+			Handler=ThisAspect.OnShowFTCheck, Events=[wx.EVT_CHECKBOX], ColLoc=2, ColSpan=1, XMLLabel='FT')
 		ThisAspect.ShowOnlySelectedCheck = UIWidgetItem(wx.CheckBox(MyEditPanel, -1, _('Selected elements only')),
-			Handler=ThisAspect.OnShowSelectedCheck, Events=[wx.EVT_CHECKBOX], ColLoc=3, ColSpan=1)
+			Handler=ThisAspect.OnShowSelectedCheck, Events=[wx.EVT_CHECKBOX], ColLoc=3, ColSpan=1, XMLLabel='OnlySelected')
 		ThisAspect.IncludeWhatLabel = UIWidgetItem(wx.StaticText(MyEditPanel, -1, _('Include:')), NewRow=True,
 			ColLoc=0, ColSpan=1, Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_RIGHT)
 		ThisAspect.CommentsCheck = UIWidgetItem(wx.CheckBox(MyEditPanel, -1, _('Comments')),
-			Handler=ThisAspect.OnCommentsCheck, Events=[wx.EVT_CHECKBOX], ColLoc=1, ColSpan=1)
+			Handler=ThisAspect.OnCommentsCheck, Events=[wx.EVT_CHECKBOX], ColLoc=1, ColSpan=1, XMLLabel='Comments')
 		ThisAspect.ActionsCheck = UIWidgetItem(wx.CheckBox(MyEditPanel, -1, _('Action items')),
-			Handler=ThisAspect.OnActionsCheck, Events=[wx.EVT_CHECKBOX], ColLoc=2, ColSpan=1)
+			Handler=ThisAspect.OnActionsCheck, Events=[wx.EVT_CHECKBOX], ColLoc=2, ColSpan=1, XMLLabel='ActionItems')
 		ThisAspect.ParkingCheck = UIWidgetItem(wx.CheckBox(MyEditPanel, -1, _('Parking lot items')),
-			Handler=ThisAspect.OnParkingCheck, Events=[wx.EVT_CHECKBOX], ColLoc=3, ColSpan=1)
+			Handler=ThisAspect.OnParkingCheck, Events=[wx.EVT_CHECKBOX], ColLoc=3, ColSpan=1, XMLLabel='ParkingLotItems')
 		# add widgets to FileBoxSubSizer
 		ThisAspect.TextWidgets.extend(display_utilities.PopulateSizer(Sizer=ScopeBoxSubSizer, Widgets=[ThisAspect.ExportWhatLabel,
 			ThisAspect.ShowHeaderCheck, ThisAspect.ShowFTCheck, ThisAspect.ShowOnlySelectedCheck,
@@ -549,18 +585,17 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 			ThisAspect.CancelButton, ThisAspect.GoButton]
 		return MyEditPanel.FTFullExportAspect
 
-	def GetPageCountInfo(self, Zoom, ShowHeader, ShowFT, ShowOnlySelected, PageSizeLongAxis, PageSizeShortAxis, Orientation,
+	def GetPageCountInfo(self, Zoom, ShowWhat, PageSizeLongAxis, PageSizeShortAxis, Orientation,
 		TopMargin, BottomMargin, LeftMargin, RightMargin, PageNumberPos, NewPagePerRR, Font, ConnectorsAcrossPages,
 		ShowComments, ShowActions, ShowParking, CannotCalculateText, CombineRRs, ExpandGates, DateKind, **Args):
 		# calculate the number of pages required to export the FT
+		# ShowWhat (str): what to include in the export. Contains some of 'Header', 'FT', 'OnlySelected'
 #		# FT: a faulttree.FTForDisplay instance
 		# return dict with args: PagesAcrossCount, PagesDownCount (2 x int)
 #		assert type(FT).InternalName == 'FTTreeView' # confirming it's the correct class
 		assert isinstance(Zoom, float)
 		assert self.MinZoom <= Zoom <= self.MaxZoom
-		assert isinstance(ShowHeader, bool)
-		assert isinstance(ShowFT, bool)
-		assert isinstance(ShowOnlySelected, bool)
+		assert isinstance(ShowWhat, str)
 		assert isinstance(PageSizeLongAxis, (int, float))
 		assert isinstance(PageSizeShortAxis, (int, float))
 		assert Orientation in ['Portrait', 'Landscape']

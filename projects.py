@@ -112,16 +112,18 @@ class ProjectItem(object): # class of PHA project instances
 		self.FTFullExportFileType = '' # str; must be '' or the Extension attrib of an instance of core_classes.ImageFileType
 		self.FTFullExportZoom = 1.0 # float; last zoom level used for exporting FT
 		self.FTConnectorsAcrossPages = True # in FT export, whether to draw connecting arrows at page breaks
-		self.FTExportShowPeripheral = ('Comments','Actions','Parking') # in FT export, which additional data to show
+		self.FTExportShowPeripheral = 'Comments,Actions,Parking' # in FT export, which additional texts to show
 		self.FTExportCannotCalculateText = _('Not calculated') # in FT export, what to show when value cannot be calc'd
 		self.FTExportCombineRRs = True # in FT export, combine RRs into a single FT where possible (if False, show a
 			# separate FT for each risk receptor, even if the resulting FTs are identical)
 		self.FTExportExpandGates = True # in FT export, whether to show full data in logic gates (if False, a small
 			# logic gate depiction will be shown instead)
-		self.FTExportShowHeader = True # in FT export, whether to show header block with overall data about the FT
-		self.FTExportShowFT = True # in FT export, whether to show the FT itself
-		self.FTExportShowOnlySelected = False # in FT export, whether to show only the selected elements in the FT
+		self.FTExportShowWhat = 'Header,FT' # in FT export, what sections to show; can include Header, FT, OnlySelected
 		self.FTExportNewPagePerRR = False # in FT export, whether to start a new page for each risk receptor
+		self.LastExportPageSize = core_classes.PaperSizeA4 # instance of core_classes.PaperSizes
+		self.FTExportPaperOrientation = 'Portrait'
+		self.ExportPaperMargins = {'Left': 10, 'Right': 10, 'Top': 10, 'Bottom': 10} # paper margins in mm
+		self.ExportPageNumberLoc = 'Top,Centre' # must include one of Top, Bottom, None and one of Left, Centre, Right
 		self.LastExportBlackAndWhite = False # bool; whether last export was in black and white
 		self.LastExportFontName = '' # str; system name of font used for last export, e.g. 'Arial'
 		self.LastExportPreferredDateToShow = None # ChoiceItem or None; one of the items in core_classes.DateChoices;

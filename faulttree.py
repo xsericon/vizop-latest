@@ -4209,10 +4209,41 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		elif Command == 'RQ_FT_DisconnectConnectors': # disconnect connector-in from its related connector-out
 			Reply = self.DisconnectConnector(Proj=Proj, ElementID=XMLRoot.findtext('ConnectorOut'),
 				CXInID = XMLRoot.findtext('ConnectorIn'), Viewport=SourceViewport)
-
+		elif Command == 'RQ_FT_UpdateFullExportAttribs': # store parms for full FT export dialogue
+			Reply = self.UpdateFullExportAttribs(Proj=Proj, XMLRoot=XMLRoot)
 		elif Command == 'OK': # dummy for 'OK' responses - received only to clear the sockets
 			Reply = vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
 		return Reply
+
+	def UpdateFullExportAttribs(self, Proj, XMLRoot):
+		# store attribs for full FT export dialogue in project
+		assert isinstance(Proj, projects.ProjectItem)
+		Proj.FTFullExportFilename = XMLRoot.findtext('Filename')
+		Proj.FTFullExportFileType = utilities.InstanceWithAttribValue(ObjList=core_classes.ImageFileTypesSupported,
+			AttribName='XMLName', TargetValue=XMLRoot.findtext('FileType'),
+			NotFoundValue=core_classes.ImageFileTypesSupported[0])
+		Proj.FTExportShowWhat = XMLRoot.findtext('ExportWhat')
+		Proj.LastExportPageSize = utilities.InstanceWithAttribValue(ObjList=core_classes.PaperSizes,
+			AttribName='XMLName', TargetValue=XMLRoot.findtext('PageSize'),
+			NotFoundValue=core_classes.PaperSizes[0])
+		Proj.FTExportPaperOrientation = XMLRoot.findtext('PaperOrientation')
+		Proj.ExportPaperMargins = {'Left': XMLRoot.findtext('MarginLeft'), 'Right': XMLRoot.findtext('MarginRight'),
+			'Top': XMLRoot.findtext('MarginTop'), 'Bottom': XMLRoot.findtext('MarginBottom')}
+		Proj.ExportPageNumberLoc = XMLRoot.findtext('PageNumberLoc')
+		Proj.FTFullExportZoom = XMLRoot.findtext('Zoom')
+		Proj.FTExportNewPagePerRR = utilities.Bool2Str(XMLRoot.findtext('NewPagePerRR'))
+		Proj.LastExportBlackAndWhite = utilities.Bool2Str(XMLRoot.findtext('Monochrome'))
+		Proj.LastExportFontName = XMLRoot.findtext('Font')
+		Proj.FTConnectorsAcrossPages = utilities.Bool2Str(XMLRoot.findtext('ConnectorsAcrossPageBreaks'))
+		Proj.FTExportShowPeripheral = XMLRoot.findtext('IncludeWhatTexts')
+		Proj.FTExportCannotCalculateText = XMLRoot.findtext('CannotCalculateText')
+		Proj.FTExportCombineRRs = utilities.Bool2Str(XMLRoot.findtext('CombineRRs'))
+		Proj.FTExportExpandGates = utilities.Bool2Str(XMLRoot.findtext('ExpandGates'))
+		Proj.LastExportPreferredDateToShow = utilities.InstanceWithAttribValue(ObjList=core_classes.DateChoices,
+			AttribName='XMLName', TargetValue=XMLRoot.findtext('DateToShow'),
+			NotFoundValue=core_classes.DateChoices[0])
+		return vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
+
 
 class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all data needed to display full FT on screen
 	# Each separate sub-object (header, cause etc) has attributes whose names are assumed to be same as in the data message from DataCore

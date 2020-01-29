@@ -1824,20 +1824,22 @@ class ChoiceItem(object): # represents an item in a group of items the user can 
 
 class ImageFileType(object): # type of file that can be offered for image export
 
-	def __init__(self, HumanName='', Extension='', SupportsMultiPage=False):
+	def __init__(self, HumanName='', XMLName='', Extension='', SupportsMultiPage=False):
 		# SupportsMultiPage: whether the file can contain more than one page
 		assert isinstance(HumanName, str)
+		assert isinstance(XMLName, str)
 		assert isinstance(Extension, str)
 		assert isinstance(SupportsMultiPage, bool)
 		object.__init__(self)
 		self.HumanName = HumanName
+		self.XMLName = XMLName
 		self.Extension = Extension
 		self.SupportsMultiPage = SupportsMultiPage
 
-PDFFileType = ImageFileType(HumanName='PDF', Extension='pdf', SupportsMultiPage=True)
-JPGFileType = ImageFileType(HumanName='JPG', Extension='jpg', SupportsMultiPage=False)
-PNGFileType = ImageFileType(HumanName='PNG', Extension='png', SupportsMultiPage=False)
-TIFFFileType = ImageFileType(HumanName='TIFF', Extension='tiff', SupportsMultiPage=False)
+PDFFileType = ImageFileType(HumanName='PDF', XMLName='PDF', Extension='pdf', SupportsMultiPage=True)
+JPGFileType = ImageFileType(HumanName='JPG', XMLName='JPG', Extension='jpg', SupportsMultiPage=False)
+PNGFileType = ImageFileType(HumanName='PNG', XMLName='PNG', Extension='png', SupportsMultiPage=False)
+TIFFFileType = ImageFileType(HumanName='TIFF', XMLName='TIFF', Extension='tiff', SupportsMultiPage=False)
 # file types to be offered for image file exports
 ImageFileTypesSupported = [PDFFileType, JPGFileType, PNGFileType, TIFFFileType]
 # check default is one of these
@@ -1846,14 +1848,16 @@ assert info.DefaultImageFileType in [t.Extension for t in ImageFileTypesSupporte
 class PaperSize(object): # paper size that can be offered for image export
 	# In future, see if we can use wx.PaperSize instead (haven't figured it out yet)
 
-	def __init__(self, HumanName='', HumanDescription='', SizeShortAxis=0, SizeLongAxis=0): # sizes are in mm
+	def __init__(self, HumanName='', XMLName='', HumanDescription='', SizeShortAxis=0, SizeLongAxis=0): # sizes are in mm
 		assert isinstance(HumanName, str)
+		assert isinstance(XMLName, str)
 		assert isinstance(HumanDescription, str)
 		assert isinstance(SizeShortAxis, (int, float))
 		assert isinstance(SizeLongAxis, (int, float))
 		assert SizeShortAxis <= SizeLongAxis # must be portrait aspect
 		object.__init__(self)
 		self.HumanName = HumanName
+		self.XMLName = XMLName
 		self.HumanDescription = HumanDescription
 		self.SizeShortAxis = SizeShortAxis
 		self.SizeLongAxis = SizeLongAxis
@@ -1865,9 +1869,17 @@ class PaperSize(object): # paper size that can be offered for image export
 	def HumanDescriptor(self): # return str containing HumanName and size, e.g. 'A4 (210 x 297mm)'
 		return '%s (%d x %d mm)' % (self.HumanName, self.SizeX, self.SizeY)
 
-PaperSizeA4 = PaperSize(HumanName='A4', HumanDescription='210 x 297mm', SizeShortAxis=210, SizeLongAxis=297)
-PaperSizeA5 = PaperSize(HumanName='A5', HumanDescription='148.5 x 210mm', SizeShortAxis=148.5, SizeLongAxis=210)
-PaperSizes = [PaperSizeA4, PaperSizeA5]
+PaperSizeA4 = PaperSize(HumanName='A4', XMLName='A4', HumanDescription='210 x 297mm', SizeShortAxis=210, SizeLongAxis=297)
+PaperSizeA5 = PaperSize(HumanName='A5', XMLName='A5', HumanDescription='148.5 x 210mm', SizeShortAxis=148.5, SizeLongAxis=210)
+PaperSizeLegal = PaperSize(HumanName='Legal', XMLName='Legal', HumanDescription='8.5 x 14"', SizeShortAxis=216, SizeLongAxis=356)
+PaperSizeA3 = PaperSize(HumanName='A3', XMLName='A3', HumanDescription='297 x 420mm', SizeShortAxis=297, SizeLongAxis=420)
+PaperSizeLetter = PaperSize(HumanName='ANSI A (Letter)', XMLName='Letter', HumanDescription='8.5 x 11"', SizeShortAxis=216, SizeLongAxis=279)
+PaperSize11_17 = PaperSize(HumanName='ANSI B (11 x 17)', XMLName='11x17', HumanDescription='11 x 17"', SizeShortAxis=279, SizeLongAxis=432)
+PaperSizeB3 = PaperSize(HumanName='B3', XMLName='B3', HumanDescription='353 x 500mm', SizeShortAxis=353, SizeLongAxis=500)
+PaperSizeB4 = PaperSize(HumanName='B4', XMLName='B4', HumanDescription='250 x 353mm', SizeShortAxis=250, SizeLongAxis=353)
+PaperSizeB5 = PaperSize(HumanName='B5', XMLName='B5', HumanDescription='176 x 250mm', SizeShortAxis=176, SizeLongAxis=250)
+PaperSizes = [PaperSizeA3, PaperSizeA4, PaperSizeA5, PaperSizeLetter, PaperSizeLegal, PaperSize11_17, PaperSizeB3,
+	PaperSizeB4, PaperSizeB5]
 
 # set up date choices; at least one must have 'Default' attrib
 ProjCreationDate = ChoiceItem(XMLName='ProjCreation', HumanName='Project created')
