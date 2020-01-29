@@ -1742,7 +1742,8 @@ class ControlFrame(wx.Frame):
 			assert isinstance(FullRefresh, bool)
 			DC.SetBackground(wx.Brush(self.BackgColour))
 			DC.Clear()
-			self.ViewportOwner.CurrentViewport.RenderInDC(DC, FullRefresh=FullRefresh)
+			self.ViewportOwner.CurrentViewport.RenderInDC(DC, FullRefresh=FullRefresh,
+				BitmapMinSize=self.GetSize(), DrawZoomTool=True)
 			# may need self.Refresh() here to invoke OnPaint()
 
 		def ShowEmptyPanel(self): # clear edit panel display to background colour
@@ -1789,6 +1790,8 @@ class ControlFrame(wx.Frame):
 				self.Bind(wx.EVT_MOTION, lambda Event: self.OnMouseMoveEdit(Event, NewMode))
 				self.Bind(wx.EVT_LEFT_DOWN, lambda Event: self.OnMouseLClickEdit(Event, Viewport=Viewport,
 					CanStartDrag=True, CanSelect=True, Mode=NewMode))
+				self.Bind(wx.EVT_MOUSEWHEEL, lambda Event: self.OnMouseWheel(Event, Viewport=Viewport,
+					Mode=NewMode))
 				self.Bind(wx.EVT_LEFT_UP, lambda Event: self.OnMouseLUpEdit(Event, NewMode))
 				SetUp4EditText()
 				wx.SetCursor(wx.Cursor(display_utilities.StockCursors['Normal'])) # normal mouse pointer
@@ -1797,6 +1800,7 @@ class ControlFrame(wx.Frame):
 				self.Unbind(wx.EVT_MOTION)
 				self.Unbind(wx.EVT_LEFT_DOWN)
 				self.Unbind(wx.EVT_LEFT_DCLICK)
+				self.Unbind(wx.EVT_MOUSEWHEEL)
 				self.Bind(wx.EVT_ENTER_WINDOW, lambda Event: OnMouseEntersViewportPanel(Event=Event, Mode=NewMode))
 					# bind method that changes mouse pointer when mouse enters display mode panel
 			# set required mouse pointer style for current screen position
@@ -1873,6 +1877,10 @@ class ControlFrame(wx.Frame):
 				# get mouse coords relative to EditPanel. Rappin p150
 				(ScreenX, ScreenY) = event.GetPosition()
 				Viewport.HandleMouseRClick(ScreenX, ScreenY, CanStartDrag=CanStartDrag, CanSelect=CanSelect)
+
+		def OnMouseWheel(self, Event, Viewport, Mode): # handle mouse wheel event
+			(ScreenX, ScreenY) = Event.GetPosition() # get mouse coords
+			Viewport.HandleMouseWheel(ScreenX, ScreenY, Event=Event) # pass event to Viewport's handler
 
 		def SetKeystrokeHandlerOnOff(self, On=True):
 			# switch on or off keystroke handling
@@ -2218,7 +2226,7 @@ class ControlFrame(wx.Frame):
 			if Args.get('ViewportToRevertTo', None) is not None:
 				ArgsToSend['ViewportToRevertTo'] = Args['ViewportToRevertTo']
 			# create the Viewport
-			NewViewport, D2CSocketNo, C2DSocketNo, VizopTalksArgs = display_utilities.CreateViewport(Proj,
+			NewViewport, D2CSocketNo, C2DSocketNo, VizopTalksArgs, VizopTalksTips = display_utilities.CreateViewport(Proj,
 				Args['ViewportClass'], DisplDevice=self.MyEditPanel, PHAObj=Args['PHAModel'], Fonts=self.Fonts,
 				SystemFontNames=self.SystemFontNames, **ArgsToSend)
 			RequestToDatacore = 'RQ_NewViewport'
@@ -2231,10 +2239,13 @@ class ControlFrame(wx.Frame):
 			info.MilestoneIDTag: NewMilestone.ID, info.D2CSocketNoTag: str(D2CSocketNo),
 			info.C2DSocketNoTag: str(C2DSocketNo), info.HumanNameTag: NewViewport.HumanName}
 		vizop_misc.SendRequest(self.zmqOutwardSocket, Command=RequestToDatacore, **NewViewportAttribs)
-		# show VizopTalks confirmation message
+		# show VizopTalks confirmation message, and set VizopTalks tips
 		if not Redoing:
 			VizopTalksArgs.update( {'Priority': ConfirmationPriority} ) # set message priority
 			self.MyVTPanel.SubmitVizopTalksMessage(**VizopTalksArgs)
+			for ThisTip in VizopTalksTips:
+				ThisTip.update( {'Priority': Tip_Context_GeneralPriority} )
+				self.MyVTPanel.SubmitVizopTalksMessage(**ThisTip)
 		return vizop_misc.MakeXMLMessage('Null', 'Null')
 
 	def DoNewPHAModelCommand(self, Proj, PHAModelClass, **Args):
@@ -2653,7 +2664,7 @@ class ControlFrame(wx.Frame):
 		return Reply
 
 	def UpdateAllViewportsAfterUndo(self, XMLRoot=None):
-		# handle request to update all Viewports after undo of a data change
+		# handle request to update all Viewports after undo of a data change. Currently not used?
 		global UndoChainWaiting
 		Proj = utilities.ObjectWithID(self.Projects, XMLRoot.find(info.ProjIDTag).text)
 		# write undo confirmation message in Vizop Talks panel
@@ -2662,7 +2673,9 @@ class ControlFrame(wx.Frame):
 		# update display in local Control Frame, if SkipRefresh tag in XMLRoot is False
 		if not utilities.Bool2Str(XMLRoot.find(info.SkipRefreshTag).text):
 			# request redraw of Viewport, with changed element visible TODO make RenderInDC force element to be visible
-			ThisViewport.RenderInDC(TargetDC, FullRefresh=True)
+#			ThisViewport.RenderInDC(TargetDC, FullRefresh=True)
+			ThisViewport.RenderInDC(TargetDC, FullRefresh=FullRefresh,
+				BitmapMinSize=self.GetSize(), DrawZoomTool=True)
 		# set UndoChainWaiting flag to trigger any further undo items
 		UndoChainWaiting = utilities.Bool2Str(XMLRoot.find(info.ChainWaitingTag).text)
 		return vizop_misc.MakeXMLMessage('Null', 'Null')

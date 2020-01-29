@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# This file is part of Vizop. Copyright xSeriCon, 2018
+# This file is part of Vizop. Copyright xSeriCon, 2020
 
 """vizop info module
 This module contains constants that are used throughout Vizop.
@@ -253,6 +253,7 @@ ValueOutOfRangeMsg = 'ValueOutOfRange'
 NO_ShowViewport = 'NO_ShowViewport'
 
 # Unicode symbols
+CommandKeyName = 'Cmd' if system() == 'Darwin' else 'Ctrl'
 CommandSymbol = u'\u2318' # cloverleaf symbol used on Mac keyboard's Command key
 InfinitySymbol = u'\u221e'
 

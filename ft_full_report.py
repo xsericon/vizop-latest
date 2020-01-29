@@ -21,6 +21,7 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 	# VizopTalks message when a new FT is created. NB don't set Priority here, as it is overridden in DoNewViewportCommand()
 	NewViewportVizopTalksArgs = {'Title': 'Fault tree full export',
 		'MainText': 'Enter the settings you require, then click Go'}
+	NewViewportVizopTalksTips = []
 	InitialEditPanelMode = 'Widgets'
 	MinZoom = 0.1 # min and max zoom factors allowed for this Viewport
 	MaxZoom = 9.99

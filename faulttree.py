@@ -4258,6 +4258,8 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 	# VizopTalks message when a new FT is created. NB don't set Priority here, as it is overridden in DoNewViewportCommand()
 	NewViewportVizopTalksArgs = {'Title': 'New Fault Tree created',
 		'MainText': 'Click on grey builder button to add first FT element'}
+	NewViewportVizopTalksTips = [{'Title': 'Tip: Zoom',
+		'MainText': info.CommandKeyName + ' + mouse wheel to zoom the fault tree'}]
 	PreferredControlPanelAspect = 'CPAspect_FaultTree' # aspect to show when FT is displayed
 	MinColumnLength = 100 # in canvas coords
 	MarginXInCU = 20 # margin between left edge of screen and left edge of first column, in canvas coords
@@ -4729,9 +4731,11 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		# request appropriate control panel aspect
 		self.SwitchToPreferredControlPanelAspect(CurrentElements=self.CurrentElements)
 
-	def RenderInDC(self, TargetDC, FullRefresh=True, **Args):
-		# render all FT components into TargetDC provided by ControlFrame
+	def RenderInDC(self, TargetDC, FullRefresh=True, BitmapMinSize=None, DrawZoomTool=True, **Args):
+		# render all FT elements into TargetDC provided
 		# FullRefresh (bool): whether to redraw from scratch
+		# BitmapMinSize ( (X, Y) tuple of int, wx.Size, or None): Ensure bitmap has this min size
+		# DrawZoomTool (bool): whether to show the zoom tool
 
 		def DrawHeader(self, DC): # render the FT header in its own bitmap, then copy it to BaseLayerDC
 			self.Header.RenderIntoBitmap(self.Zoom)
@@ -4769,7 +4773,8 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 
 		# main procedure for RenderInDC()
 		assert isinstance(FullRefresh, bool)
-		HostPanelSizeX, HostPanelSizeY = self.DisplDevice.GetSize()
+		assert isinstance(DrawZoomTool, bool)
+		assert isinstance(BitmapMinSize, wx.Size) or (BitmapMinSize is None)
 		if FullRefresh:
 			# get each element in the FT to calculate and draw itself in own bitmap: header, columns and strips
 			self.Header.CalculateSize(self.Zoom, self.PanX, self.PanY)
@@ -4786,10 +4791,11 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			self.SetupInterColumnStrips() # set up and draw strips containing connecting lines between columns
 			# make an overall bitmap, ready to blit constituent bitmaps into
 			MinBufferSizeXInPx, MinBufferSizeYInPx = self.CalculateFTScreenSize(self.InterColumnStripWidth)
-			# make sure buffer is big enough to reach the bottom of the screen, to accommodate the zoom tool
-			# (potential optimisation: draw zoom widget in separate bitmap and blit transparently into its place in the host panel)
-			ActualBufferSizeX = max(HostPanelSizeX, MinBufferSizeXInPx)
-			ActualBufferSizeY = max(HostPanelSizeY, MinBufferSizeYInPx)
+			if BitmapMinSize is not None:
+				# make sure buffer is big enough to reach the bottom of the screen, to accommodate the zoom tool
+				# (potential optimisation: draw zoom widget in separate bitmap and blit transparently into its place in the host panel)
+				ActualBufferSizeX = max(BitmapMinSize[0], MinBufferSizeXInPx)
+				ActualBufferSizeY = max(BitmapMinSize[1], MinBufferSizeYInPx)
 			self.BaseLayerBitmap = wx.Bitmap(width=ActualBufferSizeX, height=ActualBufferSizeY, depth=wx.BITMAP_SCREEN_DEPTH)
 			BaseLayerDC = wx.MemoryDC(self.BaseLayerBitmap)
 			# draw header in its own bitmap, then copy into BaseLayerDC
@@ -4799,13 +4805,16 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 				# draw column
 				Column.RenderInDC(self, BaseLayerDC, 0, 0)
 				# draw inter-column strip, to the right of the column
-				BaseLayerDC.DrawBitmap(self.InterColumnStripBuffers[ColIndex], Column.PosXInPx + Column.SizeXInPx, Column.PosYInPx, useMask=False)
+				BaseLayerDC.DrawBitmap(self.InterColumnStripBuffers[ColIndex], Column.PosXInPx + Column.SizeXInPx,
+					Column.PosYInPx, useMask=False)
 			# set PosX/Y attribs of connect buttons in pixels (needed to detect mouse clicks)
 			SetConnectButtonPos()
-		# draw zoom widget. First, set its position: 50% across the panel, and slightly above the bottom of the panel
-		self.MyZoomWidget.SetPos(HostPanelSizeX * 0.5, HostPanelSizeY - self.MyZoomWidget.GetSize()[1] - 10)
-		self.MyZoomWidget.SetZoom(self.Zoom) # update zoom setting of zoom widget
-		self.MyZoomWidget.DrawInBitmap() # draw zoom widget in its own bitmap
+		if DrawZoomTool:
+			# draw zoom widget. First, set its position: 50% across the panel, and slightly above the bottom of the panel
+			HostPanelSizeX, HostPanelSizeY = self.DisplDevice.GetSize()
+			self.MyZoomWidget.SetPos(HostPanelSizeX * 0.5, HostPanelSizeY - self.MyZoomWidget.GetSize()[1] - 10)
+			self.MyZoomWidget.SetZoom(self.Zoom) # update zoom setting of zoom widget
+			self.MyZoomWidget.DrawInBitmap() # draw zoom widget in its own bitmap
 		BlitIntoDC(BaseLayerBitmap=self.BaseLayerBitmap, TargetDC=TargetDC)
 
 	def AddBuilderButtons(self): # add builder buttons between objects in each column, and in a "new" column to the right
@@ -5285,6 +5294,13 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 					SendRequest(DisconnectList=[(From, StartClickObj) for From in JoinedFromObjs])
 				else: # not connected to anything; do nothing, case 8
 					NoChangeToConnections()
+
+	def HandleMouseWheel(self, ScreenX, ScreenY, Event):
+		# handle mouse wheel event
+		MouseState = wx.GetMouseState()
+		# check if Ctrl key (Mac: Command key) is down; if so, zoom
+		if MouseState.ControlDown():
+			self.MyZoomWidget.HandleMouseWheel(Event=Event, HostViewport=self)
 
 	def RefreshZoomWidget(self, StillZooming=True, **Args):
 		# get FT to refresh the zoom widget. Sends request to re-blit the FT, but no need to render from scratch.

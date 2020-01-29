@@ -59,6 +59,7 @@ def CreateViewport(Proj, ViewportClass, DisplDevice=None, PHAObj=None, DatacoreI
 	# Fonts: (dict) keys are strings such as 'SmallHeadingFont'; values are wx.Font instances
 	# Return the Viewport instance, and D2C and C2D socket numbers (2 x int)
 	# Also returns VizopTalksArgs (dict of attrib: value; these are args to controlframe.SubmitVizopTalksMessage)
+	# and VizopTalksTips (list of dicts, same as VizopTalksArgs)
 	assert isinstance(DatacoreIsLocal, bool)
 	# prepare dict of args to send to new Viewport
 	ArgsToSupply = Args
@@ -94,7 +95,8 @@ def CreateViewport(Proj, ViewportClass, DisplDevice=None, PHAObj=None, DatacoreI
 		SocketNo=D2CSocketNo, BelongsToDatacore=False, AddToRegister=True)
 	# get args to send to SubmitVizopTalksMessage from Viewport, if available
 	VizopTalksArgs = getattr(NewViewport, 'NewViewportVizopTalksArgs', {'MainText': '<No info provided by Viewport>'})
-	return NewViewport, D2CSocketNo, C2DSocketNo, VizopTalksArgs
+	VizopTalksTips = getattr(NewViewport, 'NewViewportVizopTalksTips', [])
+	return NewViewport, D2CSocketNo, C2DSocketNo, VizopTalksArgs, VizopTalksTips
 
 def ViewportClassWithName(TargetName):
 	# returns the Viewport class with internal name = TargetName, or None if not found
@@ -463,6 +465,16 @@ class ZoomWidgetObj(object):
 		self.CurrentZoom = self.MidZoom
 		self.Status = 'Idle' # ensures zoom widget colour remains normal
 		HostViewport.RedrawDuringZoom(NewZoom=self.CurrentZoom)
+
+	def HandleMouseWheel(self, Event=None, HostViewport=None, **Args):
+		# handle mouse wheel event to zoom. Emulates a click and Y-drag on the zoom tool
+		WheelToPixelConversionFactor = 50 # sets the zoom sensitivity
+		InitialMouseX, InitialMouseY = Event.GetPosition()
+		self.HandleMouseLClickOnMe(HostViewport=HostViewport, MouseX=InitialMouseX, MouseY=InitialMouseY)
+		VirtualNewMousePositionY = InitialMouseY + (math.copysign(1, Event.GetWheelRotation()) \
+			* WheelToPixelConversionFactor * math.log10(abs(Event.GetWheelRotation())))
+		self.HandleMouseLDragOnMe(MouseX=InitialMouseX, MouseY=VirtualNewMousePositionY, HostViewport=HostViewport, **Args)
+		self.HandleMouseLDragEndOnMe(MouseX=InitialMouseX, MouseY=VirtualNewMousePositionY, HostViewport=HostViewport, **Args)
 
 def SetPointer(Viewport, DisplayDevice, Event, Mode='Select'): # set required mouse pointer style
 	# Event is mouse event, if called as an event handler, else None
