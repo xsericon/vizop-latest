@@ -553,8 +553,6 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 		ThisAspect.StyleBox = UIWidgetItem(StyleBoxSizer, HideMethod=lambda : StyleBoxSizer.ShowItems(False),
 			ShowMethod=lambda : StyleBoxSizer.ShowItems(True), ColLoc=0, ColSpan=9, NewRow=True,
 			SetFontMethod=lambda f: StyleBoxSizer.GetStaticBox().SetFont, Font=Fonts['SmallHeadingFont'])
-#		ThisAspect.StyleLabel = UIWidgetItem(wx.StaticText(MyEditPanel, -1, _('Style')),
-#			YGap=20, ColLoc=0, ColSpan=2, Font=Fonts['SmallHeadingFont'], NewRow=True)
 		ThisAspect.FontLabel = UIWidgetItem(wx.StaticText(MyEditPanel, -1, _('Font:')),
 			ColLoc=0, ColSpan=1, Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_RIGHT)
 		ThisAspect.FontChoice = UIWidgetItem(wx.Choice(MyEditPanel, -1, size=(200, 25),
@@ -564,6 +562,7 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 			Handler=ThisAspect.OnConnectorsAcrossPagesCheck, Events=[wx.EVT_CHECKBOX], ColLoc=4, ColSpan=1, GapX=20)
 		ThisAspect.DateLabel = UIWidgetItem(wx.StaticText(MyEditPanel, -1, _('Show date:')), NewRow=True,
 			ColLoc=0, ColSpan=1, Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_RIGHT)
+		print('FF565 font info: ', ThisAspect.DateLabel.Widget.GetFont(), ThisAspect.DateLabel.Widget.GetFont().GetFaceName())
 		ThisAspect.DateChoice = UIWidgetItem(wx.Choice(MyEditPanel, -1, size=(100, 25),
 			choices=[c.HumanName for c in DateChoices]),
 			Handler=ThisAspect.OnDateChoice, Events=[wx.EVT_CHOICE], ColLoc=1, ColSpan=1)

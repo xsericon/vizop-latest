@@ -12,7 +12,7 @@ import text, utilities, core_classes, info, vizop_misc, projects, art, display_u
 
 # constants applicable to fault tree
 TextElementTopBufferInCU = 2 # y-gap in canvas units between top of a text element and top of its contained text
-DefaultFontFamily = wx.FONTFAMILY_SWISS
+DefaultFontFamily = wx.FONTFAMILY_DEFAULT
 ConnectingLineColour = (0xf6, 0xff, 0x2a) # golden yellow, for lines connecting FT elements
 ButtonBaseColour = (0x64, 0x64, 0x80) # mid grey, background colour for graphical buttons
 ButtonBorderColour = (0x20, 0x20, 0x30) # deep grey, border colour for graphical buttons
@@ -528,8 +528,12 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 		self.FillXSpace = True # whether element should expand to fill available space in X direction
 		self.Text = text.TextObject()
 		self.Text.PointSize = 20 # default size before zoom
-		self.Text.Font = wx.Font(pointSize=12, style=wx.FONTSTYLE_NORMAL, weight=wx.FONTWEIGHT_NORMAL,
-			family=DefaultFontFamily).GetFaceName() # system name for actual font used (str)
+		# experimental code to get texts to appear in default system font; might be a memory leak as it creates a
+		# StaticText every time. FIXME
+		DefaultFont = wx.StaticText().GetFont().GetFaceName()
+		self.Text.Font = DefaultFont # system name for actual font used (str)
+#		self.Text.Font = wx.Font(pointSize=12, style=wx.FONTSTYLE_NORMAL, weight=wx.FONTWEIGHT_NORMAL,
+#			family=DefaultFontFamily).GetFaceName() # system name for actual font used (str)
 		self.Text.ParaHorizAlignment = Args.get('HorizAlignment', 'Centre') # centre aligned horizontally by default
 		self.PromptTextObj = copy.copy(self.Text) # text object to use for prompt text when actual text is empty
 		self.PromptTextObj.Content = PromptText
