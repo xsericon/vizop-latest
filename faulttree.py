@@ -4812,7 +4812,8 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		if DrawZoomTool:
 			# draw zoom widget. First, set its position: 50% across the panel, and slightly above the bottom of the panel
 			HostPanelSizeX, HostPanelSizeY = self.DisplDevice.GetSize()
-			self.MyZoomWidget.SetPos(HostPanelSizeX * 0.5, HostPanelSizeY - self.MyZoomWidget.GetSize()[1] - 10)
+#			self.MyZoomWidget.SetPos(HostPanelSizeX * 0.5, HostPanelSizeY - self.MyZoomWidget.GetSize()[1] - 10)
+			self.MyZoomWidget.SetPos(HostPanelSizeX * 0.5, 10)
 			self.MyZoomWidget.SetZoom(self.Zoom) # update zoom setting of zoom widget
 			self.MyZoomWidget.DrawInBitmap() # draw zoom widget in its own bitmap
 		BlitIntoDC(BaseLayerBitmap=self.BaseLayerBitmap, TargetDC=TargetDC)

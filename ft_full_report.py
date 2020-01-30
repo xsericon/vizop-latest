@@ -31,21 +31,43 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 		def OnFilenameTextWidget(self, Event=None, WidgetObj=None):
 			# get filename stub provided by user
 			UserFilenameStub = self.FilenameText.Widget.GetValue().strip()
-			# get all actual filenames to use, based on this stub%%%
+			# get all actual filenames to use, based on this stub
 			ActualFilenames = GetFilenamesForMultipageExport(BasePath=UserFilenameStub,
 				FileType=core_classes.ImageFileTypesSupported[self.FileTypeChoice.Widget.GetSelection()],
 				PagesAcross=self.PageCountInfo['PagesAcrossCount'], PagesDown=self.PageCountInfo['PagesDownCount'])
 			print('FR37 filenames to use: ', ActualFilenames)
 			# update filename status text, Go button status etc
 			FilenameStatus = self.UpdateWidgetStatus()
-			# write name back into Proj.FTFullExportFilename, if filename is usable
+			# write name back into widget, if filename is usable
 			if FilenameStatus not in ['CannotWrite', 'NoAccess', 'Other']:
-				pass # TODO; need to send a RQ
+				self.FilenameText.Widget.ChangeValue(UserFilenameStub)
 
 		def OnSelectButton(self, Event):
-			# for testing
-			print('FR32 filenames to use: ', GetFilenamesForMultipageExport(self.FilenameText.Widget.GetValue(),
-				core_classes.ImageFileTypesSupported[self.FileTypeChoice.Widget.GetSelection()], 1, 1))
+			# fetch any filename already provided in the file stub textctrl
+			UserFilenameStub = self.FilenameText.Widget.GetValue().strip()
+			if UserFilenameStub: # if user has entered a filename, provide it as default
+				DefaultBasename = os.path.basename(UserFilenameStub)
+			else:
+				# get last used export filename from project%%%
+				DefaultBasename = self.Proj.FTFullExportFilename
+			# get the wildcard to use in the filename dialogue box
+			DefaultExtension = core_classes.ImageFileTypesSupported[self.FileTypeChoice.Widget.GetSelection()].Extension
+			Wildcard = '*' + os.extsep + DefaultExtension
+			# get default directory = directory in filename textctrl, last export save directory or project save directory, if any
+			if os.path.exists(os.path.dirname(UserFilenameStub)): DefaultDirectory = os.path.dirname(UserFilenameStub)
+			elif os.path.exists(os.path.dirname(self.Proj.FTFullExportFilename)):
+				DefaultDirectory = os.path.dirname(self.Proj.FTFullExportFilename)
+			elif os.path.exists(os.path.dirname(self.Proj.OutputFilename)): DefaultDirectory = os.path.dirname(self.Proj.OutputFilename)
+			else: DefaultDirectory = info.DefaultUserDirectory
+			(GetFilenameSuccess, SaveFilename) = vizop_misc.GetFilenameForSave(self.TopLevelFrame,
+				DialogueTitle=_('Select filename stub for FT export'), DefaultDir=DefaultDirectory,
+				DefaultFile=DefaultBasename, Wildcard=Wildcard, DefaultExtension=DefaultExtension)
+			if GetFilenameSuccess:
+				# write pathname into filename textctrl
+				self.FilenameText.Widget.ChangeValue(SaveFilename)
+				# update filename status text, Go button status etc
+				FilenameStatus = self.UpdateWidgetStatus()
+
 
 		def OnFileTypeChoice(self, Event): pass # write name back into Proj.FTFullExportFileType
 		def OnOverwriteCheck(self, Event): # handle click on Overwrite checkbox: store overwrite option
@@ -121,6 +143,7 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 
 		def Prefill(self, Proj, FT, SystemFontNames):
 			# prefill widget values
+			self.Proj = Proj # used in widget handlers
 			# filename is fetched from last used filename in the project
 			self.FilenameText.Widget.ChangeValue(Proj.FTFullExportFilename.strip())
 			self.FilenameText.Widget.SelectAll()

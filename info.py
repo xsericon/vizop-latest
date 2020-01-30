@@ -34,6 +34,7 @@ CacheFolderTail = 'vizop'
 # file-related constants
 RestoreFileSuffix = '_Restore' # suffix for project restore filename
 DefaultImageFileType = 'pdf' # must be Extension attrib of an instance of core_classes.ImageFileType
+DefaultUserDirectory = '~'
 
 # display-related constants
 if system() == 'Darwin': CtrlKey = u"\u2318" # 'command key' symbol on Mac
