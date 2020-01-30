@@ -68,10 +68,27 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 				# update filename status text, Go button status etc
 				FilenameStatus = self.UpdateWidgetStatus()
 
+		def OnFileTypeChoice(self, Event): # handle user selection of file type
+			# update the file extension in the file name textctrl, if any
+			# first, check if the existing filename has an extension matching any valid image file type
+			OldFilePath = self.FilenameText.Widget.GetValue().strip()
+			OldExtension = os.path.splitext(OldFilePath)[1]
+			if OldExtension in [(os.extsep + t.Extension) for t in core_classes.ImageFileTypesSupported]:
+				# remove old extension and separator behind (e.g. "MyFile.pdf" -> "MyFile")
+				NewFilePath = OldFilePath[:-len(OldExtension)]
+			else: NewFilePath = OldFilePath
+			# append separator, if filename doesn't already end in separator
+			if not NewFilePath.endswith(os.extsep): NewFilePath += os.extsep
+			# append new extension
+			NewFilePath += core_classes.ImageFileTypesSupported[self.FileTypeChoice.Widget.GetSelection()].Extension
+			# write new path back to file name textctrl
+			self.FilenameText.Widget.ChangeValue(NewFilePath)
+			self.FilenameText.Widget.SelectAll()
 
-		def OnFileTypeChoice(self, Event): pass # write name back into Proj.FTFullExportFileType
 		def OnOverwriteCheck(self, Event): # handle click on Overwrite checkbox: store overwrite option
 			self.Overwrite = self.OverwriteCheck.Widget.GetValue()
+			# update filename status text, Go button status etc
+			FilenameStatus = self.UpdateWidgetStatus()
 
 		def OnShowHeaderCheck(self, Event): pass
 		def OnShowFTCheck(self, Event): pass
@@ -102,48 +119,77 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 		def OnDateChoice(self, Event): pass
 		def OnCancelButton(self, Event): pass
 
-		def OnGoButton(self, Event):
-			print('FR64 in go button handler')
-			self.DoExportFTToFile()
+		def OnGoButton(self, Event): # %%%
+			# get string containing information about export required
+			ShowWhat, PageNumberWhere, ShowTexts = self.MakeAttribStrings()
+			ExportInput = {'FilePath': self.FilenameText.Widget.GetValue().strip(),
+				'FileType': core_classes.ImageFileTypesSupported[self.FileTypeChoice.Widget.GetSelection()],
+				'Zoom': self.Zoom, 'ShowWhat': ShowWhat,
+				'PageSizeLongAxis': core_classes.PaperSizes[self.PageSizeChoice.Widget.GetSelection()].SizeLongAxis,
+				'PageSizeShortAxis': core_classes.PaperSizes[self.PageSizeChoice.Widget.GetSelection()].SizeShortAxis,
+				'Orientation': 'Portrait' if self.PortraitRadio.Widget.GetValue() else 'Landscape',
+				'TopMargin': self.Margins['ExportPaperTopMargin'],
+				'BottomMargin': self.Margins['ExportPaperBottomMargin'],
+				'LeftMargin': self.Margins['ExportPaperLeftMargin'], 'RightMargin': self.Margins['ExportPaperRightMargin'],
+				'PageNumberPos': PageNumberWhere, 'FirstPageNumber': 1, 'PageCountToShow': 'Auto',
+				'NewPagePerRR': self.NewPagePerRRCheck.Widget.IsChecked(),
+				'Font': self.ParentFrame.TopLevelFrame.SystemFontNames[self.FontChoice.Widget.GetSelection()],
+				'ConnectorsAcrossPages': self.ConnectorsAcrossPagesCheck.Widget.IsChecked(),
+				'ShowTexts': ShowTexts,
+				'CannotCalculateText': self.CannotCalculateText.Widget.GetValue().strip(),
+				'CombineRRs': self.CombineRRsCheck.Widget.IsChecked(),
+				'ExpandGates': self.ExpandGatesCheck.Widget.IsChecked(),
+				'DateKind': core_classes.DateChoices[self.DateChoice.Widget.GetSelection()] }
+			self.FT.DoExportFTToFile(**ExportInput)
 			self.StoreAttribsInProject()
+
+		def MakeAttribStrings(self):
+			# return ShowWhat, PageNumberWhere and ShowTexts (3 x str) containing information about export required
+#			ThisAspect = self.DisplDevice.MyEditPanel.FTFullExportAspect # needed instead of self?
+			# make string containing labels of parts of FT to be exported, e.g. 'Header,FT'
+			ShowWhat = ','.join([w.XMLLabel for w in [self.ShowHeaderCheck, self.ShowFTCheck,
+				self.ShowOnlySelectedCheck] if w.Widget.IsChecked()])
+			# make string containing labels of page number positions, e.g. 'Top,Left'
+			PageNumberWhere = ','.join([w.XMLLabel for w in [self.PageNumberBottomRadio, self.PageNumberCentreRadio,
+				self.PageNumberLeftRadio, self.PageNumberRightRadio, self.PageNumberTopRadio,
+				self.PageNumberNoneRadio] if w.Widget.GetValue()])
+			# make string containing labels of texts to be exported, e.g. 'Action,Parking'
+			ShowTexts = ','.join([w.XMLLabel for w in [self.CommentsCheck, self.ActionsCheck,
+				self.ParkingCheck] if w.Widget.IsChecked()])
+			return ShowWhat, PageNumberWhere, ShowTexts
 
 		def StoreAttribsInProject(self):
 			# send request to datacore to store parameters in project
-			ThisAspect = self.DisplDevice.MyEditPanel.FTFullExportAspect
-			# make string containing labels of parts of FT to be exported, e.g. 'Header,FT'
-			ShowWhat = ','.join([w.XMLLabel for w in [ThisAspect.ShowHeaderCheck, ThisAspect.ShowFTCheck,
-				ThisAspect.ShowOnlySelectedCheck] if w.Widget.IsChecked()])
-			# make string containing labels of page number positions, e.g. 'Top,Left'
-			PageNumberWhere = ','.join([w.XMLLabel for w in [ThisAspect.PageNumberBottomRadio, ThisAspect.PageNumberCentreRadio,
-				ThisAspect.PageNumberLeftRadio, ThisAspect.PageNumberRightRadio, ThisAspect.PageNumberTopRadio,
-				ThisAspect.PageNumberNoneRadio] if w.Widget.IsChecked()])
-			# make string containing labels of texts to be exported, e.g. 'Action,Parking'
-			ShowTexts = ','.join([w.XMLLabel for w in [ThisAspect.CommentsCheck, ThisAspect.ActionsCheck,
-				ThisAspect.ParkingCheck] if w.Widget.IsChecked()])
-			vizop_misc.SendRequest(Socket=self.C2DSocketREQ, Command='RQ_FT_UpdateFullExportAttribs',
-				Proj=self.Proj.ID, PHAObj=self.PHAObj.ID, Viewport=self.ID,
+#			ThisAspect = self.DisplDevice.MyEditPanel.FTFullExportAspect
+			ThisViewport = self.ParentFrame.TopLevelFrame.CurrentViewport
+			# gets string containing information about export required
+			ShowWhat, PageNumberWhere, ShowTexts = self.MakeAttribStrings()
+			vizop_misc.SendRequest(Socket=ThisViewport.C2DSocketREQ,
+				Command='RQ_FT_UpdateFullExportAttribs',
+				Proj=self.Proj.ID, PHAObj=ThisViewport.PHAObj.ID, Viewport=ThisViewport.ID,
 				Filename=self.FilenameText.Widget.GetValue().strip(),
 				FileType=core_classes.ImageFileTypesSupported[self.FileTypeChoice.Widget.GetSelection()].XMLName,
 				ExportWhat=ShowWhat,
-				PageSize=core_classes.PaperSizes[ThisAspect.PageSizeChoice.Widget.GetSelection()].XMLName,
-				PaperOrientation='Portrait' if ThisAspect.PortraitRadio.IsChecked() else 'Landscape',
-				MarginLeft=self.Margins['ExportPaperLeftMargin'], MarginRight=self.Margins['ExportPaperRightMargin'],
-				MarginTop=self.Margins['ExportPaperTopMargin'], MarginBottom=self.Margins['ExportPaperBottomMargin'],
+				PageSize=core_classes.PaperSizes[self.PageSizeChoice.Widget.GetSelection()].XMLName,
+				PaperOrientation='Portrait' if self.PortraitRadio.Widget.GetValue() else 'Landscape',
+				MarginLeft=str(self.Margins['ExportPaperLeftMargin']), MarginRight=str(self.Margins['ExportPaperRightMargin']),
+				MarginTop=str(self.Margins['ExportPaperTopMargin']), MarginBottom=str(self.Margins['ExportPaperBottomMargin']),
 				PageNumberLoc=PageNumberWhere,
-				Zoom=self.Zoom,
-				NewPagePerRR=utilities.Bool2Str(ThisAspect.NewPagePerRRCheck.IsChecked()),
-				Monochrome=utilities.Bool2Str(ThisAspect.BlackWhiteCheck.IsChecked()),
-				Font=self.SystemFontNames[ThisAspect.FontChoice.Widget.GetSelection()],
-				ConnectorsAcrossPageBreaks=utilities.Bool2Str(ThisAspect.ConnectorsAcrossPagesCheck.IsChecked()),
+				Zoom=str(self.Zoom),
+				NewPagePerRR=utilities.Bool2Str(self.NewPagePerRRCheck.Widget.IsChecked()),
+				Monochrome=utilities.Bool2Str(self.BlackWhiteCheck.Widget.IsChecked()),
+				Font=self.ParentFrame.TopLevelFrame.SystemFontNames[self.FontChoice.Widget.GetSelection()],
+				ConnectorsAcrossPageBreaks=utilities.Bool2Str(self.ConnectorsAcrossPagesCheck.Widget.IsChecked()),
 				IncludeWhatTexts=ShowTexts,
-				CannotCalculateText=ThisAspect.CannotCalculateText.Widget.GetValue().Strip(),
-				CombineRRs=utilities.Bool2Str(ThisAspect.CombineRRsCheck.IsChecked()),
-				ExpandGates=utilities.Bool2Str(ThisAspect.ExpandGatesCheck.IsChecked()),
-				DateToShow=core_classes.DateChoices[ThisAspect.DateChoice.Widget.GetSelection()].XMLName)
+				CannotCalculateText=self.CannotCalculateText.Widget.GetValue().strip(),
+				CombineRRs=utilities.Bool2Str(self.CombineRRsCheck.Widget.IsChecked()),
+				ExpandGates=utilities.Bool2Str(self.ExpandGatesCheck.Widget.IsChecked()),
+				DateToShow=core_classes.DateChoices[self.DateChoice.Widget.GetSelection()].XMLName)
 
 		def Prefill(self, Proj, FT, SystemFontNames):
 			# prefill widget values
 			self.Proj = Proj # used in widget handlers
+			self.FT = FT # used in widget handlers
 			# filename is fetched from last used filename in the project
 			self.FilenameText.Widget.ChangeValue(Proj.FTFullExportFilename.strip())
 			self.FilenameText.Widget.SelectAll()
@@ -280,12 +326,12 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 				FilenameStatus = 'ReadyToMakeNewFile'
 			# 3. Paths point to at least 1 existent file that can be overwritten, and Overwrite check box is checked
 			elif (PathStati.count('NeedToOverwrite') > 0) and ('CannotWrite' not in PathStati)  and \
-					ThisAspect.OverwriteCheck.Widget.GetValue():
+					self.OverwriteCheck.Widget.GetValue():
 				Message = _('Ready to export. Existing file(s) will be overwritten when you click Go')
 				FilenameStatus = 'ReadyToOverwrite'
 			# 4. Path points to an existent file that can be overwritten, and Overwrite check box is unchecked
 			elif (PathStati.count('NeedToOverwrite') > 0) and ('CannotWrite' not in PathStati) and \
-					not ThisAspect.OverwriteCheck.Widget.GetValue():
+					not self.OverwriteCheck.Widget.GetValue():
 				if len(ActualFilePathsToUse) == 1: Message = _('File exists. Click "Overwrite", then "Go"')
 				else: Message = _('One or more files already exist. Click "Overwrite", then "Go"')
 				FilenameStatus = 'FileExists'
@@ -456,17 +502,17 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 		ThisAspect.PageNumberingLabel = UIWidgetItem(wx.StaticText(MyEditPanel, -1, _('Page numbers\nat:'),
 			style=wx.ALIGN_RIGHT), ColLoc=3, ColSpan=1, RowSpan=2)
 		ThisAspect.PageNumberTopRadio = UIWidgetItem(wx.RadioButton(MyEditPanel, -1, _('Top'), style=wx.RB_GROUP),
-			Handler=ThisAspect.OnPageNumberTopRadio, Events=[wx.EVT_RADIOBUTTON], ColLoc=4)
-		ThisAspect.PageNumberBottomRadio = UIWidgetItem(wx.RadioButton(MyEditPanel, -1, _('Bottom')),
+			Handler=ThisAspect.OnPageNumberTopRadio, Events=[wx.EVT_RADIOBUTTON], ColLoc=4, XMLLabel='Top')
+		ThisAspect.PageNumberBottomRadio = UIWidgetItem(wx.RadioButton(MyEditPanel, -1, _('Bottom')), XMLLabel='Bottom',
 			Handler=ThisAspect.OnPageNumberBottomRadio, Events=[wx.EVT_RADIOBUTTON], ColLoc=4)
-		ThisAspect.PageNumberNoneRadio = UIWidgetItem(wx.RadioButton(MyEditPanel, -1, _('None')),
+		ThisAspect.PageNumberNoneRadio = UIWidgetItem(wx.RadioButton(MyEditPanel, -1, _('None')), XMLLabel='None',
 			Handler=ThisAspect.OnPageNumberNoneRadio, Events=[wx.EVT_RADIOBUTTON], ColLoc=4)
 		ThisAspect.PageNumberLeftRadio = UIWidgetItem(wx.RadioButton(MyEditPanel, -1, _('Left'), style=wx.RB_GROUP),
-			Handler=ThisAspect.OnPageNumberLeftRadio, Events=[wx.EVT_RADIOBUTTON], ColLoc=5)
-		ThisAspect.PageNumberCentreRadio = UIWidgetItem(wx.RadioButton(MyEditPanel, -1, _('Centre')),
+			Handler=ThisAspect.OnPageNumberLeftRadio, Events=[wx.EVT_RADIOBUTTON], ColLoc=5, XMLLabel='Left')
+		ThisAspect.PageNumberCentreRadio = UIWidgetItem(wx.RadioButton(MyEditPanel, -1, _('Centre')), XMLLabel='Centre',
 			Handler=ThisAspect.OnPageNumberCentreRadio, Events=[wx.EVT_RADIOBUTTON], ColLoc=5)
 		ThisAspect.PageNumberRightRadio = UIWidgetItem(wx.RadioButton(MyEditPanel, -1, _('Right')), GapY=10,
-			Handler=ThisAspect.OnPageNumberRightRadio, Events=[wx.EVT_RADIOBUTTON], ColLoc=5)
+			Handler=ThisAspect.OnPageNumberRightRadio, Events=[wx.EVT_RADIOBUTTON], ColLoc=5,  XMLLabel='Right')
 		ThisAspect.HowManyPagesLabel = UIWidgetItem(wx.StaticText(MyEditPanel, -1, _('Fit to how\nmany pages:')),
 			ColLoc=0, ColSpan=1, RowSpan=2, NewRow=True, Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_RIGHT)
 		ThisAspect.PagesAcrossLabel = UIWidgetItem(wx.StaticText(MyEditPanel, -1, _('Across')),
@@ -642,12 +688,12 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 		return {'PagesAcrossCount': 2, 'PagesDownCount': 3}
 
 	def DoExportFTToFile(self, FilePath, FileType,
-		Zoom, ShowHeader, ShowFT, ShowOnlySelected, PageSizeLongAxis, PageSizeShortAxis,
+		Zoom, ShowWhat, PageSizeLongAxis, PageSizeShortAxis,
 		Orientation,
 		TopMargin, BottomMargin, LeftMargin, RightMargin,
 		PageNumberPos, FirstPageNumber, PageCountToShow, NewPagePerRR, Font,
 		ConnectorsAcrossPages,
-		ShowComments, ShowActions, ShowParking, CannotCalculateText, CombineRRs, ExpandGates,
+		ShowTexts, CannotCalculateText, CombineRRs, ExpandGates,
 		DateKind, **Args):
 		# Render the FT image in file(s)
 		# return:
@@ -657,9 +703,7 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 		assert FileType in core_classes.ImageFileTypesSupported
 		assert isinstance(Zoom, float)
 		assert self.MinZoom <= Zoom <= self.MaxZoom
-		assert isinstance(ShowHeader, bool)
-		assert isinstance(ShowFT, bool)
-		assert isinstance(ShowOnlySelected, bool)
+		assert isinstance(ShowWhat, str) # contains at least one of 'Header' and 'FT', plus optionally 'OnlySelected'
 		assert isinstance(PageSizeLongAxis, (int, float))
 		assert 0 < PageSizeLongAxis
 		assert isinstance(PageSizeShortAxis, (int, float))
@@ -686,9 +730,7 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 		assert isinstance(NewPagePerRR, bool)
 		assert isinstance(Font, str)
 		assert isinstance(ConnectorsAcrossPages, bool)
-		assert isinstance(ShowComments, bool)
-		assert isinstance(ShowActions, bool)
-		assert isinstance(ShowParking, bool)
+		assert isinstance(ShowTexts, str) # optionally contains 'Comments', 'ActionItems', 'ParkingLotItems'
 		assert isinstance(CannotCalculateText, str)
 		assert isinstance(CombineRRs, bool)
 		assert isinstance(ExpandGates, bool)
