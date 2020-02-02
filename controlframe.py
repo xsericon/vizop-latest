@@ -2206,6 +2206,8 @@ class ControlFrame(wx.Frame):
 		#	ViewportInRedoRecord (Viewport instance) if Redoing
 		# Optional Args:
 		#	ViewportToRevertTo (Viewport instance): Viewport to redisplay when this Viewport is destroyed
+		#	OriginatingViewport (Viewport instance): Viewport that initiated this new Viewport; passed so that the new
+		#		Viewport can interrogate the originating Viewport
 		assert isinstance(Redoing, bool)
 		assert 'PHAModel' in Args
 		assert isinstance(Args['Chain'], bool)
@@ -2223,8 +2225,9 @@ class ControlFrame(wx.Frame):
 		else:
 			# prepare dict of additional args for Viewport creation
 			ArgsToSend = {}
-			if Args.get('ViewportToRevertTo', None) is not None:
-				ArgsToSend['ViewportToRevertTo'] = Args['ViewportToRevertTo']
+			for ThisArg in ['ViewportToRevertTo','OriginatingViewport']:
+				if Args.get(ThisArg, None) is not None:
+					ArgsToSend[ThisArg] = Args[ThisArg]
 			# create the Viewport
 			NewViewport, D2CSocketNo, C2DSocketNo, VizopTalksArgs, VizopTalksTips = display_utilities.CreateViewport(Proj,
 				Args['ViewportClass'], DisplDevice=self.MyEditPanel, PHAObj=Args['PHAModel'], Fonts=self.Fonts,
@@ -2785,7 +2788,8 @@ class ControlFrame(wx.Frame):
 #			SystemFontNames=self.SystemFontNames, FT=self.CurrentViewport)
 		# make a FTFullExport Viewport. DoNewViewportCommand() provides the new Viewport as self.TrialViewport
 		self.DoNewViewportCommand(Proj=self.CurrentProj, ViewportClass=ft_full_report.FTFullExportViewport,
-			Chain=True, PHAModel=self.CurrentViewport.PHAObj, ViewportToRevertTo=self.CurrentViewport)
+			Chain=True, PHAModel=self.CurrentViewport.PHAObj, ViewportToRevertTo=self.CurrentViewport,
+			OriginatingViewport=self.CurrentViewport)
 
 	def GotoEditPanelAspect(self, NewAspect, **Args):
 		# switch to a dialogue aspect in edit panel.

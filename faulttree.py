@@ -4334,7 +4334,8 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		self.Panning = self.Zooming = False # whether user is currently changing display zoom or pan, for redraw efficiency
 		self.ConnectButtons = [] # ButtonElement instances for connect buttons in inter-column strips
 		self.EditAllowed = True # whether user is allowed to edit the data in the underlying PHAObj
-		self.CurrentElements = [] # which element(s) are "current", i.e. selected for editing
+		self.CurrentElements = [] # which element(s) are "current", i.e. selected for editing. This is accessed also in
+			# module ft_full_report
 		self.CurrentElementIDsToSetOnRefresh = [] # IDs of elements to be set as current when display is next refreshed.
 			# This is used so we can store the selection across a refresh - as datacore doesn't know which elements are
 			# "current" in our Viewport

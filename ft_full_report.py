@@ -48,7 +48,7 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 			if UserFilenameStub: # if user has entered a filename, provide it as default
 				DefaultBasename = os.path.basename(UserFilenameStub)
 			else:
-				# get last used export filename from project%%%
+				# get last used export filename from project
 				DefaultBasename = self.Proj.FTFullExportFilename
 			# get the wildcard to use in the filename dialogue box
 			DefaultExtension = core_classes.ImageFileTypesSupported[self.FileTypeChoice.Widget.GetSelection()].Extension
@@ -90,9 +90,24 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 			# update filename status text, Go button status etc
 			FilenameStatus = self.UpdateWidgetStatus()
 
-		def OnShowHeaderCheck(self, Event): pass
-		def OnShowFTCheck(self, Event): pass
-		def OnShowSelectedCheck(self, Event): pass
+		def OnShowHeaderCheck(self, Event): # handle click on "show header" checkbox
+			# get number of pages required for FT export, considering current settings, and update page count widgets
+			self.PageCountInfo = self.GetUpdatedPageCount()
+			self.UpdatePageCountWidgets(self.PageCountInfo)
+			self.UpdateWidgetStatus()
+
+		def OnShowFTCheck(self, Event): # handle click on "show FT" checkbox
+			# get number of pages required for FT export, considering current settings, and update page count widgets
+			self.PageCountInfo = self.GetUpdatedPageCount()
+			self.UpdatePageCountWidgets(self.PageCountInfo)
+			self.UpdateWidgetStatus()
+
+		def OnShowSelectedCheck(self, Event): # handle click on "selected elements only" checkbox
+			# get number of pages required for FT export, considering current settings, and update page count widgets
+			self.PageCountInfo = self.GetUpdatedPageCount()
+			self.UpdatePageCountWidgets(self.PageCountInfo)
+			self.UpdateWidgetStatus()
+
 		def OnPageSizeChoice(self, Event): pass
 		def OnPortraitRadio(self, Event): pass
 		def OnLandscapeRadio(self, Event): pass
@@ -119,7 +134,7 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 		def OnDateChoice(self, Event): pass
 		def OnCancelButton(self, Event): pass
 
-		def OnGoButton(self, Event): # %%%
+		def OnGoButton(self, Event):
 			# get string containing information about export required
 			ShowWhat, PageNumberWhere, ShowTexts = self.MakeAttribStrings()
 			ExportInput = {'FilePath': self.FilenameText.Widget.GetValue().strip(),
@@ -282,23 +297,40 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 			self.Zoom = Proj.FTFullExportZoom
 			self.ZoomText.Widget.ChangeValue(str(self.Zoom * 100))
 			self.ZoomText.Widget.SelectAll()
-			PageCountInput = {'FT': FT, 'Zoom': self.Zoom, 'ShowWhat': Proj.FTExportShowWhat,
-				'PageSizeLongAxis': TargetPaperSize.SizeLongAxis, 'PageSizeShortAxis': TargetPaperSize.SizeShortAxis,
-				'Orientation': PaperOrientation, 'TopMargin': self.Margins['ExportPaperTopMargin'],
-				'BottomMargin': self.Margins['ExportPaperBottomMargin'],
-				'LeftMargin': self.Margins['ExportPaperLeftMargin'], 'RightMargin': self.Margins['ExportPaperRightMargin'],
-				'PageNumberPos': PageNumberPos, 'FirstPageNumber': 1, 'PageCountToShow': 'Auto',
-				'NewPagePerRR': Proj.FTExportNewPagePerRR, 'Font': FontNameToUse,
-				'ConnectorsAcrossPages': Proj.FTConnectorsAcrossPages,
-				'ShowComments': ShowComments, 'ShowActions': ShowActions, 'ShowParking': ShowParking,
-				'CannotCalculateText': Proj.FTExportCannotCalculateText, 'CombineRRs': Proj.FTExportCombineRRs,
-				'ExpandGates': Proj.FTExportExpandGates, 'DateKind': DateToShow }
-			self.PageCountInfo = FT.GetPageCountInfo(**PageCountInput)
-			self.PagesAcrossText.Widget.ChangeValue(str(self.PageCountInfo['PagesAcrossCount']))
-			self.PagesAcrossText.Widget.SelectAll()
-			self.PagesDownText.Widget.ChangeValue(str(self.PageCountInfo['PagesDownCount']))
-			self.PagesDownText.Widget.SelectAll()
+			# get number of pages required for FT export, considering current settings, and update page count widgets
+			self.PageCountInfo = self.GetUpdatedPageCount()
+			self.UpdatePageCountWidgets(self.PageCountInfo)
 			self.UpdateWidgetStatus()
+
+
+		def GetUpdatedPageCount(self): # recalculate page count and update widgets
+			ShowWhat, PageNumberWhere, ShowTexts = self.MakeAttribStrings()
+			PageCountInput = {'FT': self.FT, 'Zoom': self.Zoom, 'ShowWhat': ShowWhat,
+				'PageSizeLongAxis': core_classes.PaperSizes[self.PageSizeChoice.Widget.GetSelection()].SizeLongAxis,
+				'PageSizeShortAxis': core_classes.PaperSizes[self.PageSizeChoice.Widget.GetSelection()].SizeShortAxis,
+				'Orientation': 'Portrait' if self.PortraitRadio.Widget.GetValue() else 'Landscape',
+				'TopMargin': self.Margins['ExportPaperTopMargin'],
+				'BottomMargin': self.Margins['ExportPaperBottomMargin'],
+				'LeftMargin': self.Margins['ExportPaperLeftMargin'],
+				'RightMargin': self.Margins['ExportPaperRightMargin'],
+				'PageNumberPos': PageNumberWhere, 'FirstPageNumber': 1, 'PageCountToShow': 'Auto',
+				'NewPagePerRR': self.NewPagePerRRCheck.Widget.IsChecked(),
+				'Font': self.ParentFrame.TopLevelFrame.SystemFontNames[self.FontChoice.Widget.GetSelection()],
+				'ConnectorsAcrossPages': self.ConnectorsAcrossPagesCheck.Widget.IsChecked(),
+				'ShowTexts': ShowTexts,
+				'CannotCalculateText': self.CannotCalculateText.Widget.GetValue().strip(),
+				'CombineRRs': self.CombineRRsCheck.Widget.IsChecked(),
+				'ExpandGates': self.ExpandGatesCheck.Widget.IsChecked(),
+				'DateKind': core_classes.DateChoices[self.DateChoice.Widget.GetSelection()]}
+			return self.FT.GetPageCountInfo(**PageCountInput)
+
+		def UpdatePageCountWidgets(self, PageCountInfo):
+			# update PagesAcrossText and PagesDownText with page count info supplied in PageCountInfo (tuple returned
+			# from self.FT.GetPageCountInfo() )
+			self.PagesAcrossText.Widget.ChangeValue(str(PageCountInfo['PagesAcrossCount']))
+			self.PagesAcrossText.Widget.SelectAll()
+			self.PagesDownText.Widget.ChangeValue(str(PageCountInfo['PagesDownCount']))
+			self.PagesDownText.Widget.SelectAll()
 
 		def UpdateFilenameStatusMessage(self, UserFilePath='', ActualFilePathsToUse=[]):
 			# update filename status message widget text based UserFilePath (str; what's currently in the Filename
@@ -357,7 +389,8 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 
 		def UpdateWidgetStatus(self):
 			# update enabled/disabled status of all widgets
-			# First, get a list of all actual filenames to use for multipage export
+			ThisViewport = self.ParentFrame.TopLevelFrame.CurrentViewport
+			# First, get a list of all actual filenames to use for multipage export%%%
 			UserFilenameStub = self.FilenameText.Widget.GetValue().strip()
 			ActualFilenames = GetFilenamesForMultipageExport(BasePath=UserFilenameStub,
 				FileType=core_classes.ImageFileTypesSupported[self.FileTypeChoice.Widget.GetSelection()],
@@ -365,7 +398,12 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 			FilenameStatus = self.UpdateFilenameStatusMessage(UserFilePath=UserFilenameStub,
 				ActualFilePathsToUse=ActualFilenames)
 			# set status of Go button
-			self.GoButton.Widget.Enable(FilenameStatus in ['ReadyToMakeNewFile', 'ReadyToOverwrite'])
+			SomeFTElementsAreSelected = bool(ThisViewport.OriginatingViewport.CurrentElements)
+			FilenameUsable = FilenameStatus in ['ReadyToMakeNewFile', 'ReadyToOverwrite']
+			ContentIsNonzero = self.ShowHeaderCheck.Widget.IsChecked() or \
+				(self.ShowFTCheck.Widget.IsChecked() and (SomeFTElementsAreSelected or \
+				not self.ShowOnlySelectedCheck.Widget.IsChecked()))
+			self.GoButton.Widget.Enable(FilenameUsable and ContentIsNonzero)
 			return FilenameStatus
 
 
@@ -579,9 +617,6 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 			Handler=ThisAspect.OnExpandGatesCheck, Events=[wx.EVT_CHECKBOX], ColLoc=4, ColSpan=1)
 		ThisAspect.BlackWhiteCheck = UIWidgetItem(wx.CheckBox(MyEditPanel, -1, _('Monochrome')), NewRow=True,
 			Handler=ThisAspect.OnBlackWhiteCheck, Events=[wx.EVT_CHECKBOX], ColLoc=4, ColSpan=1)
-#		ThisAspect.DepictionLabel = UIWidgetItem(wx.StaticText(MyEditPanel, -1,
-#			_('Fault tree depiction')),
-#			YGap=20, ColLoc=0, ColSpan=2, Font=Fonts['SmallHeadingFont'], NewRow=True)
 		ThisAspect.TextWidgets.extend(display_utilities.PopulateSizer(Sizer=StyleBoxSubSizer, Widgets=[
 			ThisAspect.FontLabel, ThisAspect.FontChoice, ThisAspect.ConnectorsAcrossPagesCheck,
 			ThisAspect.DateLabel, ThisAspect.DateChoice, ThisAspect.CombineRRsCheck,
@@ -656,7 +691,7 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 
 	def GetPageCountInfo(self, Zoom, ShowWhat, PageSizeLongAxis, PageSizeShortAxis, Orientation,
 		TopMargin, BottomMargin, LeftMargin, RightMargin, PageNumberPos, NewPagePerRR, Font, ConnectorsAcrossPages,
-		ShowComments, ShowActions, ShowParking, CannotCalculateText, CombineRRs, ExpandGates, DateKind, **Args):
+		ShowTexts, CannotCalculateText, CombineRRs, ExpandGates, DateKind, **Args):
 		# calculate the number of pages required to export the FT
 		# ShowWhat (str): what to include in the export. Contains some of 'Header', 'FT', 'OnlySelected'
 #		# FT: a faulttree.FTForDisplay instance
@@ -676,14 +711,26 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 		assert isinstance(NewPagePerRR, bool)
 		assert isinstance(Font, str)
 		assert isinstance(ConnectorsAcrossPages, bool)
-		assert isinstance(ShowComments, bool)
-		assert isinstance(ShowActions, bool)
-		assert isinstance(ShowParking, bool)
+		assert isinstance(ShowTexts, str) # can contain 'Comments', 'ActionItems', 'ParkingLotItems'
 		assert isinstance(CannotCalculateText, str)
 		assert isinstance(CombineRRs, bool)
 		assert isinstance(ExpandGates, bool)
 		assert DateKind in core_classes.DateChoices
-		print('FR372 GetPageCountInfo: not implemented yet')
+		print('FF704 GetPageCountInfo: receiving:')
+		print('Zoom: ', Zoom)
+		print('ShowWhat: ', ShowWhat)
+		print('PageSizeLongAxis, PageSizeShortAxis: ', PageSizeLongAxis, PageSizeShortAxis)
+		print('Orientation: ', Orientation)
+		print('Margins T, B, L, R: ', TopMargin, BottomMargin, LeftMargin, RightMargin)
+		print('PageNumberPos: ', PageNumberPos)
+		print('NewPagePerRR: ', NewPagePerRR)
+		print('Font: ', Font)
+		print('ConnectorsAcrossPages: ', ConnectorsAcrossPages)
+		print('ShowTexts: ', ShowTexts)
+		print('CannotCalculateText: ', CannotCalculateText)
+		print('CombineRRs: ', CombineRRs)
+		print('ExpandGates:', ExpandGates)
+		print('DateKind: ', DateKind.HumanName)
 		return {'PagesAcrossCount': 2, 'PagesDownCount': 3}
 
 	def DoExportFTToFile(self, FilePath, FileType,
@@ -744,6 +791,9 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 		# make aspect object for dialogue
 		self.DialogueAspect = self.MakeFTFullExportAspect(MyEditPanel=DisplDevice, Fonts=Fonts,
 			SystemFontNames=SystemFontNames, DateChoices=Args['DateChoices'])
+		# get connection to originating Viewport
+		assert isinstance(Args['OriginatingViewport'], faulttree.FTForDisplay)
+		self.OriginatingViewport = Args['OriginatingViewport']
 
 	def PrepareFullDisplay(self, XMLTree):
 		# display dialogue in our display device to get export parameters from user
