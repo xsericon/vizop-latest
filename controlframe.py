@@ -1443,6 +1443,8 @@ class ControlFrame(wx.Frame):
 					self.TopLevelFrame.SwitchToPHAObj(Proj=Proj, TargetPHAObjID=FTRequestedID)
 
 		def FaultTreeAspect_OnGoToViewChoice(self, Event, **Args): pass
+			# can use SwitchToPHAObj()
+
 		def FaultTreeAspect_OnCommentButton(self, Event, **Args): pass
 		def FaultTreeAspect_OnActionButton(self, Event, **Args): pass
 		def FaultTreeAspect_OnProblemShowMeButton(self, Event, **Args): pass
@@ -1753,7 +1755,6 @@ class ControlFrame(wx.Frame):
 
 		def ReleaseViewportFromDisplDevice(self):
 			# execute actions needed when display device is changing from one Viewport to another
-			print('CF1755 clearing Viewport from display device')
 			# first, do wrap-up actions in the Viewport
 			self.ViewportOwner.CurrentViewport.ReleaseDisplayDevice(DisplDevice=self)
 			self.TopLevelFrame.CurrentViewport = None # this probably isn't used, redundant
@@ -2170,7 +2171,8 @@ class ControlFrame(wx.Frame):
 		Handler = {'RP_NewViewport': self.PostProcessNewViewport,
 			'RP_SwitchToViewport': self.PostProcessSwitchToViewport,
 			'RP_NewPHAModel': self.PostProcessNewPHAModel,
-			'RP_StopDisplayingViewport': self.PostProcessNoActionRequired
+			'RP_StopDisplayingViewport': self.PostProcessNoActionRequired,
+			'RP_DestroyViewport': self.PostProcessNoActionRequired
 			}[XMLRoot.tag.strip()]
 		# call handler, and return its reply
 		Reply = Handler(XMLRoot)
@@ -2191,7 +2193,8 @@ class ControlFrame(wx.Frame):
 			'RQ_SwitchToViewport': self.DatacoreSwitchToViewport,
 			'RQ_NewFTEventNotIPL': self.DatacoreDoNewFTEventNotIPL,
 			'RQ_NewPHAObject': DatacoreDoNewPHAObj,
-			'RQ_StopDisplayingViewport': DatacoreStopDisplayingViewport}[
+			'RQ_StopDisplayingViewport': DatacoreStopDisplayingViewport,
+			'RQ_DestroyViewport': self.DatacoreDestroyViewport}[
 			ParsedMsgRoot.tag.strip()]
 		# call handler and collect reply XML tree to send back to Control Frame
 		ReplyXML = Handler(Proj=Proj, XMLRoot=ParsedMsgRoot)
@@ -2321,10 +2324,11 @@ class ControlFrame(wx.Frame):
 		# handle incoming RP_ message to Control Frame where no action is required
 		return vizop_misc.MakeXMLMessage('Null', 'Null')
 
-	def DoSwitchToViewportCommand(self, Proj, PHAObj, Viewport, Redoing=False, Chain=False, **Args):
+	def DoSwitchToViewportCommand(self, Proj, PHAObj, Viewport, Redoing=False, Chain=False, ViewportToDestroy=None, **Args):
 		# handle request to switch to existing Viewport in project Proj
 		# Redoing (bool): whether we are redoing an undone "switch to Viewport" operation (currently not used, can be removed)
 		# Chain (bool): whether this new Viewport creation call is chained from another event (e.g. switch PHA model)
+		# ViewportToDestroy (Viewport instance or None): if specified, destroy this Viewport
 		# Possible Args:
 		#	ViewportInRedoRecord (Viewport instance) if Redoing
 		assert isinstance(Proj, projects.ProjectItem)
@@ -2332,44 +2336,44 @@ class ControlFrame(wx.Frame):
 		assert isinstance(Viewport, display_utilities.ViewportBaseClass)
 		assert isinstance(Redoing, bool)
 		assert isinstance(Chain, bool)
+		assert isinstance(ViewportToDestroy, display_utilities.ViewportBaseClass) or (ViewportToDestroy is None)
 		if Redoing:
 			assert isinstance(Args['ViewportInRedoRecord'], display_utilities.ViewportBaseClass)
-		# store a navigation milestone to go back to
-		NewMilestone = core_classes.MilestoneItem(Proj=Proj, DisplDevice=self.MyEditPanel, Displayable=True)
-		Proj.BackwardHistory.append(NewMilestone)
-#		# create new Viewport object, with communication sockets, or retrieve previously made Viewport if redoing
-#		if Redoing:
-#			NewViewport = Args['ViewportInRedoRecord']
-#			RequestToDatacore = 'RQ_NewViewport_Redo'
-#		else:
-#			NewViewport, D2CSocketNo, C2DSocketNo, VizopTalksArgs = display_utilities.CreateViewport(Proj,
-#				Args['ViewportClass'], DisplDevice=self.MyEditPanel, PHAObj=Args['PHAModel'], Fonts=self.Fonts)
+		KeepingOldViewport = (ViewportToDestroy is None)
+		if KeepingOldViewport: # store a navigation milestone to go back to
+			NewMilestone = core_classes.MilestoneItem(Proj=Proj, DisplDevice=self.MyEditPanel, Displayable=True)
+			Proj.BackwardHistory.append(NewMilestone)
 		RequestToDatacore = 'RQ_SwitchToViewport'
-#		self.Viewports.append(NewViewport) # add it to the register for Control Frame
-#		self.TrialViewport = NewViewport # set as temporary current viewport, confirmed after successful creation
 #		# request datacore to create new viewport shadow
 		# The attribs in the dict below are used in DatacoreSwitchToViewport(). Many of them are not currently used;
 		# TODO remove unneeded attribs for bug resilience
 		TargetViewportAttribs = {'ControlFrame': self.ID, info.SkipRefreshTag: utilities.Bool2Str(Chain),
 			info.ProjIDTag: Proj.ID, info.ViewportTag: Viewport.ID,
-			info.PHAModelIDTag: PHAObj.ID,
-#			info.PHAModelIDTag: PHAObj.ID, info.PHAModelTypeTag: PHAObj.InternalName,
-			info.MilestoneIDTag: NewMilestone.ID}
+			info.PHAModelIDTag: PHAObj.ID}
+		if KeepingOldViewport: 	TargetViewportAttribs.update({info.MilestoneIDTag: NewMilestone.ID})
+		else: TargetViewportAttribs.update({info.DoomedViewportIDTag: ViewportToDestroy.ID})
 		vizop_misc.SendRequest(self.zmqOutwardSocket, Command=RequestToDatacore, **TargetViewportAttribs)
 		# show VizopTalks confirmation message
 		if not Redoing:
+			VTMessage = PHAObj.HumanName + '\n\n' + _('Use back button to go back') if KeepingOldViewport \
+				else PHAObj.HumanName
 			self.MyVTPanel.SubmitVizopTalksMessage(Title=_('Now showing %s:') % type(PHAObj).HumanName,
-				MainText=PHAObj.HumanName + '\n\n' + _('Use back button to go back'), Priority=ConfirmationPriority)
+				MainText=VTMessage, Priority=ConfirmationPriority)
 		return vizop_misc.MakeXMLMessage('Null', 'Null')
 
-	def SwitchToPHAObj(self, Proj, TargetPHAObjID):
-		# display most recently viewed Viewport of PHA object with ID == TargetPHAObj
+	def SwitchToPHAObj(self, Proj, TargetPHAObjID, TargetViewport=None, ViewportToDestroy=None):
+		# display a Viewport of PHA object with ID == TargetPHAObj.
+		# If TargetViewport (a Viewport shadow) is specified, display this Viewport; else display most recently viewed one
+		# If ViewportToDestroy (a Viewport shadow) is specified, also destroy the specified Viewport
 		assert isinstance(Proj, projects.ProjectItem)
 		assert isinstance(TargetPHAObjID, str)
 		assert TargetPHAObjID in [p.ID for p in Proj.PHAObjShadows]
 		TargetPHAObj = Proj.PHAObjShadows[ [p.ID for p in Proj.PHAObjShadows].index(TargetPHAObjID) ]
-		TargetViewport = self.MyEditPanel.LatestViewport[TargetPHAObj]
-		self.DoSwitchToViewportCommand(Proj=Proj, PHAObj=TargetPHAObj, Viewport=TargetViewport)
+		if TargetViewport is None:
+			ViewportToShow = self.MyEditPanel.LatestViewport[TargetPHAObj]
+		else: ViewportToShow = TargetViewport
+		self.DoSwitchToViewportCommand(Proj=Proj, PHAObj=TargetPHAObj, Viewport=ViewportToShow,
+			ViewportToDestroy=ViewportToDestroy)
 
 	def PostProcessSwitchToViewport(self, XMLRoot):
 		# get info on an existing Viewport from datacore in XMLRoot, and display the Viewport
@@ -2506,6 +2510,20 @@ class ControlFrame(wx.Frame):
 			PHAObjInControlPanel=self.CurrentViewport.PHAObj, ComponentInControlPanel=None)
 		return vizop_misc.MakeXMLMessage('Null', 'Null')
 
+	def DestroyViewport(self, Proj, DoomedViewport, **Args):
+		# don't use this function; destroy a Viewport by calling DoSwitchToViewportCommand() instead
+		# destroy DoomedViewport, remove it from Proj
+		# might also work for future Redo; Args may need to include Chain
+		# TODO check if Viewport is in any Milestone in the navigation history, and remove it? Or will that cause
+		# complications with undo/redo of Destroy Viewport?
+		self.Viewports.remove(DoomedViewport) # remove it from register
+		if self.TrialViewport == DoomedViewport: self.TrialViewport = None # for safety
+		RequestToDatacore = 'RQ_DestroyViewport'
+		# request datacore to destroy Viewport shadow
+		ViewportAttribs = {'ControlFrame': self.ID, info.SkipRefreshTag: utilities.Bool2Str(Args.get('Chain', False)),
+			info.ProjIDTag: Proj.ID, 'Viewport': DoomedViewport.ID}
+		vizop_misc.SendRequest(self.zmqOutwardSocket, Command=RequestToDatacore, **ViewportAttribs)
+
 	def DatacoreDoNewViewport_Undo(self, Proj, UndoRecord, **Args): # undo creation of new Viewport
 		global UndoChainWaiting
 		assert isinstance(Proj, projects.ProjectItem)
@@ -2605,6 +2623,17 @@ class ControlFrame(wx.Frame):
 		# send the info back to control frame as a reply message (via ListenToSocket)
 		return Reply
 
+	def DatacoreDestroyViewport(self, XMLRoot=None):
+		# find the Viewport to destroy
+		DoomedViewportID = XMLRoot.find(info.DoomedViewportIDTag).text
+		ThisProj = utilities.ObjectWithID(self.Projects, XMLRoot.find(info.ProjIDTag).text)
+		HostPHAObj = utilities.ObjectWithID(ThisProj.PHAObjs, XMLRoot.find(info.PHAModelIDTag).text)
+		DoomedViewport = utilities.ObjectWithID(HostPHAObj.Viewports, DoomedViewportID)
+		# remove the Viewport from its PHA object
+		HostPHAObj.Viewports.remove(DoomedViewport)
+		Reply = vizop_misc.MakeXMLMessage(RootName='RP_DestroyViewport', RootText=DoomedViewportID, Elements={})
+		return Reply
+
 	def MakeXMLMessageForDrawViewport(self, MessageHead, PHAObj, Viewport, ViewportID):
 		# make and return XML element containing message required for SwitchToViewport, with all required redraw data
 		# MessageHead: command string required as XML root, e.g. 'RP_NewViewport'
@@ -2626,7 +2655,7 @@ class ControlFrame(wx.Frame):
 		# one of the Control Frames (local or remote), already exists for this Viewport.
 		# Input data is supplied in XMLRoot, an XML ElementTree root element, or as separate attribs
 		# including Chain (str: 'NoChain' or 'Stepwise'): whether this call is chained from another event, e.g. new PHA model
-		# return reply data (XML tree) to send back to respective Control Frame
+		# return reply data (XML tree) to send back to respective Control Frame%%%
 		# This function might be better placed outside Control Frame class, but currently we can't because it needs
 		# access to ControlFrame's self.Projects
 		# First, get the attribs needed to find the Viewport in the datacore
@@ -2663,6 +2692,9 @@ class ControlFrame(wx.Frame):
 		TargetViewport.IsOnDisplay = True
 		Reply = self.MakeXMLMessageForDrawViewport(MessageHead='RP_SwitchToViewport', PHAObj=ExistingPHAObj,
 			Viewport=TargetViewport, ViewportID=TargetViewportID)
+		# check whether we should destroy an old Viewport, and destroy it if required
+		if XMLRoot.find(info.DoomedViewportIDTag):
+			self.DatacoreDestroyViewport(XMLRoot=XMLRoot)
 		# send the info back to control frame as a reply message (via ListenToSocket)
 		return Reply
 
@@ -2747,7 +2779,7 @@ class ControlFrame(wx.Frame):
 		self.MyControlPanel.UpdateNavigationButtonStatus(Proj=Proj)
 
 	def ShowViewport(self, MessageReceived=None, MessageAsXMLTree=None, **Args):
-		# show Viewport ViewportToShow in PHA panel, using data in MessageReceived (XML string) or, if None, in
+		# show Viewport self.CurrentViewport in its host panel, using data in MessageReceived (XML string) or, if None, in
 		# MessageAsXMLTree (XML root element)
 		if MessageReceived is None:
 			assert isinstance(MessageAsXMLTree, ElementTree.Element)
@@ -3135,6 +3167,7 @@ def DatacoreDoNewPHAObj(Proj, XMLRoot=None, ViewportID=None, **NewPHAObjArgs):
 		# TODO properly handle case of PHA model unknown (e.g. we're running old version of Vizop)
 	# make the PHA model and attach it to the project
 	NewPHAObj = NewPHAObjType(Proj, **NewPHAObjArgs)
+	print('CF3171 new PHA obj ID: ', NewPHAObj.ID)
 	Proj.PHAObjs.append(NewPHAObj)
 	Proj.PHAObjShadows.append(NewPHAObj) # put the same object in the shadows list, for local display devices to access
 	Proj.AssignDefaultNameToPHAObj(PHAObj=NewPHAObj)

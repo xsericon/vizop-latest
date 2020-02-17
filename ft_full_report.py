@@ -28,6 +28,12 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 
 	class FTFullExportDialogueAspect(project_display.EditPanelAspectItem):
 
+		def UpdatePageCount(self): # recalculate number of pages required for FT export, update page count widgets and
+			# update other GUI elements such as Go button status
+			self.PageCountInfo = self.GetUpdatedPageCount()
+			self.UpdatePageCountWidgets(self.PageCountInfo)
+			self.UpdateWidgetStatus()
+
 		def OnFilenameTextWidget(self, Event=None, WidgetObj=None):
 			# get filename stub provided by user
 			UserFilenameStub = self.FilenameText.Widget.GetValue().strip()
@@ -92,49 +98,192 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 
 		def OnShowHeaderCheck(self, Event): # handle click on "show header" checkbox
 			# get number of pages required for FT export, considering current settings, and update page count widgets
-			self.PageCountInfo = self.GetUpdatedPageCount()
-			self.UpdatePageCountWidgets(self.PageCountInfo)
-			self.UpdateWidgetStatus()
+			self.UpdatePageCount()
 
 		def OnShowFTCheck(self, Event): # handle click on "show FT" checkbox
 			# get number of pages required for FT export, considering current settings, and update page count widgets
-			self.PageCountInfo = self.GetUpdatedPageCount()
-			self.UpdatePageCountWidgets(self.PageCountInfo)
-			self.UpdateWidgetStatus()
+			self.UpdatePageCount()
 
 		def OnShowSelectedCheck(self, Event): # handle click on "selected elements only" checkbox
 			# get number of pages required for FT export, considering current settings, and update page count widgets
-			self.PageCountInfo = self.GetUpdatedPageCount()
-			self.UpdatePageCountWidgets(self.PageCountInfo)
-			self.UpdateWidgetStatus()
+			self.UpdatePageCount()
 
-		def OnPageSizeChoice(self, Event): pass
-		def OnPortraitRadio(self, Event): pass
-		def OnLandscapeRadio(self, Event): pass
-		def OnMarginTextCtrl(self, Event=None, WidgetObj=None): pass # need to write legal value into self.Margins{}
-		def OnPageNumberTopRadio(self, Event): pass
-		def OnPageNumberBottomRadio(self, Event): pass
-		def OnPageNumberNoneRadio(self, Event): pass
-		def OnPageNumberLeftRadio(self, Event): pass
-		def OnPageNumberCentreRadio(self, Event): pass
-		def OnPageNumberRightRadio(self, Event): pass
-		def OnPagesAcrossTextCtrl(self, Event=None, WidgetObj=None): pass
-		def OnPagesDownTextCtrl(self, Event=None, WidgetObj=None): pass
-		def OnNewPagePerRRCheck(self, Event): pass
-		def OnZoomTextCtrl(self, Event=None, WidgetObj=None): pass # need to write legal value to self.Zoom
-		def OnBlackWhiteCheck(self, Event): pass
-		def OnFontChoice(self, Event): pass
-		def OnConnectorsAcrossPagesCheck(self, Event): pass
-		def OnCommentsCheck(self, Event): pass
-		def OnActionsCheck(self, Event): pass
-		def OnParkingCheck(self, Event): pass
-		def OnCannotCalculateTextCtrl(self, Event=None, WidgetObj=None): pass
-		def OnCombineRRsCheck(self, Event): pass
-		def OnExpandGatesCheck(self, Event): pass
-		def OnDateChoice(self, Event): pass
-		def OnCancelButton(self, Event): pass
+		def OnPageSizeChoice(self, Event): # handle change of page size choice
+			# get number of pages required for FT export, considering current settings, and update page count widgets
+			# ensure margins leave reasonable space for the image
+			self.Margins, MarginsChanged = display_utilities.EnsurePaperMarginsReasonable(self.Margins,
+				PaperSize=core_classes.PaperSizes[self.PageSizeChoice.Widget.GetSelection()],
+				Orientation='Portrait' if self.PortraitRadio.Widget.GetValue() else 'Landscape',
+				LastMarginChanged=None)
+			# write new margin values back to widgets, if changed
+			if MarginsChanged:
+				WidgetAndKeyList = [(self.TopMarginText, 'Top'),
+					(self.BottomMarginText, 'Bottom'),
+					(self.LeftMarginText, 'Left'),
+					(self.RightMarginText, 'Right')]
+				for ThisWidget, KeyName in WidgetAndKeyList:
+					ThisWidget.Widget.ChangeValue(str(self.Margins[KeyName]))
+			self.UpdatePageCount()
 
-		def OnGoButton(self, Event):
+		def OnPortraitRadio(self, Event): # handle click on "portrait" radio button
+			self.UpdatePageCount()
+
+		def OnLandscapeRadio(self, Event): # handle click on "landscape" radio button
+			self.UpdatePageCount()
+
+		def OnMarginTextCtrl(self, Event=None, WidgetObj=None):
+			# handle user edit of values in any of the margin text boxes%%%
+			# check if all the text boxes contain legal values; if not, write the old value back into the text box
+			LastMarginChanged = 'Top' # which margin was edited by the user; populated later
+			# find which widget was just edited
+			WidgetObjEdited = WidgetObj if Event is None else Event.GetEventObject()
+			WidgetAndKeyList = [(self.TopMarginText, 'Top'),
+				(self.BottomMarginText, 'Bottom'),
+				(self.LeftMarginText, 'Left'),
+				(self.RightMarginText, 'Right')]
+			for ThisWidget, KeyName in WidgetAndKeyList:
+				NewValue = utilities.str2real(ThisWidget.Widget.GetValue(),
+					meaninglessvalue=self.Margins[KeyName])
+				# store new value in self.Margins{}
+				self.Margins[KeyName] = NewValue
+				# find out which margin was just edited
+				if WidgetObjEdited == ThisWidget.Widget: LastMarginChanged = KeyName
+			# ensure margins leave reasonable space for the image
+			self.Margins, MarginsChanged = display_utilities.EnsurePaperMarginsReasonable(self.Margins,
+				PaperSize=core_classes.PaperSizes[self.PageSizeChoice.Widget.GetSelection()],
+				Orientation='Portrait' if self.PortraitRadio.Widget.GetValue() else 'Landscape',
+				LastMarginChanged=LastMarginChanged)
+			# write new margin values back to widgets
+			for ThisWidget, KeyName in WidgetAndKeyList:
+				ThisWidget.Widget.ChangeValue(str(self.Margins[KeyName]))
+			self.UpdatePageCount()
+
+		def OnPageNumberTopRadio(self, Event): # handle click in "page number at top" radio button
+			self.UpdatePageCount()
+
+		def OnPageNumberBottomRadio(self, Event): # handle click in "page number at bottom" radio button
+			self.UpdatePageCount()
+
+		def OnPageNumberNoneRadio(self, Event):  # handle click in "no page number" radio button
+			self.UpdatePageCount()
+
+		def OnPageNumberLeftRadio(self, Event): # handle click in "page number at left" radio button
+			self.UpdatePageCount()
+
+		def OnPageNumberCentreRadio(self, Event): # handle click in "page number at centre" radio button
+			self.UpdatePageCount()
+
+		def OnPageNumberRightRadio(self, Event): # handle click in "page number at right" radio button
+			self.UpdatePageCount()
+
+		def OnPagesAcrossTextCtrl(self, Event=None, WidgetObj=None): # handle edit of "number of pages across" textctrl
+			# check if the requested number of pages is legal; if not, write previous value back to textctrl
+			PagesAcrossRequested = utilities.str2int(self.PagesAcrossText.Widget.GetValue(), MeaninglessValue='?')
+			if PagesAcrossRequested == '?': # meaningless value received - cannot extract an integer
+				# write back the previous value
+				self.PagesAcrossText.Widget.ChangeValue(str(self.PagesAcross))
+			elif PagesAcrossRequested < 1: # invalid integer received; write back the previous value
+				self.PagesAcrossText.Widget.ChangeValue(str(self.PagesAcross))
+			elif PagesAcrossRequested == self.PagesAcross: # did we receive a value that's the same as the previous value?
+				# write back the previous value
+				self.PagesAcrossText.Widget.ChangeValue(str(self.PagesAcross))
+			else:
+				# calculate zoom required to achieve the requested number of pages across; see algorithm 392-1
+				PageCountInput = self.GetPageCountInput(IncludeZoom=False)
+				self.PagesAcross, self.PagesDown, self.Zoom = display_utilities.CalculateZoom(
+					PageCountMethod=self.FT.GetPageCountInfo,
+					PagesAcrossRequested=PagesAcrossRequested, PagesDownRequested=self.PagesDown,
+					PageCountMethodArgs=PageCountInput,
+					MaxZoom=self.FT.MaxZoom, MinZoom=self.FT.MinZoom)
+				# write values back into textctrls
+				self.PagesAcrossText.Widget.ChangeValue(str(self.PagesAcross))
+				self.PagesDownText.Widget.ChangeValue(str(self.PagesDown))
+				self.ZoomText.Widget.ChangeValue(str(int(round(100 * self.Zoom))))
+				self.UpdateWidgetStatus()
+
+		def OnPagesDownTextCtrl(self, Event=None, WidgetObj=None): # handle edit of "number of pages down" textctrl
+			# check if the requested number of pages is legal; if not, write previous value back to textctrl
+			PagesDownRequested = utilities.str2int(self.PagesDownText.Widget.GetValue(), MeaninglessValue='?')
+			if PagesDownRequested == '?': # meaningless value received - cannot extract an integer
+				# write back the previous value
+				self.PagesDownText.Widget.ChangeValue(str(self.PagesDown))
+			elif PagesDownRequested < 1: # invalid integer received; write back the previous value
+				self.PagesDownText.Widget.ChangeValue(str(self.PagesDown))
+			elif PagesDownRequested == self.PagesDown: # did we receive a value that's the same as the previous value?
+				# write back the previous value
+				self.PagesDownText.Widget.ChangeValue(str(self.PagesDown))
+			else:
+				# calculate zoom required to achieve the requested number of pages down; see algorithm 392-1
+				PageCountInput = self.GetPageCountInput(IncludeZoom=False)
+				self.PagesAcross, self.PagesDown, self.Zoom = display_utilities.CalculateZoom(
+					PageCountMethod=self.FT.GetPageCountInfo,
+					PagesAcrossRequested=self.PagesAcross, PagesDownRequested=PagesDownRequested,
+					PageCountMethodArgs=PageCountInput,
+					MaxZoom=self.FT.MaxZoom, MinZoom=self.FT.MinZoom)
+				# write values back into textctrls
+				self.PagesAcrossText.Widget.ChangeValue(str(self.PagesAcross))
+				self.PagesDownText.Widget.ChangeValue(str(self.PagesDown))
+				self.ZoomText.Widget.ChangeValue(str(int(round(100 * self.Zoom))))
+				self.UpdateWidgetStatus()
+
+		def OnNewPagePerRRCheck(self, Event): # handle click in "start new page per RR" checkbox
+			self.UpdatePageCount()
+
+		def OnZoomTextCtrl(self, Event=None, WidgetObj=None): # handle edit of zoom value in textctrl
+			ZoomRequested = utilities.str2int(self.ZoomText.Widget.GetValue(), MeaninglessValue='?')
+			if ZoomRequested == '?': # meaningless value received - cannot extract an integer
+				# write back the previous value
+				self.ZoomText.Widget.ChangeValue(str(self.Zoom))
+			else:
+				if ZoomRequested < 100 * self.FT.MinZoom: # underrange received; force within range
+					ZoomToUse = self.FT.MinZoom
+				elif ZoomRequested > 100 * self.FT.MaxZoom: # overrange received; force within range
+					ZoomToUse = self.FT.MaxZoom
+				else: ZoomToUse = 0.01 * ZoomRequested # convert received text to percent
+				# write legal value to self.Zoom
+				self.Zoom = ZoomToUse
+				# write new zoom back to textctrl
+				self.ZoomText.Widget.ChangeValue(str(int(round(ZoomToUse * 100))))
+				self.ZoomText.Widget.SelectAll()
+				self.UpdatePageCount()
+
+		def OnBlackWhiteCheck(self, Event): pass # no action needed
+
+		def OnFontChoice(self, Event): # handle change of font selection
+			self.UpdatePageCount()
+
+		def OnConnectorsAcrossPagesCheck(self, Event): # handle click in "connectors across pages" checkbox
+			self.UpdatePageCount()
+
+		def OnCommentsCheck(self, Event): # handle click in "comments" checkbox
+			self.UpdatePageCount()
+
+		def OnActionsCheck(self, Event): # handle click in "action items" checkbox
+			self.UpdatePageCount()
+
+		def OnParkingCheck(self, Event): # handle click in "parking lot" checkbox
+			self.UpdatePageCount()
+
+		def OnCannotCalculateTextCtrl(self, Event=None, WidgetObj=None): # handle edit in "cannot calculate" textctrl
+			# write the value back to the textctrl without leading and trailing spaces
+			self.CannotCalculateText.Widget.ChangeValue(self.CannotCalculateText.Widget.GetValue().strip())
+			self.CannotCalculateText.Widget.SelectAll()
+			self.UpdatePageCount()
+
+		def OnCombineRRsCheck(self, Event): # handle click in "combine RRs" checkbox
+			self.UpdatePageCount()
+
+		def OnExpandGatesCheck(self, Event): # handle click in "expand gates" checkbox
+			self.UpdatePageCount()
+
+		def OnDateChoice(self, Event): # handle change of "date to show" choice
+			self.UpdatePageCount()
+
+		def OnCancelButton(self, Event): # handle click on "cancel" button
+			self.StoreAttribsInProject()
+			self.ExitViewportAndRevert()
+
+		def OnGoButton(self, Event): # handle click on "go" button
 			# get string containing information about export required
 			ShowWhat, PageNumberWhere, ShowTexts = self.MakeAttribStrings()
 			ExportInput = {'FilePath': self.FilenameText.Widget.GetValue().strip(),
@@ -143,9 +292,9 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 				'PageSizeLongAxis': core_classes.PaperSizes[self.PageSizeChoice.Widget.GetSelection()].SizeLongAxis,
 				'PageSizeShortAxis': core_classes.PaperSizes[self.PageSizeChoice.Widget.GetSelection()].SizeShortAxis,
 				'Orientation': 'Portrait' if self.PortraitRadio.Widget.GetValue() else 'Landscape',
-				'TopMargin': self.Margins['ExportPaperTopMargin'],
-				'BottomMargin': self.Margins['ExportPaperBottomMargin'],
-				'LeftMargin': self.Margins['ExportPaperLeftMargin'], 'RightMargin': self.Margins['ExportPaperRightMargin'],
+				'TopMargin': self.Margins['Top'],
+				'BottomMargin': self.Margins['Bottom'],
+				'LeftMargin': self.Margins['Left'], 'RightMargin': self.Margins['Right'],
 				'PageNumberPos': PageNumberWhere, 'FirstPageNumber': 1, 'PageCountToShow': 'Auto',
 				'NewPagePerRR': self.NewPagePerRRCheck.Widget.IsChecked(),
 				'Font': self.ParentFrame.TopLevelFrame.SystemFontNames[self.FontChoice.Widget.GetSelection()],
@@ -157,6 +306,7 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 				'DateKind': core_classes.DateChoices[self.DateChoice.Widget.GetSelection()] }
 			self.FT.DoExportFTToFile(**ExportInput)
 			self.StoreAttribsInProject()
+			self.ExitViewportAndRevert()
 
 		def MakeAttribStrings(self):
 			# return ShowWhat, PageNumberWhere and ShowTexts (3 x str) containing information about export required
@@ -175,7 +325,6 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 
 		def StoreAttribsInProject(self):
 			# send request to datacore to store parameters in project
-#			ThisAspect = self.DisplDevice.MyEditPanel.FTFullExportAspect
 			ThisViewport = self.ParentFrame.TopLevelFrame.CurrentViewport
 			# gets string containing information about export required
 			ShowWhat, PageNumberWhere, ShowTexts = self.MakeAttribStrings()
@@ -187,8 +336,8 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 				ExportWhat=ShowWhat,
 				PageSize=core_classes.PaperSizes[self.PageSizeChoice.Widget.GetSelection()].XMLName,
 				PaperOrientation='Portrait' if self.PortraitRadio.Widget.GetValue() else 'Landscape',
-				MarginLeft=str(self.Margins['ExportPaperLeftMargin']), MarginRight=str(self.Margins['ExportPaperRightMargin']),
-				MarginTop=str(self.Margins['ExportPaperTopMargin']), MarginBottom=str(self.Margins['ExportPaperBottomMargin']),
+				MarginLeft=str(self.Margins['Left']), MarginRight=str(self.Margins['Right']),
+				MarginTop=str(self.Margins['Top']), MarginBottom=str(self.Margins['Bottom']),
 				PageNumberLoc=PageNumberWhere,
 				Zoom=str(self.Zoom),
 				NewPagePerRR=utilities.Bool2Str(self.NewPagePerRRCheck.Widget.IsChecked()),
@@ -238,10 +387,10 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 			# set paper margin text boxes
 			self.Margins = {} # store margin values
 			for ThisWidget, ConfigName, Default in [
-					(self.TopMarginText, 'ExportPaperTopMargin', info.DefaultPaperTopMargin),
-					(self.BottomMarginText, 'ExportPaperBottomMargin', info.DefaultPaperBottomMargin),
-					(self.LeftMarginText, 'ExportPaperLeftMargin', info.DefaultPaperLeftMargin),
-					(self.RightMarginText, 'ExportPaperRightMargin', info.DefaultPaperRightMargin) ]:
+					(self.TopMarginText, 'Top', info.DefaultPaperTopMargin),
+					(self.BottomMarginText, 'Bottom', info.DefaultPaperBottomMargin),
+					(self.LeftMarginText, 'Left', info.DefaultPaperLeftMargin),
+					(self.RightMarginText, 'Right', info.DefaultPaperRightMargin) ]:
 #				ThisMarginStr = vizop_misc.GetValueFromUserConfig(ConfigName)
 				# converting to string, then back to real, to avoid problems with bad values in user-edited project file
 				ThisMarginStr = str(Proj.ExportPaperMargins.get(ConfigName, Default))
@@ -303,16 +452,18 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 			self.UpdateWidgetStatus()
 
 
-		def GetUpdatedPageCount(self): # recalculate page count and update widgets
+		def GetPageCountInput(self, IncludeZoom=True): # gather and return info needed to recalculate page count
+			# IncludeZoom (bool): whether to include Zoom key in returned dict
+			assert isinstance(IncludeZoom, bool)
 			ShowWhat, PageNumberWhere, ShowTexts = self.MakeAttribStrings()
-			PageCountInput = {'FT': self.FT, 'Zoom': self.Zoom, 'ShowWhat': ShowWhat,
+			PageCountInput = {'FT': self.FT, 'ShowWhat': ShowWhat,
 				'PageSizeLongAxis': core_classes.PaperSizes[self.PageSizeChoice.Widget.GetSelection()].SizeLongAxis,
 				'PageSizeShortAxis': core_classes.PaperSizes[self.PageSizeChoice.Widget.GetSelection()].SizeShortAxis,
 				'Orientation': 'Portrait' if self.PortraitRadio.Widget.GetValue() else 'Landscape',
-				'TopMargin': self.Margins['ExportPaperTopMargin'],
-				'BottomMargin': self.Margins['ExportPaperBottomMargin'],
-				'LeftMargin': self.Margins['ExportPaperLeftMargin'],
-				'RightMargin': self.Margins['ExportPaperRightMargin'],
+				'TopMargin': self.Margins['Top'],
+				'BottomMargin': self.Margins['Bottom'],
+				'LeftMargin': self.Margins['Left'],
+				'RightMargin': self.Margins['Right'],
 				'PageNumberPos': PageNumberWhere, 'FirstPageNumber': 1, 'PageCountToShow': 'Auto',
 				'NewPagePerRR': self.NewPagePerRRCheck.Widget.IsChecked(),
 				'Font': self.ParentFrame.TopLevelFrame.SystemFontNames[self.FontChoice.Widget.GetSelection()],
@@ -322,13 +473,19 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 				'CombineRRs': self.CombineRRsCheck.Widget.IsChecked(),
 				'ExpandGates': self.ExpandGatesCheck.Widget.IsChecked(),
 				'DateKind': core_classes.DateChoices[self.DateChoice.Widget.GetSelection()]}
-			return self.FT.GetPageCountInfo(**PageCountInput)
+			if IncludeZoom: PageCountInput['Zoom'] = self.Zoom
+			return PageCountInput
+
+		def GetUpdatedPageCount(self): # recalculate page count and update widgets
+			return self.FT.GetPageCountInfo(**self.GetPageCountInput())
 
 		def UpdatePageCountWidgets(self, PageCountInfo):
 			# update PagesAcrossText and PagesDownText with page count info supplied in PageCountInfo (tuple returned
 			# from self.FT.GetPageCountInfo() )
+			self.PagesAcross = PageCountInfo['PagesAcrossCount']
 			self.PagesAcrossText.Widget.ChangeValue(str(PageCountInfo['PagesAcrossCount']))
 			self.PagesAcrossText.Widget.SelectAll()
+			self.PagesDown = PageCountInfo['PagesDownCount']
 			self.PagesDownText.Widget.ChangeValue(str(PageCountInfo['PagesDownCount']))
 			self.PagesDownText.Widget.SelectAll()
 
@@ -390,7 +547,7 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 		def UpdateWidgetStatus(self):
 			# update enabled/disabled status of all widgets
 			ThisViewport = self.ParentFrame.TopLevelFrame.CurrentViewport
-			# First, get a list of all actual filenames to use for multipage export%%%
+			# First, get a list of all actual filenames to use for multipage export
 			UserFilenameStub = self.FilenameText.Widget.GetValue().strip()
 			ActualFilenames = GetFilenamesForMultipageExport(BasePath=UserFilenameStub,
 				FileType=core_classes.ImageFileTypesSupported[self.FileTypeChoice.Widget.GetSelection()],
@@ -401,11 +558,23 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 			SomeFTElementsAreSelected = bool(ThisViewport.OriginatingViewport.CurrentElements)
 			FilenameUsable = FilenameStatus in ['ReadyToMakeNewFile', 'ReadyToOverwrite']
 			ContentIsNonzero = self.ShowHeaderCheck.Widget.IsChecked() or \
-				(self.ShowFTCheck.Widget.IsChecked() and (SomeFTElementsAreSelected or \
+				(self.ShowFTCheck.Widget.IsChecked() and (SomeFTElementsAreSelected or
 				not self.ShowOnlySelectedCheck.Widget.IsChecked()))
 			self.GoButton.Widget.Enable(FilenameUsable and ContentIsNonzero)
 			return FilenameStatus
 
+		def ExitViewportAndRevert(self):
+			# exit from full report Viewport; destroy the Viewport; and request the hosting display device to revert
+			# to the previous Viewport
+			# first, remove all widgets from the sizer and active text widget list
+			self.Deactivate(Widgets=self.WidgetsToActivate)
+			self.MySizer.Clear()
+			# destroy the widgets
+			for ThisWidget in self.WidgetsToActivate:
+				ThisWidget.Widget.Destroy()
+			# destroy this Viewport and switch to the previous Viewport for this FT
+			self.FT.DisplDevice.TopLevelFrame.SwitchToPHAObj(Proj=self.FT.Proj, TargetPHAObjID=self.FT.PHAObj.ID,
+				TargetViewport=self.FT.ViewportToRevertTo, ViewportToDestroy=self.FT)
 
 		def __init__(self, InternalName, ParentFrame, TopLevelFrame):
 			project_display.EditPanelAspectItem.__init__(self, WidgetList=[], InternalName=InternalName,
@@ -665,8 +834,9 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 #			ThisAspect.ExpandGatesCheck, ThisAspect.DateLabel, ThisAspect.DateChoice,
 			ThisAspect.ActionBox]
 #			ThisAspect.CancelButton, ThisAspect.GoButton]
-		# make list of widgets that need to be bound to their handlers in ActivateWidgetsInPanel()
-		ThisAspect.WidgetsToActivate = [ThisAspect.FilenameLabel, ThisAspect.FilenameText, ThisAspect.SelectButton,
+		# make list of widgets that need to be bound to their handlers in ActivateWidgetsInPanel() and deleted on exit
+		ThisAspect.WidgetsToActivate = [ThisAspect.HeaderLabel,
+			ThisAspect.FilenameLabel, ThisAspect.FilenameText, ThisAspect.SelectButton,
 			ThisAspect.FileTypeLabel,
 			ThisAspect.FileTypeChoice, ThisAspect.OverwriteCheck,
 			ThisAspect.FilenameStatusMessage,
@@ -683,6 +853,7 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 			ThisAspect.PagesDownLabel, ThisAspect.PagesDownText, ThisAspect.NewPagePerRRCheck,
 			ThisAspect.ZoomLabel, ThisAspect.ZoomText,
 			ThisAspect.BlackWhiteCheck, ThisAspect.FontLabel, ThisAspect.FontChoice,
+			ThisAspect.IncludeWhatLabel,
 			ThisAspect.ConnectorsAcrossPagesCheck, ThisAspect.CommentsCheck, ThisAspect.ActionsCheck, ThisAspect.ParkingCheck,
 			ThisAspect.CannotCalculateLabel, ThisAspect.CannotCalculateText, ThisAspect.CombineRRsCheck,
 			ThisAspect.ExpandGatesCheck, ThisAspect.DateLabel, ThisAspect.DateChoice,
@@ -694,9 +865,7 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 		ShowTexts, CannotCalculateText, CombineRRs, ExpandGates, DateKind, **Args):
 		# calculate the number of pages required to export the FT
 		# ShowWhat (str): what to include in the export. Contains some of 'Header', 'FT', 'OnlySelected'
-#		# FT: a faulttree.FTForDisplay instance
 		# return dict with args: PagesAcrossCount, PagesDownCount (2 x int)
-#		assert type(FT).InternalName == 'FTTreeView' # confirming it's the correct class
 		assert isinstance(Zoom, float)
 		assert self.MinZoom <= Zoom <= self.MaxZoom
 		assert isinstance(ShowWhat, str)
@@ -805,7 +974,7 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 		self.DialogueAspect.Prefill(self.Proj, FT=self, SystemFontNames=self.SystemFontNames)
 		self.DialogueAspect.SetWidgetVisibility()
 #		self.DialogueAspect.Activate(WidgetsToActivate=self.DialogueAspect.WidgetsToActivate)
-		self.DialogueAspect.Activate(WidgetsToActivate=self.DialogueAspect.WidgetsToActivate,
+		self.DialogueAspect.Activate(WidgetsToActivate=self.DialogueAspect.WidgetsToActivate[:],
 			TextWidgets=self.DialogueAspect.TextWidgets)
 		# display aspect's sizer (containing all the visible widgets) in the edit panel
 		self.DisplDevice.SetSizer(self.DialogueAspect.MySizer)

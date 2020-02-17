@@ -57,6 +57,8 @@ DefaultPaperBottomMargin = '10'
 DefaultPaperLeftMargin = '10'
 DefaultPaperRightMargin = '10'
 DefaultPaperPageNumberPos = 'Top,Right'
+MinUsablePaperLength = 100 # minimum allowable distance between paper margins, in mm
+MinMargin = 5 # minimum allowable paper margin on each side, in mm
 
 # XML tags and attrib names for internal communication. Those marked #f are also used in project files
 IDTag = 'ID' #f
@@ -105,6 +107,7 @@ LongNameAttribName = 'LongName'
 MilestoneIDTag = 'MilestoneID'
 ViewportTypeTag = 'viewporttype'
 ViewportTag = 'Viewport'
+DoomedViewportIDTag = 'ViewportToDestroy'
 SkipRefreshTag = 'skiprefresh'
 ChainWaitingTag = 'chainwaiting'
 ChainedTag = 'chained'
@@ -254,8 +257,8 @@ ValueOutOfRangeMsg = 'ValueOutOfRange'
 NO_ShowViewport = 'NO_ShowViewport'
 
 # Unicode symbols
-CommandKeyName = 'Cmd' if system() == 'Darwin' else 'Ctrl'
 CommandSymbol = u'\u2318' # cloverleaf symbol used on Mac keyboard's Command key
+CommandKeyName = CommandSymbol if system() == 'Darwin' else 'Ctrl'
 InfinitySymbol = u'\u221e'
 
 # remove the dummy definition of _()

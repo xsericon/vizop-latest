@@ -106,8 +106,6 @@ def ViewportClassWithName(TargetName):
 		return ViewportMetaClass.ViewportClasses[InternalNameList.index(TargetName)]
 	else: return None
 
-# --- classes of iWindow widgets ---
-
 class GUIWidget(object): # superclass of all widgets that can be shown in iWindow modes
 	# when instances are created, the widgets are created, but not assigned to sizer, and no event binding is done
 	# this might be a 'parallel system' with class UIWidget in module controlframe. Consider merging.
@@ -885,3 +883,110 @@ def CheckTextCtrlFocus(HostPanel):
 	# save focused TextCtrl (if any) for next time
 	setattr(HostPanel, 'LastTextCtrlFocused', NowFocused)
 
+def CalculateZoom(PageCountMethod, PagesAcrossRequested, PagesDownRequested, PageCountMethodArgs, MaxZoom, MinZoom, **Args):
+	# For an export that may occupy more than one page, calculate the maximum zoom that will fill the number of pages
+	# requested. Implements algorithm 392-1.
+	# PageCountMethod (callable): method that calculates the number of pages required at a given zoom level. Assumed to
+	# return dict containing (at least) keys PagesAcrossCount, PagesDownCount (2 x int).
+	# PagesAcross/DownRequested (2 x int): number of pages to fill
+	# PageCountMethodArgs (dict): all other args to pass to PageCountMethod, apart from Zoom. PageCountMethod must not
+	#	require any positional args.
+	# MaxZoom, MinZoom (float): hard limits on returned zoom value
+	# returns: PagesAcrossAtFinalZoom, PagesDownAtFinalZoom, FinalZoom
+	assert callable(PageCountMethod)
+	assert isinstance(PagesAcrossRequested, int)
+	assert isinstance(PagesDownRequested, int)
+	assert PagesAcrossRequested > 0
+	assert PagesDownRequested > 0
+	assert isinstance(PageCountMethodArgs, dict)
+	assert isinstance(MaxZoom, float)
+	assert isinstance(MinZoom, float)
+	assert 0 < MinZoom < MaxZoom
+	InitialZoom = 1.0
+	# step 1: calculate page count at initial zoom
+	Zoom100Results = PageCountMethod(Zoom=InitialZoom, **PageCountMethodArgs)
+	PageAcross100 = Zoom100Results['PagesAcrossCount']
+	PageDown100 = Zoom100Results['PagesDownCount']
+	# step 2: check if the target zoom is likely underrange
+	ZoomOutOfRange = False
+	if (PageAcross100 / PagesAcrossRequested > InitialZoom / MinZoom) or (PageDown100 / PagesDownRequested > InitialZoom / MinZoom):
+		FinalZoom = MinZoom
+		ZoomOutOfRange = True
+	# step 3: check if the target zoom is likely overrange
+	elif (PageAcross100 / PagesAcrossRequested < InitialZoom / MaxZoom) or (PageDown100 / PagesDownRequested < InitialZoom / MaxZoom):
+		FinalZoom = MaxZoom
+		ZoomOutOfRange = True
+	if ZoomOutOfRange: # calculate page count at min/max zoom and exit
+		FinalZoomResults = PageCountMethod(Zoom=FinalZoom, **PageCountMethodArgs)
+		return FinalZoomResults['PagesAcrossCount'], FinalZoomResults['PagesDownCount'], FinalZoom
+	else:
+		# step 4: calculate initial trial zoom
+		ThisTrialZoom = max(min(InitialZoom * PagesAcrossRequested / PageAcross100,
+			InitialZoom * PagesDownRequested / PageDown100, MaxZoom), MinZoom)
+		LastTrialZoom = InitialZoom
+		# step 5: start loop
+		LoopCounter = 0
+		MaxLoops = 20
+		StopLooping = False
+		while not StopLooping:
+			# step 6: calculate page fount at ThisTrialZoom
+			ThisZoomResults = PageCountMethod(Zoom=ThisTrialZoom, **PageCountMethodArgs)
+			ThisPageAcross = ThisZoomResults['PagesAcrossCount']
+			ThisPageDown = ThisZoomResults['PagesDownCount']
+			# step 7: calculate a step change in zoom
+			TrialStep = min(PagesAcrossRequested / ThisPageAcross, PagesDownRequested / ThisPageDown)
+			if TrialStep == 1.0: # page target hit; increase trial zoom to find maximum acceptable zoom
+				if LoopCounter == 0: ThisZoomStep = math.sqrt(max(ThisTrialZoom, 1.0 / ThisTrialZoom))
+				else: ThisZoomStep = math.sqrt(max(ThisZoomStep, 1.0 / ThisZoomStep))
+			else: ThisZoomStep = math.sqrt(TrialStep)
+			# step 8: update trial zoom, keeping it within valid range
+			LastTrialZoom = ThisTrialZoom
+			ThisTrialZoom = max(min(ThisTrialZoom * ThisZoomStep, MaxZoom), MinZoom)
+			# step 9: increment loop counter
+			LoopCounter += 1
+			# step 10: test whether to loop again; last term stops looping if zoom step is less than 2%
+			StopLooping = (LoopCounter > MaxLoops) or \
+				(((ThisPageAcross == PagesAcrossRequested and ThisPageDown <= PagesDownRequested) or
+				(ThisPageAcross <= PagesAcrossRequested and ThisPageDown == PagesDownRequested)) and
+				(abs( (ThisTrialZoom - LastTrialZoom) / ThisTrialZoom) < 0.02))
+		# step 11: return final results
+		return ThisPageAcross, ThisPageDown, LastTrialZoom
+
+def EnsurePaperMarginsReasonable(Margins, PaperSize, Orientation, LastMarginChanged='Top'):
+	# check paper margins are acceptable considering the paper size specified.
+	# Margins: (dict with keys 'Top', 'Bottom' etc) input margin values in mm
+	# PaperSize (core_classes.PaperSize instance)
+	# Orientation (str): 'Portrait' or 'Landscape'
+	# LastMarginChanged (str or None): 'Top', 'Bottom' etc; which margin was most recently adjusted by user.
+	# 	Not currently used
+	# return: Margins (dict with keys 'Top', 'Bottom' etc; values are adjusted margins in mm);
+	# 	MarginsChanged (bool): whether any returned margin values are different from supplied values
+	KeyList = ['Top', 'Bottom', 'Left', 'Right']
+	assert isinstance(Margins, dict)
+	for ThisKey in KeyList: assert ThisKey in Margins
+	assert isinstance(PaperSize, core_classes.PaperSize)
+	assert Orientation in ['Portrait', 'Landscape']
+	assert (LastMarginChanged in KeyList) or (LastMarginChanged is None)
+	MarginsChanged = False
+	# check each axis
+	for ThisAxis, MarginA, MarginB in [ ('Vertical', 'Top', 'Bottom'), ('Horizontal', 'Left', 'Right') ]:
+		if ThisAxis == 'Vertical':
+			PaperSizeThisAxis = {'Portrait': PaperSize.SizeLongAxis, 'Landscape': PaperSize.SizeShortAxis}[Orientation]
+		else:
+			PaperSizeThisAxis = {'Portrait': PaperSize.SizeShortAxis, 'Landscape': PaperSize.SizeLongAxis}[Orientation]
+		# check if the space between the margins is too small
+		if PaperSizeThisAxis - Margins[MarginA] - Margins[MarginB] < info.MinUsablePaperLength:
+			# adjust larger of the 2 margins
+			if Margins[MarginA] > Margins[MarginB]:
+				LargerMarginKey = MarginA; SmallerMarginKey = MarginB
+			else:
+				LargerMarginKey = MarginB; SmallerMarginKey = MarginA
+			# set the margin to the required size, unless that size is less than the minimum allowed
+			Margins[LargerMarginKey] = max(info.MinMargin, PaperSizeThisAxis - info.MinUsablePaperLength \
+				- Margins[SmallerMarginKey])
+			MarginsChanged = True
+			# if we still didn't reach the minimum paper space, adjust the smaller margin as well
+			if PaperSizeThisAxis - Margins['Top'] - Margins['Bottom'] < info.MinUsablePaperLength:
+				Margins[SmallerMarginKey] = PaperSizeThisAxis - info.MinUsablePaperLength \
+					- Margins[LargerMarginKey]
+	return Margins, MarginsChanged
