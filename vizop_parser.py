@@ -1,6 +1,5 @@
 """
 Name: vizop_parser
-Python version: 3.6.3
 """
 from faulttree import FTColumnInCore
 
