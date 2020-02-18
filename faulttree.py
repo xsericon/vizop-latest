@@ -617,12 +617,9 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 
 	def HandleMouseLClickOnMe(self, **Args): # handle mouse left button single click on TextElement instance
 		# first, request control frame to show appropriate aspect in control panel
-#		# find out which object contains the parameter to be edited, if any
-#		DataHostObj = self.FT if isinstance(self.HostObject, FTHeader) else self.HostObject
 		# first, try to go to any preferred aspect of the Control panel, if our display device has a control panel
 		if getattr(self, 'ControlPanelAspect', None):
 			# if editing a component in the header, get the component name
-#			if isinstance(self.CurrentEditElement.HostObject, FTHeader):
 			if isinstance(self.HostObject, FTHeader):
 				ComponentName = self.InternalName
 			else:
@@ -1418,7 +1415,6 @@ class FTGate(FTBoxyObject): # object containing FT gates for display. These belo
 
 class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for display. These belong to FTColumn's.
 	# Is the superclass of FTConnectorIn and FTConnectorOut
-	# Rendered by drawing into bitmap (doesn't use native widgets or sizer)
 	ConnClassHumanName = {True: _('Inward connector'), False: _('Outward connector')}
 	ConnectorStyles = ['Default'] # future, will define various connector appearances (squares, arrows, circles etc)
 	NeedsConnectButton = True # whether to provide connect buttons
@@ -1464,15 +1460,15 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 
 		# column widths: 100, 100, 50, 50
 		# any element with MinHeight parm set is growable in the y axis to fit the text.
-		# it should be assigned to the Row that it can force to grow
+		# it should be assigned to the Row that it can force to grow%%%
 		ConnKind = TextElement(self.FT, Row=0, ColStart=0, ColSpan=4, EndX=199, HostObject=self,
 			InternalName='ConnKind', DisplAttrib='HumanName')
 		ConnDescription = TextElement(self.FT, Row=1, ColStart=0, ColSpan=2, EndX=199, MinHeight=50, HostObject=self,
-			InternalName='ConnDescription', PromptText=_('Type a description'))
+			InternalName='ConnectorDescription', PromptText=_('Type a description'), EditBehaviour='Text')
 		ConnGroupedButton = ButtonElement(self.FT, Row=1, ColStart=4, ColSpan=1, StartX=250, EndX=299,
 			HostObject=self, InternalName='ConnGroupedButton')
 		self.ConnValue = TextElement(self.FT, Row=2, ColStart=0, ColSpan=1, EndX=99, HostObject=self,
-			InternalName='ConnValue', ControlPanelAspect='CPAspect_NumValue')
+			InternalName='Value', ControlPanelAspect='CPAspect_NumValue', EditBehaviour='Text')
 		self.ConnValueUnitComponent = TextElement(self.FT, Row=2, ColStart=1, ColSpan=1, EndX=199, HostObject=self,
 			InternalName='ConnValueUnit')
 		self.ConnValueProblemButton = ButtonElement(self.FT, Row=2, ColStart=4, ColSpan=1, StartX=250, EndX=299,
@@ -1496,7 +1492,7 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 			# put required values into all fixed text elements; first, connector kind
 			ElementNamed(Elements, 'ConnKind').Text.Content = self.ConnClassHumanName[isinstance(self, FTConnectorIn)]
 			# The following list contains (attribs of FTConnector, element's InternalName)
-			AttribInfo = [ ('Description', 'ConnDescription'), ('Value', 'ConnValue'), ('ValueUnit', 'ConnValueUnit') ]
+			AttribInfo = [ ('Description', 'ConnectorDescription'), ('Value', 'Value'), ('ValueUnit', 'ConnValueUnit') ]
 			# put the content into the other elements
 			for (Attrib, Name) in AttribInfo:
 				MatchingEl = ElementNamed(Elements, Name)
@@ -2777,8 +2773,9 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 	# English names for components; keys are attrib names in this class. Values are translated at point of display
 	ComponentEnglishNames = {'HumanName': 'SIF name', 'Rev': 'Revision', 'OpMode': 'Operating mode',
 		'TolFreq': 'Tolerable frequency', 'SILTargetValue': 'SIL target', 'Description': 'Description',
-		'Value': 'event value'} # key 'Value' is used for elements other than the FT itself
-	# element classes that have a number system, i.e. have a Numbering attrib. Must be tuple, not list
+		'Value': 'event value', 'ConnectorDescription': 'connector description'}
+			# key 'Value' is used for elements other than the FT itself
+	# define which element classes have a number system, i.e. have a Numbering attrib. Must be tuple, not list
 	ElementsWithNumberSystem = (FTConnectorItemInCore, FTGateItemInCore, FTEventInCore)
 
 	def __init__(self, Proj, **Args):
@@ -2786,7 +2783,6 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		# ID is already assigned in PHAModelBaseClass.__init__
 		# self.EditAllowed attrib is inherited from base class
 		FTObjectInCore.AllFTObjects.append(self) # add self to register; must do after assigning self.ID
-#		self.MaxElementID = 0 # Highest ID (int) of all elements in this FT. Used only to determine next available ID
 		# set up numbering for the FT itself - to appear in a high-level list of all FTs in the project
 		self.Numbering = core_classes.NumberingItem()
 		# put a serial number into the numbering object
@@ -4234,7 +4230,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		Proj.ExportPaperMargins = {'Left': XMLRoot.findtext('MarginLeft'), 'Right': XMLRoot.findtext('MarginRight'),
 			'Top': XMLRoot.findtext('MarginTop'), 'Bottom': XMLRoot.findtext('MarginBottom')}
 		Proj.ExportPageNumberLoc = XMLRoot.findtext('PageNumberLoc')
-		Proj.FTFullExportZoom = XMLRoot.findtext('Zoom')
+		Proj.FTFullExportZoom = utilities.str2real(XMLRoot.findtext('Zoom'))
 		Proj.FTExportNewPagePerRR = utilities.Bool2Str(XMLRoot.findtext('NewPagePerRR'))
 		Proj.LastExportBlackAndWhite = utilities.Bool2Str(XMLRoot.findtext('Monochrome'))
 		Proj.LastExportFontName = XMLRoot.findtext('Font')

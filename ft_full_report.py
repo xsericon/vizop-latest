@@ -76,20 +76,22 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 
 		def OnFileTypeChoice(self, Event): # handle user selection of file type
 			# update the file extension in the file name textctrl, if any
-			# first, check if the existing filename has an extension matching any valid image file type
 			OldFilePath = self.FilenameText.Widget.GetValue().strip()
-			OldExtension = os.path.splitext(OldFilePath)[1]
-			if OldExtension in [(os.extsep + t.Extension) for t in core_classes.ImageFileTypesSupported]:
-				# remove old extension and separator behind (e.g. "MyFile.pdf" -> "MyFile")
-				NewFilePath = OldFilePath[:-len(OldExtension)]
-			else: NewFilePath = OldFilePath
-			# append separator, if filename doesn't already end in separator
-			if not NewFilePath.endswith(os.extsep): NewFilePath += os.extsep
-			# append new extension
-			NewFilePath += core_classes.ImageFileTypesSupported[self.FileTypeChoice.Widget.GetSelection()].Extension
-			# write new path back to file name textctrl
-			self.FilenameText.Widget.ChangeValue(NewFilePath)
-			self.FilenameText.Widget.SelectAll()
+			# check if there's any filename in the file name textctrl
+			if OldFilePath:
+				# check if the existing filename has an extension matching any valid image file type
+				OldExtension = os.path.splitext(OldFilePath)[1]
+				if OldExtension in [(os.extsep + t.Extension) for t in core_classes.ImageFileTypesSupported]:
+					# remove old extension and separator behind (e.g. "MyFile.pdf" -> "MyFile")
+					NewFilePath = OldFilePath[:-len(OldExtension)]
+				else: NewFilePath = OldFilePath
+				# append separator, if filename doesn't already end in separator
+				if not NewFilePath.endswith(os.extsep): NewFilePath += os.extsep
+				# append new extension
+				NewFilePath += core_classes.ImageFileTypesSupported[self.FileTypeChoice.Widget.GetSelection()].Extension
+				# write new path back to file name textctrl
+				self.FilenameText.Widget.ChangeValue(NewFilePath)
+				self.FilenameText.Widget.SelectAll()
 
 		def OnOverwriteCheck(self, Event): # handle click on Overwrite checkbox: store overwrite option
 			self.Overwrite = self.OverwriteCheck.Widget.GetValue()
@@ -109,10 +111,12 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 			self.UpdatePageCount()
 
 		def OnPageSizeChoice(self, Event): # handle change of page size choice
-			# get number of pages required for FT export, considering current settings, and update page count widgets
+			SelectedSize = core_classes.PaperSizes[self.PageSizeChoice.Widget.GetSelection()]
+			# store new page size in user config
+			vizop_misc.StoreValueInUserConfig(ConfigName='ExportPaperSize', Value=SelectedSize.XMLName)
 			# ensure margins leave reasonable space for the image
 			self.Margins, MarginsChanged = display_utilities.EnsurePaperMarginsReasonable(self.Margins,
-				PaperSize=core_classes.PaperSizes[self.PageSizeChoice.Widget.GetSelection()],
+				PaperSize=SelectedSize,
 				Orientation='Portrait' if self.PortraitRadio.Widget.GetValue() else 'Landscape',
 				LastMarginChanged=None)
 			# write new margin values back to widgets, if changed
@@ -123,12 +127,15 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 					(self.RightMarginText, 'Right')]
 				for ThisWidget, KeyName in WidgetAndKeyList:
 					ThisWidget.Widget.ChangeValue(str(self.Margins[KeyName]))
+			# get number of pages required for FT export, considering current settings, and update page count widgets
 			self.UpdatePageCount()
 
 		def OnPortraitRadio(self, Event): # handle click on "portrait" radio button
+#			vizop_misc.StoreValueInUserConfig(ConfigName='ExportPaperOrientation', Value='Portrait')
 			self.UpdatePageCount()
 
 		def OnLandscapeRadio(self, Event): # handle click on "landscape" radio button
+#			vizop_misc.StoreValueInUserConfig(ConfigName='ExportPaperOrientation', Value='Landscape')
 			self.UpdatePageCount()
 
 		def OnMarginTextCtrl(self, Event=None, WidgetObj=None):
@@ -379,11 +386,14 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 			TargetPaperSizeIndex = PaperSizesStr.index(PaperSizeStr) if PaperSizeStr in PaperSizesStr else 0
 			TargetPaperSize = core_classes.PaperSizes[TargetPaperSizeIndex]
 			self.PageSizeChoice.Widget.SetSelection(TargetPaperSizeIndex)
-			# set landscape or portrait
-			PaperOrientation = vizop_misc.GetValueFromUserConfig('ExportPaperOrientation')
-			if PaperOrientation == '': PaperOrientation = info.DefaultPaperOrientation
-			if PaperOrientation == 'Portrait': self.PortraitRadio.Widget.SetValue(True)
-			elif PaperOrientation == 'Landscape': self.LandscapeRadio.Widget.SetValue(True)
+			# set landscape or portrait from user config (not used; now stored per project)
+#			PaperOrientation = vizop_misc.GetValueFromUserConfig('ExportPaperOrientation')
+#			if PaperOrientation == '': PaperOrientation = info.DefaultPaperOrientation
+#			if PaperOrientation == 'Portrait': self.PortraitRadio.Widget.SetValue(True)
+#			elif PaperOrientation == 'Landscape': self.LandscapeRadio.Widget.SetValue(True)
+			# set paper orientation from value stored in project
+			if Proj.FTExportPaperOrientation == 'Portrait': self.PortraitRadio.Widget.SetValue(True)
+			elif Proj.FTExportPaperOrientation == 'Landscape': self.LandscapeRadio.Widget.SetValue(True)
 			# set paper margin text boxes
 			self.Margins = {} # store margin values
 			for ThisWidget, ConfigName, Default in [
@@ -866,6 +876,7 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 		# calculate the number of pages required to export the FT
 		# ShowWhat (str): what to include in the export. Contains some of 'Header', 'FT', 'OnlySelected'
 		# return dict with args: PagesAcrossCount, PagesDownCount (2 x int)
+		print('FF871 Zoom: ', Zoom, type(Zoom))
 		assert isinstance(Zoom, float)
 		assert self.MinZoom <= Zoom <= self.MaxZoom
 		assert isinstance(ShowWhat, str)

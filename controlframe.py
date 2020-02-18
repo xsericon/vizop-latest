@@ -3167,7 +3167,6 @@ def DatacoreDoNewPHAObj(Proj, XMLRoot=None, ViewportID=None, **NewPHAObjArgs):
 		# TODO properly handle case of PHA model unknown (e.g. we're running old version of Vizop)
 	# make the PHA model and attach it to the project
 	NewPHAObj = NewPHAObjType(Proj, **NewPHAObjArgs)
-	print('CF3171 new PHA obj ID: ', NewPHAObj.ID)
 	Proj.PHAObjs.append(NewPHAObj)
 	Proj.PHAObjShadows.append(NewPHAObj) # put the same object in the shadows list, for local display devices to access
 	Proj.AssignDefaultNameToPHAObj(PHAObj=NewPHAObj)
