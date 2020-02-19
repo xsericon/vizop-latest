@@ -68,7 +68,7 @@ class ButtonElement(object): # object containing a button and attributes and met
 		assert InternalName in ['EventLinkedButton', 'EventGroupedButton', 'EventCommentButton',
 			'EventActionItemButton', 'ValueCommentButton', 'ValueProblemButton', 'ConnectButton', 'GateLinkedButton',
 			'GateLinkedButton', 'GateCommentButton', 'GateActionItemButton', 'ValueProblemButton',
-			'GateStyleButton', 'GateGroupedButton', 'ConnGroupedButton', 'ConnValueProblemButton']
+			'GateStyleButton', 'GateGroupedButton', 'ConnGroupedButton', 'ValueProblemButton']
 		assert isinstance(HostObject, (FTEvent, FTGate, FTCollapseGroup, FTConnector)) or (HostObject is None)
 		object.__init__(self)
 		self.FT = FT
@@ -98,7 +98,7 @@ class ButtonElement(object): # object containing a button and attributes and met
 			'GateLinkedButton': 'FT_LinkButton', 'GateCommentButton': 'FT_CommentButton',
 			'GateActionItemButton': 'FT_ActionButton', 'ValueProblemButton': 'FT_ProblemButton',
 			'GateGroupedButton': 'FT_GroupButton', 'GateStyleButton': 'FT_GateStyleButton',
-			'ConnGroupedButton': 'FT_GroupButton', 'ConnValueProblemButton': 'FT_ProblemButton'}[InternalName]
+			'ConnGroupedButton': 'FT_GroupButton', 'ValueProblemButton': 'FT_ProblemButton'}[InternalName]
 			# ArtProviderName is name to pass to ArtProvider + '_' + key of BitmapZoomed
 		self.SizeXInCU = self.SizeYInCU = 30 # no-zoom size in pixels
 		self.SetupImages()
@@ -421,8 +421,8 @@ class FTHeader(object): # FT header object. Rendered by drawing text into bitmap
 
 	def RenderIntoBitmap(self, Zoom): # draw header in self.Bitmap. Should be called after CalculateSize()
 
-		def DrawElements(DC, Elements, Zoom, ComponentNameToHighlight=''): # render header's elements in DC
-			BackBoxRoundedness = 5 # for text elements, how rounded the background boxes' corners are
+		def DrawHeaderElements(DC, Elements, Zoom, ComponentNameToHighlight=''): # render header's elements in DC
+			BackBoxRoundedness = 3 # for text elements, how rounded the background boxes' corners are
 			for El in Elements:
 				# render element, including any background box with highlight, in DC
 				El.Draw(DC, Zoom, BackBoxRoundedness=BackBoxRoundedness,
@@ -434,7 +434,7 @@ class FTHeader(object): # FT header object. Rendered by drawing text into bitmap
 		# make a DC for drawing
 		DC = wx.MemoryDC(self.Bitmap)
 		# draw elements into the bitmap
-		DrawElements(DC, self.Elements, Zoom, self.ComponentNameToHighlight)
+		DrawHeaderElements(DC, self.Elements, Zoom, self.ComponentNameToHighlight)
 
 	def AllClickableObjects(self, SelectedOnly=False, VisibleOnly=True):
 		# return list of all elements in header that should respond to mouse clicks
@@ -492,6 +492,12 @@ class FTBoxyObject(object): # superclass of vaguely box-like FT components for u
 		if self.ID in self.FT.PreservedAttribs.keys():
 			# overwrite all preservable attribs with the preserved values (oops, no type checking)
 			self.__dict__.update(self.FT.PreservedAttribs[self.ID])
+
+	def DrawElements(self, DC, Components, Zoom): # render all the components of this object in DC
+		BackBoxRoundedness = 3 # for text elements, how rounded the background boxes' corners are
+		for El in Components:
+			if getattr(El, 'Visible', True):
+				El.Draw(DC, Zoom, BackBoxRoundedness=BackBoxRoundedness) # render element, including any background box, in DC
 
 class TextElement(FTBoxyObject): # object containing a text object and other attributes and methods needed to render it
 	# Consists of a single text inside a coloured box. It's a component of an FTHeader, FTConnector or FTEvent.
@@ -894,6 +900,7 @@ class FTEvent(FTBoxyObject): # FT event object. Rendered by drawing text into bi
 				FoundButtonElement = ElementNamed(Elements, ButtonName)
 				if FoundButtonElement:
 					FoundButtonElement.Status = {True: 'In', False: 'Out'}[Flag]
+			# the Status set in the following lines is not currently used; using its Visible attrib instead
 			ValueProblemElement = ElementNamed(Elements, 'ValueProblemButton')
 			if ValueProblemElement:
 				ValueProblemElement.Status = {True: 'Alert', False: 'Out'}[(self.ValueProblemObjectID is None)]
@@ -905,12 +912,12 @@ class FTEvent(FTBoxyObject): # FT event object. Rendered by drawing text into bi
 			# box is drawn in FTElement's own bitmap, so coords are relative to element (not using PosX/YInPx, which are relative to column)
 			DC.DrawRectangle(0, 0, self.SizeXInPx, self.SizeYInPx)
 
-		def DrawElements(DC, Elements, Zoom): # render FTEvent's elements in DC
-			BackBoxRoundedness = 3 # for text elements, how rounded the background boxes' corners are
-			for El in Elements:
-				# render element, including any background box, in DC
-				if getattr(El, 'Visible', True):
-					El.Draw(DC, Zoom, BackBoxRoundedness=BackBoxRoundedness)
+#		def DrawElements(DC, Elements, Zoom): # render FTEvent's elements in DC. Method moved to superclass
+#			BackBoxRoundedness = 3 # for text elements, how rounded the background boxes' corners are
+#			for El in Elements:
+#				# render element, including any background box, in DC
+#				if getattr(El, 'Visible', True):
+#					El.Draw(DC, Zoom, BackBoxRoundedness=BackBoxRoundedness)
 
 		# start of main procedure for RenderIntoBitmap() for FTEvent
 		BorderX = BorderY = 10 # outer border in canvas coords
@@ -950,7 +957,7 @@ class FTEvent(FTBoxyObject): # FT event object. Rendered by drawing text into bi
 		DC = wx.MemoryDC(self.Bitmap)
 		# draw background box, then elements, into the bitmap
 		DrawBackgroundBox(DC, Zoom)
-		DrawElements(DC, self.AllElements, Zoom)
+		self.DrawElements(DC, self.AllElements, Zoom)
 
 	def GetMyAcceptableUnits(self): # return list of units (UnitItem instances) this event can offer
 		if self.EventType in FTEventTypesWithFreqValue:
@@ -1097,15 +1104,17 @@ class FTGate(FTBoxyObject): # object containing FT gates for display. These belo
 				FoundButtonElement = ElementNamed(Elements, ButtonName)
 				if FoundButtonElement:
 					FoundButtonElement.Status = {True: 'In', False: 'Out'}[Flag]
+			# Status set in the following lines is not currently used
 			ValueProblemElement = ElementNamed(Elements, 'ValueProblemButton')
 			if ValueProblemElement:
 				ValueProblemElement.Status = {True: 'Alert', False: 'Out'}[(self.ValueProblemObjectID is None)]
 
-		def DrawElements(DC, Elements, Zoom): # render gate's elements in DC
-			BackBoxRoundedness = 5 # for text elements, how rounded the background boxes' corners are
-			for El in Elements:
-				El.Draw(DC, Zoom, BackBoxRoundedness=BackBoxRoundedness) # render element, including any background box, in DC
-
+#		def DrawElements(DC, Elements, Zoom): # render gate's elements in DC. Method moved to superclass
+#			BackBoxRoundedness = 5 # for text elements, how rounded the background boxes' corners are
+#			for El in Elements:
+#				if getattr(El, 'Visible', True):
+#					El.Draw(DC, Zoom, BackBoxRoundedness=BackBoxRoundedness) # render element, including any background box, in DC
+#
 		# start of main procedure for RenderIntoBitmap() for class FTGate
 		BorderX = BorderY = 20 # outer border in canvas coords
 		GapBetweenRows = GapBetweenCols = 10 # in canvas coords
@@ -1133,7 +1142,7 @@ class FTGate(FTBoxyObject): # object containing FT gates for display. These belo
 		# make a DC for drawing
 		DC = wx.MemoryDC(self.Bitmap)
 		# draw elements into the bitmap
-		DrawElements(DC, self.AllElements, Zoom)
+		self.DrawElements(DC, self.AllElements, Zoom)
 
 	def RenderIntoBitmap(self, Zoom): # draw FTGate in self.Bitmap. Also calculates FTGate size attributes
 		# based on equivalent method in FTEvent class
@@ -1166,6 +1175,7 @@ class FTGate(FTBoxyObject): # object containing FT gates for display. These belo
 				FoundButtonElement = ElementNamed(Elements, ButtonName)
 				if FoundButtonElement:
 					FoundButtonElement.Status = {True: 'In', False: 'Out'}[Flag]
+			# Status set in the following lines is not currently used
 			ValueProblemElement = ElementNamed(Elements, 'ValueProblemButton')
 			if ValueProblemElement:
 				ValueProblemElement.Status = {True: 'Alert', False: 'Out'}[(self.ValueProblemObjectID is None)]
@@ -1176,12 +1186,12 @@ class FTGate(FTBoxyObject): # object containing FT gates for display. These belo
 			# box is drawn in FTGate's own bitmap, so coords are relative to gate (not using PosX/YInPx, which are relative to column)
 			DC.DrawRectangle(0, 0, self.SizeXInPx, self.SizeYInPx)
 
-		def DrawElements(DC, Elements, Zoom): # render FTGate's elements in DC
-			BackBoxRoundedness = int(round(3 * Zoom)) # for text elements, how rounded the background boxes' corners are
-			for El in Elements:
-				# render element, including any background box, in DC
-				if getattr(El, 'Visible', True):
-					El.Draw(DC, Zoom, BackBoxRoundedness=BackBoxRoundedness)
+#		def DrawElements(DC, Elements, Zoom): # render FTGate's elements in DC. Method moved to superclass
+#			BackBoxRoundedness = int(round(3 * Zoom)) # for text elements, how rounded the background boxes' corners are
+#			for El in Elements:
+#				# render element, including any background box, in DC
+#				if getattr(El, 'Visible', True):
+#					El.Draw(DC, Zoom, BackBoxRoundedness=BackBoxRoundedness)
 
 		def DrawGateSymbol(Zoom): # draw gate in self.Bitmap as a symbol
 
@@ -1394,7 +1404,7 @@ class FTGate(FTBoxyObject): # object containing FT gates for display. These belo
 			DC = wx.MemoryDC(self.Bitmap)
 			# draw background box, then elements, into the bitmap
 			DrawBackgroundBox(DC, Zoom)
-			DrawElements(DC, self.AllElements, Zoom)
+			self.DrawElements(DC, self.AllElements, Zoom)
 		else: # non-detailed view
 			DrawGateSymbol(Zoom=Zoom)
 
@@ -1460,7 +1470,7 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 
 		# column widths: 100, 100, 50, 50
 		# any element with MinHeight parm set is growable in the y axis to fit the text.
-		# it should be assigned to the Row that it can force to grow%%%
+		# it should be assigned to the Row that it can force to grow
 		ConnKind = TextElement(self.FT, Row=0, ColStart=0, ColSpan=4, EndX=199, HostObject=self,
 			InternalName='ConnKind', DisplAttrib='HumanName')
 		ConnDescription = TextElement(self.FT, Row=1, ColStart=0, ColSpan=2, EndX=199, MinHeight=50, HostObject=self,
@@ -1471,13 +1481,13 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 			InternalName='Value', ControlPanelAspect='CPAspect_NumValue', EditBehaviour='Text')
 		self.ConnValueUnitComponent = TextElement(self.FT, Row=2, ColStart=1, ColSpan=1, EndX=199, HostObject=self,
 			InternalName='ConnValueUnit')
-		self.ConnValueProblemButton = ButtonElement(self.FT, Row=2, ColStart=4, ColSpan=1, StartX=250, EndX=299,
-			HostObject=self, InternalName='ConnValueProblemButton')
+		self.ValueProblemButton = ButtonElement(self.FT, Row=2, ColStart=4, ColSpan=1, StartX=250, EndX=299,
+			HostObject=self, InternalName='ValueProblemButton')
 		# Connectors don't have "value types" (it's always calculated), "comments" or "action items"
 		# TODO %%% fix the above; CX-in needs other value types, and all CX's should have comments and action items
 		# make list of elements
 		TopEls = [ConnKind, ConnDescription, ConnGroupedButton, self.ConnValue, self.ConnValueUnitComponent,
-			self.ConnValueProblemButton]
+			self.ValueProblemButton]
 		# set text element colours
 		for El in TopEls:
 			if type(El) is TextElement:
@@ -1500,15 +1510,17 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 					MatchingEl.Text.Content = self.__dict__[Attrib]
 
 		def SetButtonStati(Elements):
-			# set 'Status' attributes of buttons in Elements
-			ValueProblemElement = ElementNamed(Elements, 'ConnValueProblemButton')
+			# set 'Status' attributes of buttons in Elements; but Status is not currently used
+			print('FT1504 setting button status with self.ValueProblemObjectID:', self.ValueProblemObjectID)
+			ValueProblemElement = ElementNamed(Elements, 'ValueProblemButton')
 			if ValueProblemElement:
 				ValueProblemElement.Status = {True: 'Alert', False: 'Out'}[(self.ValueProblemObjectID is None)]
 
-		def DrawElements(DC, Elements, Zoom): # render FTConnector's elements in DC
-			BackBoxRoundedness = 5 # for text elements, how rounded the background boxes' corners are
-			for El in Elements:
-				El.Draw(DC, Zoom, BackBoxRoundedness=BackBoxRoundedness) # render element, including any background box, in DC
+#		def DrawElements(DC, Elements, Zoom): # render FTConnector's elements in DC. Method moved to superclass
+#			BackBoxRoundedness = 3 # for text elements, how rounded the background boxes' corners are
+#			for El in Elements:
+#				if getattr(El, 'Visible', True):
+#					El.Draw(DC, Zoom, BackBoxRoundedness=BackBoxRoundedness) # render element, including any background box, in DC
 
 		def DrawBackgroundBox(DC, Zoom): # draw FTConnector's background box in DC
 			DC.SetPen(wx.Pen(self.BorderColour, width=1)) # for now, a 1 pixel border around the event. TODO make nicer and apply zoom
@@ -1557,7 +1569,7 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 		DC = wx.MemoryDC(self.Bitmap)
 		# draw background box, then elements, into the bitmap
 		DrawBackgroundBox(DC, Zoom)
-		DrawElements(DC, self.AllElements, Zoom)
+		self.DrawElements(DC, self.AllElements, Zoom)
 
 class FTConnectorIn(FTConnector):
 
@@ -2772,7 +2784,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		'TextColour']
 	# English names for components; keys are attrib names in this class. Values are translated at point of display
 	ComponentEnglishNames = {'HumanName': 'SIF name', 'Rev': 'Revision', 'OpMode': 'Operating mode',
-		'TolFreq': 'Tolerable frequency', 'SILTargetValue': 'SIL target', 'Description': 'Description',
+		'TolFreq': 'Tolerable frequency', 'SILTargetValue': 'SIL target', 'EventDescription': 'Description',
 		'Value': 'event value', 'ConnectorDescription': 'connector description'}
 			# key 'Value' is used for elements other than the FT itself
 	# define which element classes have a number system, i.e. have a Numbering attrib. Must be tuple, not list
@@ -3129,6 +3141,39 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 				El.text = str(Attrib.Unit.HumanName)
 			return HeaderEl
 
+		def GetValueAndUnitForDisplay(FT, ThisElement, XMLElement):
+			# get value and unit of ThisElement (an FT event or connector) for display.
+			# XMLElement: the ElementTree element that will contain sendable data on ThisElement
+			# Return: ElementValue (displayable str), ElementUnit (UnitItem instance),
+			#	ProblemValue (a value status),
+			#	ProblemObj (instance of FT element causing the problem, or None if no problem)
+
+			RRToDisplay = FT.RiskReceptorGroupOnDisplay[0]
+			ValueStatus = ThisElement.Value.Status(RR=RRToDisplay)
+			if ValueStatus == core_classes.NumProblemValue_NoProblem:
+				# get the likelihood value of the element, and format for display
+				ElementValue = utilities.RoundValueForDisplay(InputValue=ThisElement.Value.GetMyValue(RR=RRToDisplay),
+					SigFigs=info.EventValueSigFigs)
+				# run value checks
+				ValueStatus = ThisElement.CheckValue(NumValueInstance=ThisElement.Value)
+				# decide whether a problem indicator is needed
+				if (ValueStatus == core_classes.NumProblemValue_NoProblem): ProblemLevel = None
+				else: ProblemLevel = 'Level10'
+			else: # can't display value; make tag for problem indicator
+				if ValueStatus == core_classes.NumProblemValue_UndefNumValue: ElementValue = _('not set')
+				else: ElementValue = info.CantDisplayValueOnScreen # signifying value unobtainable
+				ProblemLevel = 'Level10'
+			if ProblemLevel: # do we need to display value problem indicator?
+				ProblemTag = ElementTree.SubElement(XMLElement, info.ProblemIndicatorTag)
+				ProblemTag.text = ValueStatus.HumanHelp
+				ProblemTag.set(info.ProblemLevelAttribName, ProblemLevel) # indicating the seriousness of the problem
+			else: ProblemTag = None
+			ElementUnit = ThisElement.Value.GetMyUnit()
+			ProblemValue = ThisElement.Value.Status(RR=RRToDisplay)
+			ProblemObj = None # TODO work out how to fetch this from the NumValueItem instance; also in FTConnectorInCore
+			return ElementValue, ElementUnit, ProblemValue, ProblemObj
+
+
 		def PopulateFTEventData(FT, El, FTEvent, EventListForNumbering):
 			# put FT event data into XML element El
 			# EventListForNumbering: list containing all FTEvents to consider when numbering this one
@@ -3152,28 +3197,29 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			# make FTEvent element to contain all the other elements
 			EventEl = ElementTree.SubElement(El, info.FTEventTag)
 			# get value and unit for display
-			RRToDisplay = FT.RiskReceptorGroupOnDisplay[0]
-			ValueStatus = FTEvent.Value.Status(RR=RRToDisplay)
-			if ValueStatus == core_classes.NumProblemValue_NoProblem:
-				# get the likelihood value of the FTEvent, and format for display
-				EventValue = utilities.RoundValueForDisplay(InputValue=FTEvent.Value.GetMyValue(RR=RRToDisplay),
-					SigFigs=info.EventValueSigFigs)
-				# run value checks
-				ValueStatus = FTEvent.CheckValue(NumValueInstance=FTEvent.Value)
-				# decide whether a problem indicator is needed
-				if (ValueStatus == core_classes.NumProblemValue_NoProblem): ProblemLevel = None
-				else: ProblemLevel = 'Level10'
-			else: # can't display value; make tag for problem indicator
-				if ValueStatus == core_classes.NumProblemValue_UndefNumValue: EventValue = _('not set')
-				else: EventValue = info.CantDisplayValueOnScreen # signifying value unobtainable
-				ProblemLevel = 'Level10'
-			if ProblemLevel: # do we need to display value problem indicator?
-				ProblemTag = ElementTree.SubElement(EventEl, info.ProblemIndicatorTag)
-				ProblemTag.text = ValueStatus.HumanHelp
-				ProblemTag.set(info.ProblemLevelAttribName, ProblemLevel) # indicating the seriousness of the problem
-			EventUnit = FTEvent.Value.GetMyUnit()
-			ProblemValue = FTEvent.Value.Status(RR=RRToDisplay)
-			ProblemObj = None # TODO work out how to fetch this from the NumValueItem instance; also in FTConnectorInCore
+			EventValue, EventUnit, ProblemValue, ProblemObj = GetValueAndUnitForDisplay(FT, FTEvent, EventEl)
+#			RRToDisplay = FT.RiskReceptorGroupOnDisplay[0]
+#			ValueStatus = FTEvent.Value.Status(RR=RRToDisplay)
+#			if ValueStatus == core_classes.NumProblemValue_NoProblem:
+#				# get the likelihood value of the FTEvent, and format for display
+#				EventValue = utilities.RoundValueForDisplay(InputValue=FTEvent.Value.GetMyValue(RR=RRToDisplay),
+#					SigFigs=info.EventValueSigFigs)
+#				# run value checks
+#				ValueStatus = FTEvent.CheckValue(NumValueInstance=FTEvent.Value)
+#				# decide whether a problem indicator is needed
+#				if (ValueStatus == core_classes.NumProblemValue_NoProblem): ProblemLevel = None
+#				else: ProblemLevel = 'Level10'
+#			else: # can't display value; make tag for problem indicator
+#				if ValueStatus == core_classes.NumProblemValue_UndefNumValue: EventValue = _('not set')
+#				else: EventValue = info.CantDisplayValueOnScreen # signifying value unobtainable
+#				ProblemLevel = 'Level10'
+#			if ProblemLevel: # do we need to display value problem indicator?
+#				ProblemTag = ElementTree.SubElement(EventEl, info.ProblemIndicatorTag)
+#				ProblemTag.text = ValueStatus.HumanHelp
+#				ProblemTag.set(info.ProblemLevelAttribName, ProblemLevel) # indicating the seriousness of the problem
+#			EventUnit = FTEvent.Value.GetMyUnit()
+#			ProblemValue = FTEvent.Value.Status(RR=RRToDisplay)
+#			ProblemObj = None # TODO work out how to fetch this from the NumValueItem instance; also in FTConnectorInCore
 			# make sub-elements for all the required attribs:
 			# elements where the text is the same as the FTEvent attribute in str form
 			FTEvent.TextComponentHash = {info.IDTag: FTEvent.ID, 'IsIPL': FTEvent.IsIPL, 'EventType': FTEvent.EventType,
@@ -3260,25 +3306,26 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			# make XML element to contain all the other sub-elements
 			ConnEl = ElementTree.SubElement(El, 'FTConnector')
 			# get value and unit for display
-			RRToDisplay = self.RiskReceptorGroupOnDisplay[0]
-			ProblemValue = FTConn.Value.Status(RR=RRToDisplay)
-			ProblemObj = None # TODO get this from ProblemValue
-			if ProblemValue == core_classes.NumProblemValue_NoProblem:
-				# get the output value of the ConnEl, and format for display
-				OutputValue = utilities.RoundValueForDisplay(InputValue=FTConn.Value.GetMyValue(RR=RRToDisplay),
-					SigFigs=info.EventValueSigFigs)
-				# run value checks
-				ProblemValue = FTConn.CheckValue(NumValueInstance=FTConn.Value)
-				# decide whether a problem indicator is needed
-				if (ProblemValue == core_classes.NumProblemValue_NoProblem):
-					ProblemLevel = None
-				else:
-					ProblemLevel = 'Level10'
-			else:
-				if ProblemValue == core_classes.NumProblemValue_UndefNumValue:
-					OutputValue = _('not set')
-				else:
-					OutputValue = info.CantDisplayValueOnScreen # signifying value unobtainable
+			ConnValue, ConnUnit, ProblemValue, ProblemObj = GetValueAndUnitForDisplay(FTConn.FT, FTConn, ConnEl)
+#			RRToDisplay = self.RiskReceptorGroupOnDisplay[0]
+#			ProblemValue = FTConn.Value.Status(RR=RRToDisplay)
+#			ProblemObj = None # TODO get this from ProblemValue
+#			if ProblemValue == core_classes.NumProblemValue_NoProblem:
+#				# get the output value of the ConnEl, and format for display
+#				OutputValue = utilities.RoundValueForDisplay(InputValue=FTConn.Value.GetMyValue(RR=RRToDisplay),
+#					SigFigs=info.EventValueSigFigs)
+#				# run value checks
+#				ProblemValue = FTConn.CheckValue(NumValueInstance=FTConn.Value)
+#				# decide whether a problem indicator is needed
+#				if (ProblemValue == core_classes.NumProblemValue_NoProblem):
+#					ProblemLevel = None
+#				else:
+#					ProblemLevel = 'Level10'
+#			else:
+#				if ProblemValue == core_classes.NumProblemValue_UndefNumValue:
+#					OutputValue = _('not set')
+#				else:
+#					OutputValue = info.CantDisplayValueOnScreen # signifying value unobtainable
 
 			# make sub-elements for all the required attribs:
 			# elements where the text is the same as the FTConn attribute
@@ -3287,8 +3334,8 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 				('Description', FTConn.ConnectorDescription), ('BackgColour', FTConn.BackgColour),
 				('Numbering', FTConn.Numbering.HumanValue(PHAItem=FTConn, Host=FTConn.Column.FTElements)[0]),
 				('Style', FTConn.Style), ('EventType', {True: 'ConnectorOut', False: 'ConnectorIn'}[FTConn.Out]),
-				('ShowDescriptionComments', str(FTConn.ShowDescriptionComments)), ('Value', OutputValue),
-				('Unit', FTConn.Value.Unit.HumanName), ('ValueProblemID', getattr(ProblemValue, 'ID', '')),
+				('ShowDescriptionComments', str(FTConn.ShowDescriptionComments)), ('Value', ConnValue),
+				('Unit', ConnUnit.HumanName), ('ValueProblemID', getattr(ProblemValue, 'ID', '')),
 				('ValueProblemObjectID', getattr(ProblemObj, 'ID', '')), ('HumanName', FTConn.HumanName)]
 			for Tag, Attrib in DataInfo:
 				El = ElementTree.SubElement(ConnEl, Tag)
@@ -3374,6 +3421,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			# make FTGate element to contain all the other elements
 			GateEl = ElementTree.SubElement(El, 'FTGate')
 			# get value and unit for display
+			# TODO replace the lines below with a call to GetValueAndUnitForDisplay()
 			RRToDisplay = self.RiskReceptorGroupOnDisplay[0]
 			ValueStatus = FTGate.Value.Status(RR=RRToDisplay)
 			if ValueStatus == core_classes.NumProblemValue_NoProblem:
@@ -3740,9 +3788,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		# and the changed component highlighted (so that the undo is visible to the user)
 		# SocketFromDatacore (socket object): socket to send redraw message from datacore to Control Frame
 		# prepare data about zoom, pan, highlight etc.
-		print('FT3715 RedrawAfterUndoOrRedo: SkipRefresh:', SkipRefresh)
 		# first, check whether to redraw
-#		if (UndoRecord.Chain != 'Avalanche') or not getattr(UndoRecord, 'SkipRefresh', False):
 		if not SkipRefresh:
 			DisplayAttribTag = self.FetchDisplayAttribsFromUndoRecord(UndoRecord)
 			RedrawDataXML = self.GetFullRedrawData(ViewportClass=UndoRecord.ViewportClass,
@@ -4494,6 +4540,18 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 				NewObj = ObjPopulator[ObjElement.tag](XMLObj=ObjElement, Column=Column) # extract data for each object
 				Column.FTElements.append(NewObj) # put object in column
 
+		def SetValueProblemButtonStatus(FTElement, XMLObj):
+			# set the status (visible/invisible) of the value problem button in FTElement, using data from XMLObj
+			# retrieve data from ProblemIndicatorTag: decide whether to show problem button
+			ProblemTag = XMLObj.find(info.ProblemIndicatorTag)
+			if ProblemTag is None:
+				FTElement.ProblemHumanHelp = ''
+				FTElement.ValueProblemButton.Visible = False  # if no problem info received, don't show problem button
+			else:
+				FTElement.ProblemHumanHelp = ProblemTag.text
+				FTElement.ValueProblemButton.Visible = (ProblemTag.get(info.ProblemLevelAttribName, '') in
+					['Level7', 'Level10'])
+
 		def PopulateFTEvent(XMLObj, Column):
 			# create an FTEvent, get data for FTEvent from XMLObj (XML element). Return the FTEvent
 			assert isinstance(Column, FTColumn)
@@ -4555,20 +4613,15 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 #			print('FT4468 ID, eventkind, valuekindoptions: ', NewEvent.ID, NewEvent.EventType, [(c.HumanName, c.Applicable) for c in NewEvent.ValueKindOptions])
 			NewEvent.ValueKind = [c.HumanName for c in NewEvent.ValueKindOptions
 				if c.Applicable][0]
-			# retrieve data from ProblemIndicatorTag: decide whether to show problem button
-			ProblemTag = XMLObj.find(info.ProblemIndicatorTag)
-			if ProblemTag is None:
-				NewEvent.ValueProblemButton.Visible = False  # if no problem info received, don't show problem button
-			else:
-				NewEvent.ProblemHumanHelp = ProblemTag.text
-				NewEvent.ValueProblemButton.Visible = (ProblemTag.get(info.ProblemLevelAttribName, '') in
-					['Level7', 'Level10'])
+			# set status of value problem button, and get help text relating to any value problem
+			SetValueProblemButtonStatus(FTElement=NewEvent, XMLObj=XMLObj)
 			# recover preserved attribs from previous Viewport layout
 			NewEvent.RecoverPreservedAttribs()
 			return NewEvent
 
 		def PopulateFTConnector(XMLObj, Column):
 			# create an FTConnector, get data for FTConnector from XMLObj (XML element). Return the FTConnector
+			print("FT4573 received connector data: ", ElementTree.tostring(XMLObj))
 			assert isinstance(Column, FTColumn)
 			# First, find out if it's in- or out-connector from 'Connectivity' tag, and create appropriate object
 			NewConnector = {'In': FTConnectorIn, 'Out': FTConnectorOut}[XMLObj.findtext('Connectivity')]\
@@ -4614,14 +4667,8 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 				NewConnector.ConnectorIns.append(core_classes.ChoiceItem(HumanName=El.text, Applicable=False,
 					XMLName=El.get(info.IDTag), ID=El.get(info.IDTag)))
 					# above, we populate the XMLName attrib because it's compulsory, but we intend to use the ID attrib
-			# retrieve data from ProblemIndicatorTag: decide whether to show problem button
-			ProblemTag = XMLObj.find(info.ProblemIndicatorTag)
-			if ProblemTag is None:
-				NewConnector.ConnValueProblemButton.Visible = False  # if no problem info received, don't show problem button
-			else:
-				NewConnector.ProblemHumanHelp = ProblemTag.text
-				NewConnector.ConnValueProblemButton.Visible = (ProblemTag.get(info.ProblemLevelAttribName, '') in
-					['Level7', 'Level10'])
+			# set status of value problem button, and get help text relating to any value problem
+			SetValueProblemButtonStatus(FTElement=NewConnector, XMLObj=XMLObj)
 			# recover preserved attribs from previous Viewport layout
 			NewConnector.RecoverPreservedAttribs()
 			return NewConnector
@@ -4657,16 +4704,9 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 				ThisUnitHumanName = [u.HumanName for u in core_classes.UnitItem.UserSelectableUnits
 					if ThisTag.text == u.XMLName][0]
 				NewGate.GateValueUnit.ObjectChoices.append(core_classes.ChoiceItem(XMLName=ThisTag.text,
-																	  HumanName=ThisUnitHumanName,
-																	  Applicable=utilities.Bool2Str(ThisTag.get(info.ApplicableAttribName))))
-			# retrieve data from ProblemIndicatorTag: decide whether to show problem button
-			ProblemTag = XMLObj.find(info.ProblemIndicatorTag)
-			if ProblemTag is None:
-				NewGate.ValueProblemButton.Visible = False  # if no problem info received, don't show problem button
-			else:
-				NewGate.ProblemHumanHelp = ProblemTag.text
-				NewGate.ValueProblemButton.Visible = (ProblemTag.get(info.ProblemLevelAttribName, '') in
-					['Level7', 'Level10'])
+					HumanName=ThisUnitHumanName, Applicable=utilities.Bool2Str(ThisTag.get(info.ApplicableAttribName))))
+			# set status of value problem button, and get help text relating to any value problem
+			SetValueProblemButtonStatus(FTElement=NewGate, XMLObj=XMLObj)
 			# recover preserved attribs from previous Viewport layout
 			NewGate.RecoverPreservedAttribs()
 			return NewGate
