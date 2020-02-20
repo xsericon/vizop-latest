@@ -500,8 +500,25 @@ class FTBoxyObject(object): # superclass of vaguely box-like FT components for u
 
 	def HandleMouseLClickOnMe(self, **Args): # handle mouse left button single click on element, not on one of its
 		# clickable components%%%
-		# set the element as currently selected. If the Shift key is pressed, add to existing selection, else replace it
-		self.FT.SetElementAsCurrent(TargetFTElement=self, UnsetPrevious=not Args['Event'].ShiftDown(), RedrawEntireFT=True)
+		# if the Shift key is down, select all elements between the last one selected (if any) and the element clicked
+		if self.FT.LastElementSelected:
+			# provide a function to get the index of the column containing an FT element
+			ColIndex = lambda El: [i for i in range(len(self.FT.Columns)) if El in self.FT.Columns[i]][0]
+			# are the last element and this element in the same column?
+			ColIndexOfLastElement = ColIndex(self.FT.LastElementSelected)
+			ColIndexOfClickedElement = ColIndex(self)
+			# get the index of the elements in their respective columns
+			IndexOfLastElement = self.FT.Columns[ColIndexOfLastElement].index(self.FT.LastElementSelected)
+			IndexOfClickedElement = self.FT.Columns[ColIndexOfClickedElement].index(self)
+			if ColIndexOfLastElement == ColIndexOfClickedElement:
+				# select all the elements in the column between last and this element
+				for ThisEl in self.FT.Columns[ColIndexOfClickedElement][1 + min(IndexOfLastElement,
+					IndexOfClickedElement):max(IndexOfLastElement, IndexOfClickedElement)]:
+					self.FT.SetElementAsCurrent(TargetFTElement=ThisEl, UnsetPrevious=False, RedrawEntireFT=False)
+			else: # they're in different columns
+				pass # %%% working here
+		# set the element as currently selected. If the Cmd/Ctrl key is pressed, add to existing selection, else replace it
+		self.FT.SetElementAsCurrent(TargetFTElement=self, UnsetPrevious=not Args['Event'].CmdDown(), RedrawEntireFT=True)
 
 class TextElement(FTBoxyObject): # object containing a text object and other attributes and methods needed to render it
 	# Consists of a single text inside a coloured box. It's a component of an FTHeader, FTConnector or FTEvent.
@@ -4384,6 +4401,8 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			# This is used so we can store the selection across a refresh - as datacore doesn't know which elements are
 			# "current" in our Viewport
 		self.ExistingElementIDsOnLastRefresh = [] # IDs of all elements existing in FT when it is redrawn.
+		self.LastElementSelected = None # last element selected; used to identify start of selection extension if user
+			# does shift + left click on an element
 			# This is used so we can detect which IDs are new, so they can be made "current" (highlighted)
 		self.PreservedAttribs = {} # keys are element IDs, values are dict of {attrib name, attrib value} for any attribs
 			# that should be preserved when the FT is redrawn with updated data
@@ -5509,6 +5528,8 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		# update list of elements to set as current on next refresh
 		self.CurrentElementIDsToSelectOnRefresh = [e.ID for e in self.CurrentElements]
 		if RedrawEntireFT: self.DisplDevice.Redraw(FullRefresh=True)
+		# set this element as the last one selected, in case the user shift-clicks another element
+		self.LastElementSelected = TargetFTElement
 
 	def SwitchToPreferredControlPanelAspect(self, CurrentElements):
 		# if appropriate, ask our display device's Control Panel to go to the preferred aspect, considering which
