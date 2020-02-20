@@ -4821,6 +4821,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		# FullRefresh (bool): whether to redraw from scratch
 		# BitmapMinSize ( (X, Y) tuple of int, wx.Size, or None): Ensure bitmap has this min size
 		# DrawZoomTool (bool): whether to show the zoom tool
+		# returns the Bitmap object associated to the TargetDC.
 
 		def DrawHeader(self, DC): # render the FT header in its own bitmap, then copy it to BaseLayerDC
 			self.Header.RenderIntoBitmap(self.Zoom)
@@ -4876,11 +4877,13 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			self.SetupInterColumnStrips() # set up and draw strips containing connecting lines between columns
 			# make an overall bitmap, ready to blit constituent bitmaps into
 			MinBufferSizeXInPx, MinBufferSizeYInPx = self.CalculateFTScreenSize(self.InterColumnStripWidth)
+			ActualBufferSizeX = MinBufferSizeXInPx
+			ActualBufferSizeY = MinBufferSizeYInPx
 			if BitmapMinSize is not None:
 				# make sure buffer is big enough to reach the bottom of the screen, to accommodate the zoom tool
 				# (potential optimisation: draw zoom widget in separate bitmap and blit transparently into its place in the host panel)
-				ActualBufferSizeX = max(BitmapMinSize[0], MinBufferSizeXInPx)
-				ActualBufferSizeY = max(BitmapMinSize[1], MinBufferSizeYInPx)
+				ActualBufferSizeX = max(BitmapMinSize[0], ActualBufferSizeX)
+				ActualBufferSizeY = max(BitmapMinSize[1], ActualBufferSizeY)
 			self.BaseLayerBitmap = wx.Bitmap(width=ActualBufferSizeX, height=ActualBufferSizeY, depth=wx.BITMAP_SCREEN_DEPTH)
 			BaseLayerDC = wx.MemoryDC(self.BaseLayerBitmap)
 			# draw header in its own bitmap, then copy into BaseLayerDC
@@ -4902,6 +4905,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			self.MyZoomWidget.SetZoom(self.Zoom) # update zoom setting of zoom widget
 			self.MyZoomWidget.DrawInBitmap() # draw zoom widget in its own bitmap
 		BlitIntoDC(BaseLayerBitmap=self.BaseLayerBitmap, TargetDC=TargetDC)
+		return self.BaseLayerBitmap
 
 	def AddBuilderButtons(self): # add builder buttons between objects in each column, and in a "new" column to the right
 		BuilderButtonOffsetInCU = 70 # X offset between builder button left edges

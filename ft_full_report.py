@@ -961,7 +961,14 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 		assert isinstance(CombineRRs, bool)
 		assert isinstance(ExpandGates, bool)
 		assert DateKind in core_classes.DateChoices
-		print('FR575 DoExportFTToFile: not implemented yet')
+		print('FR575 DoExportFTToFile: Work in progress. Test image files creation only, no option supported.')
+		
+		MemoryDC = wx.MemoryDC()
+		Bitmap = faulttree.FTForDisplay.RenderInDC(self, TargetDC=MemoryDC, FullRefresh=True, BitmapMinSize=None, DrawZoomTool=True)
+		Bitmap.SaveFile("test.png", wx.BITMAP_TYPE_PNG)
+		Bitmap.SaveFile("test.jpg", wx.BITMAP_TYPE_JPEG)
+		Bitmap.SaveFile("test.tiff", wx.BITMAP_TYPE_TIFF)
+		print('Bitmap data exported to test files.')
 
 	def __init__(self, Proj, PHAObj, DisplDevice, ParentWindow, Fonts, SystemFontNames, **Args):
 		# __init__ for class FTFullExportViewport
