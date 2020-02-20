@@ -151,7 +151,7 @@ class ButtonElement(object): # object containing a button and attributes and met
 	def MouseHit(self, MouseXInPx, MouseYInPx, TolXInPx, TolYInPx, debug=False):
 		# returns (str) hotspot hit in FTBoxyObject instance, or None if not hit
 		# Hotspots can be: "Whole" (whole object hit)
-		# This procedure currently same as class BoxyObject. Consider making this class a subclass of BoxyObject?
+		# This procedure currently same as class FTBoxyObject. Consider making this class a subclass of BoxyObject?
 		assert isinstance(MouseXInPx, (float, int))
 		assert isinstance(MouseYInPx, (float, int))
 		assert isinstance(TolXInPx, (float, int)) # mouse hit tolerance in pixels
@@ -480,11 +480,10 @@ class FTBoxyObject(object): # superclass of vaguely box-like FT components for u
 	def AllClickableObjects(self, SelectedOnly=False, VisibleOnly=True):
 		# return list of all elements in FT element object that should respond to mouse clicks
 		# If SelectedOnly (bool), only return elements that are currently selected; similarly for VisibleOnly (bool)
-		# currently this procedure is the same as the version in class FTEvent
 		assert isinstance(SelectedOnly, bool)
 		assert isinstance(VisibleOnly, bool)
 		return [El for El in self.AllElements if El.IsClickable
-			if (El.Selected or not SelectedOnly) if (El.Visible or not VisibleOnly)]
+			if (El.Selected or not SelectedOnly) if (El.Visible or not VisibleOnly)] + [self]
 
 	def RecoverPreservedAttribs(self):
 		# fetch attribs for this object that were preserved from the last time the FT was displayed, and reinstate them
@@ -498,6 +497,11 @@ class FTBoxyObject(object): # superclass of vaguely box-like FT components for u
 		for El in Components:
 			if getattr(El, 'Visible', True):
 				El.Draw(DC, Zoom, BackBoxRoundedness=BackBoxRoundedness) # render element, including any background box, in DC
+
+	def HandleMouseLClickOnMe(self, **Args): # handle mouse left button single click on element, not on one of its
+		# clickable components%%%
+		# set the element as currently selected. If the Shift key is pressed, add to existing selection, else replace it
+		self.FT.SetElementAsCurrent(TargetFTElement=self, UnsetPrevious=not Args['Event'].ShiftDown(), RedrawEntireFT=True)
 
 class TextElement(FTBoxyObject): # object containing a text object and other attributes and methods needed to render it
 	# Consists of a single text inside a coloured box. It's a component of an FTHeader, FTConnector or FTEvent.
@@ -639,7 +643,10 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 			if hasattr(self.FT.DisplDevice, 'GotoControlPanelAspect'):
 				self.FT.DisplDevice.GotoControlPanelAspect(AspectName=self.ControlPanelAspect,
 					PHAObjInControlPanel=self.HostObject, ComponentInControlPanel=ComponentName)
-		if self.FT.EditAllowed: # proceed with editing only if allowed to edit in this instance of vizop
+		# set the host object to be the only currently selected element in the FT
+		self.FT.SetElementAsCurrent(TargetFTElement=self.HostObject, UnsetPrevious=True, RedrawEntireFT=True)
+		# proceed with editing only if allowed to edit in this instance of Vizop
+		if self.FT.EditAllowed:
 			# get absolute position of textbox for editing: position within element + column + FT, then apply zoom and pan
 			Zoom = self.FT.Zoom
 			# check if HostObject of this element is in a column; if so, get PosX/Y within the column
@@ -1431,6 +1438,8 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 	# Attribs are used by ParseFTData() to populate object's attributes from data transferred from datacore (may be redundant)
 	Attribs = [(info.IDTag, int, False), ('BackgColour', 'rgb', False), ('Style', str, False), ('Numbering', str, False),
 		('Description', str, False), ('Value', str, False), ('ValueUnit', str, False), ('ConnectTo', int, True)]
+	# attribs to be reinstated after a redraw
+	AttribsToPreserve = ['Selected']
 
 	def __init__(self, FT, Column, **Args): # attribs marked * below are named in quotes elsewhere: be careful if names changed
 		assert isinstance(FT, FTForDisplay)
@@ -1511,19 +1520,12 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 
 		def SetButtonStati(Elements):
 			# set 'Status' attributes of buttons in Elements; but Status is not currently used
-			print('FT1504 setting button status with self.ValueProblemObjectID:', self.ValueProblemObjectID)
 			ValueProblemElement = ElementNamed(Elements, 'ValueProblemButton')
 			if ValueProblemElement:
 				ValueProblemElement.Status = {True: 'Alert', False: 'Out'}[(self.ValueProblemObjectID is None)]
 
-#		def DrawElements(DC, Elements, Zoom): # render FTConnector's elements in DC. Method moved to superclass
-#			BackBoxRoundedness = 3 # for text elements, how rounded the background boxes' corners are
-#			for El in Elements:
-#				if getattr(El, 'Visible', True):
-#					El.Draw(DC, Zoom, BackBoxRoundedness=BackBoxRoundedness) # render element, including any background box, in DC
-
 		def DrawBackgroundBox(DC, Zoom): # draw FTConnector's background box in DC
-			DC.SetPen(wx.Pen(self.BorderColour, width=1)) # for now, a 1 pixel border around the event. TODO make nicer and apply zoom
+			DC.SetPen(wx.Pen(self.BorderColour, width=1)) # for now, a 1 pixel border around the event. TODO make nicer and apply zoom to border
 			BackgColour = self.BackgroundColourSelected if self in self.FT.CurrentElements else self.BackgroundColourUnselected
 			DC.SetBrush(wx.Brush(BackgColour))
 			# box is drawn in FTConnector's own bitmap, so coords are relative to element (not using PosX/YInPx, which are relative to column)
@@ -4378,7 +4380,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		self.EditAllowed = True # whether user is allowed to edit the data in the underlying PHAObj
 		self.CurrentElements = [] # which element(s) are "current", i.e. selected for editing. This is accessed also in
 			# module ft_full_report
-		self.CurrentElementIDsToSetOnRefresh = [] # IDs of elements to be set as current when display is next refreshed.
+		self.CurrentElementIDsToSelectOnRefresh = [] # IDs of elements to be set as current when display is next refreshed.
 			# This is used so we can store the selection across a refresh - as datacore doesn't know which elements are
 			# "current" in our Viewport
 		self.ExistingElementIDsOnLastRefresh = [] # IDs of all elements existing in FT when it is redrawn.
@@ -4621,7 +4623,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 
 		def PopulateFTConnector(XMLObj, Column):
 			# create an FTConnector, get data for FTConnector from XMLObj (XML element). Return the FTConnector
-			print("FT4573 received connector data: ", ElementTree.tostring(XMLObj))
+#			print("FT4573 received connector data: ", ElementTree.tostring(XMLObj))
 			assert isinstance(Column, FTColumn)
 			# First, find out if it's in- or out-connector from 'Connectivity' tag, and create appropriate object
 			NewConnector = {'In': FTConnectorIn, 'Out': FTConnectorOut}[XMLObj.findtext('Connectivity')]\
@@ -4759,16 +4761,15 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		self.AddBuilderButtons()
 		# populate elements' ConnectTo attribs (must be done AFTER populating all elements)
 		self.PopulateConnectTo()
-		# populate which elements are currently selected - either in CurrentElementIDsToSetOnRefresh, or newly created
-		# since last refresh
+		# populate which elements are currently selected: if any elements newly created since last refresh, only the
+		# new elements are selected; else, select elements stored from last time in CurrentElementIDsToSelectOnRefresh
 		self.CurrentElements = []
-		ExistingElementIDs = []
-		for ThisEl in WalkOverAllFTObjs(self):
-			if ThisEl.ID in self.CurrentElementIDsToSetOnRefresh or not\
-				(ThisEl.ID in self.ExistingElementIDsOnLastRefresh): self.CurrentElements.append(ThisEl)
-			# populate "existing elements" list
-			ExistingElementIDs.append(ThisEl.ID)
-		self.ExistingElementIDsOnLastRefresh = ExistingElementIDs
+		NewlyCreatedElements = [e for e in WalkOverAllFTObjs(self) if not (e.ID in self.ExistingElementIDsOnLastRefresh)]
+		if NewlyCreatedElements: self.CurrentElements = NewlyCreatedElements[:]
+		else: self.CurrentElements = [e for e in WalkOverAllFTObjs(self) if e.ID in self.CurrentElementIDsToSelectOnRefresh]
+		self.ExistingElementIDsOnLastRefresh = [e.ID for e in WalkOverAllFTObjs(self)]
+		# store which elements are selected, for next refresh
+		self.CurrentElementIDsToSelectOnRefresh = [e.ID for e in self.CurrentElements]
 		# request appropriate control panel aspect
 		self.SwitchToPreferredControlPanelAspect(CurrentElements=self.CurrentElements)
 
@@ -5144,7 +5145,8 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 				elif ClickKind == 'LeftDouble': Handler = 'HandleMouseLDClickOnMe'
 				# invoke handler, if clicked element has implemented it
 				if hasattr(ElToHandleLClick, Handler):
-					getattr(ElToHandleLClick, Handler)(HitHotspot=HitHotspot, HostViewport=self, MouseX=ClickXInPx, MouseY=ClickYInPx)
+					getattr(ElToHandleLClick, Handler)(HitHotspot=HitHotspot, HostViewport=self, MouseX=ClickXInPx,
+						MouseY=ClickYInPx, **Args)
 				else: print("FT2105 %s handler not implemented" % ClickKind)
 		else: # click on empty space within FT
 			self.EndEditingOperation() # close out any operation in progress
@@ -5415,7 +5417,8 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 						NewValue=ChosenXMLName)
 					# store current element's ID to set as "current" when display is refreshed
 					if ElementID != 'Header':
-						self.CurrentElementIDsToSetOnRefresh = [ElementID]
+						self.CurrentElementIDsToSelectOnRefresh = [ElementID]
+						print('FT5374 in EndEditingOperation; self.CurrentElementIDsToSelectOnRefresh:', self.CurrentElementIDsToSelectOnRefresh)
 				else: # no change made, or change rejected; destroy the choice widget
 					self.CurrentEditChoice.Destroy()
 					self.CurrentEditElement = self.CurrentEditChoice = None
@@ -5444,7 +5447,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		# check ElementID refers to a connector-out in this FT
 		assert ElementID in [e.ID for e in WalkOverAllFTObjs(self) if isinstance(e, FTConnectorOut)]
 		# set the connector to be selected on next redraw
-		self.CurrentElementIDsToSetOnRefresh = [ElementID]
+		self.CurrentElementIDsToSelectOnRefresh = [ElementID]
 		vizop_misc.SendRequest(Socket=self.C2DSocketREQ, Command='RQ_FT_JoinConnectors', ConnectorOut=ElementID,
 			ConnectorIn=TargetConnectorID, Viewport=self.ID)
 
@@ -5455,7 +5458,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		# check ElementID refers to a connector-out in this FT
 		assert ElementID in [e.ID for e in WalkOverAllFTObjs(self) if isinstance(e, FTConnectorOut)]
 		# set the connector-out to be selected on next redraw
-		self.CurrentElementIDsToSetOnRefresh = [ElementID]
+		self.CurrentElementIDsToSelectOnRefresh = [ElementID]
 		vizop_misc.SendRequest(Socket=self.C2DSocketREQ, Command='RQ_FT_DisconnectConnectors', ConnectorOut=ElementID,
 			ConnectorIn=ConnectorInToDisconnectID, Viewport=self.ID)
 
@@ -5492,16 +5495,20 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		self.DisplDevice = None
 		# later, might need to store any unstored user inputs, and kill any active widgets
 
-	def SetElementAsCurrent(self, TargetFTElement, UnsetPrevious=False):
+	def SetElementAsCurrent(self, TargetFTElement, UnsetPrevious=False, RedrawEntireFT=False):
 		# set TargetFTElement (FTElement or FTGate instance) as the current one. This will be reflected in Control Panel and
 		# edit operations such as "delete element".
 		# if UnsetPrevious (bool), the element(s) previously set as current will be unset. This is normal behaviour except
 		# when the user is multi-selecting elements.
-		# This function is not used yet.
+		# If RedrawEntireFT (bool), FT is redrawn to reflect the updated selections.
 		assert isinstance(TargetFTElement, (FTGate, FTConnector, FTEvent))
 		assert isinstance(UnsetPrevious, bool)
+		assert isinstance(RedrawEntireFT, bool)
 		if UnsetPrevious: self.CurrentElements = [] # unset previous current elements list
 		self.CurrentElements.append(TargetFTElement)
+		# update list of elements to set as current on next refresh
+		self.CurrentElementIDsToSelectOnRefresh = [e.ID for e in self.CurrentElements]
+		if RedrawEntireFT: self.DisplDevice.Redraw(FullRefresh=True)
 
 	def SwitchToPreferredControlPanelAspect(self, CurrentElements):
 		# if appropriate, ask our display device's Control Panel to go to the preferred aspect, considering which

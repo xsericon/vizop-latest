@@ -1815,16 +1815,16 @@ class ControlFrame(wx.Frame):
 					MyPaintDC = wx.PaintDC(self)
 					self.DoRedraw(MyPaintDC, FullRefresh=True)
 
-		def OnMouseLClickEdit(self, event, Viewport, CanStartDrag=True, CanSelect=True, **Args):
+		def OnMouseLClickEdit(self, Event, Viewport, CanStartDrag=True, CanSelect=True, **Args):
 			# handle mouse left button click inside EditPanel
 			# if CanStartDrag, this click can be treated as start of dragging gesture
 			# if CanSelect, click can change which Elements are selected
 			# get mouse coords relative to EditPanel. Rappin p150
 			if hasattr(Viewport, 'HandleMouseLClick'):
-				MouseCoordX, MouseCoordY = event.GetPosition() # seems to be relative to panel position
+				MouseCoordX, MouseCoordY = Event.GetPosition() # seems to be relative to panel position
 				Viewport.HandleMouseLClick(MouseCoordX, MouseCoordY,
 					Viewport.DisplDevice.TolXInPx, Viewport.DisplDevice.TolYInPx,
-					CanStartDrag=CanStartDrag, CanSelect=CanSelect)
+					CanStartDrag=CanStartDrag, CanSelect=CanSelect, Event=Event)
 			if CanStartDrag: self.LDragStatus = 'ReadyToDrag'
 			else: self.LDragStatus = 'NotAllowed'
 
