@@ -515,28 +515,60 @@ class FTBoxyObject(object): # superclass of vaguely box-like FT components for u
 			IndexOfClickedElement = self.FT.Columns[ColIndexOfClickedElement].FTElements.index(self)
 			print('FT514 ColIndexOfLastElement, ColIndexOfClickedElement, IndexOfLastElement, IndexOfClickedElement: ', ColIndexOfLastElement, ColIndexOfClickedElement, IndexOfLastElement, IndexOfClickedElement)
 			if ColIndexOfLastElement == ColIndexOfClickedElement:
-				# select all the elements in the column between last and this element, and redraw on the last one
+				# select all the elements in the column between last and this element, redraw on the last one,
+				# and set the clicked element as the last one selected
 				BottomElementIndex = max(IndexOfLastElement, IndexOfClickedElement)
 				for ThisElIndex in range(min(IndexOfLastElement, IndexOfClickedElement), 1 + BottomElementIndex):
 					ThisFTElement = self.FT.Columns[ColIndexOfClickedElement].FTElements[ThisElIndex]
 					self.FT.SetElementAsCurrent(
 						TargetFTElement=ThisFTElement,
-						UnsetPrevious=False, RedrawEntireFT=(ThisFTElement == BottomElementIndex),
+						UnsetPrevious=False, RedrawEntireFT=(ThisElIndex == BottomElementIndex),
 						SetAsLastSelected=(ThisFTElement is self))
 			else: # they're in different columns
-				# find the y-coord range to highlight: this is the range between the centres of the 2 elements
-				LastElYCentre = int(self.FT.LastElementSelected.PosYInCU + (0.5 * self.FT.LastElementSelected.PosYInCU))
-				CurrentElYCentre = int(self.PosYInCU + (0.5 * self.PosYInCU))
-				YCoordTop = min(LastElYCentre, CurrentElYCentre)
-				YCoordBottom = max(LastElYCentre, CurrentElYCentre)
+				# find the y-coord range to highlight:
+				# if the centre of the last element selected is lower than the clicked element, the range is from the
+				# mouse click location to the bottom of the last element.
+				# Else, the range is from the top of the last element to the mouse click location.
+				LastElYCentreInPx = int(self.FT.LastElementSelected.PosYInPx + (0.5 * self.FT.LastElementSelected.SizeYInPx))
+				MouseX, MouseY = Args['Event'].GetPosition()
+				if LastElYCentreInPx > MouseY:
+					XCoordTopInCU, YCoordTopInCU = utilities.CanvasCoordsViewport(Viewport=self.FT, ScreenX=MouseX, ScreenY=MouseY)
+					YCoordBottomInCU = self.FT.LastElementSelected.PosYInCU + self.FT.LastElementSelected.SizeYInCU
+				else:
+					YCoordTopInCU = self.FT.LastElementSelected.PosYInCU
+					XCoordBottomInCU, YCoordBottomInCU = utilities.CanvasCoordsViewport(Viewport=self.FT, ScreenX=MouseX, ScreenY=MouseY)
+#				CurrentElYCentre = int(self.PosYInCU + (0.5 * self.SizeYInCU))
+#				YCoordTop = min(LastElYCentre, CurrentElYCentre)
+#				YCoordBottom = max(LastElYCentre, CurrentElYCentre)
+#				print('FT533 LastElYCentre, CurrentElYCentre, YCoordTop, YCoordBottom: ', LastElYCentre, CurrentElYCentre, YCoordTop, YCoordBottom)
+				print('FT533 MouseY, LastElYCentreInPx, YCoordTopInCU, YCoordBottomInCU: ', MouseY, LastElYCentreInPx, YCoordTopInCU, YCoordBottomInCU)
 				# work through columns containing the 2 elements and all columns in between
+				LastColumnIndexToCheck = max(ColIndexOfLastElement, ColIndexOfClickedElement)
 				for ThisColIndex in range(min(ColIndexOfLastElement, ColIndexOfClickedElement),
-					1 + max(ColIndexOfLastElement, ColIndexOfClickedElement)):
+						1 + LastColumnIndexToCheck):
 					ThisCol = self.FT.Columns[ThisColIndex]
+					ThisIsLastColumn = (ThisColIndex == LastColumnIndexToCheck)
+					ElementsToSelect = []
 					for ThisEl in ThisCol.FTElements:
+						# make a list of elements to be selected in this column
+						# (Doing this 2-step algorithm - make list first, then select - so that we can refresh on
+						# selecting the last element)
 						# if the element's centre is in the range, select the element
-						if YCoordTop < (ThisEl.PosYInCU + (0.5 * self.FT.LastElementSelected.PosYInCU)) < YCoordBottom:
-							self.FT.SetElementAsCurrent(TargetFTElement=ThisEl, UnsetPrevious=False, RedrawEntireFT=False)
+						# It's in the range if the element's bottom is below the top of the range, and the element's
+						# top is above the bottom of the range
+						print('FT546 ThisEl pos, size: ', ThisEl.PosYInCU, ThisEl.SizeYInCU)
+#						if YCoordTop < (ThisEl.PosYInCU + (0.5 * self.FT.LastElementSelected.SizeYInCU)) < YCoordBottom:
+#						if YCoordTop <= (ThisEl.PosYInCU + (0.5 * ThisEl.SizeYInCU)) and\
+#							(ThisEl.PosYInCU + (0.5 * ThisEl.SizeYInCU)) <= YCoordBottom and\
+						if ((ThisEl.PosYInCU + ThisEl.SizeYInCU) >= YCoordTopInCU) and\
+								(ThisEl.PosYInCU <= YCoordBottomInCU) and\
+								type(ThisEl) in self.FT.ElementTypesCanBeSelected:
+							ElementsToSelect.append(ThisEl)
+					# select the elements identified for selection
+					print('FT551 ElementsToSelect: ', ElementsToSelect)
+					for ThisEl in ElementsToSelect:
+						self.FT.SetElementAsCurrent(TargetFTElement=ThisEl, UnsetPrevious=False,
+							RedrawEntireFT=ThisIsLastColumn and (ThisEl is ElementsToSelect[-1]))
 		else: # select only one element
 			# set the current element as currently selected. If the Cmd/Ctrl key is pressed, add to existing selection, else replace it
 			self.FT.SetElementAsCurrent(TargetFTElement=self, UnsetPrevious=not Args['Event'].CmdDown(),

@@ -1741,6 +1741,7 @@ class ControlFrame(wx.Frame):
 
 		def DoRedraw(self, DC, FullRefresh=True): # redraw Viewport in DC provided
 			# FullRefresh (bool): whether to request redraw from scratch
+			# %%% the problem with not filling the background in Windows may be here
 			assert isinstance(FullRefresh, bool)
 			DC.SetBackground(wx.Brush(self.BackgColour))
 			DC.Clear()
