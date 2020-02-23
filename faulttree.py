@@ -4331,7 +4331,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		Proj.FTFullExportFilename = XMLRoot.findtext('Filename')
 		Proj.FTFullExportFileType = utilities.InstanceWithAttribValue(ObjList=core_classes.ImageFileTypesSupported,
 			AttribName='XMLName', TargetValue=XMLRoot.findtext('FileType'),
-			NotFoundValue=core_classes.ImageFileTypesSupported[0])
+			NotFoundValue=core_classes.ImageFileTypesSupported[0]).Extension
 		Proj.FTExportShowWhat = XMLRoot.findtext('ExportWhat')
 		Proj.LastExportPageSize = utilities.InstanceWithAttribValue(ObjList=core_classes.PaperSizes,
 			AttribName='XMLName', TargetValue=XMLRoot.findtext('PageSize'),
@@ -4368,8 +4368,10 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 	# VizopTalks message when a new FT is created. NB don't set Priority here, as it is overridden in DoNewViewportCommand()
 	NewViewportVizopTalksArgs = {'Title': 'New Fault Tree created',
 		'MainText': 'Click on grey builder button to add first FT element'}
-	NewViewportVizopTalksTips = [{'Title': 'Tip: Zoom',
-		'MainText': info.CommandKeyName + ' + mouse wheel to zoom the fault tree'}]
+	NewViewportVizopTalksTips = [{'Title': _('Tip: Zoom'),
+			'MainText':_('%s + mouse wheel to zoom the fault tree') % info.CommandKeyName},
+		{'Title': 'Tip: Selecting FT elements',
+			'MainText': _('Shift or %s + click to select multiple elements') % info.CommandKeyName}]
 	PreferredControlPanelAspect = 'CPAspect_FaultTree' # aspect to show when FT is displayed
 	MinColumnLength = 100 # in canvas coords
 	MarginXInCU = 20 # margin between left edge of screen and left edge of first column, in canvas coords

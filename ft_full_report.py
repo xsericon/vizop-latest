@@ -365,14 +365,13 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 			self.FilenameText.Widget.ChangeValue(Proj.FTFullExportFilename.strip())
 			self.FilenameText.Widget.SelectAll()
 			# file type is fetched from project
+			print('FR368 file type in project: ', Proj.FTFullExportFileType)
 			RecognisedExtensions = [t.Extension for t in core_classes.ImageFileTypesSupported]
 			if Proj.FTFullExportFileType in RecognisedExtensions: ExtensionToSelect = Proj.FTFullExportFileType
 			else: ExtensionToSelect = info.DefaultImageFileType
 			self.FileTypeChoice.Widget.SetSelection(RecognisedExtensions.index(ExtensionToSelect))
 			# set overwrite checkbox
 			self.OverwriteCheck.Widget.SetValue(self.Overwrite)
-#			# set filename status message
-#			self.UpdateFilenameStatusMessage()
 			# set scope checkboxes
 			self.ShowHeaderCheck.Widget.SetValue('Header' in Proj.FTExportShowWhat)
 			self.ShowFTCheck.Widget.SetValue('FT' in Proj.FTExportShowWhat)
@@ -779,7 +778,6 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 			Handler=ThisAspect.OnConnectorsAcrossPagesCheck, Events=[wx.EVT_CHECKBOX], ColLoc=4, ColSpan=1, GapX=20)
 		ThisAspect.DateLabel = UIWidgetItem(wx.StaticText(MyEditPanel, -1, _('Show date:')), NewRow=True,
 			ColLoc=0, ColSpan=1, Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_RIGHT)
-		print('FF565 font info: ', ThisAspect.DateLabel.Widget.GetFont(), ThisAspect.DateLabel.Widget.GetFont().GetFaceName())
 		ThisAspect.DateChoice = UIWidgetItem(wx.Choice(MyEditPanel, -1, size=(100, 25),
 			choices=[c.HumanName for c in DateChoices]),
 			Handler=ThisAspect.OnDateChoice, Events=[wx.EVT_CHOICE], ColLoc=1, ColSpan=1)
@@ -817,11 +815,6 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 		ThisAspect.WidgetList = [ThisAspect.HeaderLabel,
 			ThisAspect.FileBox,
 			ThisAspect.PageLayoutBox,
-#			ThisAspect.FilenameLabel, ThisAspect.FilenameText, ThisAspect.SelectButton, ThisAspect.FileTypeLabel,
-#				ThisAspect.FileTypeChoice,
-#			ThisAspect.OverwriteCheck,
-#			ThisAspect.FilenameStatusMessage,
-#			ThisAspect.ExportWhatLabel, ThisAspect.ShowHeaderCheck, ThisAspect.ShowFTCheck, ThisAspect.ShowOnlySelectedCheck,
 			ThisAspect.ScopeBox,
 #			ThisAspect.PageLayoutLabel,
 #			ThisAspect.PageSizeLabel, ThisAspect.PageSizeChoice, ThisAspect.PortraitRadio, ThisAspect.LandscapeRadio,
@@ -984,14 +977,11 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 
 	def PrepareFullDisplay(self, XMLTree):
 		# display dialogue in our display device to get export parameters from user
-		print('FF434 starting PrepareFullDisplay')
 		# first, unpack data into the FT
 		super(type(self), self).PrepareFullDisplay(XMLTree)
-#		self.UndoOnCancel = Args.get('UndoOnCancel', None)
 		# build the dialogue: prefill widgets in new aspect and activate it
 		self.DialogueAspect.Prefill(self.Proj, FT=self, SystemFontNames=self.SystemFontNames)
 		self.DialogueAspect.SetWidgetVisibility()
-#		self.DialogueAspect.Activate(WidgetsToActivate=self.DialogueAspect.WidgetsToActivate)
 		self.DialogueAspect.Activate(WidgetsToActivate=self.DialogueAspect.WidgetsToActivate[:],
 			TextWidgets=self.DialogueAspect.TextWidgets)
 		# display aspect's sizer (containing all the visible widgets) in the edit panel

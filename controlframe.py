@@ -166,7 +166,9 @@ class ControlFrame(wx.Frame):
 
 		def SubmitVizopTalksMessage(self, Title='', MainText='', Buttons=[], Priority=CriticalPriority):
 			# call this procedure to send a message or tip to VizopTalks. Implements flowscheme 1 in specification.
+			# Title and MainText are assumed to be already translated.
 			# Tip_Context_General tips are assumed to be relevant to the current user context.
+			# FIXME if >1 tip is submitted in succession, only the last one is shown
 			assert isinstance(Title, str)
 			assert isinstance(MainText, str)
 			assert isinstance(Buttons, list)
