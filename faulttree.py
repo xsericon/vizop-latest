@@ -499,21 +499,18 @@ class FTBoxyObject(object): # superclass of vaguely box-like FT components for u
 				El.Draw(DC, Zoom, BackBoxRoundedness=BackBoxRoundedness) # render element, including any background box, in DC
 
 	def HandleMouseLClickOnMe(self, **Args): # handle mouse left button single click on element, not on one of its
-		# clickable components%%%
+		# clickable components
 		# if the Shift key is down, select all elements between the last one selected (if any) and the element clicked
-		print('FT504 self.FT.LastElementSelected and ShiftDown():', self.FT.LastElementSelected, Args['Event'].ShiftDown())
 		if self.FT.LastElementSelected and Args['Event'].ShiftDown():
 			# provide a function to get the index of the column containing an FT element
 			# FIXME handle case when self.FT.LastElementSelected has been deleted
 			ColIndex = lambda El: [i for i in range(len(self.FT.Columns)) if El in self.FT.Columns[i].FTElements][0]
 			# are the last element and this element in the same column?
-			print('FT513 last element, els in column: ', self.FT.LastElementSelected, self.FT.Columns[0].FTElements)
 			ColIndexOfLastElement = ColIndex(self.FT.LastElementSelected)
 			ColIndexOfClickedElement = ColIndex(self)
 			# get the index of the elements in their respective columns
 			IndexOfLastElement = self.FT.Columns[ColIndexOfLastElement].FTElements.index(self.FT.LastElementSelected)
 			IndexOfClickedElement = self.FT.Columns[ColIndexOfClickedElement].FTElements.index(self)
-			print('FT514 ColIndexOfLastElement, ColIndexOfClickedElement, IndexOfLastElement, IndexOfClickedElement: ', ColIndexOfLastElement, ColIndexOfClickedElement, IndexOfLastElement, IndexOfClickedElement)
 			if ColIndexOfLastElement == ColIndexOfClickedElement:
 				# select all the elements in the column between last and this element, redraw on the last one,
 				# and set the clicked element as the last one selected
@@ -532,16 +529,13 @@ class FTBoxyObject(object): # superclass of vaguely box-like FT components for u
 				LastElYCentreInPx = int(self.FT.LastElementSelected.PosYInPx + (0.5 * self.FT.LastElementSelected.SizeYInPx))
 				MouseX, MouseY = Args['Event'].GetPosition()
 				if LastElYCentreInPx > MouseY:
-					XCoordTopInCU, YCoordTopInCU = utilities.CanvasCoordsViewport(Viewport=self.FT, ScreenX=MouseX, ScreenY=MouseY)
+					XCoordTopInCU, YCoordTopInCU = utilities.CanvasCoordsViewport(Viewport=self.FT, ScreenX=MouseX,
+						ScreenY=MouseY)
 					YCoordBottomInCU = self.FT.LastElementSelected.PosYInCU + self.FT.LastElementSelected.SizeYInCU
 				else:
 					YCoordTopInCU = self.FT.LastElementSelected.PosYInCU
-					XCoordBottomInCU, YCoordBottomInCU = utilities.CanvasCoordsViewport(Viewport=self.FT, ScreenX=MouseX, ScreenY=MouseY)
-#				CurrentElYCentre = int(self.PosYInCU + (0.5 * self.SizeYInCU))
-#				YCoordTop = min(LastElYCentre, CurrentElYCentre)
-#				YCoordBottom = max(LastElYCentre, CurrentElYCentre)
-#				print('FT533 LastElYCentre, CurrentElYCentre, YCoordTop, YCoordBottom: ', LastElYCentre, CurrentElYCentre, YCoordTop, YCoordBottom)
-				print('FT533 MouseY, LastElYCentreInPx, YCoordTopInCU, YCoordBottomInCU: ', MouseY, LastElYCentreInPx, YCoordTopInCU, YCoordBottomInCU)
+					XCoordBottomInCU, YCoordBottomInCU = utilities.CanvasCoordsViewport(Viewport=self.FT,
+						ScreenX=MouseX, ScreenY=MouseY)
 				# work through columns containing the 2 elements and all columns in between
 				LastColumnIndexToCheck = max(ColIndexOfLastElement, ColIndexOfClickedElement)
 				for ThisColIndex in range(min(ColIndexOfLastElement, ColIndexOfClickedElement),
@@ -556,23 +550,20 @@ class FTBoxyObject(object): # superclass of vaguely box-like FT components for u
 						# if the element's centre is in the range, select the element
 						# It's in the range if the element's bottom is below the top of the range, and the element's
 						# top is above the bottom of the range
-						print('FT546 ThisEl pos, size: ', ThisEl.PosYInCU, ThisEl.SizeYInCU)
-#						if YCoordTop < (ThisEl.PosYInCU + (0.5 * self.FT.LastElementSelected.SizeYInCU)) < YCoordBottom:
-#						if YCoordTop <= (ThisEl.PosYInCU + (0.5 * ThisEl.SizeYInCU)) and\
-#							(ThisEl.PosYInCU + (0.5 * ThisEl.SizeYInCU)) <= YCoordBottom and\
 						if ((ThisEl.PosYInCU + ThisEl.SizeYInCU) >= YCoordTopInCU) and\
 								(ThisEl.PosYInCU <= YCoordBottomInCU) and\
 								type(ThisEl) in self.FT.ElementTypesCanBeSelected:
 							ElementsToSelect.append(ThisEl)
 					# select the elements identified for selection
-					print('FT551 ElementsToSelect: ', ElementsToSelect)
 					for ThisEl in ElementsToSelect:
 						self.FT.SetElementAsCurrent(TargetFTElement=ThisEl, UnsetPrevious=False,
 							RedrawEntireFT=ThisIsLastColumn and (ThisEl is ElementsToSelect[-1]))
-		else: # select only one element
-			# set the current element as currently selected. If the Cmd/Ctrl key is pressed, add to existing selection, else replace it
+		else: # de/select only one element
+			# set the clicked element as currently selected, replacing existing selection if Cmd/Ctrl key is not pressed
+			# if Cmd/Ctrl key is down, and clicked element is already selected, deselect it
 			self.FT.SetElementAsCurrent(TargetFTElement=self, UnsetPrevious=not Args['Event'].CmdDown(),
-				RedrawEntireFT=True, SetAsLastSelected=True)
+				RedrawEntireFT=True, SetAsLastSelected=True,
+				Deselect=(Args['Event'].CmdDown() and (self in self.FT.CurrentElements)))
 
 class TextElement(FTBoxyObject): # object containing a text object and other attributes and methods needed to render it
 	# Consists of a single text inside a coloured box. It's a component of an FTHeader, FTConnector or FTEvent.
@@ -4840,11 +4831,13 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		# new elements are selected; else, select elements stored from last time in CurrentElementIDsToSelectOnRefresh
 		self.CurrentElements = []
 		NewlyCreatedElements = [e for e in WalkOverAllFTObjs(self) if not (e.ID in self.ExistingElementIDsOnLastRefresh)]
-		if NewlyCreatedElements: self.CurrentElements = NewlyCreatedElements[:]
+		if NewlyCreatedElements:
+			# set newly created elements as selected; arbitrarily set the last one in the list as most recently selected%%%
+			for ThisEl in NewlyCreatedElements:
+				self.SetElementAsCurrent(TargetFTElement=ThisEl, UnsetPrevious=(ThisEl is NewlyCreatedElements[0]),
+					RedrawEntireFT=False, SetAsLastSelected=(ThisEl is NewlyCreatedElements[-1]))
 		else: self.CurrentElements = [e for e in WalkOverAllFTObjs(self) if e.ID in self.CurrentElementIDsToSelectOnRefresh]
 		self.ExistingElementIDsOnLastRefresh = [e.ID for e in WalkOverAllFTObjs(self)]
-		# store which elements are selected, for next refresh
-		self.CurrentElementIDsToSelectOnRefresh = [e.ID for e in self.CurrentElements]
 		# request appropriate control panel aspect
 		self.SwitchToPreferredControlPanelAspect(CurrentElements=self.CurrentElements)
 
@@ -5574,28 +5567,35 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		self.DisplDevice = None
 		# later, might need to store any unstored user inputs, and kill any active widgets
 
-	def SetElementAsCurrent(self, TargetFTElement, UnsetPrevious=False, RedrawEntireFT=False, SetAsLastSelected=True):
-		# set TargetFTElement (FTElement or FTGate instance) as the current one. This will be reflected in Control Panel and
-		# edit operations such as "delete element".
-		# if UnsetPrevious (bool), the element(s) previously set as current will be unset. This is normal behaviour except
-		# when the user is multi-selecting elements.
+	def SetElementAsCurrent(self, TargetFTElement, UnsetPrevious=False, RedrawEntireFT=False, SetAsLastSelected=True,
+			Deselect=False):
+		# set TargetFTElement (FTElement, connector or FTGate instance) as the current one. This will be reflected in
+		# Control Panel and edit operations such as "delete element".
+		# if UnsetPrevious (bool), the element(s) previously set as current will be unset. This is normal behaviour
+		# except when the user is multi-selecting elements.
 		# If RedrawEntireFT (bool), FT is redrawn to reflect the updated selections.
 		# If SetAsLastSelected (bool), TargetFTElement will be set as the last element selected (used for Shift+click to
-		#	multi-select)
+		#	multi-select, to identify where the selection range should begin)
+		# If Deselect is True, set TargetFTElement as not selected; else, set it as selected
 		assert isinstance(TargetFTElement, (FTBoxyObject, FTBuilder))
 		assert isinstance(UnsetPrevious, bool)
 		assert isinstance(RedrawEntireFT, bool)
 		assert isinstance(SetAsLastSelected, bool)
+		assert isinstance(Deselect, bool)
 		if type(TargetFTElement) in self.ElementTypesCanBeSelected: # ignore builder buttons
 			if UnsetPrevious: self.CurrentElements = [] # unset previous current elements list
-			self.CurrentElements.append(TargetFTElement)
+			if Deselect: # remove TargetFTElement from CurrentElements if it's selected
+				if TargetFTElement in self.CurrentElements: self.CurrentElements.remove(TargetFTElement)
+			else: # add TargetFTElement to CurrentElements if it's not already there
+				if TargetFTElement not in self.CurrentElements: self.CurrentElements.append(TargetFTElement)
 			# update list of elements to set as current on next refresh
 			self.CurrentElementIDsToSelectOnRefresh = [e.ID for e in self.CurrentElements]
 			if RedrawEntireFT: self.DisplDevice.Redraw(FullRefresh=True)
 			if SetAsLastSelected:
 				# set this element as the last one selected, in case the user shift-clicks another element
 				self.LastElementSelected = TargetFTElement
-				print('FT5554 set self.LastElementSelected to: ', TargetFTElement)
+			# store which elements are selected, for next refresh
+			self.CurrentElementIDsToSelectOnRefresh = [e.ID for e in self.CurrentElements]
 
 	def SwitchToPreferredControlPanelAspect(self, CurrentElements):
 		# if appropriate, ask our display device's Control Panel to go to the preferred aspect, considering which
