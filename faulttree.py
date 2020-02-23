@@ -4880,6 +4880,9 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			OverlayDC = wx.GCDC(BufferDC)
 			for ThisLayer in LayersToOverlayInZOrder:
 				OverlayDC.DrawBitmap(ThisLayer.Bitmap, ThisLayer.PosXInPx, ThisLayer.PosYInPx)
+			# Make a working bitmap for TargetDC. This seems to be needed only for MacOS, when exporting FT image
+			if not TargetDC.IsOk():
+				TargetDC.SelectObject(wx.Bitmap(width=BaseLayerSizeX, height=BaseLayerSizeY, depth=wx.BITMAP_SCREEN_DEPTH))
 			# copy entire FT into TargetDC in physical display device
 			TargetDC.Blit(xdest=0, ydest=0, width=BaseLayerBitmap.GetWidth(), height=BaseLayerBitmap.GetHeight(),
 				source=BufferDC, xsrc=0, ysrc=0)

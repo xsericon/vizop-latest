@@ -428,12 +428,8 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 			if FontNameToUse: self.FontChoice.Widget.SetSelection(SystemFontNames.index(FontNameToUse))
 			# set depiction checkboxes
 			self.ConnectorsAcrossPagesCheck.Widget.SetValue(Proj.FTConnectorsAcrossPages)
-			ShowComments = 'Comments' in Proj.FTExportShowPeripheral
-			ShowActions = 'Actions' in Proj.FTExportShowPeripheral
-			ShowParking = 'Parking' in Proj.FTExportShowPeripheral
-			self.CommentsCheck.Widget.SetValue(ShowComments)
-			self.ActionsCheck.Widget.SetValue(ShowActions)
-			self.ParkingCheck.Widget.SetValue(ShowParking)
+			for ThisWidget in [self.CommentsCheck, self.ActionsCheck, self.ParkingCheck]:
+				ThisWidget.Widget.SetValue(ThisWidget.XMLLabel in Proj.FTExportShowPeripheral)
 			self.CannotCalculateText.Widget.SetValue(Proj.FTExportCannotCalculateText)
 			self.CombineRRsCheck.Widget.SetValue(Proj.FTExportCombineRRs)
 			self.ExpandGatesCheck.Widget.SetValue(Proj.FTExportExpandGates)
@@ -677,9 +673,6 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 		ThisAspect.PageLayoutBox = UIWidgetItem(PageLayoutBoxSizer, HideMethod=lambda : PageLayoutBoxSizer.ShowItems(False),
 			ShowMethod=lambda : PageLayoutBoxSizer.ShowItems(True), ColLoc=5, ColSpan=5, RowSpan=2,
 			SetFontMethod=lambda f: PageLayoutBoxSizer.GetStaticBox().SetFont, Font=Fonts['SmallHeadingFont'])
-#		ThisAspect.PageLayoutLabel = UIWidgetItem(wx.StaticText(MyEditPanel, -1,
-#			_('Page layout')),
-#			ColLoc=0, ColSpan=2, Font=Fonts['SmallHeadingFont'])
 		ThisAspect.PageSizeLabel = UIWidgetItem(wx.StaticText(MyEditPanel, -1, _('Page size:')),
 			ColLoc=0, ColSpan=1, Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_RIGHT)
 		ThisAspect.PageSizeChoice = UIWidgetItem(wx.Choice(MyEditPanel, -1, size=(200, 25),
@@ -829,12 +822,6 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 #				ThisAspect.PagesDownLabel, ThisAspect.PagesDownText, ThisAspect.NewPagePerRRCheck,
 #			ThisAspect.ZoomLabel, ThisAspect.ZoomText,
 			ThisAspect.StyleBox,
-#			ThisAspect.StyleLabel,
-#			ThisAspect.BlackWhiteCheck, ThisAspect.FontLabel, ThisAspect.FontChoice,
-#			ThisAspect.DepictionLabel,
-#			ThisAspect.ConnectorsAcrossPagesCheck, ThisAspect.CommentsCheck, ThisAspect.ActionsCheck, ThisAspect.ParkingCheck,
-#			ThisAspect.CannotCalculateLabel, ThisAspect.CannotCalculateText, ThisAspect.CombineRRsCheck,
-#			ThisAspect.ExpandGatesCheck, ThisAspect.DateLabel, ThisAspect.DateChoice,
 			ThisAspect.ActionBox]
 #			ThisAspect.CancelButton, ThisAspect.GoButton]
 		# make list of widgets that need to be bound to their handlers in ActivateWidgetsInPanel() and deleted on exit
@@ -955,9 +942,10 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 		assert isinstance(ExpandGates, bool)
 		assert DateKind in core_classes.DateChoices
 		print('FR575 DoExportFTToFile: Work in progress. Test image files creation only, no option supported.')
-		
-		MemoryDC = wx.MemoryDC()
-		Bitmap = faulttree.FTForDisplay.RenderInDC(self, TargetDC=MemoryDC, FullRefresh=True, BitmapMinSize=None, DrawZoomTool=True)
+
+		MyMemoryDC = wx.MemoryDC()
+		Bitmap = faulttree.FTForDisplay.RenderInDC(self, TargetDC=MyMemoryDC, FullRefresh=True, BitmapMinSize=None, DrawZoomTool=True)
+		MyMemoryDC.SelectObject(bitmap=Bitmap)
 		Bitmap.SaveFile("test.png", wx.BITMAP_TYPE_PNG)
 		Bitmap.SaveFile("test.jpg", wx.BITMAP_TYPE_JPEG)
 		Bitmap.SaveFile("test.tiff", wx.BITMAP_TYPE_TIFF)
