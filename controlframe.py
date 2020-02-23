@@ -2634,6 +2634,8 @@ class ControlFrame(wx.Frame):
 		DoomedViewport = utilities.ObjectWithID(HostPHAObj.Viewports, DoomedViewportID)
 		# remove the Viewport from its PHA object
 		HostPHAObj.Viewports.remove(DoomedViewport)
+		# remove the Viewport from the project's master list
+		ThisProj.AllViewportShadows.remove(DoomedViewport)
 		Reply = vizop_misc.MakeXMLMessage(RootName='RP_DestroyViewport', RootText=DoomedViewportID, Elements={})
 		return Reply
 
@@ -2674,29 +2676,12 @@ class ControlFrame(wx.Frame):
 			TargetViewportID = XMLRoot.find(info.ViewportTag).text
 			TargetViewport = utilities.ObjectWithID(ThisProj.AllViewportShadows, TargetID=TargetViewportID)
 			ExistingPHAObj = utilities.ObjectWithID(ThisProj.PHAObjs, TargetID=XMLRoot.find(info.PHAModelIDTag).text)
-#				TargetViewportClass = ClassList[
-#					[Cls.InternalName for Cls in ClassList].index(XMLRoot.find('ViewportClass').text)]
-#				TargetViewportID = XMLRoot.find('Viewport').text
-#				TargetViewportHumanName = XMLRoot.find(info.HumanNameTag).text
-#				ExistingPHAObj = utilities.ObjectWithID(ThisProj.PHAObjs, XMLRoot.find(info.PHAModelIDTag).text)
-#				Chain = 'Stepwise' # TODO need 'NoChain' if we are adding new Viewport to existing PHA model
-#			# check if we can proceed to create the Viewport; we may need editing rights
-#			if Proj.EditAllowed:
-#				# make the Viewport shadow
-#				NewViewport = ViewportShadow(ThisProj, TargetViewportID, MyClass=TargetViewportClass,
-#											 HumanName=TargetViewportHumanName,
-#											 D2CSocketNumber=int(XMLRoot.find(info.D2CSocketNoTag).text),
-#											 C2DSocketNumber=int(XMLRoot.find(info.C2DSocketNoTag).text),
-#											 PHAModel=ExistingPHAObj)
-#				# attach existing PHA object to the Viewport
-#				NewViewport.PHAObj = ExistingPHAObj
-#				ExistingPHAObj.Viewports.append(NewViewport)  # add Viewport to list in the PHA object
 		# make reply message to send to control frame
 		TargetViewport.IsOnDisplay = True
 		Reply = self.MakeXMLMessageForDrawViewport(MessageHead='RP_SwitchToViewport', PHAObj=ExistingPHAObj,
 			Viewport=TargetViewport, ViewportID=TargetViewportID)
 		# check whether we should destroy an old Viewport, and destroy it if required
-		if XMLRoot.find(info.DoomedViewportIDTag):
+		if XMLRoot.find(info.DoomedViewportIDTag) is not None:
 			self.DatacoreDestroyViewport(XMLRoot=XMLRoot)
 		# send the info back to control frame as a reply message (via ListenToSocket)
 		return Reply
@@ -3088,7 +3073,6 @@ class ControlFrame(wx.Frame):
 		for ThisViewportShadow in Proj.AllViewportShadows:
 			# check if ThisViewportShadow is displayed in any display device, local or remote
 			if ThisViewportShadow.IsOnDisplay:
-				# find Viewport shadow corresponding to
 				# get refresh data from corresponding PHA object
 				RedrawXMLData = ThisViewportShadow.PHAObj.GetFullRedrawData(Viewport=ThisViewportShadow,
 					ViewportClass=ThisViewportShadow.MyClass)

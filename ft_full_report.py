@@ -365,7 +365,6 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 			self.FilenameText.Widget.ChangeValue(Proj.FTFullExportFilename.strip())
 			self.FilenameText.Widget.SelectAll()
 			# file type is fetched from project
-			print('FR368 file type in project: ', Proj.FTFullExportFileType)
 			RecognisedExtensions = [t.Extension for t in core_classes.ImageFileTypesSupported]
 			if Proj.FTFullExportFileType in RecognisedExtensions: ExtensionToSelect = Proj.FTFullExportFileType
 			else: ExtensionToSelect = info.DefaultImageFileType
@@ -856,7 +855,6 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 		# calculate the number of pages required to export the FT
 		# ShowWhat (str): what to include in the export. Contains some of 'Header', 'FT', 'OnlySelected'
 		# return dict with args: PagesAcrossCount, PagesDownCount (2 x int)
-		print('FF871 Zoom: ', Zoom, type(Zoom))
 		assert isinstance(Zoom, float)
 		assert self.MinZoom <= Zoom <= self.MaxZoom
 		assert isinstance(ShowWhat, str)
@@ -876,21 +874,21 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 		assert isinstance(CombineRRs, bool)
 		assert isinstance(ExpandGates, bool)
 		assert DateKind in core_classes.DateChoices
-		print('FF704 GetPageCountInfo: receiving:')
-		print('Zoom: ', Zoom)
-		print('ShowWhat: ', ShowWhat)
-		print('PageSizeLongAxis, PageSizeShortAxis: ', PageSizeLongAxis, PageSizeShortAxis)
-		print('Orientation: ', Orientation)
-		print('Margins T, B, L, R: ', TopMargin, BottomMargin, LeftMargin, RightMargin)
-		print('PageNumberPos: ', PageNumberPos)
-		print('NewPagePerRR: ', NewPagePerRR)
-		print('Font: ', Font)
-		print('ConnectorsAcrossPages: ', ConnectorsAcrossPages)
-		print('ShowTexts: ', ShowTexts)
-		print('CannotCalculateText: ', CannotCalculateText)
-		print('CombineRRs: ', CombineRRs)
-		print('ExpandGates:', ExpandGates)
-		print('DateKind: ', DateKind.HumanName)
+#		print('FF704 GetPageCountInfo: receiving:')
+#		print('Zoom: ', Zoom)
+#		print('ShowWhat: ', ShowWhat)
+#		print('PageSizeLongAxis, PageSizeShortAxis: ', PageSizeLongAxis, PageSizeShortAxis)
+#		print('Orientation: ', Orientation)
+#		print('Margins T, B, L, R: ', TopMargin, BottomMargin, LeftMargin, RightMargin)
+#		print('PageNumberPos: ', PageNumberPos)
+#		print('NewPagePerRR: ', NewPagePerRR)
+#		print('Font: ', Font)
+#		print('ConnectorsAcrossPages: ', ConnectorsAcrossPages)
+#		print('ShowTexts: ', ShowTexts)
+#		print('CannotCalculateText: ', CannotCalculateText)
+#		print('CombineRRs: ', CombineRRs)
+#		print('ExpandGates:', ExpandGates)
+#		print('DateKind: ', DateKind.HumanName)
 		return {'PagesAcrossCount': 2, 'PagesDownCount': 3}
 
 	def DoExportFTToFile(self, FilePath, FileType,
