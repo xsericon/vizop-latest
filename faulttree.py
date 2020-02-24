@@ -68,7 +68,8 @@ class ButtonElement(object): # object containing a button and attributes and met
 		assert InternalName in ['EventLinkedButton', 'EventGroupedButton', 'EventCommentButton',
 			'EventActionItemButton', 'ValueCommentButton', 'ValueProblemButton', 'ConnectButton', 'GateLinkedButton',
 			'GateLinkedButton', 'GateCommentButton', 'GateActionItemButton', 'ValueProblemButton',
-			'GateStyleButton', 'GateGroupedButton', 'ConnGroupedButton', 'ValueProblemButton']
+			'GateStyleButton', 'GateGroupedButton', 'ConnGroupedButton', 'ValueProblemButton',
+			'ConnDescriptionCommentButton', 'ConnValueCommentButton', 'ConnActionItemButton', 'ConnParkingLotItemButton']
 		assert isinstance(HostObject, (FTEvent, FTGate, FTCollapseGroup, FTConnector)) or (HostObject is None)
 		object.__init__(self)
 		self.FT = FT
@@ -98,7 +99,9 @@ class ButtonElement(object): # object containing a button and attributes and met
 			'GateLinkedButton': 'FT_LinkButton', 'GateCommentButton': 'FT_CommentButton',
 			'GateActionItemButton': 'FT_ActionButton', 'ValueProblemButton': 'FT_ProblemButton',
 			'GateGroupedButton': 'FT_GroupButton', 'GateStyleButton': 'FT_GateStyleButton',
-			'ConnGroupedButton': 'FT_GroupButton', 'ValueProblemButton': 'FT_ProblemButton'}[InternalName]
+			'ConnGroupedButton': 'FT_GroupButton', 'ValueProblemButton': 'FT_ProblemButton',
+			'ConnDescriptionCommentButton': 'FT_CommentButton', 'ConnValueCommentButton': 'FT_CommentButton',
+			'ConnActionItemButton': 'FT_ActionButton', 'ConnParkingLotItemButton': 'FT_ParkingLotButton'}[InternalName]
 			# ArtProviderName is name to pass to ArtProvider + '_' + key of BitmapZoomed
 		self.SizeXInCU = self.SizeYInCU = 30 # no-zoom size in pixels
 		self.SetupImages()
@@ -778,7 +781,7 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 		if Event.KeyCode == wx.WXK_ESCAPE: self.FT.EndEditingOperation(AcceptEdits=False)
 		else: Event.Skip() # allow editing widget to handle keypress normally
 
-class FTEvent(FTBoxyObject): # FT event object. Rendered by drawing text into bitmap (doesn't use native widgets or sizer)
+class FTEvent(FTBoxyObject): # FT event object
 	# Used for causes, IPLs, intermediate events, final events
 	NeedsConnectButton = True # whether to provide connect buttons
 	# Attribs are used by ParseFTData() to populate object's attributes from data transferred from datacore (may be redundant)
@@ -815,7 +818,6 @@ class FTEvent(FTBoxyObject): # FT event object. Rendered by drawing text into bi
 		self.ValueUnit = ''
 		self.ValueKind = ''
 		self.CanEditValue = False
-		self.ShowActionItems = False
 		self.BackgColour = '0,0,0' # rgb colour as str
 		self.EventDescriptionComments = [] # str values
 		self.ValueComments = [] # str values
@@ -827,7 +829,7 @@ class FTEvent(FTBoxyObject): # FT event object. Rendered by drawing text into bi
 		self.ValueCommentWidgets = []
 		# attribs determined locally, not transferred from datacore
 		self.Status = '' # button status
-		self.SizeXInPx = self.SizeXInCU = 10 # width in screen pixels and canvas units
+		self.SizeXInPx = self.SizeXInCU = 10 # width in screen pixels and canvas units; just initializing variables here
 		self.SizeYInPx = self.SizeYInCU = 10
 		self.PosXInCU = self.PosYInCU = 0 # position relative to the origin of the column it belongs to, in canvas units
 		self.PosXInPx = self.PosYInPx = 0  # absolute position on display device in pixels, taking zoom and pan into account
@@ -852,7 +854,7 @@ class FTEvent(FTBoxyObject): # FT event object. Rendered by drawing text into bi
 		ColourContentFg = (0x00, 0x00, 0x00) # black
 
 		# column widths: 100, 100, 100, 50, 50
-		# any element with MinHeight parm set is growable in the y axis to fit the text.
+		# any element with MinHeight attrib set is growable in the y axis to fit the text.
 		# it should be assigned to the Row that it can force to grow
 		# Elements in variable row number (after Comments row) have RowBase parm, which defines the row number if there
 		# are no comments visible
@@ -1503,7 +1505,7 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 	# attribs to be reinstated after a redraw
 	AttribsToPreserve = ['Selected']
 
-	def __init__(self, FT, Column, **Args): # attribs marked * below are named in quotes elsewhere: be careful if names changed
+	def __init__(self, FT, Column, **Args): # attribs marked * below are named in quotes elsewhere: be careful if names changed%%%
 		assert isinstance(FT, FTForDisplay)
 		assert isinstance(Column, FTColumn)
 		FTBoxyObject.__init__(self, **Args)
@@ -1519,13 +1521,24 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 		self.ValueKindOptions = [core_classes.UserNumValueItem, core_classes.ConstNumValueItem,
 							core_classes.LookupNumValueItem, core_classes.UseParentValueItem,
 							core_classes.ParentNumValueItem]
+		self.ConnectorDescriptionComments = [] # str values
+		self.ValueComments = [] # str values
+		self.ShowDescriptionComments = True # whether description comments are visible
+		self.ShowValueComments = True # whether value comments are visible
+		self.ActionItems = [] # str values
+		self.ShowActionItems = True
+		self.ParkingLotItems = [] # str values
+		self.ShowParkingLotItems = True
+		self.EventCommentWidgets = []
+		self.ValueCommentWidgets = []
 		self.SizeXInCU = self.SizeXInPx = self.SizeYInCU = self.SizeYInPx = 10 # size in canvas units and screen pixels
 		self.PosZ = 0 # z-coordinate
 		self.Buffer = wx.Bitmap(width=self.SizeXInPx, height=self.SizeYInPx, depth=wx.BITMAP_SCREEN_DEPTH)
 		self.CollapseGroups = [] # FTCollapseGroup objects this Connector belongs to
 		self.ValueProblemID = '' # ID of NumValueProblem instance, or '' if no problem (not used yet)
 		self.ValueProblemObjectID = '' # ID of an FT object that is causing a value problem in this object. '' = no problem
-		self.FixedEls = self.CreateFixedTextElements()
+#		self.FixedEls = self.CreateFixedTextElements()
+		(self.TopFixedEls, self.ValueFixedEls) = self.CreateFixedTextElements()
 		self.Clickable = True # bool; whether instance is intended to respond to user clicks
 		self.Visible = True # bool; whether it would be visible if currently panned onto the display device
 		self.Selected = False # bool; whether currently user-selected i.e. highlighted
@@ -1533,6 +1546,7 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 
 	def CreateFixedTextElements(self):
 		# create elements for fixed text items in FTConnector. Return list of elements
+		HeaderLabelBkg = (0xdb, 0xf7, 0xf0) # pale green
 		ColourLabelBkg = (0x80, 0x3E, 0x51) # plum; however not used in FTConnector
 		ColourLabelFg = (0xFF, 0xFF, 0xFF) # white; however not used in FTConnector
 		ColourContentBkg = (0x6A, 0xDA, 0xBD) # mint green
@@ -1548,24 +1562,77 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 			InternalName='ConnectorDescription', PromptText=_('Type a description'), EditBehaviour='Text')
 		ConnGroupedButton = ButtonElement(self.FT, Row=1, ColStart=4, ColSpan=1, StartX=250, EndX=299,
 			HostObject=self, InternalName='ConnGroupedButton')
+		self.ConnDescriptionCommentButton = ButtonElement(self.FT, Row=1, ColStart=6, ColSpan=1, StartX=300, EndX=349,
+			HostObject=self, InternalName='ConnDescriptionCommentButton')
 		self.ConnValue = TextElement(self.FT, Row=2, ColStart=0, ColSpan=1, EndX=99, HostObject=self,
 			InternalName='Value', ControlPanelAspect='CPAspect_NumValue', EditBehaviour='Text')
 		self.ConnValueUnitComponent = TextElement(self.FT, Row=2, ColStart=1, ColSpan=1, EndX=199, HostObject=self,
 			InternalName='ConnValueUnit')
 		self.ValueProblemButton = ButtonElement(self.FT, Row=2, ColStart=4, ColSpan=1, StartX=250, EndX=299,
 			HostObject=self, InternalName='ValueProblemButton')
-		# Connectors don't have "value types" (it's always calculated), "comments" or "action items"
-		# TODO %%% fix the above; CX-in needs other value types, and all CX's should have comments and action items
-		# make list of elements
-		TopEls = [ConnKind, ConnDescription, ConnGroupedButton, self.ConnValue, self.ConnValueUnitComponent,
-			self.ValueProblemButton]
+		self.ConnValueCommentButton = ButtonElement(self.FT, Row=2, ColStart=6, ColSpan=1, StartX=300, EndX=349,
+			HostObject=self, InternalName='ConnValueCommentButton')
+		self.ConnActionItemButton = ButtonElement(self.FT, Row=3, ColStart=3, ColSpan=1, StartX=250, EndX=299,
+			HostObject=self, InternalName='ConnActionItemButton')
+		self.ConnParkingLotItemButton = ButtonElement(self.FT, Row=3, ColStart=4, ColSpan=1, StartX=300, EndX=349,
+			HostObject=self, InternalName='ConnParkingLotItemButton')
+#		# make list of elements
+#		TopEls = [ConnKind, ConnDescription, ConnGroupedButton, self.ConnDescriptionCommentButton,
+#			self.ConnValue, self.ConnValueUnitComponent, self.ValueProblemButton, self.ConnValueCommentButton,
+#			self.ConnActionItemButton, self.ConnParkingLotItemButton]
+#		# set text element colours
+#		for El in TopEls:
+#			if type(El) is TextElement:
+#				El.Text.Colour = ColourContentFg
+#				El.PromptTextObj.Colour = ColourPromptText
+#				El.BkgColour = ColourContentBkg
+#		return TopEls
+		# make lists of elements: TopEls at top of connector, ValueEls relating to connector value
+		TopEls = [ConnKind, ConnDescription, ConnGroupedButton, self.ConnDescriptionCommentButton]
+		ValueEls = [self.ConnValue, self.ConnValueUnitComponent, self.ValueProblemButton, self.ConnValueCommentButton,
+			self.ConnActionItemButton, self.ConnParkingLotItemButton]
 		# set text element colours
-		for El in TopEls:
+		for El in TopEls + ValueEls:
 			if type(El) is TextElement:
-				El.Text.Colour = ColourContentFg
-				El.PromptTextObj.Colour = ColourPromptText
+				El.Text.Colour = El.PromptTextObj.Colour = ColourContentFg
 				El.BkgColour = ColourContentBkg
-		return TopEls
+		ConnKind.BkgColour = HeaderLabelBkg
+		return TopEls, ValueEls
+
+	def CreateVariableTextElements(self):
+		# create elements that vary depending on display settings - currently comments, action items and parking lot items
+		# return list of elements for each of description comments, action items, parking lot items, and value comments
+		ColourLabelBkg = (0x80, 0x3E, 0x51) # plum
+		ColourLabelFg = (0xFF, 0xFF, 0xFF) # white
+		ColourContentBkg = (0x6A, 0xDA, 0xBD) # mint green
+		ColourContentFg = (0x00, 0x00, 0x00) # black
+
+		# Make description comments, value comments and action items
+		DescrComments = []
+		ValueComments = []
+		ActionItems = []
+		ParkingLotItems = []
+		for (CommentElementList, CommentList, ShowFlag, CommentLabel) in \
+			[(DescrComments, self.ConnectorDescriptionComments, self.ShowDescriptionComments, _('Comment')),
+			 (ValueComments, self.ValueComments, self.ShowValueComments, _('Comment')),
+			 (ActionItems, self.ActionItems, self.ShowActionItems, _('Action items')),
+			 (ParkingLotItems, self.ParkingLotItems, self.ShowParkingLotItems, _('Parking lot items'))]:
+			if ShowFlag: # check whether this set of items is required to be displayed
+				for (CommentIndex, Comment) in enumerate(CommentList):
+					CommentElementList.append(TextElement(self.FT, RowBase=CommentIndex, ColStart=1, ColSpan=5,
+						EndX=399, MinHeight=25, HostObject=self))
+					CommentElementList[-1].Text.Content = Comment
+					CommentElementList[-1].Text.Colour = ColourContentFg
+					CommentElementList[-1].BkgColour = ColourContentBkg
+					CommentElementList[-1].Text.ParaHorizAlignment = 'Left'
+				# add item label (e.g. 'Comment') at left side of first row of items
+				CommentElementList.append(TextElement(self.FT, RowBase=0, ColStart=0, ColSpan=1, EndX=99,
+					HostObject=self))
+				CommentElementList[-1].Text.Content = CommentLabel
+				CommentElementList[-1].Text.Colour = ColourLabelFg
+				CommentElementList[-1].BkgColour = ColourLabelBkg
+				CommentElementList[-1].Text.ParaHorizAlignment = 'Centre'
+		return (DescrComments, ValueComments, ActionItems, ParkingLotItems)
 
 	def RenderIntoBitmap(self, Zoom): # draw FTConnector in its own self.Bitmap. Also calculates FTConnector's size attributes
 
@@ -1593,18 +1660,20 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 			# box is drawn in FTConnector's own bitmap, so coords are relative to element (not using PosX/YInPx, which are relative to column)
 			DC.DrawRectangle(0, 0, self.SizeXInPx, self.SizeYInPx)
 
-		# start of main procedure for RenderIntoBitmap() for class FTConnector
-		BorderX = BorderY = 10 # outer border in canvas coords
-		GapBetweenRows = GapBetweenCols = 5 # in canvas coords
-		MinColWidth = 40
-		# build combined element list (even though there's only one group of elements, left this way for consistency)
-		self.AllElements = BuildFullElementList(self.FixedEls)
-
 		def SetElementSizesInCU(): # set sizes in canvas units of all elements in the FTConnector instance
 			for ThisEl in self.AllElements:
 				ThisEl.SizeXInCU, ThisEl.SizeYInCU = ThisEl.MinSizeInCU
 
-		PopulateTextElements(self.AllElements) # put required text values in the elements
+		# start of main procedure for RenderIntoBitmap() for class FTConnector
+		BorderX = BorderY = 10 # outer border in canvas coords
+		GapBetweenRows = GapBetweenCols = 5 # in canvas coords
+		MinColWidth = 40
+		# create variable elements and build combined element list comprising fixed and variable elements%%%
+		(self.DescriptionCommentEls, self.ValueCommentEls, self.ActionItemEls, self.ParkingLotItemEls) =\
+			self.CreateVariableTextElements()
+		self.AllElements = BuildFullElementList(self.TopFixedEls, self.DescriptionCommentEls, self.ValueFixedEls,
+			self.ValueCommentEls, self.ActionItemEls, self.ParkingLotItemEls)
+		PopulateTextElements(self.AllElements) # put required text values in the components
 		SetElementSizesInCU()
 		SetButtonStati(self.AllElements) # set button elements to required status
 		# calculate height of each "sizer" row in canvas coords
@@ -2010,10 +2079,6 @@ class FTEventInCore(FTElementInCore): # FT event object used in DataCore by FTOb
 		assert isinstance(FT, FTObjectInCore)
 		assert isinstance(Column, FTColumnInCore)
 		FTElementInCore.__init__(self)
-#		self.ID = str(utilities.NextID(FTEventInCore.AllFTEventsInCore)) # generate unique ID; stored as str
-#		FTEventInCore.AllFTEventsInCore.append(self) # add self to register; must do after assigning self.ID
-#		FT.MaxElementID += 1 # find next available ID
-#		self.ID = str(FT.MaxElementID)
 		self.ID = FT.Proj.GetNewID() # find next available ID
 		self.Proj = Proj
 		self.FT = FT
@@ -2690,7 +2755,7 @@ def NextCombination(Length, PassMark):
 				yield LastList
 	return # finished
 
-class FTConnectorItemInCore(FTElementInCore): # in- and out-connectors (CX's) to allow data transfer between multiple FTs
+class FTConnectorItemInCore(FTElementInCore): # in- and out-connectors (CX's) to allow data transfer between multiple FTs%%%
 	AllFTCXInCore = [] # register of all FTConnectors currently active in Vizop; used to generate unique IDs
 	ConnectorStyles = ['Default'] # future, will define various connector appearances (squares, arrows, circles etc)
 	MaxElementsConnectedToThis = 100 # arbitrary limit on connectivity of out-CX
@@ -2701,15 +2766,17 @@ class FTConnectorItemInCore(FTElementInCore): # in- and out-connectors (CX's) to
 	ComponentEnglishNames = {'Value': 'Value'}
 	EventType = 'Connector'
 
-	def __init__(self, FT, Column, ColIndex=0, **Args):
+	def __init__(self, Proj, FT, Column, ColIndex=0, **Args):
 		# FT is the FaultTree object this connector belongs to
 		# Column (FTColumnInCore instance): Column to which this CX belongs
 		# ColIndex (int): index of FT column to which this CX belongs
+		assert isinstance(Proj, projects.ProjectItem)
 		assert isinstance(FT, FTObjectInCore)
 		assert isinstance(Column, FTColumnInCore)
 		assert isinstance(ColIndex, int)
 		assert ColIndex >= 0
 		FTElementInCore.__init__(self)
+		self.Proj = Proj
 		self.ID = FT.Proj.GetNewID() # find next available ID
 		self.FT = FT
 		self.Column = Column
@@ -2722,9 +2789,17 @@ class FTConnectorItemInCore(FTElementInCore): # in- and out-connectors (CX's) to
 			if isinstance(El, FTConnectorItemInCore)]))
 		self.ConnectorDescription = '' # text shown in the CX, if it's an out-CX. Also shown in in-CX if RelatedCX is None.
 		self.ConnectorDescriptionComments = [] # list of AssociatedTextItem instances
-		self.ShowDescriptionComments = False # whether description comments are visible
+		self.ShowDescriptionComments = True # whether description comments are visible
+		self.ValueComments = [] # list of AssociatedTextItem instances
+		self.ShowValueComments = True # whether value comments are visible
+		self.ActionItems = [] # list of AssociatedTextItem instances
+		self.ShowActionItems = True
+		self.ParkingLotItems = [] # list of AssociatedTextItem instances
+		self.ShowParkingLotItems = True
+		self.MakeTestComments()
 		self.RelatedCX = None # an FTConnectorItemInCore instance:
 			# If this is in-CX, defines which out-CX it's connected to. If out-CX, should be None
+		self.CanEditValue = True # False if the value should only be calculated and not overridden by user
 		self.BackgColour = '0,0,255' # blue
 		self.ConnectTo = [] # FT object instances in next column to the right
 		self.CollapseGroups = [] # CollapseGroup objects this event belongs to
@@ -2739,6 +2814,38 @@ class FTConnectorItemInCore(FTElementInCore): # in- and out-connectors (CX's) to
 			self.Value.SetMyValue(FTEventInCore.DefaultLikelihood, RR=ThisRR)
 			self.Value.SetMyStatus(NewStatus='ValueStatus_Unset', RR=ThisRR)
 		self.Value.SetMyUnit(FTEventInCore.DefaultFreqUnit)
+		self.LinkedFrom = [] # list of LinkItem instances for linking attribs to a master element elsewhere in the project
+
+	def MakeTestComments(self):
+		# make test comments for the FTConnector. Temporary
+		DC = core_classes.AssociatedTextItem(Proj=self.Proj, PHAObjClass=type(self), Host=self)
+		DC.Content = 'Test comment on connector description'
+		DC.Numbering = core_classes.NumberingItem()
+		# put a serial number into the numbering object
+		SerialObj = core_classes.SerialNumberChunkItem()
+		DC.Numbering.NumberStructure = [SerialObj]
+		self.ConnectorDescriptionComments.append(DC)
+		VC = core_classes.AssociatedTextItem(Proj=self.Proj, PHAObjClass=type(self), Host=self)
+		VC.Content = 'Test comment on connector value'
+		VC.Numbering = core_classes.NumberingItem()
+		# put a serial number into the numbering object
+		SerialObj = core_classes.SerialNumberChunkItem()
+		VC.Numbering.NumberStructure = [SerialObj]
+		self.ValueComments.append(VC)
+		AI = core_classes.AssociatedTextItem(Proj=self.Proj, PHAObjClass=type(self), Host=self)
+		AI.Content = 'Test action item for connector'
+		self.ActionItems.append(AI)
+		AI.Numbering = core_classes.NumberingItem()
+		# put a serial number into the numbering object
+		SerialObj = core_classes.SerialNumberChunkItem()
+		AI.Numbering.NumberStructure = [SerialObj]
+		PLI = core_classes.AssociatedTextItem(Proj=self.Proj, PHAObjClass=type(self), Host=self)
+		PLI.Content = 'Test parking lot item for connector'
+		self.ParkingLotItems.append(PLI)
+		PLI.Numbering = core_classes.NumberingItem()
+		# put a serial number into the numbering object
+		SerialObj = core_classes.SerialNumberChunkItem()
+		PLI.Numbering.NumberStructure = [SerialObj]
 
 	def AvailableConnectorsIn(self):
 		# returns list of Connectors-In in the project that are available for connection
@@ -3239,7 +3346,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 
 
 		def PopulateFTEventData(FT, El, FTEvent, EventListForNumbering):
-			# put FT event data into XML element El
+			# put FT event data into XML element El%%%
 			# EventListForNumbering: list containing all FTEvents to consider when numbering this one
 			# FT: FTObjectInCore containing FT event
 			if __debug__ == 1: # do type checks
@@ -3359,11 +3466,24 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			# XML sub-element
 			assert isinstance(FTConn, FTConnectorItemInCore)
 			if __debug__ == 1: # do type checks
-				TypeChecks = [(El, ElementTree.Element), (FTConn, FTConnectorItemInCore),
-							  (FTConn.ID, str), (FTConn.FT, FTObjectInCore), (FTConn.Out, bool),
-							  (FTConn.ConnectorDescription, str), (FTConn.BackgColour, str),
-							  (FTConn.ConnectTo, list), (FTConn.CollapseGroups, list),
-							  (FTConn.Numbering, core_classes.NumberingItem), (FTConn.Style, str)]
+				TypeChecks = [ (El, ElementTree.Element), (FTConn.ID, str),
+					(FTConn.Numbering, core_classes.NumberingItem), (FTConn.ConnectorDescription, str),
+					(FTConn.CanEditValue, bool), (FTConn.ShowActionItems, bool), (FTConn.ShowParkingLotItems, bool),
+					(FTConn.BackgColour, str), (FTConn.ConnectorDescriptionComments, list),
+					(FTConn.ValueComments, list), (FTConn.ShowDescriptionComments, bool),
+					(FTConn.ShowValueComments, bool), (FTConn.ActionItems, list), (FTConn.ParkingLotItems, list),
+					(FTConn.ConnectTo, list), (FTConn.CollapseGroups, list)]
+				IterableChecks = [(FTConn.LinkedFrom, core_classes.LinkItem),
+					(FTConn.CollapseGroups, FTCollapseGroup),
+					(FTConn.ConnectorDescriptionComments, core_classes.AssociatedTextItem),
+					(FTConn.ValueComments, core_classes.AssociatedTextItem),
+					(FTConn.ActionItems, core_classes.AssociatedTextItem),
+					(FTConn.ParkingLotItems, core_classes.AssociatedTextItem)]
+#				TypeChecks = [(El, ElementTree.Element), (FTConn, FTConnectorItemInCore),
+#							  (FTConn.ID, str), (FTConn.FT, FTObjectInCore), (FTConn.Out, bool),
+#							  (FTConn.ConnectorDescription, str), (FTConn.BackgColour, str),
+#							  (FTConn.ConnectTo, list), (FTConn.CollapseGroups, list),
+#							  (FTConn.Numbering, core_classes.NumberingItem), (FTConn.Style, str)]
 				IterableChecks = [(FTConn.CollapseGroups, FTCollapseGroup)]
 				# didn't do iterableCheck on ConnectTo, as several types are possible
 				core_classes.DoTypeChecks(TypeChecks, IterableChecks)
@@ -3371,25 +3491,6 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			ConnEl = ElementTree.SubElement(El, 'FTConnector')
 			# get value and unit for display
 			ConnValue, ConnUnit, ProblemValue, ProblemObj = GetValueAndUnitForDisplay(FTConn.FT, FTConn, ConnEl)
-#			RRToDisplay = self.RiskReceptorGroupOnDisplay[0]
-#			ProblemValue = FTConn.Value.Status(RR=RRToDisplay)
-#			ProblemObj = None # TODO get this from ProblemValue
-#			if ProblemValue == core_classes.NumProblemValue_NoProblem:
-#				# get the output value of the ConnEl, and format for display
-#				OutputValue = utilities.RoundValueForDisplay(InputValue=FTConn.Value.GetMyValue(RR=RRToDisplay),
-#					SigFigs=info.EventValueSigFigs)
-#				# run value checks
-#				ProblemValue = FTConn.CheckValue(NumValueInstance=FTConn.Value)
-#				# decide whether a problem indicator is needed
-#				if (ProblemValue == core_classes.NumProblemValue_NoProblem):
-#					ProblemLevel = None
-#				else:
-#					ProblemLevel = 'Level10'
-#			else:
-#				if ProblemValue == core_classes.NumProblemValue_UndefNumValue:
-#					OutputValue = _('not set')
-#				else:
-#					OutputValue = info.CantDisplayValueOnScreen # signifying value unobtainable
 
 			# make sub-elements for all the required attribs:
 			# elements where the text is the same as the FTConn attribute
@@ -3398,14 +3499,18 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 				('Description', FTConn.ConnectorDescription), ('BackgColour', FTConn.BackgColour),
 				('Numbering', FTConn.Numbering.HumanValue(PHAItem=FTConn, Host=FTConn.Column.FTElements)[0]),
 				('Style', FTConn.Style), ('EventType', {True: 'ConnectorOut', False: 'ConnectorIn'}[FTConn.Out]),
-				('ShowDescriptionComments', str(FTConn.ShowDescriptionComments)), ('Value', ConnValue),
+#				('ShowDescriptionComments', str(FTConn.ShowDescriptionComments)), ('Value', ConnValue),
+				('Value', ConnValue),
 				('Unit', ConnUnit.HumanName), ('ValueProblemID', getattr(ProblemValue, 'ID', '')),
 				('ValueProblemObjectID', getattr(ProblemObj, 'ID', '')), ('HumanName', FTConn.HumanName)]
 			for Tag, Attrib in DataInfo:
 				El = ElementTree.SubElement(ConnEl, Tag)
 				El.text = str(Attrib)
 			# elements for lists of AssociatedTextItems
-			DataInfo = [('DescriptionComments', FTConn.ConnectorDescriptionComments)]
+			DataInfo = [(info.ConnectorDescriptionCommentsTag, FTConn.ConnectorDescriptionComments),
+				(info.ValueCommentsTag, FTConn.ValueComments),
+				(info.ActionItemsTag, FTConn.ActionItems),
+				(info.ParkingLotItemsTag, FTConn.ParkingLotItems)]
 			for Tag, ListName in DataInfo:
 				for Item in ListName:
 					El = ElementTree.SubElement(ConnEl, Tag)
@@ -4703,11 +4808,15 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 				('Unit', 'ValueUnit'), ('ValueProblemID', 'ValueProblemID'), ('HumanName', 'HumanName') ]
 			for Tag, Attrib in DataInfoAsStr:
 				setattr(NewConnector, Attrib, XMLObj.findtext(Tag, default=''))
-			DataInfoAsBool = [ ('ShowDescriptionComments', 'ShowDescriptionComments') ]
+			DataInfoAsBool = [ (info.CanEditValueTag, 'CanEditValue') ]
 			for Tag, Attrib in DataInfoAsBool:
 				setattr(NewConnector, Attrib, bool(XMLObj.findtext(Tag, default='False')))
 			# DataInfoAsList: (Tag of each item in a list, name of the list to put the tag's text into)
-			DataInfoAsList = [ ('DescriptionComments', 'DescriptionComments'), ('ConnectTo', 'ConnectToIDs'),
+			DataInfoAsList = [ (info.ConnectorDescriptionCommentsTag, 'ConnectorDescriptionComments'),
+				(info.ValueCommentsTag, 'ValueComments'),
+				(info.ActionItemsTag, 'ActionItems'),
+				(info.ParkingLotItemsTag, 'ParkingLotItems'),
+				('ConnectTo', 'ConnectToIDs'),
 				('CollapseGroups', 'CollapseGroups') ]
 			for Tag, Attrib in DataInfoAsList:
 				setattr(NewConnector, Attrib, [El.text for El in XMLObj.findall(Tag)])
