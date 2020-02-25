@@ -61,15 +61,16 @@ class ButtonElement(object): # object containing a button and attributes and met
 	# class ButtonObjectNotInElement is a subclass of this
 
 	def __init__(self, FT, Row=0, RowBase=0, ColStart=0, ColSpan=1, StartX=0, EndX=200, PosYInCU=0, InternalName='',
-				 HostObject=None):
+				 HostObject=None, Stati=None):
 		# FT (FTForDisplay instance): FT containing this button element
 		# InternalName (str): label indicating the kind of function the button has
+		# Stati (iterable of str): valid self.Status values indicating which bitmap to render the button
 		assert isinstance(FT, FTForDisplay)
-		assert InternalName in ['EventLinkedButton', 'EventGroupedButton', 'EventCommentButton',
-			'EventActionItemButton', 'ValueCommentButton', 'ValueProblemButton', 'ConnectButton', 'GateLinkedButton',
-			'GateLinkedButton', 'GateCommentButton', 'GateActionItemButton', 'ValueProblemButton',
-			'GateStyleButton', 'GateGroupedButton', 'ConnGroupedButton', 'ValueProblemButton',
-			'ConnDescriptionCommentButton', 'ConnValueCommentButton', 'ConnActionItemButton', 'ConnParkingLotItemButton']
+#		assert InternalName in ['EventLinkedButton', 'EventGroupedButton', 'EventCommentButton',
+#			'EventActionItemButton', 'ValueCommentButton', 'ValueProblemButton', 'ConnectButton', 'GateLinkedButton',
+#			'GateLinkedButton', 'GateCommentButton', 'GateActionItemButton', 'ValueProblemButton',
+#			'GateStyleButton', 'GateGroupedButton', 'ConnGroupedButton', 'ValueProblemButton', 'ConnLinkedButton',
+#			'ConnDescriptionCommentButton', 'ConnValueCommentButton', 'ConnActionItemButton', 'ConnParkingLotItemButton']
 		assert isinstance(HostObject, (FTEvent, FTGate, FTCollapseGroup, FTConnector)) or (HostObject is None)
 		object.__init__(self)
 		self.FT = FT
@@ -84,13 +85,17 @@ class ButtonElement(object): # object containing a button and attributes and met
 		self.PosYInCU = PosYInCU
 		self.PosZ = 0 # z-coordinate
 		self.FillXSpace = False # whether button should expand to fill available space in X direction
-		if InternalName == 'ConnectButton': self.Status = 'Unconnected'
-		else: self.Status = 'Out'
-		# Status can be 'Out', 'In', 'Pressed' (user currently clicking it), or 'Alert' (flashing a warning)
+		if InternalName == 'ConnectButton':
+			self.Status = 'Unconnected'
+			Stati = ['Default']
+		else: self.Status = Stati[0]
+		# Stati currently defined: 'OutNotExist' (button not pressed, no associated texts (e.g. comments) exist;
+		# 	'OutExist' (button not pressed, associated texts exist), 'Alert'
 		# For Connect buttons, status is 'Unconnected', 'Connected', 'Connecting' (making a connection)
-		self.BitmapZoomed = {'Default': None} # bitmaps containing button images scaled to current zoom level.
-			# Keys must include 'Default', other keys optional
-		self.BitmapZoomLevel = 1.0 # zoom level of current bitmaps in self.BitmapZoomed (float) (not used?)
+		self.BitmapZoomed = dict( [ (s, None) for s in Stati] ) # bitmaps containing button images scaled to current zoom level
+#		self.BitmapZoomed = {'Default': None} # bitmaps containing button images scaled to current zoom level.
+#			# Keys must include 'Default', other keys optional
+		self.BitmapZoomLevel = 1.0 # zoom level of current bitmaps in self.BitmapZoomed (float)
 		self.InternalName = InternalName # name used to identify specific elements
 		self.ArtProviderName = {'EventLinkedButton': 'FT_LinkButton', 'EventGroupedButton': 'FT_GroupButton',
 			'EventCommentButton': 'FT_CommentButton', 'ConnectButton': 'FT_ConnectButton',
@@ -101,7 +106,8 @@ class ButtonElement(object): # object containing a button and attributes and met
 			'GateGroupedButton': 'FT_GroupButton', 'GateStyleButton': 'FT_GateStyleButton',
 			'ConnGroupedButton': 'FT_GroupButton', 'ValueProblemButton': 'FT_ProblemButton',
 			'ConnDescriptionCommentButton': 'FT_CommentButton', 'ConnValueCommentButton': 'FT_CommentButton',
-			'ConnActionItemButton': 'FT_ActionButton', 'ConnParkingLotItemButton': 'FT_ParkingLotButton'}[InternalName]
+			'ConnActionItemButton': 'FT_ActionButton', 'ConnParkingLotItemButton': 'FT_ParkingLotButton',
+			'ConnLinkedButton': 'FT_LinkButton'}[InternalName]
 			# ArtProviderName is name to pass to ArtProvider + '_' + key of BitmapZoomed
 		self.SizeXInCU = self.SizeYInCU = 30 # no-zoom size in pixels
 		self.SetupImages()
@@ -126,7 +132,7 @@ class ButtonElement(object): # object containing a button and attributes and met
 		else: # draw bitmap
 			# work out whether to resize button bitmaps
 			if Zoom != self.BitmapZoomLevel: self.ChangeZoom(Zoom)
-			DC.DrawBitmap(self.BitmapZoomed.get(self.Status, self.BitmapZoomed['Default']), self.PosXInCU * Zoom,
+			DC.DrawBitmap(self.BitmapZoomed[self.Status], self.PosXInCU * Zoom,
 				self.PosYInCU * Zoom, useMask=False)
 
 	def DrawConnectButton(self, DC, Zoom, InFloatLayer=False, DesignatedX=None, DesignatedY=None): # draw a connect button
@@ -869,14 +875,13 @@ class FTEvent(FTBoxyObject): # FT event object
 			HostObject=self, InternalName='EventDescription', EditBehaviour='Text', HorizAlignment='Left',
 			MaxWidthInCU=400)
 		EventLinkedButton = ButtonElement(self.FT, Row=2, ColStart=1, ColSpan=1, StartX=300, EndX=349,
-			HostObject=self, InternalName='EventLinkedButton')
-			# button elements have Status attribute that can be 'Out', 'In', 'Pressed' (user currently clicking it), or 'Alert' (flashing a warning)
+			HostObject=self, InternalName='EventLinkedButton', Stati=('OutNotExist', 'OutExist'))
 		EventGroupedButton = ButtonElement(self.FT, Row=2, ColStart=2, ColSpan=1, StartX=350, EndX=399,
-			HostObject=self, InternalName='EventGroupedButton')
+			HostObject=self, InternalName='EventGroupedButton', Stati=('OutNotExist', 'OutExist'))
 		EventCommentButton = ButtonElement(self.FT, Row=1, ColStart=6, ColSpan=1, StartX=300, EndX=349,
-			HostObject=self, InternalName='EventCommentButton')
+			HostObject=self, InternalName='EventCommentButton', Stati=('OutNotExist', 'OutExist'))
 		EventActionItemButton = ButtonElement(self.FT, Row=2, ColStart=3, ColSpan=1, StartX=350, EndX=399,
-			HostObject=self, InternalName='EventActionItemButton')
+			HostObject=self, InternalName='EventActionItemButton', Stati=('OutNotExist', 'OutExist'))
 		EventValue = TextElement(self.FT, RowBase=0, ColStart=0, ColSpan=1, EndX=99, EditBehaviour='Text',
 			HostObject=self, InternalName='Value', ControlPanelAspect='CPAspect_NumValue')
 			# internal name = 'Value' to match attrib name in Core object
@@ -887,9 +892,9 @@ class FTEvent(FTBoxyObject): # FT event object
 			HostObject=self, InternalName='EventValueKind', EditBehaviour='Choice', ObjectChoices=[],
 			DisplAttrib='HumanName')
 		ValueCommentButton = ButtonElement(self.FT, RowBase=0, ColStart=6, ColSpan=1, StartX=300, EndX=349,
-			HostObject=self, InternalName='ValueCommentButton')
+			HostObject=self, InternalName='ValueCommentButton', Stati=('OutNotExist', 'OutExist'))
 		self.ValueProblemButton = ButtonElement(self.FT, RowBase=0, ColStart=5, ColSpan=1, StartX=350, EndX=399,
-			HostObject=self, InternalName='ValueProblemButton')
+			HostObject=self, InternalName='ValueProblemButton', Stati=('Out', 'Alert'))
 
 		# make lists of elements: TopEls at top of event, ValueEls relating to event value
 		TopEls = [self.EventTypeComponent, self.EventNumberingComponent, self.EventDescriptionComponent,
@@ -970,7 +975,7 @@ class FTEvent(FTBoxyObject): # FT event object
 									   ('ValueCommentButton', bool(self.ValueComments))]:
 				FoundButtonElement = ElementNamed(Elements, ButtonName)
 				if FoundButtonElement:
-					FoundButtonElement.Status = {True: 'In', False: 'Out'}[Flag]
+					FoundButtonElement.Status = {True: 'OutExist', False: 'OutNotExist'}[Flag]
 			# the Status set in the following lines is not currently used; using its Visible attrib instead
 			ValueProblemElement = ElementNamed(Elements, 'ValueProblemButton')
 			if ValueProblemElement:
@@ -1096,19 +1101,23 @@ class FTGate(FTBoxyObject): # object containing FT gates for display. These belo
 		self.GateKind = TextElement(self.FT, Row=0, ColStart=0, ColSpan=4, EndX=299, HostObject=self,
 			InternalName='GateKind', EditBehaviour='Choice', ObjectChoices=[], DisplAttrib='HumanName')
 		self.GateStyleButton = ButtonElement(self.FT, Row=0, ColStart=4, ColSpan=1, StartX=200, EndX=249,
-			HostObject=self, InternalName='GateStyleButton')
+			HostObject=self, InternalName='GateStyleButton', Stati=['Default'])
 		self.GateDescription = TextElement(self.FT, Row=2, ColStart=0, ColSpan=2, EndX=199, MinHeight=50,
 			HostObject=self, InternalName='GateDescription', EditBehaviour='Text')
-		self.GateLinkedButton = ButtonElement(self.FT, Row=1, ColStart=3, ColSpan=1, StartX=200, EndX=249, HostObject=self, InternalName='GateLinkedButton')
-		self.GateGroupedButton = ButtonElement(self.FT, Row=1, ColStart=4, ColSpan=1, StartX=250, EndX=299, HostObject=self, InternalName='GateGroupedButton')
-		self.GateCommentButton = ButtonElement(self.FT, Row=2, ColStart=3, ColSpan=1, StartX=200, EndX=249, HostObject=self, InternalName='GateCommentButton')
-		self.GateActionItemButton = ButtonElement(self.FT, Row=2, ColStart=4, ColSpan=1, StartX=250, EndX=299, HostObject=self, InternalName='GateActionItemButton')
+		self.GateLinkedButton = ButtonElement(self.FT, Row=1, ColStart=3, ColSpan=1, StartX=200, EndX=249,
+			HostObject=self, InternalName='GateLinkedButton', Stati=('OutNotExist', 'OutExist'))
+		self.GateGroupedButton = ButtonElement(self.FT, Row=1, ColStart=4, ColSpan=1, StartX=250, EndX=299,
+			HostObject=self, InternalName='GateGroupedButton', Stati=('OutNotExist', 'OutExist'))
+		self.GateCommentButton = ButtonElement(self.FT, Row=2, ColStart=3, ColSpan=1, StartX=200, EndX=249,
+			HostObject=self, InternalName='GateCommentButton', Stati=('OutNotExist', 'OutExist'))
+		self.GateActionItemButton = ButtonElement(self.FT, Row=2, ColStart=4, ColSpan=1, StartX=250, EndX=299,
+			HostObject=self, InternalName='GateActionItemButton', Stati=('OutNotExist', 'OutExist'))
 		self.GateValue = TextElement(self.FT, RowBase=0, ColStart=0, ColSpan=1, EndX=99, HostObject=self, InternalName='GateValue')
 		self.GateValueUnit = TextElement(self.FT, RowBase=0, ColStart=1, ColSpan=1, EndX=199, HostObject=self,
 			InternalName='GateValueUnit', EditBehaviour='Choice', ObjectChoices=[],
 			DisplAttrib='HumanName')
 		self.ValueProblemButton = ButtonElement(self.FT, RowBase=0, ColStart=4, ColSpan=1, StartX=250, EndX=299,
-			HostObject=self, InternalName='ValueProblemButton')
+			HostObject=self, InternalName='ValueProblemButton', Stati=('Out', 'Alert'))
 		# Gates don't have "value types" (it's always calculated) or "value comments"
 
 		# make lists of elements: TopEls at top of event, ValueEls relating to event value
@@ -1150,71 +1159,6 @@ class FTGate(FTBoxyObject): # object containing FT gates for display. These belo
 				CommentElementList[-1].Text.ParaHorizAlignment = 'Centre'
 		return (DescrComments, ActionItems)
 
-	def RenderIntoBitmap_old(self, Zoom): # draw FTGate in its own self.Bitmap. Also calculates FTGate's size attributes
-		# old version - superseded by new one developed from equivalent procedure in FTEvent class
-
-		def PopulateTextElements(Elements):
-			# put required values into all fixed text elements
-			# (variable elements are populated in CreateVariableTextElements() )
-			# The following list contains (attribs of FTGate, element's InternalName)
-			AttribInfo = [ ('Description', 'GateDescription'), ('Value', 'GateValue'), ('ValueUnit', 'GateValueUnit') ]
-			# put the content into the elements
-			for (Attrib, Name) in AttribInfo:
-				MatchingEl = ElementNamed(Elements, Name)
-				if MatchingEl:
-					MatchingEl.Text.Content = self.__dict__[Attrib]
-			# put the gate kind into the respective element
-				self.GateKind.Text.Content = FTGate.GateKindHash.get(self.Algorithm,
-					_('<Undefined gate type>'))
-
-		def SetButtonStati(Elements):
-			# set 'Status' attributes of buttons in Elements. Old version, obsolete
-			for (ButtonName, Flag) in [('GateLinkedButton', self.Linked), ('GateGroupedButton', bool(self.CollapseGroups)),
-					('GateCommentButton', bool(self.GateDescriptionComments)), ('GateStyleButton', False),
-					('GateActionItemButton', bool(self.ActionItems))]:
-				FoundButtonElement = ElementNamed(Elements, ButtonName)
-				if FoundButtonElement:
-					FoundButtonElement.Status = {True: 'In', False: 'Out'}[Flag]
-			# Status set in the following lines is not currently used
-			ValueProblemElement = ElementNamed(Elements, 'ValueProblemButton')
-			if ValueProblemElement:
-				ValueProblemElement.Status = {True: 'Alert', False: 'Out'}[(self.ValueProblemObjectID is None)]
-
-#		def DrawElements(DC, Elements, Zoom): # render gate's elements in DC. Method moved to superclass
-#			BackBoxRoundedness = 5 # for text elements, how rounded the background boxes' corners are
-#			for El in Elements:
-#				if getattr(El, 'Visible', True):
-#					El.Draw(DC, Zoom, BackBoxRoundedness=BackBoxRoundedness) # render element, including any background box, in DC
-#
-		# start of main procedure for RenderIntoBitmap() for class FTGate
-		BorderX = BorderY = 20 # outer border in canvas coords
-		GapBetweenRows = GapBetweenCols = 10 # in canvas coords
-		MinColWidth = 40
-		# create variable elements and build combined element list comprising fixed and variable elements
-		self.DescriptionCommentEls = self.CreateVariableTextElements()
-		self.AllElements = BuildFullElementList(self.TopFixedEls, self.DescriptionCommentEls, self.ValueFixedEls)
-
-		PopulateTextElements(self.AllElements) # put required text values in the elements
-		SetButtonStati(self.AllElements) # set button elements to required status
-		# calculate height of each "sizer" row in canvas coords
-		ColWidths, ColStartXs, ColEndXs, RowHeights, RowStartYs, RowEndYs = CalculateRowAndColumnDimensions(self.AllElements, GapBetweenCols,
-			GapBetweenRows, MinColWidth, BorderX, BorderY)
-		# set element Y positions and sizes according to row heights TODO update based on changes in FTElement
-		for El in self.AllElements:
-			El.StartY = RowStartYs[El.Row]
-			El.EndY = RowEndYs[El.Row]
-		# calculate FTGate size
-		self.SizeXInCU = max([El.EndX for El in self.AllElements]) + BorderX # the + BorderX adds right border space
-		self.SizeYInCU = RowEndYs[-1] - GapBetweenRows + BorderY # remove bottom "gap", add bottom border
-		self.SizeXInPx = int(round(self.SizeXInCU * Zoom))
-		self.SizeYInPx = int(round(self.SizeYInCU * Zoom))
-		# make the bitmap
-		self.Bitmap = wx.Bitmap(width=self.SizeXInPx, height=self.SizeYInPx, depth=wx.BITMAP_SCREEN_DEPTH)
-		# make a DC for drawing
-		DC = wx.MemoryDC(self.Bitmap)
-		# draw elements into the bitmap
-		self.DrawElements(DC, self.AllElements, Zoom)
-
 	def RenderIntoBitmap(self, Zoom): # draw FTGate in self.Bitmap. Also calculates FTGate size attributes
 		# based on equivalent method in FTEvent class
 
@@ -1240,12 +1184,12 @@ class FTGate(FTBoxyObject): # object containing FT gates for display. These belo
 
 		def SetButtonStati(Elements):
 			# set 'Status' attributes of buttons in gate's Elements
-			for (ButtonName, Flag) in [('GateLinkedButton', self.Linked), ('GateGroupedButton', bool(self.CollapseGroups)),
-					('GateCommentButton', bool(self.GateDescriptionComments)), ('GateStyleButton', False),
+			for (ButtonName, Flag) in [('GateLinkedButton', bool(self.Linked)), ('GateGroupedButton', bool(self.CollapseGroups)),
+					('GateCommentButton', bool(self.GateDescriptionComments)), ('GateStyleButton', 'GateStyle'),
 					('GateActionItemButton', bool(self.ActionItems))]:
 				FoundButtonElement = ElementNamed(Elements, ButtonName)
 				if FoundButtonElement:
-					FoundButtonElement.Status = {True: 'In', False: 'Out'}[Flag]
+					FoundButtonElement.Status = {True: 'OutExist', False: 'OutNotExist', 'GateStyle': 'Default'}[Flag]
 			# Status set in the following lines is not currently used
 			ValueProblemElement = ElementNamed(Elements, 'ValueProblemButton')
 			if ValueProblemElement:
@@ -1535,9 +1479,9 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 		self.PosZ = 0 # z-coordinate
 		self.Buffer = wx.Bitmap(width=self.SizeXInPx, height=self.SizeYInPx, depth=wx.BITMAP_SCREEN_DEPTH)
 		self.CollapseGroups = [] # FTCollapseGroup objects this Connector belongs to
+		self.LinkedFrom = []
 		self.ValueProblemID = '' # ID of NumValueProblem instance, or '' if no problem (not used yet)
 		self.ValueProblemObjectID = '' # ID of an FT object that is causing a value problem in this object. '' = no problem
-#		self.FixedEls = self.CreateFixedTextElements()
 		(self.TopFixedEls, self.ValueFixedEls) = self.CreateFixedTextElements()
 		self.Clickable = True # bool; whether instance is intended to respond to user clicks
 		self.Visible = True # bool; whether it would be visible if currently panned onto the display device
@@ -1556,39 +1500,31 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 		# column widths: 100, 100, 50, 50
 		# any element with MinHeight parm set is growable in the y axis to fit the text.
 		# it should be assigned to the Row that it can force to grow
+		# Stati: valid self.Status settings for buttons
 		ConnKind = TextElement(self.FT, Row=0, ColStart=0, ColSpan=4, EndX=199, HostObject=self,
 			InternalName='ConnKind', DisplAttrib='HumanName')
 		ConnDescription = TextElement(self.FT, Row=1, ColStart=0, ColSpan=2, EndX=199, MinHeight=50, HostObject=self,
 			InternalName='ConnectorDescription', PromptText=_('Type a description'), EditBehaviour='Text')
 		ConnGroupedButton = ButtonElement(self.FT, Row=1, ColStart=4, ColSpan=1, StartX=250, EndX=299,
-			HostObject=self, InternalName='ConnGroupedButton')
+			HostObject=self, InternalName='ConnGroupedButton', Stati=('OutNotExist', 'OutExist'))
 		self.ConnDescriptionCommentButton = ButtonElement(self.FT, Row=1, ColStart=6, ColSpan=1, StartX=300, EndX=349,
-			HostObject=self, InternalName='ConnDescriptionCommentButton')
+			HostObject=self, InternalName='ConnDescriptionCommentButton', Stati=('OutNotExist', 'OutExist'))
+		self.ConnLinkedButton = ButtonElement(self.FT, Row=1, ColStart=4, ColSpan=1, StartX=350, EndX=399,
+			HostObject=self, InternalName='ConnLinkedButton', Stati=('OutNotExist', 'OutExist'))
 		self.ConnValue = TextElement(self.FT, Row=2, ColStart=0, ColSpan=1, EndX=99, HostObject=self,
 			InternalName='Value', ControlPanelAspect='CPAspect_NumValue', EditBehaviour='Text')
 		self.ConnValueUnitComponent = TextElement(self.FT, Row=2, ColStart=1, ColSpan=1, EndX=199, HostObject=self,
 			InternalName='ConnValueUnit')
 		self.ValueProblemButton = ButtonElement(self.FT, Row=2, ColStart=4, ColSpan=1, StartX=250, EndX=299,
-			HostObject=self, InternalName='ValueProblemButton')
+			HostObject=self, InternalName='ValueProblemButton', Stati=('Out', 'Alert'))
 		self.ConnValueCommentButton = ButtonElement(self.FT, Row=2, ColStart=6, ColSpan=1, StartX=300, EndX=349,
-			HostObject=self, InternalName='ConnValueCommentButton')
+			HostObject=self, InternalName='ConnValueCommentButton', Stati=('OutNotExist', 'OutExist'))
 		self.ConnActionItemButton = ButtonElement(self.FT, Row=3, ColStart=3, ColSpan=1, StartX=250, EndX=299,
-			HostObject=self, InternalName='ConnActionItemButton')
+			HostObject=self, InternalName='ConnActionItemButton', Stati=('OutNotExist', 'OutExist'))
 		self.ConnParkingLotItemButton = ButtonElement(self.FT, Row=3, ColStart=4, ColSpan=1, StartX=300, EndX=349,
-			HostObject=self, InternalName='ConnParkingLotItemButton')
-#		# make list of elements
-#		TopEls = [ConnKind, ConnDescription, ConnGroupedButton, self.ConnDescriptionCommentButton,
-#			self.ConnValue, self.ConnValueUnitComponent, self.ValueProblemButton, self.ConnValueCommentButton,
-#			self.ConnActionItemButton, self.ConnParkingLotItemButton]
-#		# set text element colours
-#		for El in TopEls:
-#			if type(El) is TextElement:
-#				El.Text.Colour = ColourContentFg
-#				El.PromptTextObj.Colour = ColourPromptText
-#				El.BkgColour = ColourContentBkg
-#		return TopEls
+			HostObject=self, InternalName='ConnParkingLotItemButton', Stati=('OutNotExist', 'OutExist'))
 		# make lists of elements: TopEls at top of connector, ValueEls relating to connector value
-		TopEls = [ConnKind, ConnDescription, ConnGroupedButton, self.ConnDescriptionCommentButton]
+		TopEls = [ConnKind, ConnDescription, ConnGroupedButton, self.ConnDescriptionCommentButton, self.ConnLinkedButton]
 		ValueEls = [self.ConnValue, self.ConnValueUnitComponent, self.ValueProblemButton, self.ConnValueCommentButton,
 			self.ConnActionItemButton, self.ConnParkingLotItemButton]
 		# set text element colours
@@ -1647,11 +1583,20 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 				if MatchingEl:
 					MatchingEl.Text.Content = self.__dict__[Attrib]
 
-		def SetButtonStati(Elements):
-			# set 'Status' attributes of buttons in Elements; but Status is not currently used
-			ValueProblemElement = ElementNamed(Elements, 'ValueProblemButton')
-			if ValueProblemElement:
-				ValueProblemElement.Status = {True: 'Alert', False: 'Out'}[(self.ValueProblemObjectID is None)]
+		def SetButtonStati(Components):
+			# set 'Status' attributes of buttons in Components; used to determine which bitmap is used to render button%%%
+			for (ButtonName, Flag) in [('ConnLinkedButton', bool(self.LinkedFrom)),
+					('ConnGroupedButton', bool(self.CollapseGroups)),
+					('ConnDescriptionCommentButton', bool(self.DescriptionCommentEls)),
+					('ConnActionItemButton', bool(self.ActionItemEls)),
+					('ConnParkingLotItemButton', bool(self.ParkingLotItemEls)),
+					('ConnValueCommentButton', bool(self.ValueCommentEls))]:
+				FoundButtonComponent = ElementNamed(Components, ButtonName)
+				if FoundButtonComponent:
+					FoundButtonComponent.Status = {True: 'OutExist', False: 'OutNotExist'}[Flag]
+			ValueProblemComponent = ElementNamed(Components, 'ValueProblemButton')
+			if ValueProblemComponent:
+				ValueProblemComponent.Status = {True: 'Alert', False: 'Out'}[(self.ValueProblemObjectID is None)]
 
 		def DrawBackgroundBox(DC, Zoom): # draw FTConnector's background box in DC
 			DC.SetPen(wx.Pen(self.BorderColour, width=1)) # for now, a 1 pixel border around the event. TODO make nicer and apply zoom to border
