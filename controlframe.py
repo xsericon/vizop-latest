@@ -1584,21 +1584,86 @@ class ControlFrame(wx.Frame):
 
 		def FTConnectorOutAspect_OnConnectorInConnectButton(self, Event, ConnectorIn): pass
 
+		def MakeCommentAspect(self): # make 'edit comment' aspect for Control Panel
+			# make basic attribs needed for the aspect
+			MyNotebookPage = wx.Panel(parent=self.MyNotebook)
+			MyTabText = _('Comments') # text appearing on notebook tab
+			self.CommentAspect = self.ControlPanelAspectItem(InternalName='Comment', ParentFrame=self,
+				TopLevelFrame=self.TopLevelFrame, PrefillMethod=self.PrefillWidgetsForCommentAspect,
+				SetWidgetVisibilityMethod=self.SetWidgetVisibilityforCommentAspect, NotebookPage=MyNotebookPage,
+				TabText=MyTabText)
+			# make fixed widgets (this aspect also has variable widgets depending on the comments defined)
+			self.MakeStandardWidgets(Scope=self.CommentAspect, NotebookPage=MyNotebookPage)
+			self.CommentAspect.HeaderLabel = UIWidgetItem(wx.StaticText(MyNotebookPage, -1, _('Comments for:')),
+				ColLoc=3, ColSpan=1, GapX=20, Font=self.TopLevelFrame.Fonts['SmallHeadingFont'])
+			self.CommentAspect.ElementKindLabel = UIWidgetItem(wx.StaticText(MyNotebookPage, -1),
+				ColLoc=4, ColSpan=1, Font=self.TopLevelFrame.Fonts['SmallHeadingFont'])
+			self.CommentAspect.ElementDescriptionLabel = UIWidgetItem(wx.StaticText(MyNotebookPage, -1),
+				ColLoc=4, ColSpan=1, Font=self.TopLevelFrame.Fonts['SmallHeadingFont'])
+			self.CommentAspect.CommentPlaceholder = UIWidgetPlaceholderItem(Name='Comments')
+			# make list of all fixed widgets in this aspect
+			self.CommentAspect.FixedWidgetList = [self.CommentAspect.NavigateBackButton,
+				self.CommentAspect.NavigateForwardButton,
+				self.CommentAspect.HeaderLabel, self.CommentAspect.ElementKindLabel,
+				self.CommentAspect.UndoButton, self.CommentAspect.RedoButton,
+				self.CommentAspect.ElementDescriptionLabel, self.CommentAspect.CommentPlaceholder]
+			self.CommentAspect.VariableWidgetList = [] # populated in LineupVariableWidgetsForCommentAspect()
+			self.CommentAspect.WidgetList = [] # complete widget list, populated in Lineup...()
+
+		def LineupVariableWidgetsForCommentAspect(self, TargetElement, CommentListAttrib, NotebookPage):
+			# adjust variable widgets in 'edit comments' aspect of Control Panel%%%
+			# depending on number of comments belonging to TargetElement
+			# CommentListAttrib (str): name of attrib of TargetElement containing the appropriate comments (e.g. 'DescriptionComments')
+			# NotebookPage: parent window for the variable widgets
+			assert isinstance(CommentListAttrib, str)
+			assert hasattr(TargetElement, CommentListAttrib)
+			# first, deactivate and destroy all existing variable widgets (to avoid memory leak)
+			self.CommentAspect.Deactivate(Widgets=self.CommentAspect.VariableWidgetList)
+			for ThisWidget in self.CommentAspect.VariableWidgetList: ThisWidget.Widget.Destroy()
+			self.CommentAspect.VariableWidgetList = []
+			CommentList = getattr(TargetElement, CommentListAttrib)
+			# make a serial widget, textctrl and 'delete' button for each comment
+			# RowOffset and ColOffset are offsets from the position of the placeholder in FixedWidgetList
+			for (ThisCommentIndex, ThisComment) in enumerate(CommentList):
+				self.CommentAspect.VariableWidgetList.append(UIWidgetItem(wx.StaticText(NotebookPage, -1,
+					str(1 + ThisCommentIndex)), RowOffset=ThisCommentIndex, ColOffset=0, ColSpan=1))
+				self.CommentAspect.VariableWidgetList.append(UIWidgetItem(wx.TextCtrl(NotebookPage, -1, ThisComment,
+					style=wx.TE_PROCESS_ENTER), RowOffset=ThisCommentIndex, ColOffset=1, ColSpan=1,
+					CommentIndex=ThisCommentIndex))
+				DeleteButtonWidget = UIWidgetItem(wx.Button(NotebookPage, size=self.StandardImageButtonSize),
+					PHAObj=self.TopLevelFrame.PHAObjInControlPanel,
+					RowOffset=ThisCommentIndex, ColOffset=2, ColSpan=1,
+					Events=[wx.EVT_BUTTON],
+					Handler=self.CommentAspect_OnDeleteCommentButton,
+					CommentIndex=ThisCommentIndex)
+				self.CommentAspect.VariableWidgetList.append(DeleteButtonWidget)
+				DeleteButtonWidget.Widget.SetBitmap(self.TopLevelFrame.ButtonBitmap(wx.ART_MINUS))
+			# add serial widget and textctrl for a new comment
+			self.CommentAspect.VariableWidgetList.append(UIWidgetItem(wx.StaticText(NotebookPage, -1,
+				str(len(CommentList))), RowOffset=len(CommentList), ColOffset=0, ColSpan=1))
+			self.CommentAspect.VariableWidgetList.append(UIWidgetItem(wx.TextCtrl(NotebookPage, -1,
+				_('Type a new comment'), style=wx.TE_PROCESS_ENTER), RowOffset=len(CommentList), ColOffset=1,
+				ColSpan=1, CommentIndex=len(CommentList)))
+			# insert comment widgets into widget list, based on RowOffset and ColOffset
+			self.CommentAspect.WidgetList = self.InsertVariableWidgets(TargetPlaceholderName='Comments',
+				FixedWidgets=self.CommentAspect.FixedWidgetList,
+				VariableWidgets=self.CommentAspect.VariableWidgetList)
+
 		def NumericalValueAspect_OnNewConnectChoiceWidget(self, Event, **Args):
-			# handle user selection of Connector-In to connect to
-			# get option selected by user
-			EventWidget = Event.GetEventObject()
-			UserSelection = EventWidget.GetSelection()
-			if UserSelection != wx.NOT_FOUND: # is any item selected?
-				# find widget object and attrib containing value kind options
-				ThisWidgetObj = [w for w in self.FTConnectorOutAspect.WidgetList if w.Widget == EventWidget][0]
-				OptionsAttrib = getattr(ThisWidgetObj.PHAObj, ThisWidgetObj.DataAttrib) if ThisWidgetObj.DataAttrib\
-					else ThisWidgetObj.PHAObj
-				# find XML name (= ID) of Connector-In requested
-				TargetConnectorID = OptionsAttrib.ConnectorInsAvailable[EventWidget.GetSelection()].ID
-				# get Viewport to request new connection
-				self.TopLevelFrame.CurrentViewport.RequestNewConnectionToConnectorIn(ElementID=ThisWidgetObj.PHAObj.ID,
-					TargetConnectorID=TargetConnectorID)
+				# handle user selection of Connector-In to connect to
+				# get option selected by user
+				EventWidget = Event.GetEventObject()
+				UserSelection = EventWidget.GetSelection()
+				if UserSelection != wx.NOT_FOUND: # is any item selected?
+					# find widget object and attrib containing value kind options
+					ThisWidgetObj = [w for w in self.FTConnectorOutAspect.WidgetList if w.Widget == EventWidget][0]
+					OptionsAttrib = getattr(ThisWidgetObj.PHAObj, ThisWidgetObj.DataAttrib) if ThisWidgetObj.DataAttrib\
+						else ThisWidgetObj.PHAObj
+					# find XML name (= ID) of Connector-In requested
+					TargetConnectorID = OptionsAttrib.ConnectorInsAvailable[EventWidget.GetSelection()].ID
+					# get Viewport to request new connection
+					self.TopLevelFrame.CurrentViewport.RequestNewConnectionToConnectorIn(ElementID=ThisWidgetObj.PHAObj.ID,
+						TargetConnectorID=TargetConnectorID)
 
 		class ControlPanelAspectItem(object): # class whose instances are aspects of the Control panel
 			# attribs:
