@@ -61,17 +61,18 @@ class ButtonElement(object): # object containing a button and attributes and met
 	# class ButtonObjectNotInElement is a subclass of this
 
 	def __init__(self, FT, Row=0, RowBase=0, ColStart=0, ColSpan=1, StartX=0, EndX=200, PosYInCU=0, InternalName='',
-				 HostObject=None, Stati=None):
+				 HostObject=None, Stati=None, LSingleClickHandler=None, CommentKind=None, AssociatedTextKind=None, **Args):
 		# FT (FTForDisplay instance): FT containing this button element
 		# InternalName (str): label indicating the kind of function the button has
 		# Stati (iterable of str): valid self.Status values indicating which bitmap to render the button
+		# LSingleClickHandler (str name of callable or None): handler for left mouse button single click on the button
+		# CommentKind (str or None): for comment buttons, 'Description' or 'Value' or None, defines kind of related component
+		# AssociatedTextKind (str or None): for action item/parking lot item buttons, defines kind of associated text
 		assert isinstance(FT, FTForDisplay)
-#		assert InternalName in ['EventLinkedButton', 'EventGroupedButton', 'EventCommentButton',
-#			'EventActionItemButton', 'ValueCommentButton', 'ValueProblemButton', 'ConnectButton', 'GateLinkedButton',
-#			'GateLinkedButton', 'GateCommentButton', 'GateActionItemButton', 'ValueProblemButton',
-#			'GateStyleButton', 'GateGroupedButton', 'ConnGroupedButton', 'ValueProblemButton', 'ConnLinkedButton',
-#			'ConnDescriptionCommentButton', 'ConnValueCommentButton', 'ConnActionItemButton', 'ConnParkingLotItemButton']
 		assert isinstance(HostObject, (FTEvent, FTGate, FTCollapseGroup, FTConnector)) or (HostObject is None)
+		assert isinstance(LSingleClickHandler, str) or (LSingleClickHandler is None)
+		assert isinstance(CommentKind, str) or (CommentKind is None)
+		assert isinstance(AssociatedTextKind, str) or (AssociatedTextKind is None)
 		object.__init__(self)
 		self.FT = FT
 		self.HostObject = HostObject # which object (e.g. FTEvent instance) contains the ButtonElement instance
@@ -93,10 +94,11 @@ class ButtonElement(object): # object containing a button and attributes and met
 		# 	'OutExist' (button not pressed, associated texts exist), 'Alert'
 		# For Connect buttons, status is 'Unconnected', 'Connected', 'Connecting' (making a connection)
 		self.BitmapZoomed = dict( [ (s, None) for s in Stati] ) # bitmaps containing button images scaled to current zoom level
-#		self.BitmapZoomed = {'Default': None} # bitmaps containing button images scaled to current zoom level.
-#			# Keys must include 'Default', other keys optional
 		self.BitmapZoomLevel = 1.0 # zoom level of current bitmaps in self.BitmapZoomed (float)
 		self.InternalName = InternalName # name used to identify specific elements
+		self.LSingleClickHandler = None if LSingleClickHandler is None else getattr(self, LSingleClickHandler, None)
+		self.CommentKind = CommentKind
+		self.AssociatedTextKind = AssociatedTextKind
 		self.ArtProviderName = {'EventLinkedButton': 'FT_LinkButton', 'EventGroupedButton': 'FT_GroupButton',
 			'EventCommentButton': 'FT_CommentButton', 'ConnectButton': 'FT_ConnectButton',
 			'EventActionItemButton': 'FT_ActionButton', 'ValueCommentButton': 'FT_CommentButton',
@@ -176,27 +178,34 @@ class ButtonElement(object): # object containing a button and attributes and met
 		else: return None
 
 	def HandleMouseLClickOnMe(self, **Args): # handle mouse left button single click on ButtonElement instance
-		if self.InternalName == 'EventCommentButton':
-			self.HandleMouseLClickOnCommentButton(CommentKind='Description')
-		elif self.InternalName == 'ValueCommentButton': self.HandleMouseLClickOnCommentButton(CommentKind='Value')
-		elif self.InternalName == 'EventActionItemButton': self.HandleMouseLClickOnActionItemButton()
-		elif self.InternalName == 'ConnectButton': self.HandleMouseLClickOnConnectButton()
-		elif self.InternalName == 'GateStyleButton': self.HandleMouseLClickOnGateStyleButton()
+		if self.LSingleClickHandler is not None:
+			self.LSingleClickHandler(CommentKind=self.CommentKind, AssociatedTextKind=self.AssociatedTextKind)
+#		if self.InternalName == 'EventCommentButton':
+#			self.HandleMouseLClickOnCommentButton(CommentKind='Description')
+#		elif self.InternalName == 'ValueCommentButton': self.HandleMouseLClickOnCommentButton(CommentKind='Value')
+#		elif self.InternalName == 'EventActionItemButton': self.HandleMouseLClickOnActionItemButton()
+#		elif self.InternalName == 'ConnectButton': self.HandleMouseLClickOnConnectButton()
+#		elif self.InternalName == 'GateStyleButton': self.HandleMouseLClickOnGateStyleButton()
 
-	def HandleMouseLClickOnCommentButton(self, CommentKind):
+	def HandleMouseLClickOnCommentButton(self, CommentKind=None, **Args):
 		# handle mouse left button single click on a comment button
+		print('FT188 in comment button handler')
 		assert CommentKind in ['Description', 'Value']
 		if CommentKind == 'Description':
-			Show = not self.HostObject.ShowDescriptionComments # toggle whether comments are visible
-			Command = 'RQ_FT_DescriptionCommentsVisible'
+			self.HostObject.ShowDescriptionComments = not self.HostObject.ShowDescriptionComments # toggle whether comments are visible
+#			Command = 'RQ_FT_DescriptionCommentsVisible'
 		elif CommentKind == 'Value':
-			Show = not self.HostObject.ValueComments # toggle whether comments are visible
-			Command = 'RQ_FT_ValueCommentsVisible'
-		vizop_misc.SendRequest(Socket=self.FT.C2DSocketREQ, Command=Command,
-			ProjID=self.FT.Proj.ID, PHAObj=self.FT.PHAObj.ID, Viewport=self.FT.ID, Element=self.HostObject.ID,
-			Visible=utilities.Bool2Str(Show))
+			self.HostObject.ShowValueComments = not self.HostObject.ShowValueComments # toggle whether comments are visible
+#			Command = 'RQ_FT_ValueCommentsVisible'
+		# redraw the whole FT
+		self.HostObject.FT.DisplDevice.Redraw(FullRefresh=True)
+		# previously we sent a command to datacore to toggle comments; no longer required here, but still need to set
+		# comments on/off in the Viewport shadow when saving project file
+#		vizop_misc.SendRequest(Socket=self.FT.C2DSocketREQ, Command=Command,
+#			ProjID=self.FT.Proj.ID, PHAObj=self.FT.PHAObj.ID, Viewport=self.FT.ID, Element=self.HostObject.ID,
+#			Visible=utilities.Bool2Str(Show))
 
-	def HandleMouseLClickOnActionItemButton(self):
+	def HandleMouseLClickOnActionItemButton(self, AssociatedTextItem=None, **Args):
 		# handle mouse left button single click on action item button
 		Show = not self.HostObject.ShowActionItems # toggle whether action items are visible
 		Command = 'RQ_FT_ActionItemsVisible'
@@ -204,7 +213,7 @@ class ButtonElement(object): # object containing a button and attributes and met
 			ProjID=self.FT.Proj.ID, PHAObj=self.FT.PHAObj.ID, Viewport=self.FT.ID, Element=self.HostObject.ID,
 			Visible=utilities.Bool2Str(Show))
 
-	def HandleMouseLClickOnConnectButton(self):
+	def HandleMouseLClickOnConnectButton(self, **Args):
 		# handle mouse left button single click on a connect button
 		self.FT.EditingConnection = True # set flags
 		self.Status = 'Connecting'
@@ -244,7 +253,7 @@ class ButtonElement(object): # object containing a button and attributes and met
 		self.FT.FloatingLayers.append(self.FloatLayer)
 		self.FT.DisplDevice.Redraw(FullRefresh=False) # refresh the display to show the changed comment button
 
-	def HandleMouseLClickOnGateStyleButton(self):
+	def HandleMouseLClickOnGateStyleButton(self, **Args):
 		# handle mouse left button single click on a gate style button
 		# TODO send message to datacore to update the initial gate style; also in click handler of FTGate
 		# change gate style flag
@@ -258,10 +267,10 @@ class ButtonObjectNotInElement(ButtonElement):
 	# such as connect buttons
 
 	def __init__(self, FT, InternalName='', PosYInCU=0, HostObject=None, **Args):
-		ButtonElement.__init__(self, FT=FT, Row=0, RowBase=0, ColStart=0, ColSpan=1, StartX=0, EndX=200, PosYInCU=PosYInCU,
-			InternalName=InternalName, HostObject=HostObject)
-		# capture attribs provided in Args
+		# capture attribs provided in Args (do this before ButtonElement.__init__ so that __init__ can overwrite attribs)
 		for (AttribName, AttribValue) in Args.items(): setattr(self, AttribName, AttribValue)
+		ButtonElement.__init__(self, FT=FT, Row=0, RowBase=0, ColStart=0, ColSpan=1, StartX=0, EndX=200, PosYInCU=PosYInCU,
+			InternalName=InternalName, HostObject=HostObject, **Args)
 		self.BestMousePointerForSelecting = 'Pencil'
 
 class FTHeader(object): # FT header object. Rendered by drawing text into bitmap (doesn't use native widgets or sizer)
@@ -858,7 +867,6 @@ class FTEvent(FTBoxyObject): # FT event object
 		ColourLabelFg = (0xFF, 0xFF, 0xFF) # white
 		ColourContentBkg = (0x6A, 0xDA, 0xBD) # mint green
 		ColourContentFg = (0x00, 0x00, 0x00) # black
-
 		# column widths: 100, 100, 100, 50, 50
 		# any element with MinHeight attrib set is growable in the y axis to fit the text.
 		# it should be assigned to the Row that it can force to grow
@@ -875,13 +883,17 @@ class FTEvent(FTBoxyObject): # FT event object
 			HostObject=self, InternalName='EventDescription', EditBehaviour='Text', HorizAlignment='Left',
 			MaxWidthInCU=400)
 		EventLinkedButton = ButtonElement(self.FT, Row=2, ColStart=1, ColSpan=1, StartX=300, EndX=349,
-			HostObject=self, InternalName='EventLinkedButton', Stati=('OutNotExist', 'OutExist'))
+			HostObject=self, InternalName='EventLinkedButton', Stati=('OutNotExist', 'OutExist'),
+			LSingleClickHandler=None)
 		EventGroupedButton = ButtonElement(self.FT, Row=2, ColStart=2, ColSpan=1, StartX=350, EndX=399,
-			HostObject=self, InternalName='EventGroupedButton', Stati=('OutNotExist', 'OutExist'))
+			HostObject=self, InternalName='EventGroupedButton', Stati=('OutNotExist', 'OutExist'),
+			LSingleClickHandler=None)
 		EventCommentButton = ButtonElement(self.FT, Row=1, ColStart=6, ColSpan=1, StartX=300, EndX=349,
-			HostObject=self, InternalName='EventCommentButton', Stati=('OutNotExist', 'OutExist'))
+			HostObject=self, InternalName='EventCommentButton', Stati=('OutNotExist', 'OutExist'),
+			LSingleClickHandler='HandleMouseLClickOnCommentButton', CommentKind='Description')
 		EventActionItemButton = ButtonElement(self.FT, Row=2, ColStart=3, ColSpan=1, StartX=350, EndX=399,
-			HostObject=self, InternalName='EventActionItemButton', Stati=('OutNotExist', 'OutExist'))
+			HostObject=self, InternalName='EventActionItemButton', Stati=('OutNotExist', 'OutExist'),
+			LSingleClickHandler='HandleMouseLClickOnActionItemButton')
 		EventValue = TextElement(self.FT, RowBase=0, ColStart=0, ColSpan=1, EndX=99, EditBehaviour='Text',
 			HostObject=self, InternalName='Value', ControlPanelAspect='CPAspect_NumValue')
 			# internal name = 'Value' to match attrib name in Core object
@@ -892,9 +904,11 @@ class FTEvent(FTBoxyObject): # FT event object
 			HostObject=self, InternalName='EventValueKind', EditBehaviour='Choice', ObjectChoices=[],
 			DisplAttrib='HumanName')
 		ValueCommentButton = ButtonElement(self.FT, RowBase=0, ColStart=6, ColSpan=1, StartX=300, EndX=349,
-			HostObject=self, InternalName='ValueCommentButton', Stati=('OutNotExist', 'OutExist'))
+			HostObject=self, InternalName='ValueCommentButton', Stati=('OutNotExist', 'OutExist'),
+			LSingleClickHandler='HandleMouseLClickOnCommentButton', CommentKind='Value')
 		self.ValueProblemButton = ButtonElement(self.FT, RowBase=0, ColStart=5, ColSpan=1, StartX=350, EndX=399,
-			HostObject=self, InternalName='ValueProblemButton', Stati=('Out', 'Alert'))
+			HostObject=self, InternalName='ValueProblemButton', Stati=('Out', 'Alert'),
+			LSingleClickHandler=None)
 
 		# make lists of elements: TopEls at top of event, ValueEls relating to event value
 		TopEls = [self.EventTypeComponent, self.EventNumberingComponent, self.EventDescriptionComponent,
@@ -1101,17 +1115,22 @@ class FTGate(FTBoxyObject): # object containing FT gates for display. These belo
 		self.GateKind = TextElement(self.FT, Row=0, ColStart=0, ColSpan=4, EndX=299, HostObject=self,
 			InternalName='GateKind', EditBehaviour='Choice', ObjectChoices=[], DisplAttrib='HumanName')
 		self.GateStyleButton = ButtonElement(self.FT, Row=0, ColStart=4, ColSpan=1, StartX=200, EndX=249,
-			HostObject=self, InternalName='GateStyleButton', Stati=['Default'])
+			HostObject=self, InternalName='GateStyleButton', Stati=['Default'],
+			LSingleClickHandler='HandleMouseLClickOnGateStyleButton')
 		self.GateDescription = TextElement(self.FT, Row=2, ColStart=0, ColSpan=2, EndX=199, MinHeight=50,
 			HostObject=self, InternalName='GateDescription', EditBehaviour='Text')
 		self.GateLinkedButton = ButtonElement(self.FT, Row=1, ColStart=3, ColSpan=1, StartX=200, EndX=249,
-			HostObject=self, InternalName='GateLinkedButton', Stati=('OutNotExist', 'OutExist'))
+			HostObject=self, InternalName='GateLinkedButton', Stati=('OutNotExist', 'OutExist'),
+			LSingleClickHandler=None)
 		self.GateGroupedButton = ButtonElement(self.FT, Row=1, ColStart=4, ColSpan=1, StartX=250, EndX=299,
-			HostObject=self, InternalName='GateGroupedButton', Stati=('OutNotExist', 'OutExist'))
+			HostObject=self, InternalName='GateGroupedButton', Stati=('OutNotExist', 'OutExist'),
+			LSingleClickHandler=None)
 		self.GateCommentButton = ButtonElement(self.FT, Row=2, ColStart=3, ColSpan=1, StartX=200, EndX=249,
-			HostObject=self, InternalName='GateCommentButton', Stati=('OutNotExist', 'OutExist'))
+			HostObject=self, InternalName='GateCommentButton', Stati=('OutNotExist', 'OutExist'),
+			LSingleClickHandler='HandleMouseLClickOnCommentButton', CommentKind='Description')
 		self.GateActionItemButton = ButtonElement(self.FT, Row=2, ColStart=4, ColSpan=1, StartX=250, EndX=299,
-			HostObject=self, InternalName='GateActionItemButton', Stati=('OutNotExist', 'OutExist'))
+			HostObject=self, InternalName='GateActionItemButton', Stati=('OutNotExist', 'OutExist'),
+			LSingleClickHandler='HandleMouseLClickOnActionItemButton')
 		self.GateValue = TextElement(self.FT, RowBase=0, ColStart=0, ColSpan=1, EndX=99, HostObject=self, InternalName='GateValue')
 		self.GateValueUnit = TextElement(self.FT, RowBase=0, ColStart=1, ColSpan=1, EndX=199, HostObject=self,
 			InternalName='GateValueUnit', EditBehaviour='Choice', ObjectChoices=[],
@@ -1449,7 +1468,7 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 	# attribs to be reinstated after a redraw
 	AttribsToPreserve = ['Selected']
 
-	def __init__(self, FT, Column, **Args): # attribs marked * below are named in quotes elsewhere: be careful if names changed%%%
+	def __init__(self, FT, Column, **Args): # attribs marked * below are named in quotes elsewhere: be careful if names changed
 		assert isinstance(FT, FTForDisplay)
 		assert isinstance(Column, FTColumn)
 		FTBoxyObject.__init__(self, **Args)
@@ -1506,23 +1525,30 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 		ConnDescription = TextElement(self.FT, Row=1, ColStart=0, ColSpan=2, EndX=199, MinHeight=50, HostObject=self,
 			InternalName='ConnectorDescription', PromptText=_('Type a description'), EditBehaviour='Text')
 		ConnGroupedButton = ButtonElement(self.FT, Row=1, ColStart=4, ColSpan=1, StartX=250, EndX=299,
-			HostObject=self, InternalName='ConnGroupedButton', Stati=('OutNotExist', 'OutExist'))
+			HostObject=self, InternalName='ConnGroupedButton', Stati=('OutNotExist', 'OutExist'),
+			LSingleClickHandler=None)
 		self.ConnDescriptionCommentButton = ButtonElement(self.FT, Row=1, ColStart=6, ColSpan=1, StartX=300, EndX=349,
-			HostObject=self, InternalName='ConnDescriptionCommentButton', Stati=('OutNotExist', 'OutExist'))
+			HostObject=self, InternalName='ConnDescriptionCommentButton', Stati=('OutNotExist', 'OutExist'),
+			LSingleClickHandler='HandleMouseLClickOnCommentButton', CommentKind='Description')
 		self.ConnLinkedButton = ButtonElement(self.FT, Row=1, ColStart=4, ColSpan=1, StartX=350, EndX=399,
-			HostObject=self, InternalName='ConnLinkedButton', Stati=('OutNotExist', 'OutExist'))
+			HostObject=self, InternalName='ConnLinkedButton', Stati=('OutNotExist', 'OutExist'),
+			LSingleClickHandler=None)
 		self.ConnValue = TextElement(self.FT, Row=2, ColStart=0, ColSpan=1, EndX=99, HostObject=self,
 			InternalName='Value', ControlPanelAspect='CPAspect_NumValue', EditBehaviour='Text')
 		self.ConnValueUnitComponent = TextElement(self.FT, Row=2, ColStart=1, ColSpan=1, EndX=199, HostObject=self,
 			InternalName='ConnValueUnit')
 		self.ValueProblemButton = ButtonElement(self.FT, Row=2, ColStart=4, ColSpan=1, StartX=250, EndX=299,
-			HostObject=self, InternalName='ValueProblemButton', Stati=('Out', 'Alert'))
+			HostObject=self, InternalName='ValueProblemButton', Stati=('Out', 'Alert'),
+			LSingleClickHandler=None)
 		self.ConnValueCommentButton = ButtonElement(self.FT, Row=2, ColStart=6, ColSpan=1, StartX=300, EndX=349,
-			HostObject=self, InternalName='ConnValueCommentButton', Stati=('OutNotExist', 'OutExist'))
+			HostObject=self, InternalName='ConnValueCommentButton', Stati=('OutNotExist', 'OutExist'),
+			LSingleClickHandler='HandleMouseLClickOnCommentButton', CommentKind='Value')
 		self.ConnActionItemButton = ButtonElement(self.FT, Row=3, ColStart=3, ColSpan=1, StartX=250, EndX=299,
-			HostObject=self, InternalName='ConnActionItemButton', Stati=('OutNotExist', 'OutExist'))
+			HostObject=self, InternalName='ConnActionItemButton', Stati=('OutNotExist', 'OutExist'),
+			LSingleClickHandler='HandleMouseLClickOnActionItemButton', AssociatedTextKind='ActionItem')
 		self.ConnParkingLotItemButton = ButtonElement(self.FT, Row=3, ColStart=4, ColSpan=1, StartX=300, EndX=349,
-			HostObject=self, InternalName='ConnParkingLotItemButton', Stati=('OutNotExist', 'OutExist'))
+			HostObject=self, InternalName='ConnParkingLotItemButton', Stati=('OutNotExist', 'OutExist'),
+			LSingleClickHandler='HandleMouseLClickOnActionItemButton', AssociatedTextKind='ParkingLotItem')
 		# make lists of elements: TopEls at top of connector, ValueEls relating to connector value
 		TopEls = [ConnKind, ConnDescription, ConnGroupedButton, self.ConnDescriptionCommentButton, self.ConnLinkedButton]
 		ValueEls = [self.ConnValue, self.ConnValueUnitComponent, self.ValueProblemButton, self.ConnValueCommentButton,
@@ -1587,10 +1613,10 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 			# set 'Status' attributes of buttons in Components; used to determine which bitmap is used to render button%%%
 			for (ButtonName, Flag) in [('ConnLinkedButton', bool(self.LinkedFrom)),
 					('ConnGroupedButton', bool(self.CollapseGroups)),
-					('ConnDescriptionCommentButton', bool(self.DescriptionCommentEls)),
-					('ConnActionItemButton', bool(self.ActionItemEls)),
-					('ConnParkingLotItemButton', bool(self.ParkingLotItemEls)),
-					('ConnValueCommentButton', bool(self.ValueCommentEls))]:
+					('ConnDescriptionCommentButton', bool(self.ConnectorDescriptionComments)),
+					('ConnActionItemButton', bool(self.ActionItems)),
+					('ConnParkingLotItemButton', bool(self.ParkingLotItems)),
+					('ConnValueCommentButton', bool(self.ValueComments))]:
 				FoundButtonComponent = ElementNamed(Components, ButtonName)
 				if FoundButtonComponent:
 					FoundButtonComponent.Status = {True: 'OutExist', False: 'OutNotExist'}[Flag]
@@ -5165,11 +5191,12 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 					# draw right connect buttons to allow disconnection
 #					if (IsLeft or (len(JoinedFrom(self, ThisElement)) < getattr(ThisElement,
 #							'MaxElementsConnectedToThis', 0))) and ThisElement.Connectable:
-					# check if ThisElement is supposed to get connect buttons
+					# check if ThisElement is supposed to get connect buttons, and provide if necessary%%%
 					if ThisElement.Connectable:
 						NewButtonWidget = ButtonObjectNotInElement(FT=ThisColumn.FT, InternalName='ConnectButton',
-							PosYInCU=0, Toggle=False, HostObject=ThisElement,
-							ArtProvider=None, ColIndex=ColIndex, ObjID=ThisElement.ID, IsLeft=IsLeft) # was IsLeft=True
+							PosYInCU=0, HostObject=ThisElement,
+							ArtProvider=None, ColIndex=ColIndex, ObjID=ThisElement.ID, IsLeft=IsLeft,
+							LSingleClickHandler='HandleMouseLClickOnConnectButton')
 						ConnectButtonWidgets.append(NewButtonWidget)
 						# set PosXInCU. For right connect buttons, this needs to know the button size
 						if IsLeft:
