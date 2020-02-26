@@ -688,7 +688,9 @@ class ControlFrame(wx.Frame):
 			if isinstance(NewAspect, str):
 				TargetAspect = {'CPAspect_NumValue': self.NumericalValueAspect,
 					'CPAspect_FaultTree': self.FaultTreeAspect,
-					'CPAspect_FTConnectorOut': self.FTConnectorOutAspect}.get(NewAspect, None)
+					'CPAspect_FTConnectorOut': self.FTConnectorOutAspect,
+					'CPAspect_Comment': self.CommentAspect
+										}.get(NewAspect, None)
 			else: TargetAspect = NewAspect
 			if TargetAspect: # any recognised aspect supplied?
 				self.ControlPanelCurrentAspect = TargetAspect # store new aspect
@@ -878,6 +880,7 @@ class ControlFrame(wx.Frame):
 			self.MakeNumericalValueAspect()
 			self.MakeFaultTreeAspect()
 			self.MakeFTConnectorOutAspect()
+			self.MakeCommentAspect()
 			# Make sizer for notebook (this is required even though there's only one item in it, the notebook itself)
 			MySizer = wx.BoxSizer()
 			MySizer.Add(self.MyNotebook, 1, wx.EXPAND)
@@ -1597,9 +1600,9 @@ class ControlFrame(wx.Frame):
 			self.CommentAspect.HeaderLabel = UIWidgetItem(wx.StaticText(MyNotebookPage, -1, _('Comments for:')),
 				ColLoc=3, ColSpan=1, GapX=20, Font=self.TopLevelFrame.Fonts['SmallHeadingFont'])
 			self.CommentAspect.ElementKindLabel = UIWidgetItem(wx.StaticText(MyNotebookPage, -1),
-				ColLoc=4, ColSpan=1, Font=self.TopLevelFrame.Fonts['SmallHeadingFont'])
+				ColLoc=4, ColSpan=2, Font=self.TopLevelFrame.Fonts['SmallHeadingFont'])
 			self.CommentAspect.ElementDescriptionLabel = UIWidgetItem(wx.StaticText(MyNotebookPage, -1),
-				ColLoc=4, ColSpan=1, Font=self.TopLevelFrame.Fonts['SmallHeadingFont'])
+				ColLoc=6, ColSpan=2, Font=self.TopLevelFrame.Fonts['SmallHeadingFont'])
 			self.CommentAspect.CommentPlaceholder = UIWidgetPlaceholderItem(Name='Comments')
 			# make list of all fixed widgets in this aspect
 			self.CommentAspect.FixedWidgetList = [self.CommentAspect.NavigateBackButton,
@@ -1609,6 +1612,8 @@ class ControlFrame(wx.Frame):
 				self.CommentAspect.ElementDescriptionLabel, self.CommentAspect.CommentPlaceholder]
 			self.CommentAspect.VariableWidgetList = [] # populated in LineupVariableWidgetsForCommentAspect()
 			self.CommentAspect.WidgetList = [] # complete widget list, populated in Lineup...()
+
+		def CommentAspect_OnDeleteCommentButton(self, Event): pass
 
 		def LineupVariableWidgetsForCommentAspect(self, TargetElement, CommentListAttrib, NotebookPage):
 			# adjust variable widgets in 'edit comments' aspect of Control Panel%%%
@@ -1648,6 +1653,32 @@ class ControlFrame(wx.Frame):
 			self.CommentAspect.WidgetList = self.InsertVariableWidgets(TargetPlaceholderName='Comments',
 				FixedWidgets=self.CommentAspect.FixedWidgetList,
 				VariableWidgets=self.CommentAspect.VariableWidgetList)
+
+		def PrefillWidgetsForCommentAspect(self, **Args):
+			# populate widgets for 'edit comment' aspect of Control Panel
+			Proj = self.TopLevelFrame.CurrentProj
+			CurrentViewport = self.TopLevelFrame.CurrentViewport
+			# capture which connector element is current
+			self.TopLevelFrame.PHAObjInControlPanel = Args['PHAObjInControlPanel']
+			self.TopLevelFrame.ComponentInControlPanel = Args['ComponentInControlPanel']
+			# enable navigation buttons if there are any items in current project's history lists
+			self.UpdateNavigationButtonStatus(Proj)
+			# set fixed widget values
+			# set up ElementKindLabel and ElementDescriptionLabel
+			# TODO limit length displayed. Smart ellipsization?
+			self.CommentAspect.ElementKindLabel.Widget.SetLabel(
+				type(self.TopLevelFrame.PHAObjInControlPanel).HumanName)
+			self.CommentAspect.ElementDescriptionLabel.Widget.SetLabel(
+				self.TopLevelFrame.PHAObjInControlPanel.HumanName)
+			# set up lineup of variable widgets
+			self.LineupVariableWidgetsForCommentAspect(TargetElement=self.TopLevelFrame.PHAObjInControlPanel,
+				CommentListAttrib=getattr(self.TopLevelFrame.PHAObjInControlPanel,
+					self.TopLevelFrame.ComponentInControlPanel).CommentKind,
+				NotebookPage=self.CommentAspect.NotebookPage)
+
+		def SetWidgetVisibilityforCommentAspect(self, **Args): # set IsVisible attrib for each widget
+			# set IsVisible attribs for all fixed and variable widgets
+			for ThisWidget in self.CommentAspect.WidgetList: ThisWidget.IsVisible = True
 
 		def NumericalValueAspect_OnNewConnectChoiceWidget(self, Event, **Args):
 				# handle user selection of Connector-In to connect to
