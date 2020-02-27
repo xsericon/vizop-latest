@@ -215,7 +215,7 @@ class ButtonElement(object): # object containing a button and attributes and met
 		if 'Description' in CommentKind:
 			self.HostObject.ShowDescriptionComments = not self.HostObject.ShowDescriptionComments # toggle whether comments are visible
 #			Command = 'RQ_FT_DescriptionCommentsVisible'
-		elif CommentKind == 'Value':
+		elif CommentKind == 'ValueComments':
 			self.HostObject.ShowValueComments = not self.HostObject.ShowValueComments # toggle whether comments are visible
 #			Command = 'RQ_FT_ValueCommentsVisible'
 		# redraw the whole FT
@@ -1531,42 +1531,46 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 		ColourContentFg = (0x00, 0x00, 0x00) # black
 		ColourPromptText = (0x80, 0x80, 0x80) # mid grey
 
-		# column widths: 100, 100, 50, 50
+		# column widths: 100, 50, 25, 25, 25, 25, 25; see attrib MinColWidth in RenderIntoBitmap()
 		# any element with MinHeight parm set is growable in the y axis to fit the text.
 		# it should be assigned to the Row that it can force to grow
 		# Stati: valid self.Status settings for buttons
-		ConnKind = TextElement(self.FT, Row=0, ColStart=0, ColSpan=6, EndX=299, HostObject=self,
+		ConnKind = TextElement(self.FT, Row=0, ColStart=0, ColSpan=4, EndX=199, HostObject=self,
 			InternalName='ConnKind', DisplAttrib='HumanName')
-		ConnDescription = TextElement(self.FT, Row=1, ColStart=0, ColSpan=2, EndX=199, MinHeight=50, HostObject=self,
+		ConnName = TextElement(self.FT, Row=0, ColStart=4, ColSpan=3, EndX=274, HostObject=self,
+			InternalName='ConnName')
+		ConnDescription = TextElement(self.FT, Row=1, ColStart=0, ColSpan=4, EndX=199, MinHeight=50, HostObject=self,
 			InternalName='ConnectorDescription', PromptText=_('Type a description'), EditBehaviour='Text')
-		ConnGroupedButton = ButtonElement(self.FT, Row=1, ColStart=4, ColSpan=1, StartX=250, EndX=299,
-			HostObject=self, InternalName='ConnGroupedButton', Stati=('OutNotExist', 'OutExist'),
-			LSingleClickHandler=None)
-		self.ConnDescriptionCommentButton = ButtonElement(self.FT, Row=1, ColStart=6, ColSpan=1, StartX=300, EndX=349,
+		self.ConnDescriptionCommentButton = ButtonElement(self.FT, Row=1, ColStart=4, ColSpan=1, StartX=200, EndX=224,
 			HostObject=self, InternalName='ConnDescriptionCommentButton', Stati=('OutNotExist', 'OutExist'),
 			LSingleClickHandler='HandleMouseLClickOnCommentButton', CommentKind='ConnectorDescriptionComments',
 			ControlPanelAspect='CPAspect_Comment')
-		self.ConnLinkedButton = ButtonElement(self.FT, Row=1, ColStart=4, ColSpan=1, StartX=350, EndX=399,
+		self.ConnLinkedButton = ButtonElement(self.FT, Row=1, ColStart=5, ColSpan=1, StartX=225, EndX=249,
 			HostObject=self, InternalName='ConnLinkedButton', Stati=('OutNotExist', 'OutExist'),
+			LSingleClickHandler=None)
+		ConnGroupedButton = ButtonElement(self.FT, Row=1, ColStart=6, ColSpan=1, StartX=250, EndX=274,
+			HostObject=self, InternalName='ConnGroupedButton', Stati=('OutNotExist', 'OutExist'),
 			LSingleClickHandler=None)
 		self.ConnValue = TextElement(self.FT, Row=2, ColStart=0, ColSpan=1, EndX=99, HostObject=self,
 			InternalName='Value', ControlPanelAspect='CPAspect_NumValue', EditBehaviour='Text')
-		self.ConnValueUnitComponent = TextElement(self.FT, Row=2, ColStart=1, ColSpan=1, EndX=199, HostObject=self,
+		self.ConnValueUnitComponent = TextElement(self.FT, Row=2, ColStart=1, ColSpan=1, EndX=149, HostObject=self,
 			InternalName='ConnValueUnit')
-		self.ValueProblemButton = ButtonElement(self.FT, Row=2, ColStart=4, ColSpan=1, StartX=250, EndX=299,
+		self.ValueProblemButton = ButtonElement(self.FT, Row=2, ColStart=2, ColSpan=1, StartX=150, EndX=174,
 			HostObject=self, InternalName='ValueProblemButton', Stati=('Out', 'Alert'),
 			LSingleClickHandler=None)
-		self.ConnValueCommentButton = ButtonElement(self.FT, Row=2, ColStart=6, ColSpan=1, StartX=300, EndX=349,
+		self.ConnValueCommentButton = ButtonElement(self.FT, Row=2, ColStart=4, ColSpan=1, StartX=200, EndX=224,
 			HostObject=self, InternalName='ConnValueCommentButton', Stati=('OutNotExist', 'OutExist'),
-			LSingleClickHandler='HandleMouseLClickOnCommentButton', CommentKind='ValueComments')
-		self.ConnActionItemButton = ButtonElement(self.FT, Row=3, ColStart=3, ColSpan=1, StartX=250, EndX=299,
+			LSingleClickHandler='HandleMouseLClickOnCommentButton', CommentKind='ValueComments',
+			ControlPanelAspect='CPAspect_Comment')
+		self.ConnActionItemButton = ButtonElement(self.FT, Row=2, ColStart=5, ColSpan=1, StartX=225, EndX=249,
 			HostObject=self, InternalName='ConnActionItemButton', Stati=('OutNotExist', 'OutExist'),
 			LSingleClickHandler='HandleMouseLClickOnActionItemButton', AssociatedTextKind='ActionItem')
-		self.ConnParkingLotItemButton = ButtonElement(self.FT, Row=3, ColStart=4, ColSpan=1, StartX=300, EndX=349,
+		self.ConnParkingLotItemButton = ButtonElement(self.FT, Row=3, ColStart=6, ColSpan=1, StartX=250, EndX=274,
 			HostObject=self, InternalName='ConnParkingLotItemButton', Stati=('OutNotExist', 'OutExist'),
 			LSingleClickHandler='HandleMouseLClickOnActionItemButton', AssociatedTextKind='ParkingLotItem')
 		# make lists of elements: TopEls at top of connector, ValueEls relating to connector value
-		TopEls = [ConnKind, ConnDescription, ConnGroupedButton, self.ConnDescriptionCommentButton, self.ConnLinkedButton]
+		TopEls = [ConnKind, ConnName, ConnDescription, ConnGroupedButton, self.ConnDescriptionCommentButton,
+			self.ConnLinkedButton]
 		ValueEls = [self.ConnValue, self.ConnValueUnitComponent, self.ValueProblemButton, self.ConnValueCommentButton,
 			self.ConnActionItemButton, self.ConnParkingLotItemButton]
 		# set text element colours
@@ -1597,8 +1601,8 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 			 (ParkingLotItems, self.ParkingLotItems, self.ShowParkingLotItems, _('Parking lot items'))]:
 			if ShowFlag: # check whether this set of items is required to be displayed
 				for (CommentIndex, Comment) in enumerate(CommentList):
-					CommentElementList.append(TextElement(self.FT, RowBase=CommentIndex, ColStart=1, ColSpan=5,
-						EndX=399, MinHeight=25, HostObject=self))
+					CommentElementList.append(TextElement(self.FT, RowBase=CommentIndex, ColStart=1, ColSpan=6,
+						EndX=274, MinHeight=25, HostObject=self))
 					CommentElementList[-1].Text.Content = Comment
 					CommentElementList[-1].Text.Colour = ColourContentFg
 					CommentElementList[-1].BkgColour = ColourContentBkg
@@ -1615,10 +1619,11 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 	def RenderIntoBitmap(self, Zoom): # draw FTConnector in its own self.Bitmap. Also calculates FTConnector's size attributes
 
 		def PopulateTextElements(Elements):
-			# put required values into all fixed text elements; first, connector kind%%% TODO add label (HumanName)
+			# put required values into all fixed text elements; first, connector kind, which contains the class HumanName
 			ElementNamed(Elements, 'ConnKind').Text.Content = type(self).HumanName
 			# The following list contains (attribs of FTConnector, element's InternalName)
-			AttribInfo = [ ('Description', 'ConnectorDescription'), ('Value', 'Value'), ('ValueUnit', 'ConnValueUnit') ]
+			AttribInfo = [ ('HumanName', 'ConnName'), ('Description', 'ConnectorDescription'), ('Value', 'Value'),
+				('ValueUnit', 'ConnValueUnit') ]
 			# put the content into the other elements
 			for (Attrib, Name) in AttribInfo:
 				MatchingEl = ElementNamed(Elements, Name)
@@ -1654,7 +1659,7 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 		# start of main procedure for RenderIntoBitmap() for class FTConnector
 		BorderX = BorderY = 10 # outer border in canvas coords
 		GapBetweenRows = GapBetweenCols = 5 # in canvas coords
-		MinColWidth = 40
+		MinColWidth = 25
 		# create variable elements and build combined element list comprising fixed and variable elements%%%
 		(self.DescriptionCommentEls, self.ValueCommentEls, self.ActionItemEls, self.ParkingLotItemEls) =\
 			self.CreateVariableTextElements()

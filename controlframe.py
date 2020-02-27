@@ -1597,19 +1597,19 @@ class ControlFrame(wx.Frame):
 				TabText=MyTabText)
 			# make fixed widgets (this aspect also has variable widgets depending on the comments defined)
 			self.MakeStandardWidgets(Scope=self.CommentAspect, NotebookPage=MyNotebookPage)
-			self.CommentAspect.HeaderLabel = UIWidgetItem(wx.StaticText(MyNotebookPage, -1, _('Comments for:')),
+			self.CommentAspect.HeaderLabel = UIWidgetItem(wx.StaticText(MyNotebookPage, -1, _('Comments:')),
 				ColLoc=3, ColSpan=1, GapX=20, Font=self.TopLevelFrame.Fonts['SmallHeadingFont'])
 			self.CommentAspect.ElementKindLabel = UIWidgetItem(wx.StaticText(MyNotebookPage, -1),
 				ColLoc=4, ColSpan=2, Font=self.TopLevelFrame.Fonts['SmallHeadingFont'])
-			self.CommentAspect.ElementDescriptionLabel = UIWidgetItem(wx.StaticText(MyNotebookPage, -1),
+			self.CommentAspect.ElementNameLabel = UIWidgetItem(wx.StaticText(MyNotebookPage, -1),
 				ColLoc=6, ColSpan=2, Font=self.TopLevelFrame.Fonts['SmallHeadingFont'])
 			self.CommentAspect.CommentPlaceholder = UIWidgetPlaceholderItem(Name='Comments')
 			# make list of all fixed widgets in this aspect
 			self.CommentAspect.FixedWidgetList = [self.CommentAspect.NavigateBackButton,
 				self.CommentAspect.NavigateForwardButton,
-				self.CommentAspect.HeaderLabel, self.CommentAspect.ElementKindLabel,
-				self.CommentAspect.UndoButton, self.CommentAspect.RedoButton,
-				self.CommentAspect.ElementDescriptionLabel, self.CommentAspect.CommentPlaceholder]
+				self.CommentAspect.HeaderLabel, self.CommentAspect.ElementKindLabel, self.CommentAspect.ElementNameLabel,
+				self.CommentAspect.CommentPlaceholder,
+				self.CommentAspect.UndoButton, self.CommentAspect.RedoButton]
 			self.CommentAspect.VariableWidgetList = [] # populated in LineupVariableWidgetsForCommentAspect()
 			self.CommentAspect.WidgetList = [] # complete widget list, populated in Lineup...()
 
@@ -1629,15 +1629,16 @@ class ControlFrame(wx.Frame):
 			CommentList = getattr(TargetElement, CommentListAttrib)
 			# make a serial widget, textctrl and 'delete' button for each comment
 			# RowOffset and ColOffset are offsets from the position of the placeholder in FixedWidgetList
+			# The textctrl's min size is forced by NewCommentTextCtrl.SetMinSize() below
 			for (ThisCommentIndex, ThisComment) in enumerate(CommentList):
 				self.CommentAspect.VariableWidgetList.append(UIWidgetItem(wx.StaticText(NotebookPage, -1,
-					str(1 + ThisCommentIndex)), RowOffset=ThisCommentIndex, ColOffset=0, ColSpan=1))
+					str(1 + ThisCommentIndex)), RowOffset=ThisCommentIndex, ColOffset=1, ColSpan=1, GapX=20))
 				self.CommentAspect.VariableWidgetList.append(UIWidgetItem(wx.TextCtrl(NotebookPage, -1, ThisComment,
-					style=wx.TE_PROCESS_ENTER), RowOffset=ThisCommentIndex, ColOffset=1, ColSpan=1,
+					style=wx.TE_PROCESS_ENTER), RowOffset=ThisCommentIndex, ColOffset=2, ColSpan=1,
 					CommentIndex=ThisCommentIndex))
 				DeleteButtonWidget = UIWidgetItem(wx.Button(NotebookPage, size=self.StandardImageButtonSize),
 					PHAObj=self.TopLevelFrame.PHAObjInControlPanel,
-					RowOffset=ThisCommentIndex, ColOffset=2, ColSpan=1,
+					RowOffset=ThisCommentIndex, ColOffset=3, ColSpan=1,
 					Events=[wx.EVT_BUTTON],
 					Handler=self.CommentAspect_OnDeleteCommentButton,
 					CommentIndex=ThisCommentIndex)
@@ -1645,9 +1646,12 @@ class ControlFrame(wx.Frame):
 				DeleteButtonWidget.Widget.SetBitmap(self.TopLevelFrame.ButtonBitmap(wx.ART_MINUS))
 			# add serial widget and textctrl for a new comment
 			self.CommentAspect.VariableWidgetList.append(UIWidgetItem(wx.StaticText(NotebookPage, -1,
-				str(len(CommentList))), RowOffset=len(CommentList), ColOffset=0, ColSpan=1))
-			self.CommentAspect.VariableWidgetList.append(UIWidgetItem(wx.TextCtrl(NotebookPage, -1,
-				_('Type a new comment'), style=wx.TE_PROCESS_ENTER), RowOffset=len(CommentList), ColOffset=1,
+				str(1 + len(CommentList))), RowOffset=len(CommentList), ColOffset=1, ColSpan=1, GapX=20))
+			NewCommentTextCtrl = wx.TextCtrl(NotebookPage, -1, '', style=wx.TE_PROCESS_ENTER)
+			NewCommentTextCtrl.SetMinSize( (400,20) )
+			NewCommentTextCtrl.SetHint(_('Type here to add another comment'))
+			self.CommentAspect.VariableWidgetList.append(UIWidgetItem(NewCommentTextCtrl, RowOffset=len(CommentList),
+				ColOffset=2,
 				ColSpan=1, CommentIndex=len(CommentList)))
 			# insert comment widgets into widget list, based on RowOffset and ColOffset
 			self.CommentAspect.WidgetList = self.InsertVariableWidgets(TargetPlaceholderName='Comments',
@@ -1664,11 +1668,11 @@ class ControlFrame(wx.Frame):
 			# enable navigation buttons if there are any items in current project's history lists
 			self.UpdateNavigationButtonStatus(Proj)
 			# set fixed widget values
-			# set up ElementKindLabel and ElementDescriptionLabel
+			# set up ElementKindLabel and ElementNameLabel
 			# TODO limit length displayed. Smart ellipsization?
 			self.CommentAspect.ElementKindLabel.Widget.SetLabel(
 				type(self.TopLevelFrame.PHAObjInControlPanel).HumanName)
-			self.CommentAspect.ElementDescriptionLabel.Widget.SetLabel(
+			self.CommentAspect.ElementNameLabel.Widget.SetLabel(
 				self.TopLevelFrame.PHAObjInControlPanel.HumanName)
 			# set up lineup of variable widgets
 			self.LineupVariableWidgetsForCommentAspect(TargetElement=self.TopLevelFrame.PHAObjInControlPanel,
