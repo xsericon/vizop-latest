@@ -128,8 +128,11 @@ class ProjectItem(object): # class of PHA project instances
 		self.LastExportFontName = '' # str; system name of font used for last export, e.g. 'Arial'
 		self.LastExportPreferredDateToShow = None # ChoiceItem or None; one of the items in core_classes.DateChoices;
 			# represents date choice used for last export, e.g. today or last edited date
+		# make a default numbering object for comment numbering, containing only a serial number
+		self.DefaultCommentNumbering = core_classes.NumberingItem()
+		self.DefaultCommentNumbering.NumberStructure = [core_classes.SerialNumberChunkItem()]
 
-		# Actual file
+		# Attributes saved in actual project file
 		self.VizopVersion = CurrentProjDocType # str; Vizop Version
 		self.ShortTitle = 'CHAZOP with chocolate sauce'  # project short title for display
 		self.ProjNumber = 141688 # int; user's project reference number

@@ -1613,7 +1613,34 @@ class ControlFrame(wx.Frame):
 			self.CommentAspect.VariableWidgetList = [] # populated in LineupVariableWidgetsForCommentAspect()
 			self.CommentAspect.WidgetList = [] # complete widget list, populated in Lineup...()
 
-		def CommentAspect_OnDeleteCommentButton(self, Event): pass
+		def CommentAspect_OnDeleteCommentButton(self, Event):
+			print('CF1617 in delete comment button handler, not coded yet')
+
+		def CommentAspect_OnEditComment(self, Event): # handle editing of comment in control panel%%%
+			print('CF1619 in OnEditComment')
+			# get the UIWidgetItem just edited
+			CommentWidgetEdited = utilities.InstanceWithAttribValue(ObjList=self.CommentAspect.VariableWidgetList,
+				AttribName='Widget', TargetValue=Event.GetEventObject(), NotFoundValue=None)
+			CommentAsTyped = Event.GetEventObject().GetValue().strip()
+			# find project, Viewport, current PHA element, comment-bearing component of the PHA element, and
+			# list of comments within the component
+			Proj = self.TopLevelFrame.CurrentProj
+			CurrentViewport = self.TopLevelFrame.CurrentViewport
+			ThisPHAElement = self.TopLevelFrame.PHAObjInControlPanel
+			ThisComponent = getattr(ThisPHAElement, self.TopLevelFrame.ComponentInControlPanel)
+			ThisCommentList = getattr(ThisPHAElement, ThisComponent.CommentKind)
+			# check if the user typed in the 'new comment' textctrl
+			if CommentWidgetEdited.CommentIndex == len(ThisCommentList):
+				# check the user typed some visible characters
+				if CommentAsTyped:
+					# submit to datacore as a new comment
+					print('CF1637 submitting new comment')
+					self.TopLevelFrame.DoNewComment(Proj=Proj, PHAObj=CurrentViewport.PHAObj, Viewport=CurrentViewport,
+						PHAElement=ThisPHAElement,
+						Component=ThisComponent, NewCommentText=CommentAsTyped)
+			else: # user typed in an existing comment
+				# check if edited comment is different from old comment
+				if CommentAsTyped == ThisCommentList[CommentWidgetEdited.CommentIndex]: pass
 
 		def LineupVariableWidgetsForCommentAspect(self, TargetElement, CommentListAttrib, NotebookPage):
 			# adjust variable widgets in 'edit comments' aspect of Control Panel%%%
@@ -1635,6 +1662,7 @@ class ControlFrame(wx.Frame):
 					str(1 + ThisCommentIndex)), RowOffset=ThisCommentIndex, ColOffset=1, ColSpan=1, GapX=20))
 				self.CommentAspect.VariableWidgetList.append(UIWidgetItem(wx.TextCtrl(NotebookPage, -1, ThisComment,
 					style=wx.TE_PROCESS_ENTER), RowOffset=ThisCommentIndex, ColOffset=2, ColSpan=1,
+					Handler=self.CommentAspect_OnEditComment, Events=[wx.EVT_TEXT_ENTER],
 					CommentIndex=ThisCommentIndex))
 				DeleteButtonWidget = UIWidgetItem(wx.Button(NotebookPage, size=self.StandardImageButtonSize),
 					PHAObj=self.TopLevelFrame.PHAObjInControlPanel,
@@ -1651,7 +1679,7 @@ class ControlFrame(wx.Frame):
 			NewCommentTextCtrl.SetMinSize( (400,20) )
 			NewCommentTextCtrl.SetHint(_('Type here to add another comment'))
 			self.CommentAspect.VariableWidgetList.append(UIWidgetItem(NewCommentTextCtrl, RowOffset=len(CommentList),
-				ColOffset=2,
+				ColOffset=2, Handler=self.CommentAspect_OnEditComment, Events=[wx.EVT_TEXT_ENTER],
 				ColSpan=1, CommentIndex=len(CommentList)))
 			# insert comment widgets into widget list, based on RowOffset and ColOffset
 			self.CommentAspect.WidgetList = self.InsertVariableWidgets(TargetPlaceholderName='Comments',
@@ -2760,7 +2788,7 @@ class ControlFrame(wx.Frame):
 		# one of the Control Frames (local or remote), already exists for this Viewport.
 		# Input data is supplied in XMLRoot, an XML ElementTree root element, or as separate attribs
 		# including Chain (str: 'NoChain' or 'Stepwise'): whether this call is chained from another event, e.g. new PHA model
-		# return reply data (XML tree) to send back to respective Control Frame%%%
+		# return reply data (XML tree) to send back to respective Control Frame
 		# This function might be better placed outside Control Frame class, but currently we can't because it needs
 		# access to ControlFrame's self.Projects
 		# First, get the attribs needed to find the Viewport in the datacore
@@ -2919,7 +2947,7 @@ class ControlFrame(wx.Frame):
 		assert isinstance(NewAspect, (project_display.EditPanelAspectItem, str))
 		global KeyPressHash
 		Proj = self.CurrentProj
-		# deactivate previous aspect, if any %%% working here
+		# deactivate previous aspect, if any
 		if self.MyEditPanel.EditPanelCurrentAspect:
 			self.MyEditPanel.EditPanelCurrentAspect.Deactivate(Widgets=self.MyEditPanel.EditPanelCurrentAspect.WidgetList)
 		# get target aspect, if supplied as a string
@@ -2941,6 +2969,15 @@ class ControlFrame(wx.Frame):
 			self.MyEditPanel.SetSizer(TargetAspect.MySizer)
 		else:
 			print('CF2771 warning, unrecognised edit panel aspect "%s" requested' % str(NewAspect))
+
+	def DoNewComment(self, Proj, PHAObj, Viewport, PHAElement, Component, NewCommentText, Redoing=False):
+		# handle new comment creation in a Component of a PHAElement that supports comments%%% working here
+		assert isinstance(Proj, projects.ProjectItem)
+		assert isinstance(PHAObj, core_classes.PHAModelBaseClass)
+		assert isinstance(NewCommentText, str)
+		assert isinstance(Redoing, bool)
+		# request Viewport to update the PHAObj with the new comment
+		Viewport.AddNewComment(PHAElement=PHAElement, PHAComponent=Component, CommentText=NewCommentText)
 
 	# ControlFrame main body
 	def __init__(self, parent=None, ID=None, title='', Projects=[], FirstProject=None, Viewport=None,

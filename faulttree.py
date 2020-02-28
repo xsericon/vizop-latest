@@ -2053,9 +2053,6 @@ class FTEventInCore(FTElementInCore): # FT event object used in DataCore by FTOb
 			(core_classes.AutoNumValueItem, EventTypesWithDerivedValues)]:
 		for ThisEventType in ThisEventTypeList:
 			DefaultValueKind[ThisEventType] = ThisValueKind
-#	AllFTEventsInCore = [] # register of all events currently active in Vizop; used to generate unique IDs
-#		# Potential gotcha: Events in this list are not guaranteed to exist in PHA models. When they are deleted from
-#		# PHA models, currently no attempt is made to remove them from this list. (Potential memory leak?)
 	InternalName = 'FTEventInCore'
 	DefaultLikelihood = 0.0 # initial numerical value of likelihood
 	DefaultProbability = 1.0 # initial numerical value of probability
@@ -4420,6 +4417,20 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 				CXInID = XMLRoot.findtext('ConnectorIn'), Viewport=SourceViewport)
 		elif Command == 'RQ_FT_UpdateFullExportAttribs': # store parms for full FT export dialogue
 			Reply = self.UpdateFullExportAttribs(Proj=Proj, XMLRoot=XMLRoot)
+		elif Command == 'RQ_FT_NewComment': # add new comment to a PHA element
+			print('FT4424 adding comment')
+			# find the corresponding element%%% working here
+			ThisPHAElement = [e for e in WalkOverAllFTObjs(self) if e.ID == XMLRoot.findtext('PHAElement')][0]
+			# find the existing comment list
+			CommentList = getattr(ThisPHAElement, XMLRoot.findtext('CommentKind'))
+			# make a new comment object, with numbering object the same as the preceding comment (if any)
+			NewComment = core_classes.AssociatedTextItem(Proj=self.Proj, PHAObjClass=type(self), Host=self)
+			NewComment.Content = XMLRoot.findtext('CommentText')
+			if CommentList: NewComment.Numbering = copy.copy(CommentList[-1].Numbering)
+			else: NewComment.Numbering = copy.copy(self.Proj.DefaultCommentNumbering)
+			# add the comment to the required comment list
+			CommentList.append(NewComment)
+			Reply = vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
 		elif Command == 'OK': # dummy for 'OK' responses - received only to clear the sockets
 			Reply = vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
 		return Reply
@@ -5718,6 +5729,12 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 				if getattr(CurrentElements[0], 'ControlPanelAspect', None):
 					self.DisplDevice.GotoControlPanelAspect(AspectName=CurrentElements[0].ControlPanelAspect,
 						PHAObjInControlPanel=CurrentElements[0], ComponentInControlPanel='')
+
+	def AddNewComment(self, PHAElement, PHAComponent, CommentText):
+		# handle request to add new comment to PHAComponent in PHAElement
+		vizop_misc.SendRequest(Socket=self.C2DSocketREQ, Command='RQ_FT_NewComment',
+			Proj=self.Proj.ID, PHAObj=self.PHAObj.ID, PHAElement=PHAElement.ID, CommentKind=PHAComponent.CommentKind,
+			CommentText=CommentText, Viewport=self.ID)
 
 FTObjectInCore.DefaultViewportType = FTForDisplay # set here (not in FTForDisplay class) due to the order of the
 	# class definitions
