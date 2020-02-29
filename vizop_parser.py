@@ -13,7 +13,6 @@ import xml
 import string
 import inspect
 import projects, core_classes, faulttree, info
-import logging
 """ ----------IMPORT----------]""" 
 
 """[----------CHARACTER CHECK---------- """
@@ -153,7 +152,7 @@ def convertProjectToXml(Proj, ProjectFilename):
 			MyXMLRoot_ProcessUnits_ProcessUnit_ID.text = pS(str(each_ProcessUnit.ID))
 
 			# <UnitNumber [UnitNumber as str] />
-			MyXMLRoot_ProcessUnits_ProcessUnit_UnitNumber = ET.SubElement(MyXMLRoot_ProcessUnits_ProcessUnit, info.UnitNumber)
+			MyXMLRoot_ProcessUnits_ProcessUnit_UnitNumber = ET.SubElement(MyXMLRoot_ProcessUnits_ProcessUnit, info.UnitNumberTag)
 			MyXMLRoot_ProcessUnits_ProcessUnit_UnitNumber.text = pS(str(each_ProcessUnit.UnitNumber))
 
 			# <ShortName [ShortName as str] />
@@ -186,34 +185,31 @@ def convertProjectToXml(Proj, ProjectFilename):
 		# create outer XML tag
 		MyXMLRoot_NumberSystem = ET.SubElement(MyXMLRoot, info.NumberSystemTag)
 
-		MyXMLRoot_NumberSystem_ID = ET.SubElement(MyXMLRoot_NumberSystem, info.IDTag)
-		#TODO J: cannot map NumberSystem ID
-		#MyXMLRoot_NumberSystem_ID.text = Proj.NumberSystems.ID
-
 		for each_NumberSystem in Proj.NumberSystems:
+			#TODO J: cannot map NumberSystem ID
+
 			# create outer XML tag
 			MyXMLRoot_NumberSystem_Chunk = ET.SubElement(MyXMLRoot_NumberSystem, info.NumberSystemTag)
 
+			#each_NumberSystem: str
 			if type(each_NumberSystem) == str:
 				MyXMLRoot_NumberSystem_Chunk_Type = ET.SubElement(MyXMLRoot_NumberSystem_Chunk, info.TypeTag)
 				MyXMLRoot_NumberSystem_Chunk_Type.text = pS(info.NumberSystemStringType)
 
 				MyXMLRoot_NumberSystem_Chunk_Value = ET.SubElement(MyXMLRoot_NumberSystem_Chunk, info.ValueTag)
 				MyXMLRoot_NumberSystem_Chunk_Value.text = pS(each_NumberSystem)
-				pass
 
+			#each_NumberSystem: core_classes.ParentNumberChunkItem
 			elif type(each_NumberSystem) == core_classes.ParentNumberChunkItem:
-				#TODO J:need to map object ID
+				MyXMLRoot_NumberSystem_Chunk_Type = ET.SubElement(MyXMLRoot_NumberSystem_Chunk, info.TypeTag)
+				MyXMLRoot_NumberSystem_Chunk_Type.text = pS(info.NumberSystemParentType)
 
-				#MyXMLRoot_NumberSystem_Chunk_Type = ET.SubElement(MyXMLRoot_NumberSystem_Chunk, info.TypeTag)
-				#MyXMLRoot_NumberSystem_Chunk_Type.text = pS(info.NumberSystemParentType)
+				MyXMLRoot_NumberSystem_Chunk_Value = ET.SubElement(MyXMLRoot_NumberSystem_Chunk, info.IDAttribName)
+				MyXMLRoot_NumberSystem_Chunk_Value.text = pS(each_NumberSystem.Source)
 
-				#MyXMLRoot_NumberSystem_Chunk_ID = ET.SubElement(MyXMLRoot_NumberSystem_Chunk, info.IDTag)
-				#MyXMLRoot_NumberSystem_Chunk_ID.text = pS(str(each_NumberSystem.ID))
-				pass
-
+			#each_NumberSystem: core_classes.SerialNumberChunkItem
 			elif type(each_NumberSystem) == core_classes.SerialNumberChunkItem:
-				MyXMLRoot_NumberSystem_Chunk_Type = ET.SubElement(MyXMLRoot_NumberSystem_Chunk, info.NumberSystemSerialType)
+				MyXMLRoot_NumberSystem_Chunk_Type = ET.SubElement(MyXMLRoot_NumberSystem_Chunk, info.TypeTag)
 				MyXMLRoot_NumberSystem_Chunk_Type.text = pS(info.NumberSystemSerialType)
 
 				#FieldWidth
@@ -229,7 +225,7 @@ def convertProjectToXml(Proj, ProjectFilename):
 				MyXMLRoot_NumberSystem_Chunk_StartSequenceAt.text  = pS(str(each_NumberSystem.StartSequenceAt))
 
 				#SkipTo
-				if each_NumberSystem.SkipTo != None:
+				if each_NumberSystem.SkipTo is None:
 					MyXMLRoot_NumberSystem_Chunk_SkipTo = ET.SubElement(MyXMLRoot_NumberSystem_Chunk, info.SkipToTag)
 					MyXMLRoot_NumberSystem_Chunk_SkipTo.text = pS(str(each_NumberSystem.SkipTo))
 
@@ -479,7 +475,7 @@ def convertProjectToXml(Proj, ProjectFilename):
 						#TODO J: what is the type of LinkedFrom item?
 						if len(each_FTEvent.LinkedFrom) > 0:
 							MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent_LinkedFrom = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent, info.LinkedFromTag)
-							each_LinkedFromItem:
+							each_LinkedFromItem: faulttree.FTEventInCore.LinkedFrom
 							MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent_LinkedFrom.text = pS(','.join(list(map(lambda each_FTEvent: each_FTEvent.ID, each_FTEvent.ConnectTo))))
 
 					if type(each_FTEvent) == faulttree.FTGateItemInCore:
@@ -666,10 +662,26 @@ def convertProjectToXml(Proj, ProjectFilename):
 def testCheckType(stringInput: str) -> str:
 	pass
 
+# Timer decorator - Start
+# Author: Jack Leung
+import time
+def timer(func):
+    def runFunction(*args, **kwargs):
+        beginTime = time.time()
+        print("Function {0} is called.".format(func.__name__))
+        func(*args,**kwargs)
+        endTime = time.time() - beginTime
+        #TODO: cannot show proper function name
+        print("Function {0} has run for {1} seconds.".format(func.__name__, endTime))
+    return runFunction
+# Timer decorator - End
+
 """ ----------TESTING AREA----------]"""  
 
 """[----------RUN MAIN PROGRAM---------- """
+@timer
 def main():
+	projects.runUnitTest()
 	pass
 
 if __name__ == '__main__':
