@@ -31,7 +31,6 @@ class ViewportMetaClass(type): # a class used to build a list of Viewport classe
 			ViewportMetaClass.ViewportClasses.append(self)
 
 class ViewportBaseClass(object, metaclass=ViewportMetaClass): # base class for all Viewports
-#	__metaclass__ = ViewportMetaClass
 	CanBeCreatedManually = True # whether user can be invited to create a Viewport of this class.
 	IsBaseClass = True # needed by metaclass
 
@@ -40,7 +39,7 @@ class ViewportBaseClass(object, metaclass=ViewportMetaClass): # base class for a
 		self.DisplDevice = None # which wx.Window object the Viewport is displayed on (needs to take a wx.DC)
 		self.ID = None # assigned in CreateViewport()
 		self.Proj = Args['Proj']
-		self.PHAObj = Args.get('PHAObj', None)
+		self.PHAObjID = Args.get('PHAObjID', None) # storing ID, not the actual object, in case datacore isn't local
 		self.Zoom = 1.0 # ratio of canvas coords to screen coords (absolute ratio, not %)
 		self.PanX = self.PanY = 0 # offset of drawing origin, in screen coords
 		self.OffsetX = self.OffsetY = 0 # offset of Viewport in display panel, in screen coords;
@@ -64,7 +63,7 @@ def CreateViewport(Proj, ViewportClass, DisplDevice=None, PHAObj=None, DatacoreI
 	# prepare dict of args to send to new Viewport
 	ArgsToSupply = Args
 	ArgsToSupply.update({'DateChoices': core_classes.DateChoices})
-	NewViewport = ViewportClass(Proj=Proj, PHAObj=PHAObj, ParentWindow=DisplDevice, DisplDevice=DisplDevice,
+	NewViewport = ViewportClass(Proj=Proj, PHAObjID=PHAObj.ID, ParentWindow=DisplDevice, DisplDevice=DisplDevice,
 		Fonts=Fonts, **ArgsToSupply)
 	# append the Viewport to the project's list
 	NewViewport.ID = str(utilities.NextID(Proj.ActiveViewports)) # generate unique ID; stored as str
@@ -73,17 +72,6 @@ def CreateViewport(Proj, ViewportClass, DisplDevice=None, PHAObj=None, DatacoreI
 	Proj.AssignDefaultNameToViewport(Viewport=NewViewport)
 	# set up sockets for communication with the new Viewport:
 	# D2C (Viewport to core) and C2D. Each socket has both REQ (send) and REP (reply) sides.
-#	# If datacore is local (i.e. running in the same instance of Vizop), we set up datacore's side first, to get the
-#	# socket numbers.
-#	if DatacoreIsLocal:
-#		NewViewport.D2CSocketREP, NewViewport.D2CSocketREPObj = vizop_misc.SetupNewSocket(SocketType='REP',
-#			SocketLabel='D2CREP_' + NewViewport.ID,
-#			PHAObj=PHAObj, Viewport=NewViewport, SocketNo=None, BelongsToDatacore=True, AddToRegister=True)
-#		NewViewport.C2DSocketREQ, NewViewport.C2DSocketREQObj = vizop_misc.SetupNewSocket(SocketType='REQ',
-#			SocketLabel=info.ViewportOutSocketLabel + '_' + NewViewport.ID,
-#			PHAObj=PHAObj, Viewport=NewViewport, SocketNo=None, BelongsToDatacore=True, AddToRegister=True)
-#		D2CSocketNo = NewViewport.D2CSocketREPObj.SocketNo
-#		C2DSocketNo = NewViewport.C2DSocketREQObj.SocketNo
 	D2CSocketNo = vizop_misc.GetNewSocketNumber()
 	C2DSocketNo = vizop_misc.GetNewSocketNumber()
 	# Then we fetch the socket numbers and make the corresponding sockets on the Viewport side.

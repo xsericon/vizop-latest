@@ -191,7 +191,7 @@ class ButtonElement(object): # object containing a button and attributes and met
 #				ComponentName = ''
 			if hasattr(self.FT.DisplDevice, 'GotoControlPanelAspect'):
 				self.FT.DisplDevice.GotoControlPanelAspect(AspectName=self.ControlPanelAspect,
-					PHAObjInControlPanel=self.HostObject, ComponentInControlPanel=self.InternalName)
+					PHAObjInControlPanel=self.HostObject, ComponentInControlPanel=self)
 		# set the host object to be the only currently selected element in the FT. Redraw here only if user clicked a connect button;
 		# all other button kinds will redraw in the specific handler, called below
 		self.FT.SetElementAsCurrent(TargetFTElement=self.HostObject, UnsetPrevious=True,
@@ -4482,7 +4482,6 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			'MainText':_('%s + mouse wheel to zoom the fault tree') % info.CommandKeyName},
 		{'Title': 'Tip: Selecting FT elements',
 			'MainText': _('Shift or %s + click to select multiple elements') % info.CommandKeyName}]
-	PreferredControlPanelAspect = 'CPAspect_FaultTree' # aspect to show when FT is displayed
 	MinColumnLength = 100 # in canvas coords
 	MarginXInCU = 20 # margin between left edge of screen and left edge of first column, in canvas coords
 	ImageSizeNoZoom = (20, 20) # initial no-zoom size of all button images
@@ -4512,10 +4511,11 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			self.XMLName = XMLName
 			self.Applicable = Applicable
 
-	def __init__(self, PHAObj, **Args): # FT object initiation. Args must include Proj and can include DisplDevice and ParentWindow
+	def __init__(self, PHAObjID, **Args): # FT object initiation. Args must include Proj and can include DisplDevice and ParentWindow
 		# self.PHAObj, Zoom, PanX, PanY, OffsetX, OffsetY defined in base class
-		display_utilities.ViewportBaseClass.__init__(self, **Args)
-		assert isinstance(PHAObj, core_classes.PHAModelBaseClass)
+		# attrib PHAObjID is set in superclass
+		display_utilities.ViewportBaseClass.__init__(self, PHAObjID=PHAObjID, **Args)
+#		assert isinstance(PHAObj, core_classes.PHAModelBaseClass)
 		self.Proj = Args['Proj']
 #		self.PHAObj = PHAObj # instance of FTObjectInCore shown in this Viewport (set in datacore.DoNewViewport())
 		self.ID = None # assigned in display_utilities.CreateViewport()
@@ -4567,6 +4567,11 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			# that should be preserved when the FT is redrawn with updated data
 			# TODO eventually, these attribs need to be sent to the ViewportShadow and stored in the project file,
 			# so that they can be reinstated when the project file is opened
+		self.PreferredControlPanelAspect = 'CPAspect_FaultTree' # initial control panel aspect to show when FT is displayed
+		self.ComponentEdited = '' # last FT element component edited (e.g. a comment button clicked);
+			# to enable control panel aspect to show required comments
+		self.PersistentFTAttribs = {} # keys are attrib names of self; values are values to reinstate when object is
+			# refreshed from datacore. Not needed, as attribs are not wiped?
 
 	def Wipe(self): # preserve any attribs that need to be preserved. Then wipe all data in the FT and re-initialize
 		# first, preserve display-related attribs. Check all elements in the "old" (previously displayed) FT
@@ -4955,7 +4960,9 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		else: self.CurrentElements = [e for e in WalkOverAllFTObjs(self) if e.ID in self.CurrentElementIDsToSelectOnRefresh]
 		self.ExistingElementIDsOnLastRefresh = [e.ID for e in WalkOverAllFTObjs(self)]
 		# request appropriate control panel aspect
-		self.SwitchToPreferredControlPanelAspect(CurrentElements=self.CurrentElements)
+		print('FT4961 component edited: ', self.ComponentEdited)
+		self.SwitchToPreferredControlPanelAspect(CurrentElements=self.CurrentElements,
+			AspectRequired=self.PreferredControlPanelAspect, ComponentEdited=self.ComponentEdited)
 
 	def RenderInDC(self, TargetDC, FullRefresh=True, BitmapMinSize=None, DrawZoomTool=True, **Args):
 		# render all FT elements into TargetDC provided
@@ -5461,7 +5468,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			assert len(DisconnectList) + len(ConnectList) > 0
 			print("FT3870 Disconnect, Connect: ", ','.join([str(i.ID) + '~' + str(j.ID) for i, j in DisconnectList]), '|', ','.join([str(i.ID) + '~' + str(j.ID) for i, j in ConnectList]))
 			vizop_misc.SendRequest(Socket=self.C2DSocketREQ, Command='RQ_FT_ChangeConnection',
-				Proj=self.Proj.ID, PHAObj=self.PHAObj.ID, Viewport=self.ID,
+				Proj=self.Proj.ID, PHAObj=self.PHAObjID, Viewport=self.ID,
 				Disconnect=','.join([str(i.ID) + '~' + str(j.ID) for i, j in DisconnectList]),
 				Connect=','.join([str(i.ID) + '~' + str(j.ID) for i, j in ConnectList]))
 
@@ -5604,7 +5611,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 					self.CurrentEditElement = self.CurrentEditChoice = None
 					# request PHA object to update choice attribute by sending message through zmq
 					vizop_misc.SendRequest(Socket=self.C2DSocketREQ, Command='RQ_FT_ChangeChoice',
-						ProjID=self.Proj.ID, PHAObj=self.PHAObj.ID, Viewport=self.ID,
+						ProjID=self.Proj.ID, PHAObj=self.PHAObjID, Viewport=self.ID,
 						Element=ElementID, TextComponent=EditComponentInternalName,
 						NewValue=ChosenXMLName)
 					# store current element's ID to set as "current" when display is refreshed
@@ -5620,7 +5627,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		# send request to Datacore to update text attribute. Also used for updating value fields, in which case
 		# at this stage, NewValue has not been validated - could be unacceptable
 		vizop_misc.SendRequest(Socket=self.C2DSocketREQ, Command='RQ_FT_ChangeText',
-							   Proj=self.Proj.ID, PHAObj=self.PHAObj.ID, Viewport=self.ID,
+							   Proj=self.Proj.ID, PHAObj=self.PHAObjID, Viewport=self.ID,
 							   Element=ElementID, TextComponent=EditComponentInternalName, NewValue=NewValue)
 
 	def RequestChangeChoice(self, ElementID, EditComponentInternalName, AttribName, NewValue):
@@ -5629,7 +5636,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		# at this stage, NewValue has not been validated - could be unacceptable
 		assert AttribName in ['Unit', 'NumberKind']
 		vizop_misc.SendRequest(Socket=self.C2DSocketREQ, Command='RQ_FT_ChangeChoice', Attrib=AttribName,
-			PHAObj=self.PHAObj.ID, Viewport=self.ID,
+			PHAObj=self.PHAObjID, Viewport=self.ID,
 			Element=ElementID, TextComponent=EditComponentInternalName, NewValue=NewValue)
 
 
@@ -5717,23 +5724,39 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			# store which elements are selected, for next refresh
 			self.CurrentElementIDsToSelectOnRefresh = [e.ID for e in self.CurrentElements]
 
-	def SwitchToPreferredControlPanelAspect(self, CurrentElements):
+	def SwitchToPreferredControlPanelAspect(self, CurrentElements, AspectRequired=None, **Args):
 		# if appropriate, ask our display device's Control Panel to go to the preferred aspect, considering which
 		# FT elements are in CurrentElements (list)
+		# If AspectRequired (str; name of a control panel aspect), switch to this one, ignoring CurrentElements
+		# (currently, we always supply AspectRequired)
+		# Args can include: ComponentEdited (instance e.g. ButtonElement) - when displaying Comment aspect, which component was clicked
 		assert hasattr(CurrentElements, '__iter__') # confirm it's a list
 		# does our display device have a control panel?
 		if hasattr(self.DisplDevice, 'GotoControlPanelAspect'):
-			# is CurrentElements non-empty, and are all current elements of the same type?
-			if len(set([type(e) for e in CurrentElements])) == 1:
-				# does the type have a preferred control panel aspect?
-				if getattr(CurrentElements[0], 'ControlPanelAspect', None):
-					self.DisplDevice.GotoControlPanelAspect(AspectName=CurrentElements[0].ControlPanelAspect,
-						PHAObjInControlPanel=CurrentElements[0], ComponentInControlPanel='')
+			if AspectRequired is None:
+				# is CurrentElements non-empty, and are all current elements of the same type?
+				if len(set([type(e) for e in CurrentElements])) == 1:
+					# does the type have a preferred control panel aspect?
+					if getattr(CurrentElements[0], 'ControlPanelAspect', None):
+						self.DisplDevice.GotoControlPanelAspect(AspectName=CurrentElements[0].ControlPanelAspect,
+							PHAObjInControlPanel=CurrentElements[0], ComponentInControlPanel='')
+			else: # switch to specified AspectRequired
+				if CurrentElements: PHAElementToShow = CurrentElements[0]
+				else: PHAElementToShow = None
+				self.DisplDevice.GotoControlPanelAspect(AspectName=AspectRequired,
+					PHAObjInControlPanel=self,
+					PHAElement=PHAElementToShow, ComponentInControlPanel=Args.get('ComponentEdited', None))
+#					CommentKind=Args.get('CommentKind', None))
 
 	def AddNewComment(self, PHAElement, PHAComponent, CommentText):
+		# store info to enable Viewport to request the comment aspect in control panel after redraw
+		# PHAComponent: the ButtonElement instance clicked to raise the comments for editing
+		self.PreferredControlPanelAspect = 'CPAspect_Comment'
+		self.ComponentEdited = PHAComponent
+		print('FT5754 sending new comment request with CommentKind: ', PHAComponent.CommentKind)
 		# handle request to add new comment to PHAComponent in PHAElement
 		vizop_misc.SendRequest(Socket=self.C2DSocketREQ, Command='RQ_FT_NewComment',
-			Proj=self.Proj.ID, PHAObj=self.PHAObj.ID, PHAElement=PHAElement.ID, CommentKind=PHAComponent.CommentKind,
+			Proj=self.Proj.ID, PHAObj=self.PHAObjID, PHAElement=PHAElement.ID, CommentKind=PHAComponent.CommentKind,
 			CommentText=CommentText, Viewport=self.ID)
 
 FTObjectInCore.DefaultViewportType = FTForDisplay # set here (not in FTForDisplay class) due to the order of the

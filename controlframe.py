@@ -636,7 +636,7 @@ class ControlFrame(wx.Frame):
 		def GotoControlPanelAspect(self, NewAspect=None, Viewport=None, **Args):
 			# Display required widgets in ControlPanel according to requested NewAspect
 			# NewAspect (ControlPanelAspectItem instance or name as str): aspect to switch to
-			# Viewport is current Viewport (currently only needed for mode 'Edit-Centre')
+			# Viewport is current Viewport
 
 			def GotoNewPHAModelAspect(PrevMode=None, PrevViewport=None):
 				# set up and display ControlPanel aspect for "New PHA model".
@@ -1390,9 +1390,9 @@ class ControlFrame(wx.Frame):
 			# set widget values
 			# set up FTNameText and FTDescriptionText
 			# 	TODO limit length displayed. Smart ellipsization? Also in GoToFTChoice and ViewNameText
-			self.FaultTreeAspect.FTNameText.Widget.ChangeValue(CurrentFT.HumanName)
+			self.FaultTreeAspect.FTNameText.Widget.ChangeValue(CurrentFT.Header.HumanName)
 			self.FaultTreeAspect.FTNameText.Widget.SelectAll()
-			self.FaultTreeAspect.FTDescriptionText.Widget.ChangeValue(CurrentFT.Description)
+			self.FaultTreeAspect.FTDescriptionText.Widget.ChangeValue(CurrentFT.Header.Description)
 			self.FaultTreeAspect.FTDescriptionText.Widget.SelectAll()
 			# set up GoToFTChoice
 			self.FaultTreeAspect.GoToFTChoice.Widget.Set([p.HumanName for p in AllFTsInProj])
@@ -1403,7 +1403,7 @@ class ControlFrame(wx.Frame):
 			# set up ViewNameText
 			self.FaultTreeAspect.ViewNameText.Widget.ChangeValue(CurrentViewport.HumanName)
 			# set up GoToViewChoice
-			ViewportsInThisPHAObj = [v for v in Proj.AllViewportShadows if v.PHAObj.ID == CurrentFT.ID]
+			ViewportsInThisPHAObj = [v for v in Proj.AllViewportShadows if v.PHAObjID == CurrentFT.ID]
 			ViewportIDs = [v.ID for v in ViewportsInThisPHAObj]
 			self.FaultTreeAspect.GoToViewChoice.Widget.Set([v.HumanName for v in ViewportsInThisPHAObj])
 			# preselect current Viewport in GotoViewChoice
@@ -1444,7 +1444,7 @@ class ControlFrame(wx.Frame):
 			if FTIndex != wx.NOT_FOUND: # is any item selected?
 				FTRequestedID = [p for p in Proj.PHAObjShadows if type(p) is faulttree.FTObjectInCore][FTIndex].ID
 				# requested different FT from the one on display?
-				if FTRequestedID != self.TopLevelFrame.CurrentViewport.PHAObj.ID:
+				if FTRequestedID != self.TopLevelFrame.CurrentViewport.PHAObjID:
 					self.TopLevelFrame.SwitchToPHAObj(Proj=Proj, TargetPHAObjID=FTRequestedID)
 
 		def FaultTreeAspect_OnGoToViewChoice(self, Event, **Args): pass
@@ -1627,7 +1627,8 @@ class ControlFrame(wx.Frame):
 			Proj = self.TopLevelFrame.CurrentProj
 			CurrentViewport = self.TopLevelFrame.CurrentViewport
 			ThisPHAElement = self.TopLevelFrame.PHAObjInControlPanel
-			ThisComponent = getattr(ThisPHAElement, self.TopLevelFrame.ComponentInControlPanel)
+#			ThisComponent = getattr(ThisPHAElement, self.TopLevelFrame.ComponentInControlPanel)
+			ThisComponent = self.TopLevelFrame.ComponentInControlPanel
 			ThisCommentList = getattr(ThisPHAElement, ThisComponent.CommentKind)
 			# check if the user typed in the 'new comment' textctrl
 			if CommentWidgetEdited.CommentIndex == len(ThisCommentList):
@@ -1703,9 +1704,11 @@ class ControlFrame(wx.Frame):
 			self.CommentAspect.ElementNameLabel.Widget.SetLabel(
 				self.TopLevelFrame.PHAObjInControlPanel.HumanName)
 			# set up lineup of variable widgets
+			print('CF1706 in prefill: component: ', self.TopLevelFrame.ComponentInControlPanel)
 			self.LineupVariableWidgetsForCommentAspect(TargetElement=self.TopLevelFrame.PHAObjInControlPanel,
-				CommentListAttrib=getattr(self.TopLevelFrame.PHAObjInControlPanel,
-					self.TopLevelFrame.ComponentInControlPanel).CommentKind,
+				CommentListAttrib=self.TopLevelFrame.ComponentInControlPanel.CommentKind,
+#				CommentListAttrib=getattr(self.TopLevelFrame.PHAObjInControlPanel,
+#					self.TopLevelFrame.ComponentInControlPanel).CommentKind,
 				NotebookPage=self.CommentAspect.NotebookPage)
 
 		def SetWidgetVisibilityforCommentAspect(self, **Args): # set IsVisible attrib for each widget
@@ -1731,7 +1734,7 @@ class ControlFrame(wx.Frame):
 		class ControlPanelAspectItem(object): # class whose instances are aspects of the Control panel
 			# attribs:
 			# WidgetList (list): UIWidgetItem instances - widgets visible in the aspect
-			# InternalName (str): name for debugging
+			# InternalName (str): name for internal reference
 			# ParentFrame (wx.Frame): reference to Control panel
 			# TopLevelFrame (wx.Frame): reference to ControlFrame (needed for access to top level methods)
 			# PrefillMethod (callable): method that prefills widget values for an instance
@@ -2019,10 +2022,10 @@ class ControlFrame(wx.Frame):
 			assert isinstance(On, bool)
 			self.Parent.KeyPressEnabled = On
 
-		def GotoControlPanelAspect(self, AspectName, PHAObjInControlPanel, ComponentInControlPanel):
+		def GotoControlPanelAspect(self, AspectName, PHAObjInControlPanel, ComponentInControlPanel='', **Args):
 			# handle request from Viewport to change the aspect in the Control Panel
 			self.TopLevelFrame.MyControlPanel.GotoControlPanelAspect(NewAspect=AspectName,
-				PHAObjInControlPanel=PHAObjInControlPanel, ComponentInControlPanel=ComponentInControlPanel)
+				PHAObjInControlPanel=PHAObjInControlPanel, ComponentInControlPanel=ComponentInControlPanel, **Args)
 
 		# allow this display device to return DatacoreIsLocal value from parent frame
 		DatacoreIsLocal = property(fget=lambda self: self.TopLevelFrame.DatacoreIsLocal)
@@ -2637,8 +2640,11 @@ class ControlFrame(wx.Frame):
 		# update other GUI elements
 		self.RefreshGUIAfterDataChange(Proj=Proj)
 		# show appropriate aspect in Control Panel
+		print('CF2640 changing control panel aspect to: ', self.CurrentViewport.PreferredControlPanelAspect)
+		print('CF2641 with viewport, PHA obj type: ', type(self.CurrentViewport), type(self.CurrentViewport.PHAObj))
 		self.MyControlPanel.GotoControlPanelAspect(NewAspect=self.CurrentViewport.PreferredControlPanelAspect,
-			PHAObjInControlPanel=self.CurrentViewport.PHAObj, ComponentInControlPanel=None)
+			PHAObjInControlPanel=self.CurrentViewport, ComponentInControlPanel=None)
+#			PHAObjInControlPanel=self.CurrentViewport.PHAObj, ComponentInControlPanel=None)
 		return vizop_misc.MakeXMLMessage('Null', 'Null')
 
 	def DestroyViewport(self, Proj, DoomedViewport, **Args):
@@ -2734,9 +2740,9 @@ class ControlFrame(wx.Frame):
 		if Proj.EditAllowed:
 			# make the Viewport shadow
 			NewViewport = ViewportShadow(ThisProj, NewViewportID, MyClass=NewViewportClass,
-				HumanName=NewViewportHumanName,
-				D2CSocketNumber=int(XMLRoot.find(info.D2CSocketNoTag).text),
-				C2DSocketNumber=int(XMLRoot.find(info.C2DSocketNoTag).text), PHAModel=ExistingPHAObj)
+										 HumanName=NewViewportHumanName,
+										 D2CSocketNumber=int(XMLRoot.find(info.D2CSocketNoTag).text),
+										 C2DSocketNumber=int(XMLRoot.find(info.C2DSocketNoTag).text), PHAObj=ExistingPHAObj)
 			# attach existing PHA object to the Viewport
 			NewViewport.PHAObj = ExistingPHAObj
 			NewViewport.IsOnDisplay = True # set flag that ensures NewViewport will get redrawn
@@ -3215,7 +3221,7 @@ class ControlFrame(wx.Frame):
 					ViewportClass=ThisViewportShadow.MyClass)
 				# make XML message with ID of PHA object, followed by full redraw data
 				FullXMLData = vizop_misc.MakeXMLMessage(RootName='RQ_RedrawViewport', RootText=ThisViewportShadow.ID,
-					Elements={info.IDTag: ThisViewportShadow.PHAObj.ID})
+					Elements={info.IDTag: ThisViewportShadow.PHAObjID})
 				FullXMLData.append(RedrawXMLData)
 				# send it to Viewport
 				vizop_misc.SendRequest(Socket=ThisViewportShadow.D2CSocketREQObj.Socket, Command='RQ_RedrawViewport',
@@ -3319,12 +3325,12 @@ class ViewportShadow(object): # defines objects that represent Viewports in the 
 	# These are not the actual (visible) Viewports - those live in the controlframe (local or remote) and aren't
 	# directly accessible by the datacore.
 
-	def __init__(self, Proj, ID, MyClass=None, D2CSocketNumber=None, C2DSocketNumber=None, PHAModel=None,
-			HumanName=''):
+	def __init__(self, Proj, ID, MyClass=None, D2CSocketNumber=None, C2DSocketNumber=None, PHAObj=None,
+				 HumanName=''):
 		# ID (str) is the same as the ID of the corresponding "real" Viewport
 		# MyClass (ViewportClasses instance): class of actual Viewport shadowed by this one
 		# D2CSocketNumber and C2DSocketNumber (2 x int): socket numbers assigned in display_utilities.CreateViewport
-		# PHAModel: PHA model owning the real Viewport
+		# PHAObj: PHA object owning the real Viewport
 		# HumanName: HumanName assigned to the real Viewport
 		assert isinstance(Proj, projects.ProjectItem)
 		assert isinstance(ID, str)
@@ -3336,14 +3342,15 @@ class ViewportShadow(object): # defines objects that represent Viewports in the 
 		self.ID = ID
 		self.MyClass = MyClass
 		self.HumanName = HumanName
+		self.PHAObjID = PHAObj.ID # storing ID, not the actual PHAObj, for consistency with real Viewports
 		self.IsOnDisplay = False # whether the Viewport shadow is currently displayed on any display device
 		# set up sockets using socket numbers provided
 		self.C2DSocketREP, self.C2DSocketREPObj, C2DSocketNumberReturned = vizop_misc.SetupNewSocket(SocketType='REP',
 			SocketLabel='C2DREP_' + self.ID,
-			PHAObj=PHAModel, Viewport=self, SocketNo=C2DSocketNumber, BelongsToDatacore=True, AddToRegister=True)
+			PHAObj=PHAObj, Viewport=self, SocketNo=C2DSocketNumber, BelongsToDatacore=True, AddToRegister=True)
 		self.D2CSocketREQ, self.D2CSocketREQObj, D2CSocketNumberReturned = vizop_misc.SetupNewSocket(SocketType='REQ',
 			SocketLabel=info.ViewportOutSocketLabel + '_' + self.ID,
-			PHAObj=PHAModel, Viewport=self, SocketNo=D2CSocketNumber, BelongsToDatacore=True, AddToRegister=True)
+			PHAObj=PHAObj, Viewport=self, SocketNo=D2CSocketNumber, BelongsToDatacore=True, AddToRegister=True)
 		# put the new viewport shadow into the project's list
 		Proj.AllViewportShadows.append(self)
 

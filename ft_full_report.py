@@ -337,7 +337,7 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 			ShowWhat, PageNumberWhere, ShowTexts = self.MakeAttribStrings()
 			vizop_misc.SendRequest(Socket=ThisViewport.C2DSocketREQ,
 				Command='RQ_FT_UpdateFullExportAttribs',
-				Proj=self.Proj.ID, PHAObj=ThisViewport.PHAObj.ID, Viewport=ThisViewport.ID,
+				Proj=self.Proj.ID, PHAObj=ThisViewport.PHAObjID, Viewport=ThisViewport.ID,
 				Filename=self.FilenameText.Widget.GetValue().strip(),
 				FileType=core_classes.ImageFileTypesSupported[self.FileTypeChoice.Widget.GetSelection()].XMLName,
 				ExportWhat=ShowWhat,

@@ -208,10 +208,11 @@ class ProjectInfoModelForDisplay(display_utilities.ViewportBaseClass): # object 
 
 	def __init__(self, **Args): # project display object initiation. Args must include Proj and Fonts (dict)
 		# and can include DisplDevice and ParentWindow
+		# attrib PHAObjID is set in superclass
 		display_utilities.ViewportBaseClass.__init__(self, **Args)
 		self.Proj = Args['Proj']
 		self.ID = None # assigned in display_utilities.CreateViewport()
-		self.PHAObj = None # instance of ProjectInfoModelInCore shown in this Viewport (set in datacore.DoNewViewport())
+#		self.PHAObj = None # instance of ProjectInfoModelInCore shown in this Viewport (set in datacore.DoNewViewport())
 		self.DisplDevice = Args.get('DisplDevice', None)
 		self.Fonts = Args['Fonts']
 		self.MaxIDInDisplayModel = 0 # highest ID of any element in this Viewport instance
@@ -400,7 +401,7 @@ class ProjectInfoModelForDisplay(display_utilities.ViewportBaseClass): # object 
 			# first, store undo information TODO
 			# request PHA model to update value by sending message through zmq
 			vizop_misc.SendRequest(Socket=self.D2CSocketREQ, Command='RQ_PI_ChangeValue',
-				Proj=self.Proj.ID, PHAObj=self.PHAObj.ID, Viewport=self.ID,
+				Proj=self.Proj.ID, PHAObj=self.PHAObjID, Viewport=self.ID,
 				Attrib=self.PHAModelAttribNameHash[WidgetObj.DataAttrib], NewValue=NewValue)
 			# set new value in Viewport
 			setattr(self, WidgetObj.DataAttrib, NewValue)

@@ -196,7 +196,7 @@ def SendRequest(Socket=None, Command='RQ_Null', FetchReply=False, XMLRoot=None, 
 				Values = [Values]
 			for ThisValue in Values:
 				if not isinstance(ThisValue, str):
-					print("VM1153: Oops: non-string data value %s sent to SendRequest" % str(ThisValue))
+					print("VM1153 Oops: non-string data value '%s' sent to SendRequest for command: '%s'" % (str(ThisValue), Cmd))
 	if XMLRoot is None:
 		# create new XML structure from keys and values in Args, and set root element = Command
 		RootElement = ElementTree.Element(Command)
