@@ -700,6 +700,7 @@ class ControlFrame(wx.Frame):
 				# fetch UndoOnCancel value to store in undo record for any tasks that should be undone when Cancel pressed
 				self.UndoOnCancel = Args.get('UndoOnCancel', None)
 				# prefill widgets in new aspect and activate it. TODO consider calling RedrawControlPanelAspect() instead
+				print('CF703 args keys: ', Args.keys())
 				TargetAspect.Prefill(**Args)
 				TargetAspect.SetWidgetVisibility(**Args)
 				# set up the notebook tab for the aspect
@@ -1550,6 +1551,7 @@ class ControlFrame(wx.Frame):
 			CurrentViewport = self.TopLevelFrame.CurrentViewport
 			# capture which connector element is current
 			self.TopLevelFrame.PHAObjInControlPanel = Args['PHAObjInControlPanel']
+			self.TopLevelFrame.PHAElementInControlPanel = Args['PHAElementInControlPanel']
 			self.TopLevelFrame.ComponentInControlPanel = Args['ComponentInControlPanel']
 			# enable navigation buttons if there are any items in current project's history lists
 			self.UpdateNavigationButtonStatus(Proj)
@@ -1626,7 +1628,7 @@ class ControlFrame(wx.Frame):
 			# list of comments within the component
 			Proj = self.TopLevelFrame.CurrentProj
 			CurrentViewport = self.TopLevelFrame.CurrentViewport
-			ThisPHAElement = self.TopLevelFrame.PHAObjInControlPanel
+			ThisPHAElement = self.TopLevelFrame.PHAElementInControlPanel
 #			ThisComponent = getattr(ThisPHAElement, self.TopLevelFrame.ComponentInControlPanel)
 			ThisComponent = self.TopLevelFrame.ComponentInControlPanel
 			ThisCommentList = getattr(ThisPHAElement, ThisComponent.CommentKind)
@@ -1648,6 +1650,7 @@ class ControlFrame(wx.Frame):
 			# depending on number of comments belonging to TargetElement
 			# CommentListAttrib (str): name of attrib of TargetElement containing the appropriate comments (e.g. 'DescriptionComments')
 			# NotebookPage: parent window for the variable widgets
+			print('CF1651 TargetElement, CommentListAttrib:', TargetElement, CommentListAttrib)
 			assert isinstance(CommentListAttrib, str)
 			assert hasattr(TargetElement, CommentListAttrib)
 			# first, deactivate and destroy all existing variable widgets (to avoid memory leak)
@@ -1691,8 +1694,9 @@ class ControlFrame(wx.Frame):
 			# populate widgets for 'edit comment' aspect of Control Panel
 			Proj = self.TopLevelFrame.CurrentProj
 			CurrentViewport = self.TopLevelFrame.CurrentViewport
-			# capture which connector element is current
+			# capture which PHA element is current
 			self.TopLevelFrame.PHAObjInControlPanel = Args['PHAObjInControlPanel']
+			self.TopLevelFrame.PHAElementInControlPanel = Args['PHAElementInControlPanel']
 			self.TopLevelFrame.ComponentInControlPanel = Args['ComponentInControlPanel']
 			# enable navigation buttons if there are any items in current project's history lists
 			self.UpdateNavigationButtonStatus(Proj)
@@ -1705,7 +1709,7 @@ class ControlFrame(wx.Frame):
 				self.TopLevelFrame.PHAObjInControlPanel.HumanName)
 			# set up lineup of variable widgets
 			print('CF1706 in prefill: component: ', self.TopLevelFrame.ComponentInControlPanel)
-			self.LineupVariableWidgetsForCommentAspect(TargetElement=self.TopLevelFrame.PHAObjInControlPanel,
+			self.LineupVariableWidgetsForCommentAspect(TargetElement=Args['PHAElementInControlPanel'],
 				CommentListAttrib=self.TopLevelFrame.ComponentInControlPanel.CommentKind,
 #				CommentListAttrib=getattr(self.TopLevelFrame.PHAObjInControlPanel,
 #					self.TopLevelFrame.ComponentInControlPanel).CommentKind,
@@ -2024,6 +2028,7 @@ class ControlFrame(wx.Frame):
 
 		def GotoControlPanelAspect(self, AspectName, PHAObjInControlPanel, ComponentInControlPanel='', **Args):
 			# handle request from Viewport to change the aspect in the Control Panel
+			print('CF2029 args keys: ', Args.keys())
 			self.TopLevelFrame.MyControlPanel.GotoControlPanelAspect(NewAspect=AspectName,
 				PHAObjInControlPanel=PHAObjInControlPanel, ComponentInControlPanel=ComponentInControlPanel, **Args)
 

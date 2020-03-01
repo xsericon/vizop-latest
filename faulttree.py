@@ -191,7 +191,7 @@ class ButtonElement(object): # object containing a button and attributes and met
 #				ComponentName = ''
 			if hasattr(self.FT.DisplDevice, 'GotoControlPanelAspect'):
 				self.FT.DisplDevice.GotoControlPanelAspect(AspectName=self.ControlPanelAspect,
-					PHAObjInControlPanel=self.HostObject, ComponentInControlPanel=self)
+					PHAObjInControlPanel=self.HostObject.FT, PHAElementInControlPanel=self.HostObject, ComponentInControlPanel=self)
 		# set the host object to be the only currently selected element in the FT. Redraw here only if user clicked a connect button;
 		# all other button kinds will redraw in the specific handler, called below
 		self.FT.SetElementAsCurrent(TargetFTElement=self.HostObject, UnsetPrevious=True,
@@ -2751,6 +2751,7 @@ class FTConnectorItemInCore(FTElementInCore): # in- and out-connectors (CX's) to
 	ConnectorStyles = ['Default'] # future, will define various connector appearances (squares, arrows, circles etc)
 	MaxElementsConnectedToThis = 100 # arbitrary limit on connectivity of out-CX
 	InternalName = 'FTConnectorInCore'
+	HumanName = _('inward connector') # used in undo texts
 	FTConnAcceptableValueKinds = [core_classes.UserNumValueItem, core_classes.ConstNumValueItem,
 		core_classes.AutoNumValueItem,
 		core_classes.LookupNumValueItem, core_classes.ParentNumValueItem, core_classes.UseParentValueItem]
@@ -4419,21 +4420,39 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			Reply = self.UpdateFullExportAttribs(Proj=Proj, XMLRoot=XMLRoot)
 		elif Command == 'RQ_FT_NewComment': # add new comment to a PHA element
 			print('FT4424 adding comment')
-			# find the corresponding element%%% working here
+			# find the corresponding element
 			ThisPHAElement = [e for e in WalkOverAllFTObjs(self) if e.ID == XMLRoot.findtext('PHAElement')][0]
 			# find the existing comment list
-			CommentList = getattr(ThisPHAElement, XMLRoot.findtext('CommentKind'))
+			CommentListAttrib = XMLRoot.findtext('CommentKind') # name of attrib containing comment list
+			CommentList = getattr(ThisPHAElement, CommentListAttrib)
 			# make a new comment object, with numbering object the same as the preceding comment (if any)
 			NewComment = core_classes.AssociatedTextItem(Proj=self.Proj, PHAObjClass=type(self), Host=self)
 			NewComment.Content = XMLRoot.findtext('CommentText')
 			if CommentList: NewComment.Numbering = copy.copy(CommentList[-1].Numbering)
 			else: NewComment.Numbering = copy.copy(self.Proj.DefaultCommentNumbering)
 			# add the comment to the required comment list
-			CommentList.append(NewComment)
+			self.DoAddNewComment(NewComment=NewComment, PHAElement=ThisPHAElement, CommentListAttrib=CommentListAttrib,
+				Viewport=SourceViewport, Redoing=False)
 			Reply = vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
 		elif Command == 'OK': # dummy for 'OK' responses - received only to clear the sockets
 			Reply = vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
 		return Reply
+
+	def DoAddNewComment(self, NewComment=None, PHAElement=None, CommentListAttrib='', Viewport=None, Redoing=False):
+		# add NewComment (AssociatedTextItem instance) to PHAElement's list in attrib named CommentListAttrib (str)%%%
+		CommentList = getattr(PHAElement, CommentListAttrib)
+		CommentList.append(NewComment)
+		undo.AddToUndoList(Proj=self.Proj, Redoing=Redoing,
+			UndoObj=undo.UndoItem(UndoHandler=self.AddNewComment_Undo,
+			RedoHandler=self.AddNewComment_Redo,
+#			Chain={False: 'NoChain', True: 'Avalanche', 'NoChain': 'NoChain'}[ChainUndo],
+			PHAElement=PHAElement, CommentListAttrib=CommentListAttrib,
+			HumanText=_('add new comment to %s') % type(PHAElement).HumanName,
+			ViewportID=Viewport.ID, ViewportClass=type(Viewport), Zoom=Viewport.Zoom,
+				PanX=Viewport.PanX, PanY=Viewport.PanY, HostElementID=PHAElement.ID))
+
+	def AddNewComment_Undo(self): pass
+	def AddNewComment_Redo(self): pass
 
 	def UpdateFullExportAttribs(self, Proj, XMLRoot):
 		# store attribs for full FT export dialogue in project
@@ -5745,7 +5764,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 				else: PHAElementToShow = None
 				self.DisplDevice.GotoControlPanelAspect(AspectName=AspectRequired,
 					PHAObjInControlPanel=self,
-					PHAElement=PHAElementToShow, ComponentInControlPanel=Args.get('ComponentEdited', None))
+					PHAElementInControlPanel=PHAElementToShow, ComponentInControlPanel=Args.get('ComponentEdited', None))
 #					CommentKind=Args.get('CommentKind', None))
 
 	def AddNewComment(self, PHAElement, PHAComponent, CommentText):
