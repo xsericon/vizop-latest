@@ -700,7 +700,7 @@ class ControlFrame(wx.Frame):
 				# fetch UndoOnCancel value to store in undo record for any tasks that should be undone when Cancel pressed
 				self.UndoOnCancel = Args.get('UndoOnCancel', None)
 				# prefill widgets in new aspect and activate it. TODO consider calling RedrawControlPanelAspect() instead
-				print('CF703 args keys: ', Args.keys())
+				print('CF703 args keys: ', Args.items())
 				TargetAspect.Prefill(**Args)
 				TargetAspect.SetWidgetVisibility(**Args)
 				# set up the notebook tab for the aspect
@@ -1650,7 +1650,6 @@ class ControlFrame(wx.Frame):
 			# depending on number of comments belonging to TargetElement
 			# CommentListAttrib (str): name of attrib of TargetElement containing the appropriate comments (e.g. 'DescriptionComments')
 			# NotebookPage: parent window for the variable widgets
-			print('CF1651 TargetElement, CommentListAttrib:', TargetElement, CommentListAttrib)
 			assert isinstance(CommentListAttrib, str)
 			assert hasattr(TargetElement, CommentListAttrib)
 			# first, deactivate and destroy all existing variable widgets (to avoid memory leak)
@@ -1658,6 +1657,7 @@ class ControlFrame(wx.Frame):
 			for ThisWidget in self.CommentAspect.VariableWidgetList: ThisWidget.Widget.Destroy()
 			self.CommentAspect.VariableWidgetList = []
 			CommentList = getattr(TargetElement, CommentListAttrib)
+			print('CF1651 TargetElement, CommentListAttrib, no of comments:', TargetElement, CommentListAttrib, len(CommentList))
 			# make a serial widget, textctrl and 'delete' button for each comment
 			# RowOffset and ColOffset are offsets from the position of the placeholder in FixedWidgetList
 			# The textctrl's min size is forced by NewCommentTextCtrl.SetMinSize() below
@@ -2028,7 +2028,7 @@ class ControlFrame(wx.Frame):
 
 		def GotoControlPanelAspect(self, AspectName, PHAObjInControlPanel, ComponentInControlPanel='', **Args):
 			# handle request from Viewport to change the aspect in the Control Panel
-			print('CF2029 args keys: ', Args.keys())
+			print('CF2029 args keys: ', Args.items())
 			self.TopLevelFrame.MyControlPanel.GotoControlPanelAspect(NewAspect=AspectName,
 				PHAObjInControlPanel=PHAObjInControlPanel, ComponentInControlPanel=ComponentInControlPanel, **Args)
 
@@ -2297,6 +2297,8 @@ class ControlFrame(wx.Frame):
 			'NO_FT_ChangeText_Undo': self.UpdateAllViewportsAfterUndo,
 			info.NO_ShowViewport: self.ProcessSwitchToViewport
 			}[XMLRoot.tag.strip()]
+		if XMLRoot.tag.strip() == info.NO_ShowViewport:
+			print('CF2301 handling message with XMLRoot: ', ElementTree.tostring(XMLRoot))
 		# call handler, and return its reply
 		Reply = Handler(XMLRoot=XMLRoot)
 		assert Reply is not None, Handler.__name__ + ' sent no reply'
@@ -2628,16 +2630,35 @@ class ControlFrame(wx.Frame):
 			self.MyEditPanel.AllViewportsShown.append(self.CurrentViewport)
 		# set Viewport as the latest shown for this shadow PHAObj in this display device
 		self.MyEditPanel.LatestViewport[ViewportToShow.PHAObj] = ViewportToShow
-		# restore zoom and pan, if provided in XMLRoot
+		# restore display parms such as zoom and pan, if <DisplayAttribs> is provided in XMLRoot
+		PHAElement = None
+		ThisComponent = None
 		if XMLRoot is not None:
-			ThisZoomTag = XMLRoot.find(info.ZoomTag)
-			TargetZoom = ThisZoomTag.text if ThisZoomTag else None
-			ThisPanXTag = XMLRoot.find(info.PanXTag)
-			TargetPanX = ThisXMLTag.text if ThisPanXTag else None
-			ThisPanYTag = XMLRoot.find(info.PanYTag)
-			TargetPanY = ThisPanYTag.text if ThisPanYTag else None
-			display_utilities.ChangeZoomAndPanValues(Viewport=self.CurrentViewport, Zoom=TargetZoom, PanX=TargetPanX,
-				PanY=TargetPanY)
+			# find the expected XML tag of the Viewport, e.g. "FTTreeView"
+			ViewportTagName = ViewportToShow.InternalName
+			# find the corresponding tag in XMLRoot
+			ViewportTag = XMLRoot.find(ViewportTagName)
+			# find DisplayAttribs tag inside ViewportTag
+			DisplayAttribsTag = ViewportTag.find(info.FTDisplayAttribTag)
+			# if tag found, extract zoom, etc from it
+			if DisplayAttribsTag is not None:
+				ThisZoomTag = DisplayAttribsTag.find(info.ZoomTag)
+				print('CF2635 ZoomTag, text: ', ThisZoomTag, getattr(ThisZoomTag, 'text', 'no tag found'))
+				TargetZoom = ThisZoomTag.text if ThisZoomTag else None
+				ThisPanXTag = DisplayAttribsTag.find(info.PanXTag)
+				TargetPanX = ThisXMLTag.text if ThisPanXTag else None
+				ThisPanYTag = DisplayAttribsTag.find(info.PanYTag)
+				TargetPanY = ThisPanYTag.text if ThisPanYTag else None
+				PHAElementTag = DisplayAttribsTag.find(info.PHAElementTag)
+				print('CF2653 all FT element IDs: ', [e for e in faulttree.WalkOverAllFTObjs(self.CurrentViewport)])
+				PHAElement = utilities.ObjectWithID(Objects=[e for e in faulttree.WalkOverAllFTObjs(self.CurrentViewport)],
+					TargetID=PHAElementTag.text) if PHAElementTag is not None else None
+				print('CF2656 PHAElement: ', PHAElement)
+				ComponentTag = DisplayAttribsTag.find(info.ComponentTag)
+				print('CF2643 ComponentTag, text: ', ComponentTag, getattr(ComponentTag, 'text', 'no tag found'))
+				ThisComponent = utilities.InstanceWithAttribValue(ObjList=PHAElement.AllComponents, AttribName='InternalName',
+					TargetValue=ComponentTag.text, NotFoundValue='xyz') if ComponentTag is not None else None
+				print('CF2659 Element.AllComponents, ComponentTag.text, ThisComponent:', PHAElement.AllComponents, ComponentTag.text, ThisComponent)
 		# store history for backward navigation
 		self.StoreMilestone(Proj, Backward=True)
 		# draw the Viewport
@@ -2648,8 +2669,8 @@ class ControlFrame(wx.Frame):
 		print('CF2640 changing control panel aspect to: ', self.CurrentViewport.PreferredControlPanelAspect)
 		print('CF2641 with viewport, PHA obj type: ', type(self.CurrentViewport), type(self.CurrentViewport.PHAObj))
 		self.MyControlPanel.GotoControlPanelAspect(NewAspect=self.CurrentViewport.PreferredControlPanelAspect,
-			PHAObjInControlPanel=self.CurrentViewport, ComponentInControlPanel=None)
-#			PHAObjInControlPanel=self.CurrentViewport.PHAObj, ComponentInControlPanel=None)
+			PHAObjInControlPanel=self.CurrentViewport, PHAElementInControlPanel=PHAElement,
+			ComponentInControlPanel=ThisComponent, debug=2673)
 		return vizop_misc.MakeXMLMessage('Null', 'Null')
 
 	def DestroyViewport(self, Proj, DoomedViewport, **Args):

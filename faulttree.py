@@ -190,7 +190,7 @@ class ButtonElement(object): # object containing a button and attributes and met
 #			else:
 #				ComponentName = ''
 			if hasattr(self.FT.DisplDevice, 'GotoControlPanelAspect'):
-				self.FT.DisplDevice.GotoControlPanelAspect(AspectName=self.ControlPanelAspect,
+				self.FT.DisplDevice.GotoControlPanelAspect(AspectName=self.ControlPanelAspect, debug=193,
 					PHAObjInControlPanel=self.HostObject.FT, PHAElementInControlPanel=self.HostObject, ComponentInControlPanel=self)
 		# set the host object to be the only currently selected element in the FT. Redraw here only if user clicked a connect button;
 		# all other button kinds will redraw in the specific handler, called below
@@ -517,11 +517,11 @@ class FTBoxyObject(object): # superclass of vaguely box-like FT components for u
 		return int(round(self.PosYInCU + 0.5 * self.SizeYInCU))
 
 	def AllClickableObjects(self, SelectedOnly=False, VisibleOnly=True):
-		# return list of all elements in FT element object that should respond to mouse clicks
-		# If SelectedOnly (bool), only return elements that are currently selected; similarly for VisibleOnly (bool)
+		# return list of all components in FT element object that should respond to mouse clicks
+		# If SelectedOnly (bool), only return components that are currently selected; similarly for VisibleOnly (bool)
 		assert isinstance(SelectedOnly, bool)
 		assert isinstance(VisibleOnly, bool)
-		return [El for El in self.AllElements if El.IsClickable
+		return [El for El in self.AllComponents if El.IsClickable
 			if (El.Selected or not SelectedOnly) if (El.Visible or not VisibleOnly)] + [self]
 
 	def RecoverPreservedAttribs(self):
@@ -736,7 +736,7 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 			else:
 				ComponentName = ''
 			if hasattr(self.FT.DisplDevice, 'GotoControlPanelAspect'):
-				self.FT.DisplDevice.GotoControlPanelAspect(AspectName=self.ControlPanelAspect,
+				self.FT.DisplDevice.GotoControlPanelAspect(AspectName=self.ControlPanelAspect, debug=739,
 					PHAObjInControlPanel=self.HostObject, ComponentInControlPanel=ComponentName)
 		# set the host object to be the only currently selected element in the FT
 		self.FT.SetElementAsCurrent(TargetFTElement=self.HostObject, UnsetPrevious=True, RedrawEntireFT=True,
@@ -992,8 +992,8 @@ class FTEvent(FTBoxyObject): # FT event object
 			NumberingEl = ElementNamed(Elements, info.NumberingTag)
 			if NumberingEl: NumberingEl.Text.Content = self.Numbering
 
-		def SetElementSizesInCU(): # set sizes in canvas units of all elements in the FTEvent instance
-			for ThisEl in self.AllElements:
+		def SetElementSizesInCU(): # set sizes in canvas units of all components in the FTEvent instance
+			for ThisEl in self.AllComponents:
 				ThisEl.SizeXInCU, ThisEl.SizeYInCU = ThisEl.MinSizeInCU
 
 		def SetButtonStati(Elements):
@@ -1028,19 +1028,19 @@ class FTEvent(FTBoxyObject): # FT event object
 		BorderX = BorderY = 10 # outer border in canvas coords
 		GapBetweenRows = GapBetweenCols = 5 # in canvas coords
 		MinColWidth = 40
-		# create variable elements and build combined element list comprising fixed and variable elements
+		# create variable elements and build combined component list comprising fixed and variable components
 		(self.DescriptionCommentEls, self.ValueCommentEls, self.ActionItemEls) = self.CreateVariableTextElements()
-		self.AllElements = BuildFullElementList(
+		self.AllComponents = BuildFullElementList(
 			self.TopFixedEls, self.DescriptionCommentEls, self.ValueFixedEls, self.ValueCommentEls, self.ActionItemEls)
 
-		PopulateTextElements(self.AllElements) # put required text values in the elements
+		PopulateTextElements(self.AllComponents) # put required text values in the components
 		SetElementSizesInCU()
-		SetButtonStati(self.AllElements) # set button elements to required status
+		SetButtonStati(self.AllComponents) # set button components to required status
 		# calculate height of each "sizer" row in canvas coords
 		ColWidths, ColStartXs, ColEndXs, RowHeights, RowStartYs, RowEndYs = CalculateRowAndColumnDimensions(
-			self.AllElements, GapBetweenCols, GapBetweenRows, MinColWidth, BorderX, BorderY)
-		# set element X, Y positions according to column positions and row heights
-		for El in self.AllElements:
+			self.AllComponents, GapBetweenCols, GapBetweenRows, MinColWidth, BorderX, BorderY)
+		# set component X, Y positions according to column positions and row heights
+		for El in self.AllComponents:
 			El.PosXInCU = ColStartXs[El.ColStart]
 			El.EndXInCU = El.PosXInCU + sum([ColWidths[c] for c in range(El.ColStart, El.ColStart + El.ColSpan)]) - GapBetweenCols
 			# if element should fill available X-space, adjust its X size to match available space
@@ -1052,7 +1052,7 @@ class FTEvent(FTBoxyObject): # FT event object
 			El.SizeYInCU = El.EndYInCU - El.PosYInCU
 			El.SizeYInPx = int(round(El.SizeYInCU * Zoom))
 		# calculate FTEvent size; removing gap after final row/col and adding borders at both edges
-		self.SizeXInCU = max([El.EndXInCU for El in self.AllElements]) - GapBetweenCols + 2 * BorderX
+		self.SizeXInCU = max([El.EndXInCU for El in self.AllComponents]) - GapBetweenCols + 2 * BorderX
 		self.SizeYInCU = RowEndYs[-1] - GapBetweenRows + 2 * BorderY
 		self.SizeXInPx = int(round(self.SizeXInCU * Zoom))
 		self.SizeYInPx = int(round(self.SizeYInCU * Zoom))
@@ -1062,7 +1062,7 @@ class FTEvent(FTBoxyObject): # FT event object
 		DC = wx.MemoryDC(self.Bitmap)
 		# draw background box, then elements, into the bitmap
 		DrawBackgroundBox(DC, Zoom)
-		self.DrawElements(DC, self.AllElements, Zoom)
+		self.DrawElements(DC, self.AllComponents, Zoom)
 
 	def GetMyAcceptableUnits(self): # return list of units (UnitItem instances) this event can offer
 		if self.EventType in FTEventTypesWithFreqValue:
@@ -1212,8 +1212,8 @@ class FTGate(FTBoxyObject): # object containing FT gates for display. These belo
 			self.GateKind.Text.Content = self.GateKindHash.get(self.Algorithm,
 				_('<Undefined gate type>'))
 
-		def SetElementSizesInCU():  # set sizes in canvas units of all elements in the FTGate instance
-			for ThisEl in self.AllElements:
+		def SetElementSizesInCU():  # set sizes in canvas units of all components in the FTGate instance
+			for ThisEl in self.AllComponents:
 				ThisEl.SizeXInCU, ThisEl.SizeYInCU = ThisEl.MinSizeInCU
 
 		def SetButtonStati(Elements):
@@ -1421,17 +1421,17 @@ class FTGate(FTBoxyObject): # object containing FT gates for display. These belo
 			MinColWidth = 40
 			# create variable elements and build combined element list comprising fixed and variable elements
 			(self.DescriptionCommentEls, self.ActionItemEls) = self.CreateVariableTextElements()
-			self.AllElements = BuildFullElementList(
+			self.AllComponents = BuildFullElementList(
 				self.TopFixedEls, self.ValueFixedEls, self.DescriptionCommentEls, self.ActionItemEls)
 
-			PopulateTextElements(self.AllElements) # put required text values in the components
+			PopulateTextElements(self.AllComponents) # put required text values in the components
 			SetElementSizesInCU()
-			SetButtonStati(self.AllElements) # set button elements to required status
+			SetButtonStati(self.AllComponents) # set button components to required status
 			# calculate height of each "sizer" row in canvas coords
 			ColWidths, ColStartXs, ColEndXs, RowHeights, RowStartYs, RowEndYs = CalculateRowAndColumnDimensions(
-				self.AllElements, GapBetweenCols, GapBetweenRows, MinColWidth, BorderX, BorderY)
-			# set element X, Y positions according to column positions and row heights
-			for El in self.AllElements:
+				self.AllComponents, GapBetweenCols, GapBetweenRows, MinColWidth, BorderX, BorderY)
+			# set component X, Y positions according to column positions and row heights
+			for El in self.AllComponents:
 				El.PosXInCU = ColStartXs[El.ColStart]
 				El.EndXInCU = El.PosXInCU + sum([ColWidths[c] for c in range(El.ColStart, El.ColStart + El.ColSpan)]) - GapBetweenCols
 				# if element should fill available X-space, adjust its X size to match available space
@@ -1443,7 +1443,7 @@ class FTGate(FTBoxyObject): # object containing FT gates for display. These belo
 				El.SizeYInCU = El.EndYInCU - El.PosYInCU
 				El.SizeYInPx = int(round(El.SizeYInCU * Zoom))
 			# calculate FTGate size; removing gap after final row/col and adding borders at both edges
-			self.SizeXInCU = max([El.EndXInCU for El in self.AllElements]) - GapBetweenCols + 2 * BorderX
+			self.SizeXInCU = max([El.EndXInCU for El in self.AllComponents]) - GapBetweenCols + 2 * BorderX
 			self.SizeYInCU = RowEndYs[-1] - GapBetweenRows + 2 * BorderY
 			self.SizeXInPx = int(round(self.SizeXInCU * Zoom))
 			self.SizeYInPx = int(round(self.SizeYInCU * Zoom))
@@ -1453,7 +1453,7 @@ class FTGate(FTBoxyObject): # object containing FT gates for display. These belo
 			DC = wx.MemoryDC(self.Bitmap)
 			# draw background box, then elements, into the bitmap
 			DrawBackgroundBox(DC, Zoom)
-			self.DrawElements(DC, self.AllElements, Zoom)
+			self.DrawElements(DC, self.AllComponents, Zoom)
 		else: # non-detailed view
 			DrawGateSymbol(Zoom=Zoom)
 
@@ -1631,7 +1631,7 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 					MatchingEl.Text.Content = self.__dict__[Attrib]
 
 		def SetButtonStati(Components):
-			# set 'Status' attributes of buttons in Components; used to determine which bitmap is used to render button%%%
+			# set 'Status' attributes of buttons in Components; used to determine which bitmap is used to render button
 			for (ButtonName, Flag) in [('ConnLinkedButton', bool(self.LinkedFrom)),
 					('ConnGroupedButton', bool(self.CollapseGroups)),
 					('ConnDescriptionCommentButton', bool(self.ConnectorDescriptionComments)),
@@ -1652,27 +1652,27 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 			# box is drawn in FTConnector's own bitmap, so coords are relative to element (not using PosX/YInPx, which are relative to column)
 			DC.DrawRectangle(0, 0, self.SizeXInPx, self.SizeYInPx)
 
-		def SetElementSizesInCU(): # set sizes in canvas units of all elements in the FTConnector instance
-			for ThisEl in self.AllElements:
+		def SetElementSizesInCU(): # set sizes in canvas units of all components in the FTConnector instance
+			for ThisEl in self.AllComponents:
 				ThisEl.SizeXInCU, ThisEl.SizeYInCU = ThisEl.MinSizeInCU
 
 		# start of main procedure for RenderIntoBitmap() for class FTConnector
 		BorderX = BorderY = 10 # outer border in canvas coords
 		GapBetweenRows = GapBetweenCols = 5 # in canvas coords
 		MinColWidth = 25
-		# create variable elements and build combined element list comprising fixed and variable elements%%%
+		# create variable elements and build combined element list comprising fixed and variable elements
 		(self.DescriptionCommentEls, self.ValueCommentEls, self.ActionItemEls, self.ParkingLotItemEls) =\
 			self.CreateVariableTextElements()
-		self.AllElements = BuildFullElementList(self.TopFixedEls, self.DescriptionCommentEls, self.ValueFixedEls,
+		self.AllComponents = BuildFullElementList(self.TopFixedEls, self.DescriptionCommentEls, self.ValueFixedEls,
 			self.ValueCommentEls, self.ActionItemEls, self.ParkingLotItemEls)
-		PopulateTextElements(self.AllElements) # put required text values in the components
+		PopulateTextElements(self.AllComponents) # put required text values in the components
 		SetElementSizesInCU()
-		SetButtonStati(self.AllElements) # set button elements to required status
+		SetButtonStati(self.AllComponents) # set button components to required status
 		# calculate height of each "sizer" row in canvas coords
-		ColWidths, ColStartXs, ColEndXs, RowHeights, RowStartYs, RowEndYs = CalculateRowAndColumnDimensions(self.AllElements, GapBetweenCols,
+		ColWidths, ColStartXs, ColEndXs, RowHeights, RowStartYs, RowEndYs = CalculateRowAndColumnDimensions(self.AllComponents, GapBetweenCols,
 			GapBetweenRows, MinColWidth, BorderX, BorderY)
 		# set element X, Y positions and sizes according to column positions and row heights
-		for El in self.AllElements:
+		for El in self.AllComponents:
 			El.PosXInCU = ColStartXs[El.ColStart]
 			El.EndXInCU = El.PosXInCU + sum([ColWidths[c] for c in range(El.ColStart, El.ColStart + El.ColSpan)]) - GapBetweenCols
 			# if element should fill available X-space, adjust its X size to match available space
@@ -1684,7 +1684,7 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 			El.SizeYInCU = El.EndYInCU - El.PosYInCU
 			El.SizeYInPx = int(round(El.SizeYInCU * Zoom))
 		# calculate FTConnector size
-		self.SizeXInCU = max([El.EndXInCU for El in self.AllElements]) - GapBetweenCols + 2 * BorderX
+		self.SizeXInCU = max([El.EndXInCU for El in self.AllComponents]) - GapBetweenCols + 2 * BorderX
 		self.SizeYInCU = RowEndYs[-1] - GapBetweenRows + 2 * BorderY
 		self.SizeXInPx = int(round(self.SizeXInCU * Zoom))
 		self.SizeYInPx = int(round(self.SizeYInCU * Zoom))
@@ -1694,7 +1694,7 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 		DC = wx.MemoryDC(self.Bitmap)
 		# draw background box, then elements, into the bitmap
 		DrawBackgroundBox(DC, Zoom)
-		self.DrawElements(DC, self.AllElements, Zoom)
+		self.DrawElements(DC, self.AllComponents, Zoom)
 
 class FTConnectorIn(FTConnector):
 	HumanName = _('Inward connector') # class name
@@ -3499,6 +3499,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 				El = ElementTree.SubElement(ConnEl, Tag)
 				El.text = str(Attrib)
 			# elements for lists of AssociatedTextItems
+			print('FT3502 connector ID with comments: ', FTConn, FTConn.ConnectorDescriptionComments)
 			DataInfo = [(info.ConnectorDescriptionCommentsTag, FTConn.ConnectorDescriptionComments),
 				(info.ValueCommentsTag, FTConn.ValueComments),
 				(info.ActionItemsTag, FTConn.ActionItems),
@@ -3701,6 +3702,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		NewEvent = NewEventClass(Proj=Proj, FT=self, Column=self.Columns[ThisColIndex], ModelGate=self.ModelGate,
 			ColIndex=ThisColIndex)
 		self.Columns[ThisColIndex].FTElements.insert(ThisIndexInCol, NewEvent)
+		print('FT3705 added new element: ', NewEvent)
 		return vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
 
 	def ConnectElements(self, FromEl, ToEl, Viewport):
@@ -3874,11 +3876,13 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 
 	def FetchDisplayAttribsFromUndoRecord(self, UndoRecord):
 		# extract data about zoom, pan, highlight etc. from UndoRecord, build it into an XML tag FTDisplayAttribTag
-		# and return the tag
+		# and return the tag%%%
 		DisplaySpecificData = ElementTree.Element(info.FTDisplayAttribTag)
 		for (UndoRecordAttribName, TagName) in [ ('ElementID', info.FTElementContainingComponentToHighlight),
-			  ('ComponentName', info.FTComponentToHighlight),
-			  ('Zoom', info.ZoomTag), ('PanX', info.PanXTag), ('PanY', info.PanYTag)]:
+				('ComponentName', info.FTComponentToHighlight), ('HostElementID', info.PHAElementTag),
+				('ComponentName', info.ComponentTag),
+				('Zoom', info.ZoomTag), ('PanX', info.PanXTag), ('PanY', info.PanYTag)]:
+			print('FT3883 checking for attrib in undo record: ', UndoRecordAttribName, hasattr(UndoRecord, UndoRecordAttribName))
 			if hasattr(UndoRecord, UndoRecordAttribName):
 				ThisAttribTag = ElementTree.SubElement(DisplaySpecificData, TagName)
 				ThisAttribTag.text = str(getattr(UndoRecord, UndoRecordAttribName))
@@ -4419,9 +4423,9 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		elif Command == 'RQ_FT_UpdateFullExportAttribs': # store parms for full FT export dialogue
 			Reply = self.UpdateFullExportAttribs(Proj=Proj, XMLRoot=XMLRoot)
 		elif Command == 'RQ_FT_NewComment': # add new comment to a PHA element
-			print('FT4424 adding comment')
 			# find the corresponding element
 			ThisPHAElement = [e for e in WalkOverAllFTObjs(self) if e.ID == XMLRoot.findtext('PHAElement')][0]
+			print('FT4424 adding comment to element, with ComponentName: ', ThisPHAElement, XMLRoot.findtext(info.ComponentTag))
 			# find the existing comment list
 			CommentListAttrib = XMLRoot.findtext('CommentKind') # name of attrib containing comment list
 			CommentList = getattr(ThisPHAElement, CommentListAttrib)
@@ -4432,26 +4436,44 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			else: NewComment.Numbering = copy.copy(self.Proj.DefaultCommentNumbering)
 			# add the comment to the required comment list
 			self.DoAddNewComment(NewComment=NewComment, PHAElement=ThisPHAElement, CommentListAttrib=CommentListAttrib,
-				Viewport=SourceViewport, Redoing=False)
+				ComponentName=XMLRoot.findtext(info.ComponentTag), Viewport=SourceViewport, Redoing=False)
 			Reply = vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
 		elif Command == 'OK': # dummy for 'OK' responses - received only to clear the sockets
 			Reply = vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
 		return Reply
 
-	def DoAddNewComment(self, NewComment=None, PHAElement=None, CommentListAttrib='', Viewport=None, Redoing=False):
+	def DoAddNewComment(self, NewComment=None, PHAElement=None, ComponentName=None, CommentListAttrib='', Viewport=None,
+			Redoing=False):
 		# add NewComment (AssociatedTextItem instance) to PHAElement's list in attrib named CommentListAttrib (str)%%%
+		# ComponentName is the InternalName of the Viewport PHAElement's component that selects the comment for editing;
+		# needed for undo implementation
 		CommentList = getattr(PHAElement, CommentListAttrib)
 		CommentList.append(NewComment)
 		undo.AddToUndoList(Proj=self.Proj, Redoing=Redoing,
 			UndoObj=undo.UndoItem(UndoHandler=self.AddNewComment_Undo,
 			RedoHandler=self.AddNewComment_Redo,
 #			Chain={False: 'NoChain', True: 'Avalanche', 'NoChain': 'NoChain'}[ChainUndo],
-			PHAElement=PHAElement, CommentListAttrib=CommentListAttrib,
+			PHAElement=PHAElement, ComponentName=ComponentName, CommentListAttrib=CommentListAttrib,
 			HumanText=_('add new comment to %s') % type(PHAElement).HumanName,
 			ViewportID=Viewport.ID, ViewportClass=type(Viewport), Zoom=Viewport.Zoom,
-				PanX=Viewport.PanX, PanY=Viewport.PanY, HostElementID=PHAElement.ID))
+			PanX=Viewport.PanX, PanY=Viewport.PanY, HostElementID=PHAElement.ID))
 
-	def AddNewComment_Undo(self): pass
+	def AddNewComment_Undo(self, Proj, UndoRecord, **Args): # handle undo for add new comment
+		assert isinstance(Proj, projects.ProjectItem)
+		assert isinstance(UndoRecord, undo.UndoItem)
+		# find out which datacore socket to send messages on
+		SocketFromDatacore = vizop_misc.SocketWithName(TargetName=Args['SocketFromDatacoreName'])
+		# remove the newly added comment (assumes it's the last one in the host's list)
+		CommentList = getattr(UndoRecord.PHAElement, UndoRecord.CommentListAttrib)
+		print('FT4465 element, CommentList, length: ', UndoRecord.PHAElement, UndoRecord.CommentListAttrib, len(CommentList))
+		setattr(UndoRecord.PHAElement, UndoRecord.CommentListAttrib, getattr(UndoRecord.PHAElement, UndoRecord.CommentListAttrib)[:-1])
+		print('FT4468 CommentList length: ', len(getattr(UndoRecord.PHAElement, UndoRecord.CommentListAttrib)))
+		# request Control Frame to switch to the Viewport that was visible when the original edit was made
+		self.RedrawAfterUndoOrRedo(UndoRecord, SocketFromDatacore)
+		projects.SaveOnFly(Proj, UpdateData=vizop_misc.MakeXMLMessage(RootName=info.FTTag,
+			Elements={info.IDTag: self.ID, info.ComponentHostIDTag: UndoRecord.PHAElement.ID}))
+		# TODO add data for the changed component to the Save On Fly data
+		return {'Success': True}
 	def AddNewComment_Redo(self): pass
 
 	def UpdateFullExportAttribs(self, Proj, XMLRoot):
@@ -4849,6 +4871,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 				('CollapseGroups', 'CollapseGroups') ]
 			for Tag, Attrib in DataInfoAsList:
 				setattr(NewConnector, Attrib, [El.text for El in XMLObj.findall(Tag)])
+			print('FT4872 new connector has ID, this many comments: ', NewConnector.ID, len(NewConnector.ConnectorDescriptionComments))
 			# populate connector type name: internal name and human name
 			NewConnector.EventType = XMLObj.find('EventType').text
 			NewConnector.EventTypeHumanName = self.EventTypeNameHash[NewConnector.EventType]
@@ -5152,8 +5175,8 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 				ThisElement.PosXInPx, ThisElement.PosYInPx = utilities.ScreenCoords(ThisColOffsetXInCU + ThisElement.PosXInCU,
 					ThisElement.PosYInCU, self.Zoom, PanX=self.PanX, PanY=self.PanY)
 				# set PosX/Y of components within elements
-				if hasattr(ThisElement, 'AllElements'):
-					for ThisComponent in ThisElement.AllElements:
+				if hasattr(ThisElement, 'AllComponents'):
+					for ThisComponent in ThisElement.AllComponents:
 						ThisComponent.PosXInPx = ThisElement.PosXInPx + (ThisComponent.PosXInCU * self.Zoom)
 						ThisComponent.PosYInPx = ThisElement.PosYInPx + (ThisComponent.PosYInCU * self.Zoom)
 				# set overall column width
@@ -5750,6 +5773,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		# (currently, we always supply AspectRequired)
 		# Args can include: ComponentEdited (instance e.g. ButtonElement) - when displaying Comment aspect, which component was clicked
 		assert hasattr(CurrentElements, '__iter__') # confirm it's a list
+		print('FT5769 SwitchToPreferredControlPanelAspect: CurrentElements: ', CurrentElements)
 		# does our display device have a control panel?
 		if hasattr(self.DisplDevice, 'GotoControlPanelAspect'):
 			if AspectRequired is None:
@@ -5757,12 +5781,12 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 				if len(set([type(e) for e in CurrentElements])) == 1:
 					# does the type have a preferred control panel aspect?
 					if getattr(CurrentElements[0], 'ControlPanelAspect', None):
-						self.DisplDevice.GotoControlPanelAspect(AspectName=CurrentElements[0].ControlPanelAspect,
-							PHAObjInControlPanel=CurrentElements[0], ComponentInControlPanel='')
+						self.DisplDevice.GotoControlPanelAspect(AspectName=CurrentElements[0].ControlPanelAspect, debug=5784,
+							PHAObjInControlPanel=self, PHAElementInControlPanel=CurrentElements[0], ComponentInControlPanel='')
 			else: # switch to specified AspectRequired
 				if CurrentElements: PHAElementToShow = CurrentElements[0]
 				else: PHAElementToShow = None
-				self.DisplDevice.GotoControlPanelAspect(AspectName=AspectRequired,
+				self.DisplDevice.GotoControlPanelAspect(AspectName=AspectRequired, debug=5789,
 					PHAObjInControlPanel=self,
 					PHAElementInControlPanel=PHAElementToShow, ComponentInControlPanel=Args.get('ComponentEdited', None))
 #					CommentKind=Args.get('CommentKind', None))
@@ -5776,7 +5800,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		# handle request to add new comment to PHAComponent in PHAElement
 		vizop_misc.SendRequest(Socket=self.C2DSocketREQ, Command='RQ_FT_NewComment',
 			Proj=self.Proj.ID, PHAObj=self.PHAObjID, PHAElement=PHAElement.ID, CommentKind=PHAComponent.CommentKind,
-			CommentText=CommentText, Viewport=self.ID)
+			Component=PHAComponent.InternalName, CommentText=CommentText, Viewport=self.ID)
 
 FTObjectInCore.DefaultViewportType = FTForDisplay # set here (not in FTForDisplay class) due to the order of the
 	# class definitions
