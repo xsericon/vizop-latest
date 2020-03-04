@@ -204,8 +204,8 @@ def convertProjectToXml(Proj, ProjectFilename):
 				MyXMLRoot_NumberSystem_Chunk_Type = ET.SubElement(MyXMLRoot_NumberSystem_Chunk, info.TypeTag)
 				MyXMLRoot_NumberSystem_Chunk_Type.text = pS(info.NumberSystemParentType)
 
-				MyXMLRoot_NumberSystem_Chunk_Value = ET.SubElement(MyXMLRoot_NumberSystem_Chunk, info.IDAttribName)
-				MyXMLRoot_NumberSystem_Chunk_Value.text = pS(each_NumberSystem.Source)
+				MyXMLRoot_NumberSystem_Chunk_ID = ET.SubElement(MyXMLRoot_NumberSystem_Chunk, info.IDAttribName)
+				MyXMLRoot_NumberSystem_Chunk_ID.text = pS(each_NumberSystem.Source)
 
 			#each_NumberSystem: core_classes.SerialNumberChunkItem
 			elif type(each_NumberSystem) == core_classes.SerialNumberChunkItem:
@@ -243,63 +243,43 @@ def convertProjectToXml(Proj, ProjectFilename):
 
 			else:
 				raise Exception('NumberSystem type incorrect.')
-				pass
 
 	# Risk Matrix
 	if len(Proj.RiskMatrices) > 0:
-		# create outer XML tag
-		MyXMLRoot_RiskMatrices = ET.SubElement(MyXMLRoot, info.RiskMatricesTag)
 
 		# LookupTableItem
 		for each_RiskMatrix in Proj.RiskMatrices:
 			assert type(each_RiskMatrix) == core_classes.LookupTableItem
-			MyXMLRoot_RiskMatrices_RiskMatrix = ET.SubElement(MyXMLRoot_RiskMatrices, info.RiskMatrixTag)
+			MyXMLRoot_RiskMatrix = ET.SubElement(MyXMLRoot, info.RiskMatrixTag)
 
 			# <Category>
 			# Map to Keys
 			if len(each_RiskMatrix.Keys) > 0:
-				#Categories
-				MyXMLRoot_RiskMatrices_RiskMatrix_Categories = ET.SubElement(MyXMLRoot_RiskMatrices, info.CategoriesTag)
-
 				each_Key: core_classes.CategoryNameItem
 				for each_Key in each_RiskMatrix.Keys:
 					#Category
-					MyXMLRoot_RiskMatrices_RiskMatrix_Categories_Category = ET.SubElement(MyXMLRoot_RiskMatrices_RiskMatrix_Categories, info.CategoryTag)
+					MyXMLRoot_RiskMatrix_Category = ET.SubElement(MyXMLRoot_RiskMatrix, info.CategoryTag)
 
-					#TODO cannot map Description
-					#MyXMLRoot_RiskMatrices_RiskMatrix_Categories_Category.text =
+					# ID
+					# TODO J: cannot map Catergory ID
+					"""
+					MyXMLRoot_RiskMatrix_Category_ID = ET.SubElement(MyXMLRoot_RiskMatrix_Category, info.IDTag)
+					MyXMLRoot_RiskMatrix_Category_ID.text = pS(each_Key.)
+					"""
+
+					# Name
+					MyXMLRoot_RiskMatrix_Category_Name = ET.SubElement(MyXMLRoot_RiskMatrix_Category, info.NameTag)
+					MyXMLRoot_RiskMatrix_Category_Name.text = pS(each_Key.HumanName)
+
+					# Description
+					MyXMLRoot_RiskMatrix_Category_Description = ET.SubElement(MyXMLRoot_RiskMatrix_Category,info.DescriptionTag)
+					MyXMLRoot_RiskMatrix_Category_Description.text = pS(each_Key.HumanDescription)
 
 					pass
 
-			# <SeverityDimension [SeverityDimensionIndex int as str] />
-			if each_RiskMatrix.SeverityDimensionIndex != None:
-				MyXMLRoot_RiskMatrices_RiskMatrix_SeverityDimension = ET.SubElement(MyXMLRoot_RiskMatrices_RiskMatrix, info.SeverityDimensionTag)
-				MyXMLRoot_RiskMatrices_RiskMatrix_SeverityDimension.text = each_RiskMatrix.SeverityDimensionIndex
 
-			if len(each_RiskMatrix.DimensionUnits) > 0:
-				MyXMLRoot_RiskMatrices_RiskMatrix_DimensionUnits = ET.SubElement(MyXMLRoot_RiskMatrices_RiskMatrix,info.DimensionsTag)
 
-				for each_DimensionUnit in each_RiskMatrix.DimensionUnits:
-					assert type(each_DimensionUnit) == core_classes.UnitItem
-					MyXMLRoot_RiskMatrices_RiskMatrix_DimensionUnits_DimensionUnit = ET.SubElement(MyXMLRoot_RiskMatrices_RiskMatrix_DimensionUnits, info.DimensionTag)
-
-					#Name
-					MyXMLRoot_RiskMatrices_RiskMatrix_DimensionUnits_DimensionUnit_Name = ET.SubElement(MyXMLRoot_RiskMatrices_RiskMatrix_DimensionUnits_DimensionUnit, info.NameTag)
-					MyXMLRoot_RiskMatrices_RiskMatrix_DimensionUnits_DimensionUnit_Name.text = pS(each_DimensionUnit.HumanName)
-
-			#Key
-			# J: TODO
-			if len(each_RiskMatrix.Keys) > 0:
-				MyXMLRoot_RiskMatrices_RiskMatrix_Key = ET.SubElement(MyXMLRoot_RiskMatrices_RiskMatrix, info.KeyTag)
-				MyXMLRoot_RiskMatrices_RiskMatrix_Key.text = ''
-
-			#Entry
-			if len(each_RiskMatrix.Values) > 0:
-				MyXMLRoot_RiskMatrices_RiskMatrix_Entries = ET.SubElement(MyXMLRoot_RiskMatrices_RiskMatrix, info.EntriesTag)
-
-				for each_Value in each_RiskMatrix.Values:
-					MyXMLRoot_RiskMatrices_RiskMatrix_Entries_Entry = ET.SubElement(MyXMLRoot_RiskMatrices_RiskMatrix_Entries, info.EntryTag)
-					MyXMLRoot_RiskMatrices_RiskMatrix_Entries_Entry.text = pS(str(each_Value))
+			pass
 
 	#Constants
 	# J: TODO
