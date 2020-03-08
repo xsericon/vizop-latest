@@ -214,17 +214,12 @@ class ButtonElement(object): # object containing a button and attributes and met
 			'ValueComments']
 		if 'Description' in CommentKind:
 			self.HostObject.ShowDescriptionComments = not self.HostObject.ShowDescriptionComments # toggle whether comments are visible
-#			Command = 'RQ_FT_DescriptionCommentsVisible'
 		elif CommentKind == 'ValueComments':
 			self.HostObject.ShowValueComments = not self.HostObject.ShowValueComments # toggle whether comments are visible
-#			Command = 'RQ_FT_ValueCommentsVisible'
 		# redraw the whole FT
 		self.HostObject.FT.DisplDevice.Redraw(FullRefresh=True)
 		# previously we sent a command to datacore to toggle comments; no longer required here, but still need to set
 		# comments on/off in the Viewport shadow when saving project file
-#		vizop_misc.SendRequest(Socket=self.FT.C2DSocketREQ, Command=Command,
-#			ProjID=self.FT.Proj.ID, PHAObj=self.FT.PHAObj.ID, Viewport=self.FT.ID, Element=self.HostObject.ID,
-#			Visible=utilities.Bool2Str(Show))
 
 	def HandleMouseLClickOnActionItemButton(self, AssociatedTextItem=None, **Args):
 		# handle mouse left button single click on action item button
@@ -972,25 +967,25 @@ class FTEvent(FTBoxyObject): # FT event object
 				CommentElementList[-1].Text.ParaHorizAlignment = 'Centre'
 		return (DescrComments, ValueComments, ActionItems)
 
-	def RenderIntoBitmap(self, Zoom): # draw FTEvent in self.Bitmap. Also calculates FTEvent size attributes
+	def PopulateTextElements(self, Elements):
+		# put required values into all fixed text components of this element
+		# (variable elements are populated in CreateVariableTextElements() )
+		# The following list contains (attribs of FTEvent, element's InternalName)
+		# It's a combined list for both DescriptionElements and ValueElements, hence the "if" below
+		AttribInfo = [('EventTypeHumanName', 'EventType'), ('Value', 'Value'),
+					  ('ValueUnit', 'EventValueUnit'), ('ValueKind', 'EventValueKind')]
+		# put the content into the elements
+		for (Attrib, Name) in AttribInfo:
+			MatchingEl = ElementNamed(Elements, Name)
+			if MatchingEl:
+				MatchingEl.Text.Content = self.__dict__[Attrib]
+		# put event numbering and description into respective fields
+		DescriptionEl = ElementNamed(Elements, 'EventDescription')
+		if DescriptionEl: DescriptionEl.Text.Content = self.EventDescription
+		NumberingEl = ElementNamed(Elements, info.NumberingTag)
+		if NumberingEl: NumberingEl.Text.Content = self.Numbering
 
-		def PopulateTextElements(Elements):
-			# put required values into all fixed text components of this element
-			# (variable elements are populated in CreateVariableTextElements() )
-			# The following list contains (attribs of FTEvent, element's InternalName)
-			# It's a combined list for both DescriptionElements and ValueElements, hence the "if" below
-			AttribInfo = [ ('EventTypeHumanName', 'EventType'), ('Value', 'Value'),
-				('ValueUnit', 'EventValueUnit'), ('ValueKind', 'EventValueKind') ]
-			# put the content into the elements
-			for (Attrib, Name) in AttribInfo:
-				MatchingEl = ElementNamed(Elements, Name)
-				if MatchingEl:
-					MatchingEl.Text.Content = self.__dict__[Attrib]
-			# put event numbering and description into respective fields
-			DescriptionEl = ElementNamed(Elements, 'EventDescription')
-			if DescriptionEl: DescriptionEl.Text.Content = self.EventDescription
-			NumberingEl = ElementNamed(Elements, info.NumberingTag)
-			if NumberingEl: NumberingEl.Text.Content = self.Numbering
+	def RenderIntoBitmap(self, Zoom): # draw FTEvent in self.Bitmap. Also calculates FTEvent size attributes
 
 		def SetElementSizesInCU(): # set sizes in canvas units of all components in the FTEvent instance
 			for ThisEl in self.AllComponents:
@@ -1029,11 +1024,12 @@ class FTEvent(FTBoxyObject): # FT event object
 		GapBetweenRows = GapBetweenCols = 5 # in canvas coords
 		MinColWidth = 40
 		# create variable elements and build combined component list comprising fixed and variable components
-		(self.DescriptionCommentEls, self.ValueCommentEls, self.ActionItemEls) = self.CreateVariableTextElements()
-		self.AllComponents = BuildFullElementList(
-			self.TopFixedEls, self.DescriptionCommentEls, self.ValueFixedEls, self.ValueCommentEls, self.ActionItemEls)
-
-		PopulateTextElements(self.AllComponents) # put required text values in the components
+		# (now moved to PopulateFTEvent() )
+#		(self.DescriptionCommentEls, self.ValueCommentEls, self.ActionItemEls) = self.CreateVariableTextElements()
+#		self.AllComponents = BuildFullElementList(
+#			self.TopFixedEls, self.DescriptionCommentEls, self.ValueFixedEls, self.ValueCommentEls, self.ActionItemEls)
+#
+#		PopulateTextElements(self.AllComponents) # put required text values in the components
 		SetElementSizesInCU()
 		SetButtonStati(self.AllComponents) # set button components to required status
 		# calculate height of each "sizer" row in canvas coords
@@ -1193,24 +1189,23 @@ class FTGate(FTBoxyObject): # object containing FT gates for display. These belo
 				CommentElementList[-1].Text.ParaHorizAlignment = 'Centre'
 		return (DescrComments, ActionItems)
 
+	def PopulateTextElements(self, Elements):
+		# put required values into all fixed text components of this FT gate
+		# (variable elements are populated in CreateVariableTextElements() )
+		# The following list contains (attribs of FTGate, element's InternalName)
+		# It's a combined list for both DescriptionElements and ValueElements, hence the "if" below
+		AttribInfo = [('Description', 'GateDescription'), ('Value', 'GateValue'), ('ValueUnit', 'GateValueUnit'),
+					  ('Numbering', info.NumberingTag)]
+		# put the content into the elements
+		for (Attrib, TagName) in AttribInfo:
+			MatchingEl = ElementNamed(Elements, TagName)
+			if MatchingEl:
+				MatchingEl.Text.Content = self.__dict__[Attrib]
+		# put the gate kind into the respective element
+		self.GateKind.Text.Content = self.GateKindHash.get(self.Algorithm, _('<Undefined gate type>'))
+
 	def RenderIntoBitmap(self, Zoom): # draw FTGate in self.Bitmap. Also calculates FTGate size attributes
 		# based on equivalent method in FTEvent class
-
-		def PopulateTextElements(Elements):
-			# put required values into all fixed text components of this element
-			# (variable elements are populated in CreateVariableTextElements() )
-			# The following list contains (attribs of FTGate, element's InternalName)
-			# It's a combined list for both DescriptionElements and ValueElements, hence the "if" below
-			AttribInfo = [ ('Description', 'GateDescription'), ('Value', 'GateValue'), ('ValueUnit', 'GateValueUnit'),
-						   ('Numbering', info.NumberingTag)]
-			# put the content into the elements
-			for (Attrib, TagName) in AttribInfo:
-				MatchingEl = ElementNamed(Elements, TagName)
-				if MatchingEl:
-					MatchingEl.Text.Content = self.__dict__[Attrib]
-			# put the gate kind into the respective element
-			self.GateKind.Text.Content = self.GateKindHash.get(self.Algorithm,
-				_('<Undefined gate type>'))
 
 		def SetElementSizesInCU():  # set sizes in canvas units of all components in the FTGate instance
 			for ThisEl in self.AllComponents:
@@ -1420,11 +1415,12 @@ class FTGate(FTBoxyObject): # object containing FT gates for display. These belo
 			GapBetweenRows = GapBetweenCols = 5 # in canvas coords
 			MinColWidth = 40
 			# create variable elements and build combined element list comprising fixed and variable elements
-			(self.DescriptionCommentEls, self.ActionItemEls) = self.CreateVariableTextElements()
-			self.AllComponents = BuildFullElementList(
-				self.TopFixedEls, self.ValueFixedEls, self.DescriptionCommentEls, self.ActionItemEls)
-
-			PopulateTextElements(self.AllComponents) # put required text values in the components
+			# (now moved to PopulateFTGate() )
+#			(self.DescriptionCommentEls, self.ActionItemEls) = self.CreateVariableTextElements()
+#			self.AllComponents = BuildFullElementList(
+#				self.TopFixedEls, self.ValueFixedEls, self.DescriptionCommentEls, self.ActionItemEls)
+#
+#			PopulateTextElements(self.AllComponents) # put required text values in the components
 			SetElementSizesInCU()
 			SetButtonStati(self.AllComponents) # set button components to required status
 			# calculate height of each "sizer" row in canvas coords
@@ -1616,19 +1612,19 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 				CommentElementList[-1].Text.ParaHorizAlignment = 'Centre'
 		return (DescrComments, ValueComments, ActionItems, ParkingLotItems)
 
-	def RenderIntoBitmap(self, Zoom): # draw FTConnector in its own self.Bitmap. Also calculates FTConnector's size attributes
+	def PopulateTextComponents(self, Components):
+		# put required values into all fixed text Components; first, connector kind, which contains the class HumanName
+		ElementNamed(Components, 'ConnKind').Text.Content = type(self).HumanName
+		# The following list contains (attribs of FTConnector, component's InternalName)
+		AttribInfo = [('HumanName', 'ConnName'), ('Description', 'ConnectorDescription'), ('Value', 'Value'),
+					  ('ValueUnit', 'ConnValueUnit')]
+		# put the content into the other Components
+		for (Attrib, Name) in AttribInfo:
+			MatchingComponent = ElementNamed(Components, Name)
+			if MatchingComponent:
+				MatchingComponent.Text.Content = self.__dict__[Attrib]
 
-		def PopulateTextElements(Elements):
-			# put required values into all fixed text elements; first, connector kind, which contains the class HumanName
-			ElementNamed(Elements, 'ConnKind').Text.Content = type(self).HumanName
-			# The following list contains (attribs of FTConnector, element's InternalName)
-			AttribInfo = [ ('HumanName', 'ConnName'), ('Description', 'ConnectorDescription'), ('Value', 'Value'),
-				('ValueUnit', 'ConnValueUnit') ]
-			# put the content into the other elements
-			for (Attrib, Name) in AttribInfo:
-				MatchingEl = ElementNamed(Elements, Name)
-				if MatchingEl:
-					MatchingEl.Text.Content = self.__dict__[Attrib]
+	def RenderIntoBitmap(self, Zoom): # draw FTConnector in its own self.Bitmap. Also calculates FTConnector's size attributes
 
 		def SetButtonStati(Components):
 			# set 'Status' attributes of buttons in Components; used to determine which bitmap is used to render button
@@ -1661,11 +1657,12 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 		GapBetweenRows = GapBetweenCols = 5 # in canvas coords
 		MinColWidth = 25
 		# create variable elements and build combined element list comprising fixed and variable elements
-		(self.DescriptionCommentEls, self.ValueCommentEls, self.ActionItemEls, self.ParkingLotItemEls) =\
-			self.CreateVariableTextElements()
-		self.AllComponents = BuildFullElementList(self.TopFixedEls, self.DescriptionCommentEls, self.ValueFixedEls,
-			self.ValueCommentEls, self.ActionItemEls, self.ParkingLotItemEls)
-		PopulateTextElements(self.AllComponents) # put required text values in the components
+		# (now done in PopulateFTConnector)
+#		(self.DescriptionCommentEls, self.ValueCommentEls, self.ActionItemEls, self.ParkingLotItemEls) =\
+#			self.CreateVariableTextElements()
+#		self.AllComponents = BuildFullElementList(self.TopFixedEls, self.DescriptionCommentEls, self.ValueFixedEls,
+#			self.ValueCommentEls, self.ActionItemEls, self.ParkingLotItemEls)
+#		PopulateTextElements(self.AllComponents) # put required text values in the components
 		SetElementSizesInCU()
 		SetButtonStati(self.AllComponents) # set button components to required status
 		# calculate height of each "sizer" row in canvas coords
@@ -1798,7 +1795,8 @@ class FTBuilder(FTBoxyObject): # 'add' button object within an FTColumn.
 		# request PHA object to add new element by sending message through zmq
 #		print('FT1494 FT sending request on socket: ',  [(s.SocketNo, s.SocketLabel) for s in vizop_misc.RegisterSocket.Register if s.Socket == self.FT.C2DSocketREQ])
 		vizop_misc.SendRequest(Socket=self.FT.C2DSocketREQ, Command='RQ_FT_NewElement',
-			Proj=self.FT.Proj.ID, PHAObj=self.FT.PHAObj.ID, Viewport=self.FT.ID,
+			Proj=self.FT.Proj.ID, PHAObj=self.FT.PHAObj.ID, Viewport=self.FT.ID, Zoom=str(self.FT.Zoom),
+			PanX=str(self.FT.PanX), PanY=str(self.FT.PanY),
 			ObjKindRequested=self.ObjTypeRequested.InternalName, ColNo=str(self.ColNo), IndexInCol=str(IndexInCol))
 
 	def AllClickableObjects(self, SelectedOnly=False, VisibleOnly=True):
@@ -1814,9 +1812,6 @@ class FTColumn(object): # object containing a column of FT objects for display, 
 	# FTEvent (including IPL), FTGate, FTConnectorIn/Out, collapse groups, and builder buttons
 	# Used to populate Columns[] in FTForDisplay instance
 	# This class declaration has to be below the declaration of FTEvent and FTGate
-#	# SuitableObjects: keys are tags of recognised objects, values are corresponding object classes
-#	SuitableObjects = {'event': FTEvent, 'gate': FTGate, 'connector-in': FTConnectorIn,
-#		'connector-out': FTConnectorOut, 'FTAddButton': None}
 
 	def __init__(self, FT, ColNo): # ColNo: column number, counting from zero (int)
 		object.__init__(self)
@@ -2224,7 +2219,7 @@ class FTEventInCore(FTElementInCore): # FT event object used in DataCore by FTOb
 
 	def DoChangeEventType(self, NewEventType, Viewport,
 		ViewportID, ViewportClass, Zoom, PanX, PanY, Redoing=False, ChainUndo=False):
-		# execute event type change
+		# execute event type change. FIXME ViewportClass arg is useless, as it's the Viewport shadow class. Needed?
 		undo.AddToUndoList(Proj=self.Proj, Redoing=Redoing, UndoObj=undo.UndoItem(UndoHandler=self.ChangeEventType_Undo,
 			  RedoHandler=self.ChangeEventType_Redo,
 			  Chain={False: 'NoChain', True: 'Avalanche', 'NoChain': 'NoChain'}[ChainUndo],
@@ -3499,7 +3494,6 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 				El = ElementTree.SubElement(ConnEl, Tag)
 				El.text = str(Attrib)
 			# elements for lists of AssociatedTextItems
-			print('FT3502 connector ID with comments: ', FTConn, FTConn.ConnectorDescriptionComments)
 			DataInfo = [(info.ConnectorDescriptionCommentsTag, FTConn.ConnectorDescriptionComments),
 				(info.ValueCommentsTag, FTConn.ValueComments),
 				(info.ActionItemsTag, FTConn.ActionItems),
@@ -3661,7 +3655,8 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 
 		# GetFullRedrawData main procedure
 		# First, make the root element
-		RootElement = ElementTree.Element(ViewportClass.InternalName)
+#		RootElement = ElementTree.Element(ViewportClass.InternalName)
+		RootElement = ElementTree.Element(info.FTTag)
 		# populate with overall FT-related data
 		PopulateOverallData(RootElement)
 		# populate with header data
@@ -3682,7 +3677,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			RootElement.append(Args['ExtraXMLTagsAsTags'])
 		return RootElement
 
-	def AddNewElement(self, Proj, ColNo=None, IndexInCol=None, ObjKindRequested=None):
+	def AddNewElement(self, Proj, ColNo=None, IndexInCol=None, ObjKindRequested=None, **Args):
 		# insert a new non-IPL event of type ObjKindRequested (str; InternalName of an element type in FTObjectInCore for datacore)
 		# into column with index ColNo (str) at index IndexInCol (str)
 		# returns XML tree with information about the update
@@ -3702,7 +3697,6 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		NewEvent = NewEventClass(Proj=Proj, FT=self, Column=self.Columns[ThisColIndex], ModelGate=self.ModelGate,
 			ColIndex=ThisColIndex)
 		self.Columns[ThisColIndex].FTElements.insert(ThisIndexInCol, NewEvent)
-		print('FT3705 added new element: ', NewEvent)
 		return vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
 
 	def ConnectElements(self, FromEl, ToEl, Viewport):
@@ -3777,16 +3771,17 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 				ValueIsValid = (ConvertedProposedValue >= TargetComponent.MinValue)
 		return ValueIsValid
 
-	def ChangeText(self, Proj, ElementID, TextComponentName, NewValue, Viewport):
+	def ChangeText(self, Proj, ElementID, TextComponentName, NewValue, Viewport, Zoom, PanX, PanY):
 		# change content of text component in ElementID (int as str, or 'Header') identified by
 		# InternalName=TextComponentName (str) to NewValue (str)
-		# Viewport is the Viewport object that sent the change text request
+		# Viewport is the ViewportShadow associated with the object that sent the change text request
+		# Zoom, PanX, PanY are display parameters stored to allow restoration of display on undo
 		# Returns XML tree with information about the update
 		assert isinstance(Proj, projects.ProjectItem)
 		assert isinstance(ElementID, str)
 		assert isinstance(TextComponentName, str)
 		assert isinstance(NewValue, str)
-		assert isinstance(Viewport, FTForDisplay)
+		assert isinstance(Viewport, FTObjectInCore)
 		ChangeAccepted = True
 		# find relevant element containing the component
 		if ElementID == 'Header':
@@ -3810,7 +3805,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 				PanX=Viewport.PanX, PanY=Viewport.PanY, HostElementID=ElementID, Redoing=False)
 #			OldValue = getattr(ComponentHost, ComponentToUpdate) # get old value for saving in Undo record
 #			setattr(ComponentHost, ComponentToUpdate, NewValue) # write new value to component
-#			# store undo record
+#			# store undo record. FIXME ViewportClass arg is useless, as it's the Viewport shadow class. Needed?
 #			undo.AddToUndoList(Proj, Redoing=False, UndoObj=undo.UndoItem(UndoHandler=self.ChangeTextInTextField_Undo,
 #				RedoHandler=self.ChangeTextInTextField_Redo, Chain='NoChain', ComponentHost=ComponentHost, ViewportID=Viewport.ID,
 #				ViewportClass=type(Viewport),
@@ -3831,7 +3826,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		assert isinstance(Redoing, bool)
 		OldValue = getattr(ComponentHost, ComponentToUpdate) # get old value for saving in Undo record
 		setattr(ComponentHost, ComponentToUpdate, TargetValue) # write new value to component
-		# store undo record
+		# store undo record. FIXME ViewportClass arg is useless, as it's the Viewport shadow class. Needed?
 		undo.AddToUndoList(Proj, Redoing=Redoing, UndoObj=undo.UndoItem(UndoHandler=self.ChangeTextInTextField_Undo,
 			  RedoHandler=self.ChangeTextInTextField_Redo,
 			  Chain='NoChain', ComponentHost=ComponentHost,
@@ -3861,7 +3856,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			# write new value to component
 			for ThisRR in RRGroup:
 				TargetComponent.SetMyValue(NewValue=TargetValue, RR=ThisRR)
-			# store undo record
+			# store undo record.  FIXME ViewportClass arg is useless, as it's the Viewport shadow class. Needed?
 			undo.AddToUndoList(Proj, Redoing=Redoing, UndoObj=undo.UndoItem(UndoHandler=self.ChangeTextInValueField_Undo,
 				  RedoHandler=self.ChangeTextInValueField_Redo,
 				  Chain='NoChain', ComponentHost=ComponentHost, RR=RRGroup,
@@ -3882,7 +3877,6 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 				('ComponentName', info.FTComponentToHighlight), ('HostElementID', info.PHAElementTag),
 				('ComponentName', info.ComponentTag),
 				('Zoom', info.ZoomTag), ('PanX', info.PanXTag), ('PanY', info.PanYTag)]:
-			print('FT3883 checking for attrib in undo record: ', UndoRecordAttribName, hasattr(UndoRecord, UndoRecordAttribName))
 			if hasattr(UndoRecord, UndoRecordAttribName):
 				ThisAttribTag = ElementTree.SubElement(DisplaySpecificData, TagName)
 				ThisAttribTag.text = str(getattr(UndoRecord, UndoRecordAttribName))
@@ -3956,8 +3950,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		# first, check whether to redraw
 		if not SkipRefresh:
 			DisplayAttribTag = self.FetchDisplayAttribsFromUndoRecord(UndoRecord)
-			RedrawDataXML = self.GetFullRedrawData(ViewportClass=UndoRecord.ViewportClass,
-				ExtraXMLTagsAsTags=DisplayAttribTag)
+			RedrawDataXML = self.GetFullRedrawData(ViewportClass=None, ExtraXMLTagsAsTags=DisplayAttribTag)
 			MsgToControlFrame = ElementTree.Element(info.NO_ShowViewport)
 			# add a ViewportID tag to the message, so that Control Frame knows which Viewport to redraw
 			ViewportTag = ElementTree.Element(info.ViewportTag)
@@ -3972,7 +3965,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		# to the value whose XMLName attrib is NewValue (str)
 		# ViewportObj: the Viewport object in which to show any undo (this attrib is named ViewportObj because
 		#	Args already contains Viewport, which is the Viewport ID)
-		# Args contains all tags:texts supplied in the change request
+		# Args contains all tags:texts supplied in the change request; and also Zoom, PanX and PanY for storing in undo record
 		# returns XML tree with information about the update
 		assert isinstance(Proj, projects.ProjectItem)
 		assert isinstance(ElementID, str)
@@ -4009,15 +4002,15 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 					ThisEvent.AvailEventTypes, ThisEvent.DefaultEventType = ThisEvent.SetAvailableEventTypes()
 					if ThisEvent.EventType not in ThisEvent.AvailEventTypes:
 						ThisEvent.ChangeEventType(ChangingOpMode=True, Viewport=ViewportObj,
-							ViewportClass=type(ViewportObj), ViewportID=ViewportObj.ID, Zoom=ViewportObj.Zoom,
-							PanX=ViewportObj.PanX, PanY=ViewportObj.PanY)
+							ViewportClass=type(ViewportObj), ViewportID=ViewportObj.ID, Zoom=Args['Zoom'],
+							PanX=Args['PanX'], PanY=Args['PanY'])
 		elif ComponentToUpdate == 'EventType': # update FTEvent type
 			# find the FTEvent to update
 			ThisFTEvent = [e for e in WalkOverAllFTObjs(self) if e.ID == ElementID][0]
 			# update the event type
 			ThisFTEvent.ChangeEventType(NewEventType=NewValue, ChangingOpMode=False, Viewport=ViewportObj,
-				ViewportClass=type(ViewportObj), ViewportID=ViewportObj.ID, Zoom=ViewportObj.Zoom,
-				PanX=ViewportObj.PanX, PanY=ViewportObj.PanY)
+				ViewportClass=type(ViewportObj), ViewportID=ViewportObj.ID, Zoom=Args['Zoom'],
+				PanX=Args['PanX'], PanY=Args['PanY'])
 		elif ComponentToUpdate in ('EventValueUnit', 'GateValueUnit'):
 			# update value unit of FTEvent or FTGate
 			# find the FTEvent/FTGate to update
@@ -4126,6 +4119,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		else:
 			ValueAttrib.SetMyUnit(NewUnit)
 			UndoText = _('change %s to %s') % (_(self.ComponentEnglishNames[ValueAttribName]), _(NewUnit.HumanName))
+		# FIXME Below, ViewportClass arg is useless, as it's the Viewport shadow class. Needed?
 		undo.AddToUndoList(Proj=self.Proj, Redoing=Redoing, UndoObj=undo.UndoItem(UndoHandler=self.ChangeUnit_Undo,
 			RedoHandler=self.ChangeUnit_Redo,
 			Chain='NoChain', ComponentHost=FTElement, Convert=Convert,
@@ -4228,6 +4222,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			ViewportID, ViewportClass, Chained,
 			Zoom, PanX, PanY, Redoing=False):
 		# Chained: bool (from original action) or 'Avalanche' (from redo)
+		# FIXME Below, ViewportClass arg is useless, as it's the Viewport shadow class. Needed?
 		undo.AddToUndoList(Proj=self.Proj, Redoing=Redoing, UndoObj=undo.UndoItem(UndoHandler=self.ChangeNumberKind_Undo,
 			RedoHandler=self.ChangeNumberKind_Redo,
 			Chain={False: 'NoChain', True: 'Avalanche', 'Avalanche': 'Avalanche'}[Chained], ComponentHost=FTElement,
@@ -4276,9 +4271,10 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			# TODO add data for the changed component to the Save On Fly data
 		return {'Success': True}
 
-	def DisconnectConnector(self, Proj, ElementID, CXInID, Viewport):
+	def DisconnectConnector(self, Proj, ElementID, CXInID, Viewport, Zoom, PanX, PanY):
 		# handle request to disconnect connector-in with ID=CXInID from its related connector-out.
 		# ElementID: ID of connector-out to redisplay on undo/redo (to show that the connection is changed)
+		# Viewport: ViewportShadow object corresponding to the Viewport from which the disconnect request was made
 		assert isinstance(Proj, projects.ProjectItem)
 		assert isinstance(ElementID, str)
 		assert isinstance(CXInID, str)
@@ -4292,7 +4288,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		assert isinstance(ThisConnectorIn, FTConnectorItemInCore)
 		# remove the connection at the CX-in end, and store Undo record
 		self.DoDisconnectConnector(Proj, ThisConnectorOut, ThisConnectorIn, ViewportID=Viewport.ID,
-			ViewportClass=type(Viewport), Zoom=Viewport.Zoom, PanX=Viewport.PanX, PanY=Viewport.PanY)
+			ViewportClass=type(Viewport), Zoom=Zoom, PanX=PanX, PanY=PanY)
 		return vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
 
 	def DoDisconnectConnector(self, Proj, ThisConnectorOut, ThisConnectorIn, ViewportID,
@@ -4300,6 +4296,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		# execute the disconnection, and store Undo record
 		assert isinstance(Redoing, bool)
 		assert isinstance(ChainUndo, bool)
+		# FIXME Below, ViewportClass arg is useless, as it's the Viewport shadow class. Needed?
 		undo.AddToUndoList(Proj=Proj, Redoing=Redoing, UndoObj=undo.UndoItem(UndoHandler=self.DisconnectConnector_Undo,
 			RedoHandler=self.DisconnectConnector_Redo,
 			Chain={False: 'NoChain', True: 'Avalanche'}[ChainUndo], ConnectorOut=ThisConnectorOut,
@@ -4341,7 +4338,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		return {'Success': True}
 
 	def HandleIncomingRequest(self, MessageReceived=None, MessageAsXMLTree=None, **Args):
-		# handle request received by FT model in datacore from a Viewport. Request can be to edit data (eg add new element)
+		# handle request received by FT PHAobject in datacore from a Viewport
 		# Incoming message can be supplied as either an XML string or XML tree root element
 		# MessageReceived (str or None): XML message containing request info
 		# MessageAsXMLTree (XML element or None): root of XML tree
@@ -4356,20 +4353,25 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		Proj = Args['Proj'] # get ProjectItem object to which the current FT belongs
 		# get the command - it's the tag of the root element
 		Command = XMLRoot.tag
-		# get the Viewport from which the command was issued
-		SourceViewport = utilities.ObjectWithID(Objects=Proj.ActiveViewports, TargetID=XMLRoot.findtext('Viewport'))
+		# get the ViewportShadow corresponding to the Viewport from which the command was issued
+#		SourceViewport = utilities.ObjectWithID(Objects=Proj.ActiveViewports, TargetID=XMLRoot.findtext('Viewport'))
+		SourceViewport = utilities.ObjectWithID(Objects=Proj.AllViewportShadows, TargetID=XMLRoot.findtext('Viewport'))
+		# extract display-related parms to store in undo records
+		Zoom = XMLRoot.findtext(info.ZoomTag)
+		PanX = XMLRoot.findtext(info.PanXTag)
+		PanY = XMLRoot.findtext(info.PanYTag)
 		# prepare default reply if command unknown
 		Reply = vizop_misc.MakeXMLMessage(RootName='Fail', RootText='CommandNotRecognised')
 		# process the command
 		if Command == 'RQ_FT_NewElement':
-			Reply = self.AddNewElement(Proj=Proj, ColNo=XMLRoot.findtext('ColNo'),
+			Reply = self.AddNewElement(Proj=Proj, ColNo=XMLRoot.findtext('ColNo'), Zoom=Zoom, PanX=PanX, PanY=PanY,
 				IndexInCol=XMLRoot.findtext('IndexInCol'), ObjKindRequested=XMLRoot.findtext('ObjKindRequested'))
 		elif Command == 'RQ_FT_ChangeText':
-			Reply = self.ChangeText(Proj=Proj, ElementID=XMLRoot.findtext('Element'),
+			Reply = self.ChangeText(Proj=Proj, ElementID=XMLRoot.findtext('Element'), Zoom=Zoom, PanX=PanX, PanY=PanY,
 				TextComponentName=XMLRoot.findtext('TextComponent'),
 				NewValue=XMLRoot.findtext('NewValue'), Viewport=SourceViewport)
 		elif Command == 'RQ_FT_ChangeChoice':
-			Reply = self.ChangeChoice(Proj=Proj, ElementID=XMLRoot.findtext('Element'),
+			Reply = self.ChangeChoice(Proj=Proj, ElementID=XMLRoot.findtext('Element'), Zoom=Zoom, PanX=PanX, PanY=PanY,
 				TextComponentName=XMLRoot.findtext('TextComponent'), ViewportObj=SourceViewport,
 				**dict([(ThisTag.tag, ThisTag.text) for ThisTag in XMLRoot.iter()]))
 			# The ** arg sends a dict of all tags and their texts, allowing ChangeChoice to pick up case-specific tags
@@ -4419,13 +4421,12 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			Reply = vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
 		elif Command == 'RQ_FT_DisconnectConnectors': # disconnect connector-in from its related connector-out
 			Reply = self.DisconnectConnector(Proj=Proj, ElementID=XMLRoot.findtext('ConnectorOut'),
-				CXInID = XMLRoot.findtext('ConnectorIn'), Viewport=SourceViewport)
+				CXInID = XMLRoot.findtext('ConnectorIn'), Viewport=SourceViewport, Zoom=Zoom, PanX=PanX, PanY=PanY)
 		elif Command == 'RQ_FT_UpdateFullExportAttribs': # store parms for full FT export dialogue
 			Reply = self.UpdateFullExportAttribs(Proj=Proj, XMLRoot=XMLRoot)
 		elif Command == 'RQ_FT_NewComment': # add new comment to a PHA element
 			# find the corresponding element
 			ThisPHAElement = [e for e in WalkOverAllFTObjs(self) if e.ID == XMLRoot.findtext('PHAElement')][0]
-			print('FT4424 adding comment to element, with ComponentName: ', ThisPHAElement, XMLRoot.findtext(info.ComponentTag))
 			# find the existing comment list
 			CommentListAttrib = XMLRoot.findtext('CommentKind') # name of attrib containing comment list
 			CommentList = getattr(ThisPHAElement, CommentListAttrib)
@@ -4436,17 +4437,19 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			else: NewComment.Numbering = copy.copy(self.Proj.DefaultCommentNumbering)
 			# add the comment to the required comment list
 			self.DoAddNewComment(NewComment=NewComment, PHAElement=ThisPHAElement, CommentListAttrib=CommentListAttrib,
-				ComponentName=XMLRoot.findtext(info.ComponentTag), Viewport=SourceViewport, Redoing=False)
+				ComponentName=XMLRoot.findtext(info.ComponentTag), Viewport=SourceViewport, Redoing=False,
+				Zoom=Zoom, PanX=PanX, PanY=PanY)
 			Reply = vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
 		elif Command == 'OK': # dummy for 'OK' responses - received only to clear the sockets
 			Reply = vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
 		return Reply
 
 	def DoAddNewComment(self, NewComment=None, PHAElement=None, ComponentName=None, CommentListAttrib='', Viewport=None,
-			Redoing=False):
-		# add NewComment (AssociatedTextItem instance) to PHAElement's list in attrib named CommentListAttrib (str)%%%
+			Redoing=False, Zoom=1.0, PanX=0, PanY=0):
+		# add NewComment (AssociatedTextItem instance) to PHAElement's list in attrib named CommentListAttrib (str)
 		# ComponentName is the InternalName of the Viewport PHAElement's component that selects the comment for editing;
 		# needed for undo implementation
+		# Viewport: ViewportShadow corresponding to the Viewport from where the add comment request was made
 		CommentList = getattr(PHAElement, CommentListAttrib)
 		CommentList.append(NewComment)
 		undo.AddToUndoList(Proj=self.Proj, Redoing=Redoing,
@@ -4455,8 +4458,9 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 #			Chain={False: 'NoChain', True: 'Avalanche', 'NoChain': 'NoChain'}[ChainUndo],
 			PHAElement=PHAElement, ComponentName=ComponentName, CommentListAttrib=CommentListAttrib,
 			HumanText=_('add new comment to %s') % type(PHAElement).HumanName,
-			ViewportID=Viewport.ID, ViewportClass=type(Viewport), Zoom=Viewport.Zoom,
-			PanX=Viewport.PanX, PanY=Viewport.PanY, HostElementID=PHAElement.ID))
+#			ViewportID=Viewport.ID, ViewportClass=type(Viewport), Zoom=Zoom,
+			ViewportID=Viewport.ID, Zoom=Zoom,
+			PanX=PanX, PanY=PanY, HostElementID=PHAElement.ID))
 
 	def AddNewComment_Undo(self, Proj, UndoRecord, **Args): # handle undo for add new comment
 		assert isinstance(Proj, projects.ProjectItem)
@@ -4465,9 +4469,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		SocketFromDatacore = vizop_misc.SocketWithName(TargetName=Args['SocketFromDatacoreName'])
 		# remove the newly added comment (assumes it's the last one in the host's list)
 		CommentList = getattr(UndoRecord.PHAElement, UndoRecord.CommentListAttrib)
-		print('FT4465 element, CommentList, length: ', UndoRecord.PHAElement, UndoRecord.CommentListAttrib, len(CommentList))
 		setattr(UndoRecord.PHAElement, UndoRecord.CommentListAttrib, getattr(UndoRecord.PHAElement, UndoRecord.CommentListAttrib)[:-1])
-		print('FT4468 CommentList length: ', len(getattr(UndoRecord.PHAElement, UndoRecord.CommentListAttrib)))
 		# request Control Frame to switch to the Viewport that was visible when the original edit was made
 		self.RedrawAfterUndoOrRedo(UndoRecord, SocketFromDatacore)
 		projects.SaveOnFly(Proj, UpdateData=vizop_misc.MakeXMLMessage(RootName=info.FTTag,
@@ -4644,8 +4646,8 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			[y for ThisEl in self.Columns for y in ThisEl.AllClickableObjects(SelectedOnly, VisibleOnly)] +\
 			[self.MyZoomWidget] + self.ConnectButtons
 
-	def PrepareFullDisplay(self, XMLData): # instruct FTForDisplay object to fetch and set up all data needed to display the FT
-		# extract all data from XML tree and use to build up FT data structure
+	def PrepareFullDisplay(self, XMLData): # set up all data needed to display the FT, by
+		# extracting all data from XML tree and use to build up FT data structure
 
 		def PopulateValueOptions(XMLRoot, HostEl, ComponentName, ListAttrib, OptionTagName, MasterOptionsList):
 			# populate choice list for attribs of a numerical value.
@@ -4820,27 +4822,21 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 				MasterOptionsList=core_classes.UnitItem.UserSelectableUnits)
 			NewEvent.EventValueUnitComponent.ObjectChoices = [core_classes.ChoiceItem(XMLName=u.XMLName,
 					HumanName=u.HumanName, Applicable=u.Applicable) for u in NewEvent.UnitOptions]
-			# old way of populating unit choices is below
-#			for ThisTag in XMLObj.findall(info.UnitOptionTag):
-#				# find human name for this unit option (use startswith() to ignore convert marker suffix)
-#				ThisUnitHumanName = [u.HumanName for u in core_classes.UnitItem.UserSelectableUnits
-#					if ThisTag.text.startswith(u.XMLName)][0]
-#				# set human name according to whether this is a value conversion option
-#				if ThisTag.text.endswith(info.ConvertValueMarker): ThisHumanName = _('Convert value to %s') % ThisUnitHumanName
-#				else: ThisHumanName = ThisUnitHumanName
-#				NewEvent.EventValueUnitComponent.ObjectChoices.append(core_classes.ChoiceItem(XMLName=ThisTag.text,
-#					HumanName=ThisHumanName,
-#					Applicable=utilities.Bool2Str(ThisTag.get(info.ApplicableAttribName))))
 			# populate value kind choice
 			PopulateValueOptions(XMLRoot=XMLObj, HostEl=NewEvent, ComponentName='',
 				ListAttrib='ValueKindOptions', OptionTagName=info.ValueKindOptionTag,
 				MasterOptionsList=core_classes.NumValueClasses)
 			# populate value kind with HumanName of number kind marked as applicable
-#			print('FT4468 ID, eventkind, valuekindoptions: ', NewEvent.ID, NewEvent.EventType, [(c.HumanName, c.Applicable) for c in NewEvent.ValueKindOptions])
 			NewEvent.ValueKind = [c.HumanName for c in NewEvent.ValueKindOptions
 				if c.Applicable][0]
 			# set status of value problem button, and get help text relating to any value problem
 			SetValueProblemButtonStatus(FTElement=NewEvent, XMLObj=XMLObj)
+			# create variable elements and build combined component list comprising fixed and variable components
+			(NewEvent.DescriptionCommentEls, NewEvent.ValueCommentEls, NewEvent.ActionItemEls) = NewEvent.CreateVariableTextElements()
+			NewEvent.AllComponents = BuildFullElementList(
+				NewEvent.TopFixedEls, NewEvent.DescriptionCommentEls, NewEvent.ValueFixedEls, NewEvent.ValueCommentEls,
+				NewEvent.ActionItemEls)
+			NewEvent.PopulateTextElements(NewEvent.AllComponents)  # put required text values in the components
 			# recover preserved attribs from previous Viewport layout
 			NewEvent.RecoverPreservedAttribs()
 			return NewEvent
@@ -4871,7 +4867,6 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 				('CollapseGroups', 'CollapseGroups') ]
 			for Tag, Attrib in DataInfoAsList:
 				setattr(NewConnector, Attrib, [El.text for El in XMLObj.findall(Tag)])
-			print('FT4872 new connector has ID, this many comments: ', NewConnector.ID, len(NewConnector.ConnectorDescriptionComments))
 			# populate connector type name: internal name and human name
 			NewConnector.EventType = XMLObj.find('EventType').text
 			NewConnector.EventTypeHumanName = self.EventTypeNameHash[NewConnector.EventType]
@@ -4900,6 +4895,13 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 					# above, we populate the XMLName attrib because it's compulsory, but we intend to use the ID attrib
 			# set status of value problem button, and get help text relating to any value problem
 			SetValueProblemButtonStatus(FTElement=NewConnector, XMLObj=XMLObj)
+			# create variable elements and build combined element list comprising fixed and variable elements
+			(NewConnector.DescriptionCommentEls, NewConnector.ValueCommentEls, NewConnector.ActionItemEls,
+				NewConnector.ParkingLotItemEls) = NewConnector.CreateVariableTextElements()
+			NewConnector.AllComponents = BuildFullElementList(NewConnector.TopFixedEls,
+				NewConnector.DescriptionCommentEls, NewConnector.ValueFixedEls,
+				NewConnector.ValueCommentEls, NewConnector.ActionItemEls, NewConnector.ParkingLotItemEls)
+			NewConnector.PopulateTextComponents(NewConnector.AllComponents) # put required text values in the components
 			# recover preserved attribs from previous Viewport layout
 			NewConnector.RecoverPreservedAttribs()
 			return NewConnector
@@ -4938,6 +4940,11 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 					HumanName=ThisUnitHumanName, Applicable=utilities.Bool2Str(ThisTag.get(info.ApplicableAttribName))))
 			# set status of value problem button, and get help text relating to any value problem
 			SetValueProblemButtonStatus(FTElement=NewGate, XMLObj=XMLObj)
+			# create variable elements and build combined element list comprising fixed and variable elements
+			(NewGate.DescriptionCommentEls, NewGate.ActionItemEls) = NewGate.CreateVariableTextElements()
+			NewGate.AllComponents = BuildFullElementList(
+				NewGate.TopFixedEls, NewGate.ValueFixedEls, NewGate.DescriptionCommentEls, NewGate.ActionItemEls)
+			NewGate.PopulateTextElements(NewGate.AllComponents) # put required text values in the components
 			# recover preserved attribs from previous Viewport layout
 			NewGate.RecoverPreservedAttribs()
 			return NewGate
@@ -4966,7 +4973,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 #		ElementTree.dump(XMLData) # print all data received, for debugging
 		self.Wipe() # start with a blank FT
 		# find the outer tag containing the FT data
-		FTData = [t for t in XMLData.iter(self.InternalName)][0]
+		FTData = [t for t in XMLData.iter(info.FTTag)][0]
 		# populate display-related attributes specific to this Viewport, such as zoom, pan, selection, collapse groups,
 		# and highlights
 		DisplayAttribData = FTData.find(info.FTDisplayAttribTag)
@@ -5002,7 +5009,6 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		else: self.CurrentElements = [e for e in WalkOverAllFTObjs(self) if e.ID in self.CurrentElementIDsToSelectOnRefresh]
 		self.ExistingElementIDsOnLastRefresh = [e.ID for e in WalkOverAllFTObjs(self)]
 		# request appropriate control panel aspect
-		print('FT4961 component edited: ', self.ComponentEdited)
 		self.SwitchToPreferredControlPanelAspect(CurrentElements=self.CurrentElements,
 			AspectRequired=self.PreferredControlPanelAspect, ComponentEdited=self.ComponentEdited)
 
@@ -5653,7 +5659,8 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 					self.CurrentEditElement = self.CurrentEditChoice = None
 					# request PHA object to update choice attribute by sending message through zmq
 					vizop_misc.SendRequest(Socket=self.C2DSocketREQ, Command='RQ_FT_ChangeChoice',
-						ProjID=self.Proj.ID, PHAObj=self.PHAObjID, Viewport=self.ID,
+						ProjID=self.Proj.ID, PHAObj=self.PHAObjID, Viewport=self.ID, Zoom=str(self.Zoom)(),
+						PanX=str(self.PanX), PanY=str(self.PanY),
 						Element=ElementID, TextComponent=EditComponentInternalName,
 						NewValue=ChosenXMLName)
 					# store current element's ID to set as "current" when display is refreshed
@@ -5669,8 +5676,9 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		# send request to Datacore to update text attribute. Also used for updating value fields, in which case
 		# at this stage, NewValue has not been validated - could be unacceptable
 		vizop_misc.SendRequest(Socket=self.C2DSocketREQ, Command='RQ_FT_ChangeText',
-							   Proj=self.Proj.ID, PHAObj=self.PHAObjID, Viewport=self.ID,
-							   Element=ElementID, TextComponent=EditComponentInternalName, NewValue=NewValue)
+			Proj=self.Proj.ID, PHAObj=self.PHAObjID, Viewport=self.ID, Zoom=str(self.FT.Zoom), PanX=str(self.FT.PanX),
+			PanY=str(self.FT.PanY),
+			Element=ElementID, TextComponent=EditComponentInternalName, NewValue=NewValue)
 
 	def RequestChangeChoice(self, ElementID, EditComponentInternalName, AttribName, NewValue):
 		# send request to Datacore to change value in a Choice widget
@@ -5701,7 +5709,8 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		# set the connector-out to be selected on next redraw
 		self.CurrentElementIDsToSelectOnRefresh = [ElementID]
 		vizop_misc.SendRequest(Socket=self.C2DSocketREQ, Command='RQ_FT_DisconnectConnectors', ConnectorOut=ElementID,
-			ConnectorIn=ConnectorInToDisconnectID, Viewport=self.ID)
+			ConnectorIn=ConnectorInToDisconnectID, Viewport=self.ID, Zoom=str(self.Zoom), PanX=str(self.PanX),
+			PanY=str(self.PanY))
 
 	def ConnectButtonsCanConnectTo(self, StartButton):
 		# find and return list of connect buttons that StartButton (a connect button object) can connect to.
@@ -5773,7 +5782,6 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		# (currently, we always supply AspectRequired)
 		# Args can include: ComponentEdited (instance e.g. ButtonElement) - when displaying Comment aspect, which component was clicked
 		assert hasattr(CurrentElements, '__iter__') # confirm it's a list
-		print('FT5769 SwitchToPreferredControlPanelAspect: CurrentElements: ', CurrentElements)
 		# does our display device have a control panel?
 		if hasattr(self.DisplDevice, 'GotoControlPanelAspect'):
 			if AspectRequired is None:
@@ -5796,11 +5804,12 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		# PHAComponent: the ButtonElement instance clicked to raise the comments for editing
 		self.PreferredControlPanelAspect = 'CPAspect_Comment'
 		self.ComponentEdited = PHAComponent
-		print('FT5754 sending new comment request with CommentKind: ', PHAComponent.CommentKind)
 		# handle request to add new comment to PHAComponent in PHAElement
+		# arg names Zoom, PanX, PanY must match values of info.ZoomTag etc
 		vizop_misc.SendRequest(Socket=self.C2DSocketREQ, Command='RQ_FT_NewComment',
 			Proj=self.Proj.ID, PHAObj=self.PHAObjID, PHAElement=PHAElement.ID, CommentKind=PHAComponent.CommentKind,
-			Component=PHAComponent.InternalName, CommentText=CommentText, Viewport=self.ID)
+			Component=PHAComponent.InternalName, CommentText=CommentText, Viewport=self.ID, Zoom=str(self.Zoom),
+			PanX=str(self.PanX), PanY=str(self.PanY))
 
 FTObjectInCore.DefaultViewportType = FTForDisplay # set here (not in FTForDisplay class) due to the order of the
 	# class definitions

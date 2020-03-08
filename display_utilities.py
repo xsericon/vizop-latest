@@ -66,8 +66,8 @@ def CreateViewport(Proj, ViewportClass, DisplDevice=None, PHAObj=None, DatacoreI
 	NewViewport = ViewportClass(Proj=Proj, PHAObjID=PHAObj.ID, ParentWindow=DisplDevice, DisplDevice=DisplDevice,
 		Fonts=Fonts, **ArgsToSupply)
 	# append the Viewport to the project's list
-	NewViewport.ID = str(utilities.NextID(Proj.ActiveViewports)) # generate unique ID; stored as str
-	# ID is assigned this way (rather than with master lists per class, as for other objects) to avoid memory leaks
+#	NewViewport.ID = str(utilities.NextID(Proj.ActiveViewports)) # generate unique ID; stored as str
+	NewViewport.ID = str(Proj.GetNewID()) # generate unique ID; stored as str. FIXME this is getting ID from client side Proj!
 	# assign default name to Viewport
 	Proj.AssignDefaultNameToViewport(Viewport=NewViewport)
 	# set up sockets for communication with the new Viewport:

@@ -700,7 +700,6 @@ class ControlFrame(wx.Frame):
 				# fetch UndoOnCancel value to store in undo record for any tasks that should be undone when Cancel pressed
 				self.UndoOnCancel = Args.get('UndoOnCancel', None)
 				# prefill widgets in new aspect and activate it. TODO consider calling RedrawControlPanelAspect() instead
-				print('CF703 args keys: ', Args.items())
 				TargetAspect.Prefill(**Args)
 				TargetAspect.SetWidgetVisibility(**Args)
 				# set up the notebook tab for the aspect
@@ -1618,8 +1617,7 @@ class ControlFrame(wx.Frame):
 		def CommentAspect_OnDeleteCommentButton(self, Event):
 			print('CF1617 in delete comment button handler, not coded yet')
 
-		def CommentAspect_OnEditComment(self, Event): # handle editing of comment in control panel%%%
-			print('CF1619 in OnEditComment')
+		def CommentAspect_OnEditComment(self, Event): # handle editing of comment in control panel
 			# get the UIWidgetItem just edited
 			CommentWidgetEdited = utilities.InstanceWithAttribValue(ObjList=self.CommentAspect.VariableWidgetList,
 				AttribName='Widget', TargetValue=Event.GetEventObject(), NotFoundValue=None)
@@ -1629,7 +1627,6 @@ class ControlFrame(wx.Frame):
 			Proj = self.TopLevelFrame.CurrentProj
 			CurrentViewport = self.TopLevelFrame.CurrentViewport
 			ThisPHAElement = self.TopLevelFrame.PHAElementInControlPanel
-#			ThisComponent = getattr(ThisPHAElement, self.TopLevelFrame.ComponentInControlPanel)
 			ThisComponent = self.TopLevelFrame.ComponentInControlPanel
 			ThisCommentList = getattr(ThisPHAElement, ThisComponent.CommentKind)
 			# check if the user typed in the 'new comment' textctrl
@@ -1637,7 +1634,6 @@ class ControlFrame(wx.Frame):
 				# check the user typed some visible characters
 				if CommentAsTyped:
 					# submit to datacore as a new comment
-					print('CF1637 submitting new comment')
 					self.TopLevelFrame.DoNewComment(Proj=Proj, PHAObj=CurrentViewport.PHAObj, Viewport=CurrentViewport,
 						PHAElement=ThisPHAElement,
 						Component=ThisComponent, NewCommentText=CommentAsTyped)
@@ -1657,7 +1653,6 @@ class ControlFrame(wx.Frame):
 			for ThisWidget in self.CommentAspect.VariableWidgetList: ThisWidget.Widget.Destroy()
 			self.CommentAspect.VariableWidgetList = []
 			CommentList = getattr(TargetElement, CommentListAttrib)
-			print('CF1651 TargetElement, CommentListAttrib, no of comments:', TargetElement, CommentListAttrib, len(CommentList))
 			# make a serial widget, textctrl and 'delete' button for each comment
 			# RowOffset and ColOffset are offsets from the position of the placeholder in FixedWidgetList
 			# The textctrl's min size is forced by NewCommentTextCtrl.SetMinSize() below
@@ -1708,11 +1703,8 @@ class ControlFrame(wx.Frame):
 			self.CommentAspect.ElementNameLabel.Widget.SetLabel(
 				self.TopLevelFrame.PHAObjInControlPanel.HumanName)
 			# set up lineup of variable widgets
-			print('CF1706 in prefill: component: ', self.TopLevelFrame.ComponentInControlPanel)
 			self.LineupVariableWidgetsForCommentAspect(TargetElement=Args['PHAElementInControlPanel'],
 				CommentListAttrib=self.TopLevelFrame.ComponentInControlPanel.CommentKind,
-#				CommentListAttrib=getattr(self.TopLevelFrame.PHAObjInControlPanel,
-#					self.TopLevelFrame.ComponentInControlPanel).CommentKind,
 				NotebookPage=self.CommentAspect.NotebookPage)
 
 		def SetWidgetVisibilityforCommentAspect(self, **Args): # set IsVisible attrib for each widget
@@ -2028,7 +2020,6 @@ class ControlFrame(wx.Frame):
 
 		def GotoControlPanelAspect(self, AspectName, PHAObjInControlPanel, ComponentInControlPanel='', **Args):
 			# handle request from Viewport to change the aspect in the Control Panel
-			print('CF2029 args keys: ', Args.items())
 			self.TopLevelFrame.MyControlPanel.GotoControlPanelAspect(NewAspect=AspectName,
 				PHAObjInControlPanel=PHAObjInControlPanel, ComponentInControlPanel=ComponentInControlPanel, **Args)
 
@@ -2297,8 +2288,8 @@ class ControlFrame(wx.Frame):
 			'NO_FT_ChangeText_Undo': self.UpdateAllViewportsAfterUndo,
 			info.NO_ShowViewport: self.ProcessSwitchToViewport
 			}[XMLRoot.tag.strip()]
-		if XMLRoot.tag.strip() == info.NO_ShowViewport:
-			print('CF2301 handling message with XMLRoot: ', ElementTree.tostring(XMLRoot))
+#		if XMLRoot.tag.strip() == info.NO_ShowViewport:
+#			print('CF2301 handling message with XMLRoot: ', ElementTree.tostring(XMLRoot))
 		# call handler, and return its reply
 		Reply = Handler(XMLRoot=XMLRoot)
 		assert Reply is not None, Handler.__name__ + ' sent no reply'
@@ -2526,7 +2517,7 @@ class ControlFrame(wx.Frame):
 		# find the target Viewport from the ID returned from datacore (it's the text of the root tag)
 		TargetViewport = utilities.ObjectWithID(self.MyEditPanel.AllViewportsShown, TargetID=XMLRoot.text)
 		# set target Viewport as the current Viewport and release any existing Viewport from display device
-		self.SwitchToViewport(TargetViewport=TargetViewport, XMLRoot=XMLRoot)
+		self.SwitchToViewport(TargetViewport=TargetViewport, XMLRoot=XMLRoot, debug=2529)
 		# send acknowledgment message back (ListenToSockets does the actual sending)
 		return vizop_misc.MakeXMLMessage('CP_SwitchToViewport', RootText='OK')
 
@@ -2547,7 +2538,7 @@ class ControlFrame(wx.Frame):
 		self.TrialViewport.PHAObj = PHAObj
 		self.TrialViewport.C2DSocketREQObj.PHAObj = self.TrialViewport.D2CSocketREPObj.PHAObj = PHAObj
 		# set Viewport as the current Viewport and release any existing Viewport from display device
-		self.SwitchToViewport(TargetViewport=self.TrialViewport, XMLRoot=XMLRoot)
+		self.SwitchToViewport(TargetViewport=self.TrialViewport, XMLRoot=XMLRoot, debug=2550)
 		# send acknowledgment message back (ListenToSockets does the actual sending)
 		return vizop_misc.MakeXMLMessage('CP_NewViewport', RootText='OK')
 
@@ -2572,7 +2563,7 @@ class ControlFrame(wx.Frame):
 		global UndoChainWaiting, RedoChainWaiting
 		Proj = utilities.ObjectWithID(self.Projects, XMLRoot.find(info.ProjIDTag).text)
 		# set trial Viewport (created in PostProcessNewPHAModel_Redo) as the current Viewport
-		self.SwitchToViewport(TargetViewport=self.TrialViewport, XMLRoot=XMLRoot)
+		self.SwitchToViewport(TargetViewport=self.TrialViewport, XMLRoot=XMLRoot, debug=2575)
 		# attach Viewport to PHA object, and label its sockets
 		self.CurrentViewport.PHAObj = PHAObj
 		self.CurrentViewport.C2DSocketREQObj.PHAObj = self.CurrentViewport.D2CSocketREPObj.PHAObj = PHAObj
@@ -2605,9 +2596,11 @@ class ControlFrame(wx.Frame):
 				FetchReply=False, **AttribDict)
 			self.CurrentViewport = None
 
-	def SwitchToViewport(self, TargetViewport=None, XMLRoot=None):
+	def SwitchToViewport(self, TargetViewport=None, XMLRoot=None, debug=0):
+		# Client side method
 		# switch edit panel display (in local ControlFrame) to show TargetViewport
-		# TargetViewport is supplied directly as an arg, or (if it's None) via ViewportTag in XMLRoot
+		# TargetViewport (actual Viewport instance, not Viewport shadow)
+		assert isinstance(TargetViewport, display_utilities.ViewportBaseClass)
 		# first, find which Viewport to show
 		Proj = self.CurrentProj
 		if TargetViewport is None: # don't use this route - requested viewport may not exist in Proj.ActiveViewports
@@ -2615,8 +2608,8 @@ class ControlFrame(wx.Frame):
 				TargetID=XMLRoot.find(info.ViewportTag).text)
 		else: ViewportToShow = TargetViewport
 		assert isinstance(ViewportToShow, (ViewportShadow, display_utilities.ViewportBaseClass))
-		if isinstance(ViewportToShow, display_utilities.ViewportBaseClass):
-			print('CF2406 Warning: Viewport shadow is Viewport class, should be ViewportShadow class')
+		if isinstance(ViewportToShow, ViewportShadow):
+			print('CF2406 Warning: Viewport shadow is ViewportShadow class, should be displayable Viewport class')
 		# release any existing Viewport from PHA panel
 		self.ReleaseCurrentViewport(Proj=Proj)
 		# add target Viewport
@@ -2634,40 +2627,38 @@ class ControlFrame(wx.Frame):
 		PHAElement = None
 		ThisComponent = None
 		if XMLRoot is not None:
-			# find the expected XML tag of the Viewport, e.g. "FTTreeView"
-			ViewportTagName = ViewportToShow.InternalName
+			# find the expected XML tag of the Viewport, e.g. "FTTreeView"; now changed to info.FTTag
+			ViewportTagName = info.FTTag
 			# find the corresponding tag in XMLRoot
 			ViewportTag = XMLRoot.find(ViewportTagName)
 			# find DisplayAttribs tag inside ViewportTag
 			DisplayAttribsTag = ViewportTag.find(info.FTDisplayAttribTag)
-			# if tag found, extract zoom, etc from it
+			# if tag found, extract zoom, PanX and PanY from it
 			if DisplayAttribsTag is not None:
 				ThisZoomTag = DisplayAttribsTag.find(info.ZoomTag)
-				print('CF2635 ZoomTag, text: ', ThisZoomTag, getattr(ThisZoomTag, 'text', 'no tag found'))
 				TargetZoom = ThisZoomTag.text if ThisZoomTag else None
 				ThisPanXTag = DisplayAttribsTag.find(info.PanXTag)
 				TargetPanX = ThisXMLTag.text if ThisPanXTag else None
 				ThisPanYTag = DisplayAttribsTag.find(info.PanYTag)
 				TargetPanY = ThisPanYTag.text if ThisPanYTag else None
-				PHAElementTag = DisplayAttribsTag.find(info.PHAElementTag)
-				print('CF2653 all FT element IDs: ', [e for e in faulttree.WalkOverAllFTObjs(self.CurrentViewport)])
-				PHAElement = utilities.ObjectWithID(Objects=[e for e in faulttree.WalkOverAllFTObjs(self.CurrentViewport)],
-					TargetID=PHAElementTag.text) if PHAElementTag is not None else None
-				print('CF2656 PHAElement: ', PHAElement)
-				ComponentTag = DisplayAttribsTag.find(info.ComponentTag)
-				print('CF2643 ComponentTag, text: ', ComponentTag, getattr(ComponentTag, 'text', 'no tag found'))
-				ThisComponent = utilities.InstanceWithAttribValue(ObjList=PHAElement.AllComponents, AttribName='InternalName',
-					TargetValue=ComponentTag.text, NotFoundValue='xyz') if ComponentTag is not None else None
-				print('CF2659 Element.AllComponents, ComponentTag.text, ThisComponent:', PHAElement.AllComponents, ComponentTag.text, ThisComponent)
 		# store history for backward navigation
 		self.StoreMilestone(Proj, Backward=True)
 		# draw the Viewport
 		self.ShowViewport(MessageAsXMLTree=XMLRoot)
+		if DisplayAttribsTag is not None:
+			# get the newly refreshed current element (PHAElement) and current component (ThisComponent); must do after
+			# calling ShowViewport, as this rebuilds
+			# the Viewport from XMLRoot, creating new elements and components
+			PHAElementTag = DisplayAttribsTag.find(info.PHAElementTag)
+			PHAElement = utilities.ObjectWithID(Objects=[e for e in faulttree.WalkOverAllFTObjs(self.CurrentViewport)],
+				TargetID=PHAElementTag.text) if PHAElementTag is not None else None
+			ComponentTag = DisplayAttribsTag.find(info.ComponentTag)
+			ThisComponent = utilities.InstanceWithAttribValue(ObjList=PHAElement.AllComponents, AttribName='InternalName',
+				TargetValue=ComponentTag.text,
+				NotFoundValue='xyz') if ComponentTag is not None else None
 		# update other GUI elements
 		self.RefreshGUIAfterDataChange(Proj=Proj)
 		# show appropriate aspect in Control Panel
-		print('CF2640 changing control panel aspect to: ', self.CurrentViewport.PreferredControlPanelAspect)
-		print('CF2641 with viewport, PHA obj type: ', type(self.CurrentViewport), type(self.CurrentViewport.PHAObj))
 		self.MyControlPanel.GotoControlPanelAspect(NewAspect=self.CurrentViewport.PreferredControlPanelAspect,
 			PHAObjInControlPanel=self.CurrentViewport, PHAElementInControlPanel=PHAElement,
 			ComponentInControlPanel=ThisComponent, debug=2673)
@@ -2864,9 +2855,9 @@ class ControlFrame(wx.Frame):
 		return vizop_misc.MakeXMLMessage('Null', 'Null')
 
 	def ProcessSwitchToViewport(self, XMLRoot=None):
-		# handle request in incoming message to switch to a Viewport
-		self.SwitchToViewport(TargetViewport=utilities.ObjectWithID(Objects=self.Viewports,
-			TargetID=XMLRoot.findtext(info.ViewportTag)), XMLRoot=XMLRoot)
+		# handle request in incoming message to switch to a Viewport. Client side method
+		self.SwitchToViewport(TargetViewport=utilities.ObjectWithID(Objects=self.CurrentProj.ActiveViewports,
+			TargetID=XMLRoot.findtext(info.ViewportTag)), XMLRoot=XMLRoot, debug=2869)
 		return vizop_misc.MakeXMLMessage('Null', 'Null')
 
 	def DatacoreDoNewFTEventNotIPL(self, Root): # handle request to datacore for new FT event that's not an IPL

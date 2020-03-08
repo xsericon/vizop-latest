@@ -72,7 +72,8 @@ class ProjectItem(object): # class of PHA project instances
 		self.PHAObjs = [] # list of PHA objects existing locally, in order created; empty if datacore is remote
 		self.PHAObjShadows = [] # list of info about PHA objects; used by control frame, as the project datacore may be
 			# remote, so it may not have access to self.PHAObjs; same order as self.PHAObjs
-		self.ActiveViewports = [] # list of all Viewports currently displayed in a display device
+		self.ActiveViewports = [] # list of all actual Viewports (not Viewport shadows) currently displayed in a display device.
+			# This attrib is used on the "display side" (client side) project instance, not in datacore
 		self.AllViewportShadows = [] # list of all Viewport shadows (belonging to datacore)
 		#	should be ViewportShadow instances, but might be Viewport instances, i.e. ViewportBaseClass subclass instances FIXME
 		self.IPLKinds = []
@@ -134,7 +135,7 @@ class ProjectItem(object): # class of PHA project instances
 
 		# Attributes saved in actual project file
 		self.VizopVersion = CurrentProjDocType # str; Vizop Version
-		self.ShortTitle = 'CHAZOP with chocolate sauce'  # project short title for display
+		self.ShortTitle = 'CHAZOP of gas treatment plant'  # project short title for display
 		self.ProjNumber = 141688 # int; user's project reference number
 		self.Description = 'A great excuse to spend 4 weeks in Seoul'  # longer description of project
 		self.EditNumber = 0 # int; incremented every time the project's dataset is changed
@@ -143,7 +144,7 @@ class ProjectItem(object): # class of PHA project instances
 		self.RiskMatrices = [core_classes.LookupTableItem()] # list of risk matrix
 
 	def GetNewID(self):
-		# get and return ID for new object in self (str)
+		# get and return ID for new object in self (str). This should be called only for datacore-side project instances
 		assert isinstance(self.MaxIDInProj, int)
 		self.MaxIDInProj += 1
 		return str(self.MaxIDInProj)
@@ -176,6 +177,7 @@ class ProjectItem(object): # class of PHA project instances
 		PHAObj.HumanName = HumanNameStub + str(HighestSuffix + 1)
 
 	def AssignDefaultNameToViewport(self, Viewport): # assigns a default HumanName to Viewport
+		# FIXME this should be a datacore-side function; currently called on client side
 		# The default name is the parent PHA object e.g. "Fault Tree", then "View", then '-' and a serial number
 		assert isinstance(Viewport, display_utilities.ViewportBaseClass)
 		ParentPHAObjID = Viewport.PHAObjID
