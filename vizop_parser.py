@@ -255,8 +255,10 @@ def convertProjectToXml(Proj, ProjectFilename):
 			# <Category>
 			# Map to Keys
 			if len(each_RiskMatrix.Keys) > 0:
-				each_Key: core_classes.CategoryNameItem
-				for each_Key in each_RiskMatrix.Keys:
+				each_Category: core_classes.CategoryNameItem
+				# TODO J: cannot map the object attribute which stores the list of categories
+				for each_Category in each_RiskMatrix.Value:
+
 					#Category
 					MyXMLRoot_RiskMatrix_Category = ET.SubElement(MyXMLRoot_RiskMatrix, info.CategoryTag)
 
@@ -269,17 +271,41 @@ def convertProjectToXml(Proj, ProjectFilename):
 
 					# Name
 					MyXMLRoot_RiskMatrix_Category_Name = ET.SubElement(MyXMLRoot_RiskMatrix_Category, info.NameTag)
-					MyXMLRoot_RiskMatrix_Category_Name.text = pS(each_Key.HumanName)
+					MyXMLRoot_RiskMatrix_Category_Name.text = pS(each_Category.HumanName)
 
 					# Description
 					MyXMLRoot_RiskMatrix_Category_Description = ET.SubElement(MyXMLRoot_RiskMatrix_Category,info.DescriptionTag)
-					MyXMLRoot_RiskMatrix_Category_Description.text = pS(each_Key.HumanDescription)
-
+					MyXMLRoot_RiskMatrix_Category_Description.text = pS(each_Category.HumanDescription)
 					pass
 
+				MyXMLRoot_RiskMatrix_SeverityDimensionIndex = ET.SubElement(MyXMLRoot_RiskMatrix, info.SeverityDimensionTag)
+				MyXMLRoot_RiskMatrix_SeverityDimensionIndex.text = pS(str(each_RiskMatrix.SeverityDimensionIndex))
 
+				# Dimension
+				each_list_of_keys: core_classes.CategoryNameItem
+				for each_list_of_keys in each_RiskMatrix.Keys:
+					for inner_list in each_list_of_keys:
+						MyXMLRoot_RiskMatrix_Dimension = ET.SubElement(MyXMLRoot_RiskMatrix, info.DimensionTag)
 
+						# TODO J: what is the attribute
+						"""
+						MyXMLRoot_RiskMatrix_Dimension_Name = ET.SubElement(MyXMLRoot_RiskMatrix_Dimension, info.NameTag)
+						MyXMLRoot_RiskMatrix_Dimension_Name.text = pS(inner_list.)
+
+						MyXMLRoot_RiskMatrix_Dimension_Key = ET.SubElement(MyXMLRoot_RiskMatrix_Dimension, info.KeyTag)
+						MyXMLRoot_RiskMatrix_Dimension_Key.text = pS(inner_list.)
+						"""
+						# ID
+						# TODO J: cannot map Catergory ID
+
+				# Value
+
+				for each_value in each_RiskMatrix.Value:
+					pass
+
+				pass
 			pass
+		pass
 
 	#Constants
 	# J: TODO
@@ -551,16 +577,16 @@ def convertProjectToXml(Proj, ProjectFilename):
 			#Severity
 			MyXMLRoot_FaultTrees_FaultTree_Severity = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree, info.SeverityTag)
 
-			each_Key: core_classes.RiskReceptorItem
-			for each_Key in each_FaultTree.Severity:
+			each_list_of_keys: core_classes.RiskReceptorItem
+			for each_list_of_keys in each_FaultTree.Severity:
 				# RR
 				MyXMLRoot_FaultTrees_FaultTree_Severity_RR = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Severity, info.RRTag)
 				# Name
 				MyXMLRoot_FaultTrees_FaultTree_Severity_RR_Name = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Severity_RR, info.NameTag)
-				MyXMLRoot_FaultTrees_FaultTree_Severity_RR_Name.text = pS(each_Key.XMLName)
+				MyXMLRoot_FaultTrees_FaultTree_Severity_RR_Name.text = pS(each_list_of_keys.XMLName)
 				# SeverityValue
 				MyXMLRoot_FaultTrees_FaultTree_Severity_RR_SeverityValue = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Severity_RR, info.SeverityValueTag)
-				MyXMLRoot_FaultTrees_FaultTree_Severity_RR_SeverityValue.text = pS(each_FaultTree.Severity.get(each_Key))
+				MyXMLRoot_FaultTrees_FaultTree_Severity_RR_SeverityValue.text = pS(each_FaultTree.Severity.get(each_list_of_keys))
 
 				pass
 
