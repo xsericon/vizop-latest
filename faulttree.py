@@ -127,7 +127,7 @@ class ButtonElement(object): # object containing a button and attributes and met
 	def ChangeZoom(self, NewZoom): # recalculate button bitmaps for new zoom level
 		assert isinstance(NewZoom, float)
 		for Status in self.BitmapZoomed:
-			self.BitmapZoomed[Status] = wx.BitmapFromImage(self.FT.ArtProvider.get_image(
+			self.BitmapZoomed[Status] = wx.Bitmap(self.FT.ArtProvider.get_image(
 				name=self.ArtProviderName + '_' + Status, conserve_aspect_ratio=True,
 				size=(int(self.SizeXInCU * NewZoom), int(self.SizeYInCU * NewZoom))))
 		self.BitmapZoomLevel = NewZoom

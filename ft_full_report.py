@@ -949,9 +949,9 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 		Bitmap.SaveFile("test.tiff", wx.BITMAP_TYPE_TIFF)
 		print('Bitmap data exported to test files.')
 
-	def __init__(self, Proj, PHAObj, DisplDevice, ParentWindow, Fonts, SystemFontNames, **Args):
+	def __init__(self, Proj, PHAObjID, DisplDevice, ParentWindow, Fonts, SystemFontNames, **Args):
 		# __init__ for class FTFullExportViewport
-		faulttree.FTForDisplay.__init__(self, Proj=Proj, PHAObj=PHAObj, DisplDevice=DisplDevice,
+		faulttree.FTForDisplay.__init__(self, Proj=Proj, PHAObjID=PHAObjID, DisplDevice=DisplDevice,
 			ParentWindow=ParentWindow, **Args)
 		self.SystemFontNames = SystemFontNames
 		# make aspect object for dialogue
