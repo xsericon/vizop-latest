@@ -1616,6 +1616,20 @@ class ControlFrame(wx.Frame):
 
 		def CommentAspect_OnDeleteCommentButton(self, Event):
 			print('CF1617 in delete comment button handler, not coded yet')
+			# get the UIWidgetItem containing the delete button just clicked
+			CommentWidgetEdited = utilities.InstanceWithAttribValue(ObjList=self.CommentAspect.VariableWidgetList,
+				AttribName='Widget', TargetValue=Event.GetEventObject(), NotFoundValue=None)
+			# find project, Viewport, current PHA element, comment-bearing component of the PHA element, and
+			# list of comments within the component
+			Proj = self.TopLevelFrame.CurrentProj
+			CurrentViewport = self.TopLevelFrame.CurrentViewport
+			ThisPHAElement = self.TopLevelFrame.PHAElementInControlPanel
+			ThisComponent = self.TopLevelFrame.ComponentInControlPanel
+			ThisCommentList = getattr(ThisPHAElement, ThisComponent.CommentKind)
+			# submit 'delete comment' request to datacore
+			self.TopLevelFrame.DoDeleteComment(Proj=Proj, PHAObj=CurrentViewport.PHAObj, Viewport=CurrentViewport,
+				PHAElement=ThisPHAElement,
+				Component=ThisComponent, DoomedCommentIndex=CommentWidgetEdited.CommentIndex)
 
 		def CommentAspect_OnEditComment(self, Event): # handle editing of comment in control panel
 			# get the UIWidgetItem just edited
@@ -1640,11 +1654,14 @@ class ControlFrame(wx.Frame):
 			else: # user typed in an existing comment
 				# check if edited comment is different from old comment
 				if CommentAsTyped == ThisCommentList[CommentWidgetEdited.CommentIndex]: pass
+				else:
+					print('CF1658 editing an existing comment, not coded yet')
 
 		def LineupVariableWidgetsForCommentAspect(self, TargetElement, CommentListAttrib, NotebookPage):
-			# adjust variable widgets in 'edit comments' aspect of Control Panel%%%
+			# adjust variable widgets in 'edit comments' aspect of Control Panel
 			# depending on number of comments belonging to TargetElement
-			# CommentListAttrib (str): name of attrib of TargetElement containing the appropriate comments (e.g. 'DescriptionComments')
+			# CommentListAttrib (str): name of attrib of TargetElement containing the appropriate comments
+			# 	(e.g. 'DescriptionComments')
 			# NotebookPage: parent window for the variable widgets
 			assert isinstance(CommentListAttrib, str)
 			assert hasattr(TargetElement, CommentListAttrib)
@@ -2994,13 +3011,22 @@ class ControlFrame(wx.Frame):
 			print('CF2771 warning, unrecognised edit panel aspect "%s" requested' % str(NewAspect))
 
 	def DoNewComment(self, Proj, PHAObj, Viewport, PHAElement, Component, NewCommentText, Redoing=False):
-		# handle new comment creation in a Component of a PHAElement that supports comments%%% working here
+		# handle new comment creation in a Component of a PHAElement that supports comments
 		assert isinstance(Proj, projects.ProjectItem)
 		assert isinstance(PHAObj, core_classes.PHAModelBaseClass)
 		assert isinstance(NewCommentText, str)
 		assert isinstance(Redoing, bool)
 		# request Viewport to update the PHAObj with the new comment
 		Viewport.AddNewComment(PHAElement=PHAElement, PHAComponent=Component, CommentText=NewCommentText)
+
+	def DoDeleteComment(self, Proj, PHAObj, Viewport, PHAElement, Component, DoomedCommentIndex, Redoing=False):
+		# handle comment deletion in a Component of a PHAElement that supports comments
+		assert isinstance(Proj, projects.ProjectItem)
+		assert isinstance(PHAObj, core_classes.PHAModelBaseClass)
+		assert isinstance(DoomedCommentIndex, int)
+		assert isinstance(Redoing, bool)
+		# request Viewport to update the PHAObj with the new comment
+		Viewport.DeleteComment(PHAElement=PHAElement, PHAComponent=Component, DoomedCommentIndex=DoomedCommentIndex)
 
 	# ControlFrame main body
 	def __init__(self, parent=None, ID=None, title='', Projects=[], FirstProject=None, Viewport=None,

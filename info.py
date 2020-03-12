@@ -189,6 +189,7 @@ SIFNameTag = 'HumanName' # possible clash with HumanNameTag; this one must be Hu
 	# attributes listed in TextComponentNames are assumed to have the same name and XML tag, oops
 CommentsTag = 'Comments'
 CommentTag = 'Comment'
+CommentIndexTag = 'CommentIndex'
 ContentTag = 'Content'
 isVisibleTag = 'isVisible'
 showInReportTag = 'showInReport'

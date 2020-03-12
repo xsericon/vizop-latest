@@ -410,9 +410,10 @@ class ZoomWidgetObj(object):
 		else:
 			return None
 
-	def HandleMouseLClickOnMe(self, HitHotspot='Whole', HostViewport=None, MouseX=0, MouseY=0):
+	def HandleMouseLClickOnMe(self, HitHotspot='Whole', HostViewport=None, MouseX=0, MouseY=0, **Args):
 		# handle mouse left button down inside zoom widget at coords MouseX, MouseY (2 x int) in pixels relative to panel
-		# ends by calling HostViewport.RefreshZoomWidget() with bitmap containing redrawn widget as arg
+		# Ends by calling HostViewport.RefreshZoomWidget() with bitmap containing redrawn widget as arg
+		# No args required in Args
 		self.MouseLDownX = MouseX
 		self.MouseLDownY = MouseY # capture coords of original mouse down position
 		self.MouseLastX = MouseX # capture coords of last seen mouse position (used in HandleMouseLDrag)
