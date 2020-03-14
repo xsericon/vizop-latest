@@ -1887,7 +1887,7 @@ class ControlFrame(wx.Frame):
 
 		def DoRedraw(self, DC, FullRefresh=True): # redraw Viewport in DC provided
 			# FullRefresh (bool): whether to request redraw from scratch
-			# %%% the problem with not filling the background in Windows may be here
+			# FIXME the problem with not filling the background in Windows may be here
 			assert isinstance(FullRefresh, bool)
 			DC.SetBackground(wx.Brush(self.BackgColour))
 			DC.Clear()
@@ -2277,7 +2277,7 @@ class ControlFrame(wx.Frame):
 		MessageReceived |= ViewportMessageReceived
 		# update applicable Viewports, if any messages were received
 		if ViewportMessageReceived:
-			self.UpdateAllViewports(Proj=self.CurrentProj, Message=ViewportMessageReceivedThisTime)
+			self.UpdateAllViewports(MessageAsStr=ViewportMessageReceivedThisTime)
 		# 3. check sockets for any messages coming into the control frame, and process
 		MessageReceived |= bool(vizop_misc.ListenToSocket(Socket=self.zmqInwardSocket, Handler=self.HandleIncomingMessageToControlFrame))
 		MessageReceived |= bool(vizop_misc.ListenToSocket(Socket=self.zmqOutwardSocket, Handler=self.HandleIncomingReplyToControlFrame,
@@ -2297,13 +2297,15 @@ class ControlFrame(wx.Frame):
 		# parse incoming message to XML tree
 		XMLRoot = ElementTree.fromstring(MessageReceived)
 		# handlers for all possible notifications to Control Frame. Handler must send a reply
+		# NO_ShowViewport not currently used
 		Handler = {
 			'NO_NewPHAModel_Undo': self.PostProcessNewPHAModel_Undo,
 			'NO_NewPHAModel_Redo': self.PostProcessNewPHAModel_Redo,
 			'NO_NewViewport_Undo': self.PostProcessNewViewport_Undo,
 			'NO_NewViewport_Redo': self.PostProcessNewViewport_Redo,
 			'NO_FT_ChangeText_Undo': self.UpdateAllViewportsAfterUndo,
-			info.NO_ShowViewport: self.ProcessSwitchToViewport
+			info.NO_ShowViewport: self.ProcessSwitchToViewport,
+			info.NO_RedrawAfterUndo: self.UpdateAllViewports
 			}[XMLRoot.tag.strip()]
 #		if XMLRoot.tag.strip() == info.NO_ShowViewport:
 #			print('CF2301 handling message with XMLRoot: ', ElementTree.tostring(XMLRoot))
@@ -2921,7 +2923,7 @@ class ControlFrame(wx.Frame):
 				self.MyVTPanel.FinishedWithCurrentMessage()
 			return vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
 		else:
-			# draw complete Viewport
+			# draw complete Viewport (this branch handles message RQ_RedrawViewport)
 			ReplyXML = self.ShowViewport(MessageReceived=MessageReceived, MessageAsXMLTree=XMLTreeToSend, **Args)
 			self.RefreshGUIAfterDataChange(Proj=self.CurrentProj)
 			return ReplyXML
@@ -2944,6 +2946,7 @@ class ControlFrame(wx.Frame):
 			assert isinstance(MessageReceived, bytes)
 			XMLTree = ElementTree.fromstring(MessageReceived)
 		# First, tell Viewport to prepare for display, with data from PHA model
+		print('CF2949 in ShowViewport')
 		self.CurrentViewport.PrepareFullDisplay(XMLTree)
 		self.MyEditPanel.EditPanelMode(self.CurrentViewport, NewMode=self.CurrentViewport.InitialEditPanelMode)
 			# set up initial mouse pointer and mouse bindings
@@ -3166,7 +3169,7 @@ class ControlFrame(wx.Frame):
 
 #		try:
 #			# load the previous layout of the panels
-#			print("CF1402 reloading of screen layout from cache is commented out") # %%%
+#			print("CF1402 reloading of screen layout from cache is commented out")
 #			layout = sm.get_value('main_frame_layout')
 #			self.layout_manager.LoadPerspective(layout, True)
 #		except KeyError:
@@ -3250,25 +3253,38 @@ class ControlFrame(wx.Frame):
 		assert isinstance(NewDisplayDevice, wx.Panel)
 		self.DisplayDevices.append(NewDisplayDevice)
 
-	def UpdateAllViewports(self, Proj=None, Message=None):
-		# this is a Datacore function.
+	def UpdateAllViewports(self, MessageAsStr='', XMLRoot=None, **Args):
+		# this is a Datacore function.%%%
 		# refresh Viewports after change to data in datacore. For now, we just redraw all Viewports currently shown
 		# in a display device.
-		# Message (str): XML message received requesting update to Viewports (currently not used)
+		# MessageAsStr (str): str containing XML message received requesting update to Viewports (currently not used)
+		# XMLRoot (ElementTree element or None): any instruction to update display parameters (zoom, pan) of a Viewport
+		#	(used during redraw after undo)
+		# retrieve any data about a specific Viewport that needs display parameters updated
+		ViewportIDToUpdate = None
+		if XMLRoot is not None:
+			ViewportToUpdateTag = XMLRoot.find(info.ViewportTag)
+			if ViewportToUpdateTag is not None:
+				ViewportIDToUpdate = ViewportToUpdateTag.text
 		# Check with all Viewports that datacore knows about
-		for ThisViewportShadow in Proj.AllViewportShadows:
+		for ThisViewportShadow in self.CurrentProj.AllViewportShadows:
 			# check if ThisViewportShadow is displayed in any display device, local or remote
 			if ThisViewportShadow.IsOnDisplay:
-				# get refresh data from corresponding PHA object
+				# get refresh data from corresponding PHA object (now done below: entire FTDisplayAttribTag is appended)
 				RedrawXMLData = ThisViewportShadow.PHAObj.GetFullRedrawData(Viewport=ThisViewportShadow,
 					ViewportClass=ThisViewportShadow.MyClass)
 				# make XML message with ID of PHA object, followed by full redraw data
 				FullXMLData = vizop_misc.MakeXMLMessage(RootName='RQ_RedrawViewport', RootText=ThisViewportShadow.ID,
 					Elements={info.IDTag: ThisViewportShadow.PHAObjID})
 				FullXMLData.append(RedrawXMLData)
-				# send it to Viewport
+				# append display parameter update data, if provided
+				if ViewportIDToUpdate == ThisViewportShadow.ID:
+					if ViewportToUpdateTag is not None:
+						FullXMLData.append(ViewportToUpdateTag.find(info.FTDisplayAttribTag))
+				# send all XML data to Viewport
 				vizop_misc.SendRequest(Socket=ThisViewportShadow.D2CSocketREQObj.Socket, Command='RQ_RedrawViewport',
 					XMLRoot=FullXMLData)
+		return vizop_misc.MakeXMLMessage('Null', 'Null')
 
 class ControlFramePersistent(object):
 	# a persistent object used for returning data from control frame after it is Destroy()ed.

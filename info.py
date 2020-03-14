@@ -261,9 +261,10 @@ ValueOutOfRangeMsg = 'ValueOutOfRange'
 
 # NO_ commands to control frame
 NO_ShowViewport = 'NO_ShowViewport'
+NO_RedrawAfterUndo = 'NO_RedrawAfterUndo'
 
 # Unicode symbols
-CommandSymbol = u'\u2318' # cloverleaf symbol used on Mac keyboard's Command key
+CommandSymbol = u'\u2318' # cloverleaf symbol on Mac keyboard's Command key
 CommandKeyName = CommandSymbol if system() == 'Darwin' else 'Ctrl'
 InfinitySymbol = u'\u221e'
 

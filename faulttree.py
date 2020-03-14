@@ -200,12 +200,6 @@ class ButtonElement(object): # object containing a button and attributes and met
 		# call handler for the specific kind of button clicked
 		if self.LSingleClickHandler is not None:
 			self.LSingleClickHandler(CommentKind=self.CommentKind, AssociatedTextKind=self.AssociatedTextKind)
-#		if self.InternalName == 'EventCommentButton':
-#			self.HandleMouseLClickOnCommentButton(CommentKind='Description')
-#		elif self.InternalName == 'ValueCommentButton': self.HandleMouseLClickOnCommentButton(CommentKind='Value')
-#		elif self.InternalName == 'EventActionItemButton': self.HandleMouseLClickOnActionItemButton()
-#		elif self.InternalName == 'ConnectButton': self.HandleMouseLClickOnConnectButton()
-#		elif self.InternalName == 'GateStyleButton': self.HandleMouseLClickOnGateStyleButton()
 
 	def HandleMouseLClickOnCommentButton(self, CommentKind=None, **Args):
 		# handle mouse left button single click on a comment button
@@ -1580,11 +1574,12 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 	def CreateVariableTextElements(self):
 		# create elements that vary depending on display settings - currently comments, action items and parking lot items
 		# return list of elements for each of description comments, action items, parking lot items, and value comments
+		# Returned lists are fully populated as if each associated text is visible (so that they can be shown on demand)
 		ColourLabelBkg = (0x80, 0x3E, 0x51) # plum
 		ColourLabelFg = (0xFF, 0xFF, 0xFF) # white
 		ColourContentBkg = (0x6A, 0xDA, 0xBD) # mint green
 		ColourContentFg = (0x00, 0x00, 0x00) # black
-
+		print('FT1587 CreateVariableTextElements: self.ShowDescriptionComments: ', self.ShowDescriptionComments)
 		# Make description comments, value comments and action items
 		DescrComments = []
 		ValueComments = []
@@ -1595,7 +1590,8 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 			 (ValueComments, self.ValueComments, self.ShowValueComments, _('Comment')),
 			 (ActionItems, self.ActionItems, self.ShowActionItems, _('Action items')),
 			 (ParkingLotItems, self.ParkingLotItems, self.ShowParkingLotItems, _('Parking lot items'))]:
-			if ShowFlag: # check whether this set of items is required to be displayed
+#			if ShowFlag: # check whether this set of items is required to be displayed
+			if True: # populate all lists irrespective of whether associated texts are visible
 				for (CommentIndex, Comment) in enumerate(CommentList):
 					CommentElementList.append(TextElement(self.FT, RowBase=CommentIndex, ColStart=1, ColSpan=6,
 						EndX=274, MinHeight=25, HostObject=self))
@@ -1623,6 +1619,15 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 			MatchingComponent = ElementNamed(Components, Name)
 			if MatchingComponent:
 				MatchingComponent.Text.Content = self.__dict__[Attrib]
+
+	def MakeCompleteComponentList(self):
+		# set self.AllComponents as a complete list of all visible components, considering whether associated texts
+		# (comments, action items etc) are visible
+		ElementCandidateInfo = [ (self.TopFixedEls, True), (self.DescriptionCommentEls, self.ShowDescriptionComments),
+			(self.ValueFixedEls, True), (self.ValueCommentEls, self.ShowValueComments),
+			(self.ActionItemEls, self.ShowActionItems), (self.ParkingLotItemEls, self.ShowParkingLotItems) ]
+		ElementsToInclude = [e for (e, Flag) in ElementCandidateInfo if Flag]
+		self.AllComponents = BuildFullElementList(*ElementsToInclude)
 
 	def RenderIntoBitmap(self, Zoom): # draw FTConnector in its own self.Bitmap. Also calculates FTConnector's size attributes
 
@@ -1656,13 +1661,8 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 		BorderX = BorderY = 10 # outer border in canvas coords
 		GapBetweenRows = GapBetweenCols = 5 # in canvas coords
 		MinColWidth = 25
-		# create variable elements and build combined element list comprising fixed and variable elements
-		# (now done in PopulateFTConnector)
-#		(self.DescriptionCommentEls, self.ValueCommentEls, self.ActionItemEls, self.ParkingLotItemEls) =\
-#			self.CreateVariableTextElements()
-#		self.AllComponents = BuildFullElementList(self.TopFixedEls, self.DescriptionCommentEls, self.ValueFixedEls,
-#			self.ValueCommentEls, self.ActionItemEls, self.ParkingLotItemEls)
-#		PopulateTextElements(self.AllComponents) # put required text values in the components
+		# update lineup of variable elements depending on whether associated texts should be shown
+		self.MakeCompleteComponentList()
 		SetElementSizesInCU()
 		SetButtonStati(self.AllComponents) # set button components to required status
 		# calculate height of each "sizer" row in canvas coords
@@ -3950,14 +3950,15 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		# first, check whether to redraw
 		if not SkipRefresh:
 			DisplayAttribTag = self.FetchDisplayAttribsFromUndoRecord(UndoRecord)
-			RedrawDataXML = self.GetFullRedrawData(ViewportClass=None, ExtraXMLTagsAsTags=DisplayAttribTag)
-			MsgToControlFrame = ElementTree.Element(info.NO_ShowViewport)
+			RedrawDataXML = self.GetFullRedrawData(ViewportClass=None)
+			MsgToControlFrame = ElementTree.Element(info.NO_RedrawAfterUndo)
 			# add a ViewportID tag to the message, so that Control Frame knows which Viewport to redraw
 			ViewportTag = ElementTree.Element(info.ViewportTag)
 			ViewportTag.text = UndoRecord.ViewportID
+			ViewportTag.append(DisplayAttribTag)
 			MsgToControlFrame.append(ViewportTag)
 			MsgToControlFrame.append(RedrawDataXML)
-			vizop_misc.SendRequest(Socket=SocketFromDatacore.Socket, Command=info.NO_ShowViewport, XMLRoot=MsgToControlFrame)
+			vizop_misc.SendRequest(Socket=SocketFromDatacore.Socket, Command=info.NO_RedrawAfterUndo, XMLRoot=MsgToControlFrame)
 
 	def ChangeChoice(self, Proj, ElementID, TextComponentName, NewValue, ViewportObj, **Args):
 		# change content of choice component in ElementID (int as str, or 'Header')
@@ -4896,6 +4897,8 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			# First, find out if it's in- or out-connector from 'Connectivity' tag, and create appropriate object
 			NewConnector = {'In': FTConnectorIn, 'Out': FTConnectorOut}[XMLObj.findtext('Connectivity')]\
 				(FT=self, Column=Column)
+			# recover preserved attribs from previous Viewport layout
+			NewConnector.RecoverPreservedAttribs()
 			# get connector data. In DataInfoAsXXX, each pair of items is: (XML tag, FTConnector attrib name)
 			DataInfoAsStr = [ (info.IDTag, 'ID'), ('Description', 'Description'), ('BackgColour', 'BackgColour'),
 				('Numbering', 'Numbering'), ('Style', 'Style'), ('RelatedConnector', 'RelatedConnector'),
@@ -4943,15 +4946,20 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 					# above, we populate the XMLName attrib because it's compulsory, but we intend to use the ID attrib
 			# set status of value problem button, and get help text relating to any value problem
 			SetValueProblemButtonStatus(FTElement=NewConnector, XMLObj=XMLObj)
-			# create variable elements and build combined element list comprising fixed and variable elements
+			# create variable elements and build combined element list comprising fixed and variable elements%%%
 			(NewConnector.DescriptionCommentEls, NewConnector.ValueCommentEls, NewConnector.ActionItemEls,
 				NewConnector.ParkingLotItemEls) = NewConnector.CreateVariableTextElements()
-			NewConnector.AllComponents = BuildFullElementList(NewConnector.TopFixedEls,
-				NewConnector.DescriptionCommentEls, NewConnector.ValueFixedEls,
-				NewConnector.ValueCommentEls, NewConnector.ActionItemEls, NewConnector.ParkingLotItemEls)
-			NewConnector.PopulateTextComponents(NewConnector.AllComponents) # put required text values in the components
-			# recover preserved attribs from previous Viewport layout
-			NewConnector.RecoverPreservedAttribs()
+#			NewConnector.AllComponents = BuildFullElementList(NewConnector.TopFixedEls,
+#				NewConnector.DescriptionCommentEls, NewConnector.ValueFixedEls,
+#				NewConnector.ValueCommentEls, NewConnector.ActionItemEls, NewConnector.ParkingLotItemEls)
+			# put required text values in the components
+			NewConnector.PopulateTextComponents(NewConnector.TopFixedEls +\
+				NewConnector.DescriptionCommentEls + NewConnector.ValueFixedEls +\
+				NewConnector.ValueCommentEls + NewConnector.ActionItemEls + NewConnector.ParkingLotItemEls)
+			# set AllComponents attrib of NewConnector according to whether associated texts are visible
+			NewConnector.MakeCompleteComponentList()
+#			# recover preserved attribs from previous Viewport layout (now done at the top of this procedure)
+#			NewConnector.RecoverPreservedAttribs()
 			return NewConnector
 
 		def PopulateFTGate(XMLObj, Column):
@@ -5861,7 +5869,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			PanX=str(self.PanX), PanY=str(self.PanY))
 
 	def DeleteComment(self, PHAElement, PHAComponent, DoomedCommentIndex):
-		# handle request from ControlFrame to delete comment in component PHAComponent of element PHAElement%%%
+		# handle request from ControlFrame to delete comment in component PHAComponent of element PHAElement
 		assert isinstance(PHAElement, self.ElementTypesCanHostComments)
 		assert isinstance(DoomedCommentIndex, int)
 		# First, store info to enable Viewport to request the comment aspect in control panel after redraw
