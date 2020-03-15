@@ -190,6 +190,7 @@ SIFNameTag = 'HumanName' # possible clash with HumanNameTag; this one must be Hu
 CommentsTag = 'Comments'
 CommentTag = 'Comment'
 CommentIndexTag = 'CommentIndex'
+CommentTextTag = 'CommentText'
 ContentTag = 'Content'
 isVisibleTag = 'isVisible'
 showInReportTag = 'showInReport'

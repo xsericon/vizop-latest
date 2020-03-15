@@ -4441,6 +4441,8 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 				ComponentName=XMLRoot.findtext(info.ComponentTag), Viewport=SourceViewport, Redoing=False,
 				Zoom=Zoom, PanX=PanX, PanY=PanY)
 			Reply = vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
+		elif Command == 'RQ_FT_ChangeComment':
+			Reply = self.HandleChangeCommentRequest(XMLRoot, Viewport=SourceViewport, Zoom=Zoom, PanX=PanX, PanY=PanY)
 		elif Command == 'RQ_FT_DeleteComment': # delete comment from a FT element
 			# find the corresponding element
 			ThisPHAElement = [e for e in WalkOverAllFTObjs(self) if e.ID == XMLRoot.findtext('PHAElement')][0]
@@ -4456,6 +4458,20 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			Reply = vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
 		return Reply
 
+	def HandleChangeCommentRequest(self, XMLRoot, Viewport, Zoom, PanX, PanY):
+		# handle request to change text of an existing comment%%%
+		# find the corresponding element
+		ThisPHAElement = [e for e in WalkOverAllFTObjs(self) if e.ID == XMLRoot.findtext('PHAElement')][0]
+		# find the existing comment list
+		CommentListAttrib = XMLRoot.findtext('CommentKind') # name of attrib containing comment list
+		CommentList = getattr(ThisPHAElement, CommentListAttrib)
+		# update the comment in the required comment list
+		self.DoChangeComment(NewComment=XMLRoot.findtext(info.CommentTextTag),
+			CommentIndex=int(XMLRoot.findtext(info.CommentIndexTag)), PHAElement=ThisPHAElement,
+			CommentListAttrib=CommentListAttrib, ComponentName=XMLRoot.findtext(info.ComponentTag),
+			Viewport=Viewport, Redoing=False, Zoom=Zoom, PanX=PanX, PanY=PanY)
+		return vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
+
 	def DoAddNewComment(self, NewComment=None, PHAElement=None, ComponentName=None, CommentListAttrib='', Viewport=None,
 			Redoing=False, Zoom=1.0, PanX=0, PanY=0):
 		# add NewComment (AssociatedTextItem instance) to PHAElement's list in attrib named CommentListAttrib (str)
@@ -4470,6 +4486,24 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 #			Chain={False: 'NoChain', True: 'Avalanche', 'NoChain': 'NoChain'}[ChainUndo],
 			PHAElement=PHAElement, ComponentName=ComponentName, CommentListAttrib=CommentListAttrib,
 			HumanText=_('add new comment to %s') % type(PHAElement).HumanName,
+			ViewportID=Viewport.ID, Zoom=Zoom,
+			PanX=PanX, PanY=PanY, HostElementID=PHAElement.ID))
+
+	def DoChangeComment(self, NewComment=None, CommentIndex=0, PHAElement=None, ComponentName=None,
+			CommentListAttrib='', Viewport=None, Redoing=False, Zoom=1.0, PanX=0, PanY=0):
+		# Change text of comment in PHAElement's list in attrib named CommentListAttrib (str) at CommentIndex to NewComment (str)
+		# ComponentName is the InternalName of the Viewport PHAElement's component that selects the comment for editing;
+		# needed for undo implementation
+		# Viewport: ViewportShadow corresponding to the Viewport from where the change comment request was made
+		CommentList = getattr(PHAElement, CommentListAttrib)
+		OldCommentText = CommentList[CommentIndex].Content
+		CommentList[CommentIndex].Content = NewComment
+		undo.AddToUndoList(Proj=self.Proj, Redoing=Redoing,
+			UndoObj=undo.UndoItem(UndoHandler=self.ChangeComment_Undo,
+			RedoHandler=self.ChangeComment_Redo, OldComment=OldCommentText, CommentIndex=CommentIndex,
+#			Chain={False: 'NoChain', True: 'Avalanche', 'NoChain': 'NoChain'}[ChainUndo],
+			PHAElement=PHAElement, ComponentName=ComponentName, CommentListAttrib=CommentListAttrib,
+			HumanText=_('change comment in %s') % type(PHAElement).HumanName,
 			ViewportID=Viewport.ID, Zoom=Zoom,
 			PanX=PanX, PanY=PanY, HostElementID=PHAElement.ID))
 
@@ -4506,7 +4540,25 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			Elements={info.IDTag: self.ID, info.ComponentHostIDTag: UndoRecord.PHAElement.ID}))
 		# TODO add data for the changed component to the Save On Fly data
 		return {'Success': True}
+
 	def AddNewComment_Redo(self): pass
+
+	def ChangeComment_Undo(self, Proj, UndoRecord, **Args): # handle undo for add new comment; TODO copied, not modified yet
+		assert isinstance(Proj, projects.ProjectItem)
+		assert isinstance(UndoRecord, undo.UndoItem)
+		# find out which datacore socket to send messages on
+		SocketFromDatacore = vizop_misc.SocketWithName(TargetName=Args['SocketFromDatacoreName'])
+		# remove the newly added comment (assumes it's the last one in the host's list)
+		CommentList = getattr(UndoRecord.PHAElement, UndoRecord.CommentListAttrib)
+		setattr(UndoRecord.PHAElement, UndoRecord.CommentListAttrib, getattr(UndoRecord.PHAElement, UndoRecord.CommentListAttrib)[:-1])
+		# request Control Frame to switch to the Viewport that was visible when the original edit was made
+		self.RedrawAfterUndoOrRedo(UndoRecord, SocketFromDatacore)
+		projects.SaveOnFly(Proj, UpdateData=vizop_misc.MakeXMLMessage(RootName=info.FTTag,
+			Elements={info.IDTag: self.ID, info.ComponentHostIDTag: UndoRecord.PHAElement.ID}))
+		# TODO add data for the changed component to the Save On Fly data
+		return {'Success': True}
+
+	def ChangeComment_Redo(self): pass
 
 	def DeleteComment_Undo(self, Proj, UndoRecord, **Args): # handle undo for delete comment
 		assert isinstance(Proj, projects.ProjectItem)
@@ -5863,10 +5915,28 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		self.ComponentEdited = PHAComponent
 		# handle request to add new comment to PHAComponent in PHAElement
 		# arg names Zoom, PanX, PanY must match values of info.ZoomTag etc
+		# TODO use info.ZoomTag, as in DeleteComment()
 		vizop_misc.SendRequest(Socket=self.C2DSocketREQ, Command='RQ_FT_NewComment',
 			Proj=self.Proj.ID, PHAObj=self.PHAObjID, PHAElement=PHAElement.ID, CommentKind=PHAComponent.CommentKind,
 			Component=PHAComponent.InternalName, CommentText=CommentText, Viewport=self.ID, Zoom=str(self.Zoom),
 			PanX=str(self.PanX), PanY=str(self.PanY))
+
+	def ChangeComment(self, PHAElement, PHAComponent, CommentIndex, CommentText):
+		# handle request from ControlFrame to change text of comment at CommentIndex (int) in component PHAComponent of
+		# element PHAElement
+		# First, store info to enable Viewport to request the comment aspect in control panel after redraw
+		# PHAComponent: the ButtonElement instance clicked to raise the comments for editing
+		assert isinstance(CommentIndex, int)
+		self.PreferredControlPanelAspect = 'CPAspect_Comment'
+		self.ComponentEdited = PHAComponent
+		# handle request to add new comment to PHAComponent in PHAElement
+		# We use the ArgsToSend dict so that we can get arg names from info module
+		ArgsToSend = {info.CommentIndexTag: str(CommentIndex), info.ZoomTag: str(self.Zoom),
+			info.PanXTag: str(self.PanX), info.PanYTag: str(self.PanY),
+			info.CommentTextTag: CommentText}
+		vizop_misc.SendRequest(Socket=self.C2DSocketREQ, Command='RQ_FT_ChangeComment',
+			Proj=self.Proj.ID, PHAObj=self.PHAObjID, PHAElement=PHAElement.ID, CommentKind=PHAComponent.CommentKind,
+			Component=PHAComponent.InternalName, Viewport=self.ID, **ArgsToSend)
 
 	def DeleteComment(self, PHAElement, PHAComponent, DoomedCommentIndex):
 		# handle request from ControlFrame to delete comment in component PHAComponent of element PHAElement

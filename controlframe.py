@@ -1655,7 +1655,10 @@ class ControlFrame(wx.Frame):
 				# check if edited comment is different from old comment
 				if CommentAsTyped == ThisCommentList[CommentWidgetEdited.CommentIndex]: pass
 				else:
-					print('CF1658 editing an existing comment, not coded yet')
+					print('CF1658 editing an existing comment, working here')
+					self.TopLevelFrame.DoChangeComment(Proj=Proj, PHAObj=CurrentViewport.PHAObj, Viewport=CurrentViewport,
+						PHAElement=ThisPHAElement, Component=ThisComponent,
+						CommentIndex=CommentWidgetEdited.CommentIndex, NewCommentText=CommentAsTyped)
 
 		def LineupVariableWidgetsForCommentAspect(self, TargetElement, CommentListAttrib, NotebookPage):
 			# adjust variable widgets in 'edit comments' aspect of Control Panel
@@ -3021,6 +3024,17 @@ class ControlFrame(wx.Frame):
 		assert isinstance(Redoing, bool)
 		# request Viewport to update the PHAObj with the new comment
 		Viewport.AddNewComment(PHAElement=PHAElement, PHAComponent=Component, CommentText=NewCommentText)
+
+	def DoChangeComment(self, Proj, PHAObj, Viewport, PHAElement, Component, CommentIndex, NewCommentText, Redoing=False):
+		# handle change of existing comment in a Component of a PHAElement that supports comments
+		assert isinstance(Proj, projects.ProjectItem)
+		assert isinstance(PHAObj, core_classes.PHAModelBaseClass)
+		assert isinstance(CommentIndex, int)
+		assert isinstance(NewCommentText, str)
+		assert isinstance(Redoing, bool)
+		# request Viewport to update the PHAObj with the changed comment
+		Viewport.ChangeComment(PHAElement=PHAElement, PHAComponent=Component, CommentIndex=CommentIndex,
+			CommentText=NewCommentText)
 
 	def DoDeleteComment(self, Proj, PHAObj, Viewport, PHAElement, Component, DoomedCommentIndex, Redoing=False):
 		# handle comment deletion in a Component of a PHAElement that supports comments
