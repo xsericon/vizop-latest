@@ -60,9 +60,9 @@ def SILTarget(Mode='', RiskRed=1.0):
 class ButtonElement(object): # object containing a button and attributes and methods needed to render it
 	# class ButtonObjectNotInElement is a subclass of this
 
-	def __init__(self, FT, Row=0, RowBase=0, ColStart=0, ColSpan=1, StartX=0, EndX=200, PosYInCU=0, InternalName='',
+	def __init__(self, FT, Row=0, RowBase=0, ColStart=0, ColSpan=1, RowSpan=1, StartX=0, EndX=200, PosYInCU=0, InternalName='',
 				 HostObject=None, Stati=None, LSingleClickHandler=None, CommentKind=None, AssociatedTextKind=None,
-				 ControlPanelAspect=None, **Args):
+				 ControlPanelAspect=None, CommentKindHuman=None, **Args):
 		# FT (FTForDisplay instance): FT containing this button element
 		# InternalName (str): label indicating the kind of function the button has
 		# Stati (iterable of str): valid self.Status values indicating which bitmap to render the button
@@ -71,9 +71,12 @@ class ButtonElement(object): # object containing a button and attributes and met
 		# 	e.g. 'EventDescriptionComments' or 'ValueComments' or None
 		# AssociatedTextKind (str or None): for action item/parking lot item buttons, defines kind of associated text
 		assert isinstance(FT, FTForDisplay)
+		assert isinstance(RowSpan, int)
+		assert RowSpan > 0
 		assert isinstance(HostObject, (FTEvent, FTGate, FTCollapseGroup, FTConnector)) or (HostObject is None)
 		assert isinstance(LSingleClickHandler, str) or (LSingleClickHandler is None)
 		assert isinstance(CommentKind, str) or (CommentKind is None)
+		assert isinstance(CommentKindHuman, str) or (CommentKindHuman is None)
 		assert isinstance(AssociatedTextKind, str) or (AssociatedTextKind is None)
 		assert isinstance(ControlPanelAspect, str) or (ControlPanelAspect is None)
 		object.__init__(self)
@@ -83,6 +86,7 @@ class ButtonElement(object): # object containing a button and attributes and met
 		self.RowBase = RowBase # relative row of grid within a subgroup of elements
 		self.ColStart = ColStart # column of grid in which button starts
 		self.ColSpan = ColSpan # how many columns of grid are spanned by the button
+		self.RowSpan = RowSpan # how many rows of grid are spanned by the button
 		self.StartX = StartX # X-coord (canvas coords) of button left end, relative to DC (obsolescent)
 		self.EndX = EndX # similar for right end of button
 		# StartX, EndX were intended to facilitate checking for mouse hits but probably better to make new attribs StartXScreen etc
@@ -101,6 +105,7 @@ class ButtonElement(object): # object containing a button and attributes and met
 		self.InternalName = InternalName # name used to identify specific elements
 		self.LSingleClickHandler = None if LSingleClickHandler is None else getattr(self, LSingleClickHandler, None)
 		self.CommentKind = CommentKind
+		self.CommentKindHuman = CommentKindHuman
 		self.AssociatedTextKind = AssociatedTextKind
 		self.ControlPanelAspect = ControlPanelAspect
 		self.ArtProviderName = {'EventLinkedButton': 'FT_LinkButton', 'EventGroupedButton': 'FT_GroupButton',
@@ -596,7 +601,7 @@ class FTBoxyObject(object): # superclass of vaguely box-like FT components for u
 class TextElement(FTBoxyObject): # object containing a text object and other attributes and methods needed to render it
 	# Consists of a single text inside a coloured box. It's a component of an FTHeader, FTConnector or FTEvent.
 
-	def __init__(self, FT, Row=0, RowBase=0, ColStart=0, ColSpan=1, EndX=200, MinHeight=10, InternalName='',
+	def __init__(self, FT, Row=0, RowBase=0, ColStart=0, ColSpan=1, RowSpan=1, EndX=200, MinHeight=10, InternalName='',
 				 HostObject=None, PromptText='', **Args):
 		# HostObject: the FTHeader or FTEvent instance containing this TextElement instance
 		# 'PromptText' (str): text to show when self.Content is empty
@@ -610,6 +615,8 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 		#		'EditInControlPanel': don't allow edit-in-place; editing allowed only in a control panel aspect
 		FTBoxyObject.__init__(self, **Args)
 		assert isinstance(FT, FTForDisplay)
+		assert isinstance(RowSpan, int)
+		assert RowSpan > 0
 		assert isinstance(HostObject, (FTHeader, FTEvent, FTGate, FTConnector))
 		assert isinstance(PromptText, str)
 		assert Args.get('HorizAlignment', 'Centre') in ['Left', 'Centre', 'Right']
@@ -619,6 +626,7 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 		self.RowBase = RowBase # relative row of grid within a subgroup of elements
 		self.ColStart = ColStart # column of grid in which text starts (int counting from 0)
 		self.ColSpan = ColSpan # how many columns of grid are spanned by the text (int)
+		self.RowSpan = RowSpan # how many rows of grid are spanned by the text (int)
 		self.PosXInCU = self.PosYInCU = 0 # X/Y-coord (canvas coords) of text container left end, top edge
 		self.StartY = 0 # Y-coord (canvas coords) of text container top edge, relative to whole of header.
 		self.EndX = self.EndXInCU = EndX # similar for right end of container (not the actual text in the container)
@@ -941,8 +949,8 @@ class FTEvent(FTBoxyObject): # FT event object
 		ValueComments = []
 		ActionItems = []
 		for (CommentElementList, CommentList, ShowFlag, CommentLabel) in \
-			[(DescrComments, self.EventDescriptionComments, self.ShowDescriptionComments, _('Comment')),
-			 (ValueComments, self.ValueComments, self.ShowValueComments, _('Comment')),
+			[(DescrComments, self.EventDescriptionComments, self.ShowDescriptionComments, _('Comment on\ndescription')),
+			 (ValueComments, self.ValueComments, self.ShowValueComments, _('Comment on\nvalue')),
 			 (ActionItems, self.ActionItems, self.ShowActionItems, _('Action items'))]:
 			if ShowFlag: # check whether this set of items is required to be displayed
 				for (CommentIndex, Comment) in enumerate(CommentList):
@@ -1525,6 +1533,7 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 		# any element with MinHeight parm set is growable in the y axis to fit the text.
 		# it should be assigned to the Row that it can force to grow
 		# Stati: valid self.Status settings for buttons
+		# ConnectorKindHuman: Human description of the kind of comment; shown in Control Panel
 		ConnKind = TextElement(self.FT, Row=0, ColStart=0, ColSpan=4, EndX=199, HostObject=self,
 			InternalName='ConnKind', DisplAttrib='HumanName')
 		ConnName = TextElement(self.FT, Row=0, ColStart=4, ColSpan=3, EndX=274, HostObject=self,
@@ -1534,7 +1543,7 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 		self.ConnDescriptionCommentButton = ButtonElement(self.FT, Row=1, ColStart=4, ColSpan=1, StartX=200, EndX=224,
 			HostObject=self, InternalName='ConnDescriptionCommentButton', Stati=('OutNotExist', 'OutExist'),
 			LSingleClickHandler='HandleMouseLClickOnCommentButton', CommentKind='ConnectorDescriptionComments',
-			ControlPanelAspect='CPAspect_Comment')
+			ControlPanelAspect='CPAspect_Comment', CommentKindHuman=_('Connector description'))
 		self.ConnLinkedButton = ButtonElement(self.FT, Row=1, ColStart=5, ColSpan=1, StartX=225, EndX=249,
 			HostObject=self, InternalName='ConnLinkedButton', Stati=('OutNotExist', 'OutExist'),
 			LSingleClickHandler=None)
@@ -1551,7 +1560,7 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 		self.ConnValueCommentButton = ButtonElement(self.FT, Row=2, ColStart=4, ColSpan=1, StartX=200, EndX=224,
 			HostObject=self, InternalName='ConnValueCommentButton', Stati=('OutNotExist', 'OutExist'),
 			LSingleClickHandler='HandleMouseLClickOnCommentButton', CommentKind='ValueComments',
-			ControlPanelAspect='CPAspect_Comment')
+			ControlPanelAspect='CPAspect_Comment', CommentKindHuman=_('Connector value'))
 		self.ConnActionItemButton = ButtonElement(self.FT, Row=2, ColStart=5, ColSpan=1, StartX=225, EndX=249,
 			HostObject=self, InternalName='ConnActionItemButton', Stati=('OutNotExist', 'OutExist'),
 			LSingleClickHandler='HandleMouseLClickOnActionItemButton', AssociatedTextKind='ActionItem')
@@ -1579,19 +1588,17 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 		ColourLabelFg = (0xFF, 0xFF, 0xFF) # white
 		ColourContentBkg = (0x6A, 0xDA, 0xBD) # mint green
 		ColourContentFg = (0x00, 0x00, 0x00) # black
-		print('FT1587 CreateVariableTextElements: self.ShowDescriptionComments: ', self.ShowDescriptionComments)
 		# Make description comments, value comments and action items
 		DescrComments = []
 		ValueComments = []
 		ActionItems = []
 		ParkingLotItems = []
 		for (CommentElementList, CommentList, ShowFlag, CommentLabel) in \
-			[(DescrComments, self.ConnectorDescriptionComments, self.ShowDescriptionComments, _('Comment')),
-			 (ValueComments, self.ValueComments, self.ShowValueComments, _('Comment')),
+			[(DescrComments, self.ConnectorDescriptionComments, self.ShowDescriptionComments, _('Comments on\ndescription')),
+			 (ValueComments, self.ValueComments, self.ShowValueComments, _('Comments on\nvalue')),
 			 (ActionItems, self.ActionItems, self.ShowActionItems, _('Action items')),
 			 (ParkingLotItems, self.ParkingLotItems, self.ShowParkingLotItems, _('Parking lot items'))]:
-#			if ShowFlag: # check whether this set of items is required to be displayed
-			if True: # populate all lists irrespective of whether associated texts are visible
+			if True: # populate all lists irrespective of whether associated texts are visible (formerly "if ShowFlag:")
 				for (CommentIndex, Comment) in enumerate(CommentList):
 					CommentElementList.append(TextElement(self.FT, RowBase=CommentIndex, ColStart=1, ColSpan=6,
 						EndX=274, MinHeight=25, HostObject=self))
@@ -1599,9 +1606,9 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 					CommentElementList[-1].Text.Colour = ColourContentFg
 					CommentElementList[-1].BkgColour = ColourContentBkg
 					CommentElementList[-1].Text.ParaHorizAlignment = 'Left'
-				# add item label (e.g. 'Comment') at left side of first row of items
+				# add item label (e.g. 'Comment') at left side of first row of items, occupying as many rows as comments
 				CommentElementList.append(TextElement(self.FT, RowBase=0, ColStart=0, ColSpan=1, EndX=99,
-					HostObject=self))
+					RowSpan=max(1, len(CommentList)), HostObject=self))
 				CommentElementList[-1].Text.Content = CommentLabel
 				CommentElementList[-1].Text.Colour = ColourLabelFg
 				CommentElementList[-1].BkgColour = ColourLabelBkg
@@ -1666,8 +1673,8 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 		SetElementSizesInCU()
 		SetButtonStati(self.AllComponents) # set button components to required status
 		# calculate height of each "sizer" row in canvas coords
-		ColWidths, ColStartXs, ColEndXs, RowHeights, RowStartYs, RowEndYs = CalculateRowAndColumnDimensions(self.AllComponents, GapBetweenCols,
-			GapBetweenRows, MinColWidth, BorderX, BorderY)
+		ColWidths, ColStartXs, ColEndXs, RowHeights, RowStartYs, RowEndYs = CalculateRowAndColumnDimensions(
+			self.AllComponents, GapBetweenCols, GapBetweenRows, MinColWidth, BorderX, BorderY)
 		# set element X, Y positions and sizes according to column positions and row heights
 		for El in self.AllComponents:
 			El.PosXInCU = ColStartXs[El.ColStart]
@@ -1676,8 +1683,8 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 			if El.FillXSpace: El.SizeXInCU = El.EndXInCU - El.PosXInCU
 			El.SizeXInPx = int(round(El.SizeXInCU * Zoom))
 			El.PosXInPx = int(round(El.PosXInCU * Zoom))
-			El.StartY = El.PosYInCU = RowStartYs[El.Row] # transitioning from StartY to PosYInCU; eventually should kill StartY
-			El.EndYInCU = RowEndYs[El.Row]
+			El.StartY = El.PosYInCU = RowStartYs[El.Row] # transitioning from StartY to PosYInCU; eventually should kill StartY%%%
+			El.EndYInCU = RowEndYs[El.Row + getattr(El, 'RowSpan', 1) - 1]
 			El.SizeYInCU = El.EndYInCU - El.PosYInCU
 			El.SizeYInPx = int(round(El.SizeYInCU * Zoom))
 		# calculate FTConnector size
@@ -1874,15 +1881,19 @@ def CalculateRowAndColumnDimensions(Elements, GapBetweenCols, GapBetweenRows, Mi
 	# put the required max heights in each element in the row heights list
 	for El in Elements:
 		El.MinSizeX, MinSizeY = El.MinSizeInCU
-		# first pass: assign column widths for elements spanning only 1 column
+		# first pass: assign column widths for elements spanning only 1 column; likewise for rows
 		if El.ColSpan == 1: ColWidths[El.ColStart] = max(ColWidths[El.ColStart], El.MinSizeX)
-		RowHeights[El.Row] = max(RowHeights[El.Row], MinSizeY)
+		if El.RowSpan == 1: RowHeights[El.Row] = max(RowHeights[El.Row], MinSizeY)
 	for El in Elements:
 		# second pass: assign any additional space needed in last column of element spanning >1 column.
+		# Likewise for rows
 		# The 'sum' function calculates the space already assigned in columns prior to the last column
 		if El.ColSpan > 1:
 			ColWidths[El.ColStart + El.ColSpan - 1] = max(ColWidths[El.ColStart + El.ColSpan - 1],
 				El.MinSizeX - sum(ColWidths[El.ColStart:El.ColStart+El.ColSpan-1]))
+		if El.RowSpan > 1:
+			RowHeights[El.Row + El.RowSpan - 1] = max(RowHeights[El.Row + El.RowSpan - 1],
+				MinSizeY - sum(RowHeights[El.Row:El.Row+El.RowSpan-1]))
 	# add GapBetweenCols to each column width
 	ColWidths = [w + GapBetweenCols for w in ColWidths]
 	# add GapBetweenRows to each row height
@@ -2783,7 +2794,7 @@ class FTConnectorItemInCore(FTElementInCore): # in- and out-connectors (CX's) to
 		self.ShowActionItems = True
 		self.ParkingLotItems = [] # list of AssociatedTextItem instances
 		self.ShowParkingLotItems = True
-		self.MakeTestComments()
+		self.MakeTestComments() # make test comments, action item and parking lot item
 		self.RelatedCX = None # an FTConnectorItemInCore instance:
 			# If this is in-CX, defines which out-CX it's connected to. If out-CX, should be None
 		self.CanEditValue = True # False if the value should only be calculated and not overridden by user
@@ -4500,7 +4511,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		CommentList[CommentIndex].Content = NewComment
 		undo.AddToUndoList(Proj=self.Proj, Redoing=Redoing,
 			UndoObj=undo.UndoItem(UndoHandler=self.ChangeComment_Undo,
-			RedoHandler=self.ChangeComment_Redo, OldComment=OldCommentText, CommentIndex=CommentIndex,
+			RedoHandler=self.ChangeComment_Redo, OldCommentText=OldCommentText, CommentIndex=CommentIndex,
 #			Chain={False: 'NoChain', True: 'Avalanche', 'NoChain': 'NoChain'}[ChainUndo],
 			PHAElement=PHAElement, ComponentName=ComponentName, CommentListAttrib=CommentListAttrib,
 			HumanText=_('change comment in %s') % type(PHAElement).HumanName,
@@ -4543,14 +4554,14 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 
 	def AddNewComment_Redo(self): pass
 
-	def ChangeComment_Undo(self, Proj, UndoRecord, **Args): # handle undo for add new comment; TODO copied, not modified yet
+	def ChangeComment_Undo(self, Proj, UndoRecord, **Args): # handle undo for change comment
 		assert isinstance(Proj, projects.ProjectItem)
 		assert isinstance(UndoRecord, undo.UndoItem)
 		# find out which datacore socket to send messages on
 		SocketFromDatacore = vizop_misc.SocketWithName(TargetName=Args['SocketFromDatacoreName'])
-		# remove the newly added comment (assumes it's the last one in the host's list)
+		# restore the previous text of the comment
 		CommentList = getattr(UndoRecord.PHAElement, UndoRecord.CommentListAttrib)
-		setattr(UndoRecord.PHAElement, UndoRecord.CommentListAttrib, getattr(UndoRecord.PHAElement, UndoRecord.CommentListAttrib)[:-1])
+		CommentList[UndoRecord.CommentIndex].Content = UndoRecord.OldCommentText
 		# request Control Frame to switch to the Viewport that was visible when the original edit was made
 		self.RedrawAfterUndoOrRedo(UndoRecord, SocketFromDatacore)
 		projects.SaveOnFly(Proj, UpdateData=vizop_misc.MakeXMLMessage(RootName=info.FTTag,
@@ -4998,20 +5009,15 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 					# above, we populate the XMLName attrib because it's compulsory, but we intend to use the ID attrib
 			# set status of value problem button, and get help text relating to any value problem
 			SetValueProblemButtonStatus(FTElement=NewConnector, XMLObj=XMLObj)
-			# create variable elements and build combined element list comprising fixed and variable elements%%%
+			# create variable elements and build combined element list comprising fixed and variable elements
 			(NewConnector.DescriptionCommentEls, NewConnector.ValueCommentEls, NewConnector.ActionItemEls,
 				NewConnector.ParkingLotItemEls) = NewConnector.CreateVariableTextElements()
-#			NewConnector.AllComponents = BuildFullElementList(NewConnector.TopFixedEls,
-#				NewConnector.DescriptionCommentEls, NewConnector.ValueFixedEls,
-#				NewConnector.ValueCommentEls, NewConnector.ActionItemEls, NewConnector.ParkingLotItemEls)
 			# put required text values in the components
 			NewConnector.PopulateTextComponents(NewConnector.TopFixedEls +\
 				NewConnector.DescriptionCommentEls + NewConnector.ValueFixedEls +\
 				NewConnector.ValueCommentEls + NewConnector.ActionItemEls + NewConnector.ParkingLotItemEls)
 			# set AllComponents attrib of NewConnector according to whether associated texts are visible
 			NewConnector.MakeCompleteComponentList()
-#			# recover preserved attribs from previous Viewport layout (now done at the top of this procedure)
-#			NewConnector.RecoverPreservedAttribs()
 			return NewConnector
 
 		def PopulateFTGate(XMLObj, Column):
