@@ -1568,7 +1568,7 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 		self.ConnActionItemButton = ButtonElement(self.FT, Row=2, ColStart=5, ColSpan=1, StartX=225, EndX=249,
 			HostObject=self, InternalName='ConnActionItemButton', Stati=('OutNotExist', 'OutExist'),
 			LSingleClickHandler='HandleMouseLClickOnActionItemButton', AssociatedTextListAttrib='ActionItems',
-			ControlPanelAspect='CPAspect_ActionItems') # %%%
+			ControlPanelAspect='CPAspect_ActionItems')
 		self.ConnParkingLotItemButton = ButtonElement(self.FT, Row=3, ColStart=6, ColSpan=1, StartX=250, EndX=274,
 			HostObject=self, InternalName='ConnParkingLotItemButton', Stati=('OutNotExist', 'OutExist'),
 			LSingleClickHandler='HandleMouseLClickOnActionItemButton', AssociatedTextListAttrib='ParkingLotItems',
@@ -1689,7 +1689,7 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 			if El.FillXSpace: El.SizeXInCU = El.EndXInCU - El.PosXInCU
 			El.SizeXInPx = int(round(El.SizeXInCU * Zoom))
 			El.PosXInPx = int(round(El.PosXInCU * Zoom))
-			El.StartY = El.PosYInCU = RowStartYs[El.Row] # transitioning from StartY to PosYInCU; eventually should kill StartY%%%
+			El.StartY = El.PosYInCU = RowStartYs[El.Row] # transitioning from StartY to PosYInCU; eventually should kill StartY
 			El.EndYInCU = RowEndYs[El.Row + getattr(El, 'RowSpan', 1) - 1]
 			El.SizeYInCU = El.EndYInCU - El.PosYInCU
 			El.SizeYInPx = int(round(El.SizeYInCU * Zoom))
@@ -3888,7 +3888,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 
 	def FetchDisplayAttribsFromUndoRecord(self, UndoRecord):
 		# extract data about zoom, pan, highlight etc. from UndoRecord, build it into an XML tag FTDisplayAttribTag
-		# and return the tag%%%
+		# and return the tag
 		DisplaySpecificData = ElementTree.Element(info.FTDisplayAttribTag)
 		for (UndoRecordAttribName, TagName) in [ ('ElementID', info.FTElementContainingComponentToHighlight),
 				('ComponentName', info.FTComponentToHighlight), ('HostElementID', info.PHAElementTag),
@@ -4471,12 +4471,14 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 				ComponentName=XMLRoot.findtext(info.ComponentTag), Viewport=SourceViewport, Redoing=False,
 				Zoom=Zoom, PanX=PanX, PanY=PanY)
 			Reply = vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
+		elif Command == 'RQ_FT_NewAssociatedText':
+			Reply = self.HandleNewAssociatedTextRequest(XMLRoot, Viewport=SourceViewport, Zoom=Zoom, PanX=PanX, PanY=PanY)
 		elif Command == 'OK': # dummy for 'OK' responses - received only to clear the sockets
 			Reply = vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
 		return Reply
 
 	def HandleChangeCommentRequest(self, XMLRoot, Viewport, Zoom, PanX, PanY):
-		# handle request to change text of an existing comment%%%
+		# handle request to change text of an existing comment
 		# find the corresponding element
 		ThisPHAElement = [e for e in WalkOverAllFTObjs(self) if e.ID == XMLRoot.findtext('PHAElement')][0]
 		# find the existing comment list
@@ -4486,6 +4488,20 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		self.DoChangeComment(NewComment=XMLRoot.findtext(info.CommentTextTag),
 			CommentIndex=int(XMLRoot.findtext(info.CommentIndexTag)), PHAElement=ThisPHAElement,
 			CommentListAttrib=CommentListAttrib, ComponentName=XMLRoot.findtext(info.ComponentTag),
+			Viewport=Viewport, Redoing=False, Zoom=Zoom, PanX=PanX, PanY=PanY)
+		return vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
+
+	def HandleNewAssociatedTextRequest(self, XMLRoot, Viewport, Zoom, PanX, PanY):
+		# handle request to add new associated text
+		# find the corresponding element
+		ThisPHAElement = [e for e in WalkOverAllFTObjs(self) if e.ID == XMLRoot.findtext('PHAElement')][0]
+		# find the existing associated text list in the element
+		AssociatedTextListAttrib = XMLRoot.findtext('AssociatedTextListAttrib') # name of attrib containing associated text list
+		AssociatedTextList = getattr(ThisPHAElement, AssociatedTextListAttrib)
+		# update the AssociatedText in the required AssociatedText list
+		self.DoNewAssociatedText(NewAssociatedTextContent=XMLRoot.findtext(info.AssociatedTextContent),
+			AssociatedTextIndex=int(XMLRoot.findtext(info.AssociatedTextIndexTag)), PHAElement=ThisPHAElement,
+			AssociatedTextListAttrib=AssociatedTextListAttrib, ComponentName=XMLRoot.findtext(info.ComponentTag),
 			Viewport=Viewport, Redoing=False, Zoom=Zoom, PanX=PanX, PanY=PanY)
 		return vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
 
@@ -4594,6 +4610,35 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		return {'Success': True}
 
 	def DeleteComment_Redo(self): pass
+
+	def DoNewAssociatedText(self, NewAssociatedText=None, PHAElement=None, ComponentName=None,
+			AssociatedTextListAttrib='', Viewport=None,
+			Redoing=False, Zoom=1.0, PanX=0, PanY=0):
+		# add NewAssociatedText (AssociatedTextItem instance) to PHAElement's list in attrib named AssociatedTextListAttrib (str)
+		# ComponentName is the InternalName of the Viewport PHAElement's component that selects the AssociatedText for editing;
+		# needed for undo implementation
+		# Viewport: ViewportShadow corresponding to the Viewport from where the add AssociatedText request was made
+		AssociatedTextList = getattr(PHAElement, AssociatedTextListAttrib)
+		AssociatedTextList.append(NewAssociatedText)
+		# add the associated text to project's master list
+		AssociatedTextListInProj = getattr(self.Proj, AssociatedTextListAttrib)
+		AssociatedTextListInProj.append(NewAssociatedText)
+		UndoEnglishText = 'add new %s to' % core_classes.AssociatedTextEnglishNamesSingular[AssociatedTextListAttrib]
+		undo.AddToUndoList(Proj=self.Proj, Redoing=Redoing,
+						   UndoObj=undo.UndoItem(UndoHandler=self.NewAssociatedText_Undo,
+												 RedoHandler=self.NewAssociatedText_Redo,
+#			Chain={False: 'NoChain', True: 'Avalanche', 'NoChain': 'NoChain'}[ChainUndo],
+												 PHAElement=PHAElement, ComponentName=ComponentName,
+												 AssociatedTextListAttrib=AssociatedTextListAttrib,
+												 HumanText=_(UndoEnglishText + ' %s') % type(PHAElement).HumanName,
+												 ViewportID=Viewport.ID, Zoom=Zoom,
+												 PanX=PanX, PanY=PanY, HostElementID=PHAElement.ID))
+
+	def NewAssociatedText_Undo(self, Proj, UndoRecord, **Args): # handle undo for add new associated text
+		pass
+
+	def NewAssociatedText_Redo(self, Proj, RedoRecord, **Args): # handle redo for add new associated text
+		pass
 
 	def UpdateFullExportAttribs(self, Proj, XMLRoot):
 		# store attribs for full FT export dialogue in project
@@ -5967,25 +6012,28 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 
 	def AddNewAssociatedText(self, PHAElement, PHAComponent, AssociatedTextContent):
 		# handle request from ControlFrame for new AssociatedText in component PHAComponent of element PHAElement
+		# This method is for a completely new AssociatedText that doesn't exist in the project
 		# First, store info to enable Viewport to request the AssociatedText aspect in control panel after redraw
 		# PHAComponent: the ButtonElement instance clicked to raise the AssociatedTexts for editing
-		self.PreferredControlPanelAspect = 'CPAspect_%%%'
+		self.PreferredControlPanelAspect = PHAComponent.ControlPanelAspect # aspect identifier such as 'CPAspect_ActionItems'
 		self.ComponentEdited = PHAComponent
 		# handle request to add new AssociatedText to PHAComponent in PHAElement
-		# arg names Zoom, PanX, PanY must match values of info.ZoomTag etc
-		# TODO use info.ZoomTag, as in DeleteAssociatedText()
+		ArgsToSend = {info.ZoomTag: str(self.Zoom),
+			info.PanXTag: str(self.PanX), info.PanYTag: str(self.PanY),
+			info.AssociatedTextTag: AssociatedTextContent}
 		vizop_misc.SendRequest(Socket=self.C2DSocketREQ, Command='RQ_FT_NewAssociatedText',
-			Proj=self.Proj.ID, PHAObj=self.PHAObjID, PHAElement=PHAElement.ID, AssociatedTextListAttrib=PHAComponent.AssociatedTextListAttrib,
-			Component=PHAComponent.InternalName, AssociatedTextContent=AssociatedTextContent, Viewport=self.ID, Zoom=str(self.Zoom),
-			PanX=str(self.PanX), PanY=str(self.PanY))
+			Proj=self.Proj.ID, PHAObj=self.PHAObjID, PHAElement=PHAElement.ID,
+			AssociatedTextListAttrib=PHAComponent.AssociatedTextListAttrib,
+			Component=PHAComponent.InternalName, AssociatedTextContent=AssociatedTextContent, Viewport=self.ID,
+			**ArgsToSend)
 
 	def ChangeAssociatedText(self, PHAElement, PHAComponent, AssociatedTextIndex, AssociatedTextContent):
-		# handle request from ControlFrame to change text of AssociatedText at AssociatedTextIndex (int) in component PHAComponent of
-		# element PHAElement
-		# First, store info to enable Viewport to request the AssociatedText aspect in control panel after redraw
+		# handle request from ControlFrame to change text of AssociatedText at AssociatedTextIndex (int)
+		# in component PHAComponent of element PHAElement
 		# PHAComponent: the ButtonElement instance clicked to raise the AssociatedTexts for editing
+		# First, store info to enable Viewport to request the AssociatedText aspect in control panel after redraw
 		assert isinstance(AssociatedTextIndex, int)
-		self.PreferredControlPanelAspect = 'CPAspect_%%%'
+		self.PreferredControlPanelAspect = PHAComponent.ControlPanelAspect # aspect identifier such as 'CPAspect_ActionItems'
 		self.ComponentEdited = PHAComponent
 		# We use the ArgsToSend dict so that we can get arg names from info module
 		ArgsToSend = {info.AssociatedTextIndexTag: str(AssociatedTextIndex), info.ZoomTag: str(self.Zoom),
@@ -5997,17 +6045,18 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 
 	def DeleteAssociatedText(self, PHAElement, PHAComponent, DoomedAssociatedTextIndex):
 		# handle request from ControlFrame to delete AssociatedText in component PHAComponent of element PHAElement
+		# PHAComponent: the ButtonElement instance clicked to raise the AssociatedTexts for editing
 		assert isinstance(PHAElement, self.ElementTypesCanHostAssociatedTexts)
 		assert isinstance(DoomedAssociatedTextIndex, int)
 		# First, store info to enable Viewport to request the AssociatedText aspect in control panel after redraw
-		# PHAComponent: the ButtonElement instance clicked to raise the AssociatedTexts for editing
-		self.PreferredControlPanelAspect = 'CPAspect_%%%'
+		self.PreferredControlPanelAspect = PHAComponent.ControlPanelAspect # aspect identifier such as 'CPAspect_ActionItems'
 		self.ComponentEdited = PHAComponent
 		# We use the ArgsToSend dict so that we can get arg names from info module
 		ArgsToSend = {info.AssociatedTextIndexTag: str(DoomedAssociatedTextIndex), info.ZoomTag: str(self.Zoom),
 			info.PanXTag: str(self.PanX), info.PanYTag: str(self.PanY)}
 		vizop_misc.SendRequest(Socket=self.C2DSocketREQ, Command='RQ_FT_DeleteAssociatedText',
-			Proj=self.Proj.ID, PHAObj=self.PHAObjID, PHAElement=PHAElement.ID, AssociatedTextListAttrib=PHAComponent.AssociatedTextListAttrib,
+			Proj=self.Proj.ID, PHAObj=self.PHAObjID, PHAElement=PHAElement.ID,
+			AssociatedTextListAttrib=PHAComponent.AssociatedTextListAttrib,
 			Component=PHAComponent.InternalName, Viewport=self.ID, **ArgsToSend)
 
 FTObjectInCore.DefaultViewportType = FTForDisplay # set here (not in FTForDisplay class) due to the order of the

@@ -132,6 +132,8 @@ class ProjectItem(object): # class of PHA project instances
 		# make a default numbering object for comment numbering, containing only a serial number
 		self.DefaultCommentNumbering = core_classes.NumberingItem()
 		self.DefaultCommentNumbering.NumberStructure = [core_classes.SerialNumberChunkItem()]
+		self.ActionItems = [] # list of AssociatedText instances
+		self.ParkingLotItems = [] # list of AssociatedText instances
 
 		# Attributes saved in actual project file
 		self.VizopVersion = CurrentProjDocType # str; Vizop Version

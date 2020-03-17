@@ -1581,7 +1581,7 @@ class LowerCaseRomanNumberSystem(RomanNumberSystem):
 NumberSystems = [ArabicNumberSystem, LowerCaseLetterNumberSystem, UpperCaseLetterNumberSystem,
 	UpperCaseRomanNumberSystem, LowerCaseRomanNumberSystem]
 
-class TextItem(object):  # text forming part of a PHA object, such as a description, comment or recommendation
+class TextItem(object):  # text forming part of a PHA object, such as a description
 	DefaultTextHorizAlignment = 'Centre'
 	DefaultTextVertAlignment = 'Centre'
 
@@ -1595,12 +1595,16 @@ class TextItem(object):  # text forming part of a PHA object, such as a descript
 		self.InitialTextStyle = Proj.MostRecentInitialTextStyle.get(PHAObjClass,
 			Proj.MostRecentInitialTextStyle['Default'])
 
-class AssociatedTextItem(TextItem):  # 'smart text' used for comments and recommendations
+class AssociatedTextItem(TextItem):  # 'smart text' used for comments, action items and parking lot items
 
 	def __init__(self, Proj, PHAObjClass, Host):
 		TextItem.__init__(self, Proj, PHAObjClass, Host)
 		self.Tack = None  # reference to a position object on a PIDItem, or another PHA object, referred to by this text
 		self.Numbering = NumberingItem()
+
+# English names for associated text kinds. Translated at point of use, because they could be subject or object
+AssociatedTextEnglishNamesSingular = {'ActionItems': 'action item', 'ParkingLotItems': 'parking lot item'}
+AssociatedTextEnglishNamesPlural = {'ActionItems': 'action items', 'ParkingLotItems': 'parking lot items'}
 
 DefaultTextStyleItem = TextStyleItem()
 
