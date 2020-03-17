@@ -689,7 +689,9 @@ class ControlFrame(wx.Frame):
 				TargetAspect = {'CPAspect_NumValue': self.NumericalValueAspect,
 					'CPAspect_FaultTree': self.FaultTreeAspect,
 					'CPAspect_FTConnectorOut': self.FTConnectorOutAspect,
-					'CPAspect_Comment': self.CommentAspect
+					'CPAspect_Comment': self.CommentAspect,
+					'CPAspect_ActionItems': self.ActionItemsAspect,
+					'CPAspect_ParkingLot': self.ParkingLotAspect
 										}.get(NewAspect, None)
 			else: TargetAspect = NewAspect
 			if TargetAspect: # any recognised aspect supplied?
@@ -881,6 +883,13 @@ class ControlFrame(wx.Frame):
 			self.MakeFaultTreeAspect()
 			self.MakeFTConnectorOutAspect()
 			self.MakeCommentAspect()
+			self.ActionItemsAspect = self.MakeAssociatedTextAspect(Aspect='ActionItems')
+			# define hint text shown in textctrl for new associated texts, in English
+			self.ActionItemsAspect.NewItemHintFirst = 'Type an action item'
+			self.ActionItemsAspect.NewItemHintNotFirst = 'Type another action item'
+			self.ParkingLotAspect = self.MakeAssociatedTextAspect(Aspect='ParkingLotItems')
+			self.ParkingLotAspect.NewItemHintFirst = 'Type a parking lot item'
+			self.ParkingLotAspect.NewItemHintNotFirst = 'Type another parking lot item'
 			# Make sizer for notebook (this is required even though there's only one item in it, the notebook itself)
 			MySizer = wx.BoxSizer()
 			MySizer.Add(self.MyNotebook, 1, wx.EXPAND)
@@ -1002,7 +1011,7 @@ class ControlFrame(wx.Frame):
 			self.PHAModelsAspect.UndoButton.Widget.Enable(bool(Proj.UndoList))
 			self.PHAModelsAspect.RedoButton.Widget.Enable(bool(Proj.RedoList))
 
-		def PrefillWidgetsForPHAModelsAspect(self): # set initial values for widgets in PHAModels aspect
+		def PrefillWidgetsForPHAModelsAspect(self, **Args): # set initial values for widgets in PHAModels aspect
 			Proj = self.TopLevelFrame.CurrentProj
 			# enable navigation buttons if there are any items in current project's history lists
 			self.UpdateNavigationButtonStatus(Proj)
@@ -1735,7 +1744,6 @@ class ControlFrame(wx.Frame):
 
 		def SetWidgetVisibilityforCommentAspect(self, **Args): # set IsVisible attrib for each widget
 			# set IsVisible attribs for all fixed and variable widgets
-			# Aspect: (AspectItem instance) self.ActionItemsAspect or self.ParkingLotAspect
 			for ThisWidget in self.CommentAspect.WidgetList: ThisWidget.IsVisible = True
 
 		def MakeAssociatedTextAspect(self, Aspect): # make 'action item/parking lot item' aspect for Control Panel
@@ -1743,17 +1751,18 @@ class ControlFrame(wx.Frame):
 			# Aspect (str): 'ActionItems' or 'ParkingLotItems'
 			assert Aspect in ('ActionItems', 'ParkingLotItems')
 			# select parms for the appropriate aspect
-			(TabText, InternalName, HeaderLabel, PrefillMethod, SetWidgetVisibilityMethod) =\
-				{'ActionItems': ('Action items', 'ActionItems', 'Action items:', self.PrefillWidgetsForActionItemsAspect,
-					self.SetWidgetVisibilityforActionItemsAspect),
-				'ParkingLotItems': ('Parking lot', 'ParkingLot', 'Parking lot items:', self.PrefillWidgetsForParkingLotAspect,
-					self.SetWidgetVisibilityforParkingLotAspect)}[Aspect]
+			(TabText, InternalName, HeaderLabel) =\
+				{'ActionItems': ('Action items', 'ActionItems', 'Action items:'),
+				'ParkingLotItems': ('Parking lot', 'ParkingLot', 'Parking lot items:')}[Aspect]
 			MyNotebookPage = wx.Panel(parent=self.MyNotebook)
 			# set text appearing on notebook tab
-			MyTabText = _(MyTabText)
+			MyTabText = _(TabText)
 			NewAspect = self.ControlPanelAspectItem(InternalName=InternalName, ParentFrame=self,
-				TopLevelFrame=self.TopLevelFrame, PrefillMethod=PrefillMethod,
-				SetWidgetVisibilityMethod=SetWidgetVisibilityMethod, NotebookPage=MyNotebookPage,
+				TopLevelFrame=self.TopLevelFrame,
+				PrefillMethod=lambda **Args: self.PrefillWidgetsForAssociatedTextAspect(Aspect=NewAspect, **Args),
+				SetWidgetVisibilityMethod=lambda **Args: self.SetWidgetVisibilityforAssociatedTextAspect(
+					Aspect=NewAspect, **Args),
+				NotebookPage=MyNotebookPage,
 				TabText=MyTabText)
 			# make fixed widgets (this aspect also has variable widgets depending on the associated texts defined)
 			self.MakeStandardWidgets(Scope=NewAspect, NotebookPage=MyNotebookPage)
@@ -1792,7 +1801,7 @@ class ControlFrame(wx.Frame):
 				PHAElement=ThisPHAElement,
 				Component=ThisComponent, DoomedAssociatedTextIndex=DeleteWidgetClicked.AssociatedTextIndex)
 
-		def AssociatedTextAspect_OnEditComment(self, Event, Aspect): # handle editing of AssociatedText in control panel
+		def AssociatedTextAspect_OnEditAssociatedText(self, Event, Aspect): # handle editing of AssociatedText in control panel
 			# Aspect: (AspectItem instance) self.ActionItemsAspect or self.ParkingLotAspect
 			# get the UIWidgetItem just edited
 			AssociatedTextWidgetEdited = utilities.InstanceWithAttribValue(ObjList=Aspect.VariableWidgetList,
@@ -1804,9 +1813,9 @@ class ControlFrame(wx.Frame):
 			CurrentViewport = self.TopLevelFrame.CurrentViewport
 			ThisPHAElement = self.TopLevelFrame.PHAElementInControlPanel
 			ThisComponent = self.TopLevelFrame.ComponentInControlPanel
-			ThisAssociatedTextList = getattr(ThisPHAElement, ThisComponent.AssociatedTextKind)
+			ThisAssociatedTextList = getattr(ThisPHAElement, ThisComponent.AssociatedTextListAttrib)
 			# check if the user typed in the 'new associated text' textctrl (at the bottom)
-			if AssociatedTextWidgetEdited.CommentIndex == len(ThisAssociatedTextList):
+			if AssociatedTextWidgetEdited.AssociatedTextIndex == len(ThisAssociatedTextList):
 				# check the user typed some visible characters
 				if AssociatedTextAsTyped:
 					# submit to datacore as a new associated text
@@ -1817,12 +1826,13 @@ class ControlFrame(wx.Frame):
 				# check if edited associated text is different from old associated text
 				if AssociatedTextAsTyped == ThisAssociatedTextList[AssociatedTextWidgetEdited.AssociatedTextIndex]: pass
 				else:
-					print('CF1815 editing an existing associated text, working here')
+					print('CF1815 editing an existing associated text, working here') # %%%
 					self.TopLevelFrame.DoChangeAssociatedText(Proj=Proj, PHAObj=CurrentViewport.PHAObj, Viewport=CurrentViewport,
 						PHAElement=ThisPHAElement, Component=ThisComponent,
 						AssociatedTextIndex=AssociatedTextWidgetEdited.AssociatedTextIndex, NewAssociatedTextContent=AssociatedTextAsTyped)
 
-		def LineupVariableWidgetsForAssociatedTextAspect(self, TargetElement, AssociatedTextListAttrib, NotebookPage, Aspect):
+		def LineupVariableWidgetsForAssociatedTextAspect(self, TargetElement, AssociatedTextListAttrib, NotebookPage,
+			Aspect):
 			# adjust variable widgets in 'action items/parking lot' aspect of Control Panel
 			# depending on number of associated texts belonging to TargetElement
 			# AssociatedTextListAttrib (str): name of attrib of TargetElement containing the appropriate texts
@@ -1844,14 +1854,15 @@ class ControlFrame(wx.Frame):
 					'NumberMe!'), RowOffset=ThisAssociatedTextIndex, ColOffset=1, ColSpan=1, GapX=20))
 				Aspect.VariableWidgetList.append(UIWidgetItem(wx.TextCtrl(NotebookPage, -1, ThisAssociatedText,
 					style=wx.TE_PROCESS_ENTER), RowOffset=ThisAssociatedTextIndex, ColOffset=2, ColSpan=1,
-					Handler=AssociatedTextAspect_OnEditAssociatedText, Events=[wx.EVT_TEXT_ENTER],
-					CommentIndex=ThisAssociatedTextIndex))
+					Handler=lambda Event: self.AssociatedTextAspect_OnEditAssociatedText(Event=Event, Aspect=Aspect),
+					Events=[wx.EVT_TEXT_ENTER],
+					AssociatedTextIndex=ThisAssociatedTextIndex))
 				DeleteButtonWidget = UIWidgetItem(wx.Button(NotebookPage, size=self.StandardImageButtonSize),
 					PHAObj=self.TopLevelFrame.PHAObjInControlPanel,
 					RowOffset=ThisAssociatedTextIndex, ColOffset=3, ColSpan=1,
 					Events=[wx.EVT_BUTTON],
-					Handler=AssociatedTextAspect_OnDeleteAssociatedTextButton,
-					CommentIndex=ThisAssociatedTextIndex)
+					Handler=lambda Event: self.AssociatedTextAspect_OnDeleteItemButton(Event=Event, Aspect=Aspect),
+					AssociatedTextIndex=ThisAssociatedTextIndex)
 				Aspect.VariableWidgetList.append(DeleteButtonWidget)
 				DeleteButtonWidget.Widget.SetBitmap(self.TopLevelFrame.ButtonBitmap(wx.ART_MINUS))
 			# add serial widget and textctrl for a new AssociatedText
@@ -1859,11 +1870,13 @@ class ControlFrame(wx.Frame):
 				'NumberMe!'), RowOffset=len(AssociatedTextList), ColOffset=1, ColSpan=1, GapX=20))
 			NewAssociatedTextCtrl = wx.TextCtrl(NotebookPage, -1, '', style=wx.TE_PROCESS_ENTER)
 			NewAssociatedTextCtrl.SetMinSize( (400,20) )
-			NewAssociatedTextCtrl.SetHint(_(Aspect.NewCommentHintNotFirst) if AssociatedTextList else
-				_(Aspect.NewCommentHintNotFirst))
+			NewAssociatedTextCtrl.SetHint(_(Aspect.NewItemHintNotFirst) if AssociatedTextList else
+				_(Aspect.NewItemHintFirst))
 			Aspect.VariableWidgetList.append(UIWidgetItem(NewAssociatedTextCtrl, RowOffset=len(AssociatedTextList),
-				ColOffset=2, Handler=AssociatedTextAspect_OnEditAssociatedText, Events=[wx.EVT_TEXT_ENTER],
-				ColSpan=1, CommentIndex=len(AssociatedTextList)))
+				ColOffset=2,
+				Handler=lambda Event: self.AssociatedTextAspect_OnEditAssociatedText(Event=Event, Aspect=Aspect),
+				Events=[wx.EVT_TEXT_ENTER],
+				ColSpan=1, AssociatedTextIndex=len(AssociatedTextList)))
 			# insert AssociatedText widgets into widget list, based on RowOffset and ColOffset
 			Aspect.WidgetList = self.InsertVariableWidgets(TargetPlaceholderName='AssociatedTexts',
 				FixedWidgets=Aspect.FixedWidgetList,
@@ -1889,7 +1902,7 @@ class ControlFrame(wx.Frame):
 				self.TopLevelFrame.PHAElementInControlPanel.HumanName)
 			# set up lineup of variable widgets
 			self.LineupVariableWidgetsForAssociatedTextAspect(TargetElement=Args['PHAElementInControlPanel'],
-				CommentListAttrib=self.TopLevelFrame.ComponentInControlPanel.CommentKind,
+				AssociatedTextListAttrib=self.TopLevelFrame.ComponentInControlPanel.AssociatedTextListAttrib,
 				NotebookPage=Aspect.NotebookPage, Aspect=Aspect)
 
 		def SetWidgetVisibilityforAssociatedTextAspect(self, Aspect, **Args): # set IsVisible attrib for each widget
@@ -1961,7 +1974,6 @@ class ControlFrame(wx.Frame):
 
 			def SetWidgetVisibility(self, **Args): # set IsVisible attrib of each widget in self.WidgetList
 				self.SetWidgetVisibilityMethod(**Args)
-
 
 	def ActivateWidgetsInPanel(self, Widgets=[], Sizer=None, ActiveWidgetList=[], **Args):
 		# activate widgets that are about to be displayed in a panel of the Control Frame
@@ -3210,6 +3222,38 @@ class ControlFrame(wx.Frame):
 		# request Viewport to update the PHAObj with the new comment
 		Viewport.DeleteComment(PHAElement=PHAElement, PHAComponent=Component, DoomedCommentIndex=DoomedCommentIndex)
 
+	def DoNewAssociatedText(self, Proj, PHAObj, Viewport, PHAElement, Component, NewAssociatedText, Redoing=False):
+		# handle new associated text (action item/parking lot item) creation in a Component of a PHAElement
+		assert isinstance(Proj, projects.ProjectItem)
+		assert isinstance(PHAObj, core_classes.PHAModelBaseClass)
+		assert isinstance(NewAssociatedText, str)
+		assert isinstance(Redoing, bool)
+		# request Viewport to update the PHAObj with the new associated text
+		Viewport.AddNewAssociatedText(PHAElement=PHAElement, PHAComponent=Component, AssociatedTextContent=NewAssociatedText)
+
+	def DoChangeAssociatedText(self, Proj, PHAObj, Viewport, PHAElement, Component, AssociatedTextIndex,
+			NewAssociatedText, Redoing=False):
+		# handle change of existing associated text (action item/parking lot item) in a Component of a PHAElement
+		assert isinstance(Proj, projects.ProjectItem)
+		assert isinstance(PHAObj, core_classes.PHAModelBaseClass)
+		assert isinstance(AssociatedTextIndex, int)
+		assert isinstance(NewAssociatedText, str)
+		assert isinstance(Redoing, bool)
+		# request Viewport to update the PHAObj with the changed AssociatedText
+		Viewport.ChangeAssociatedText(PHAElement=PHAElement, PHAComponent=Component,
+			AssociatedTextIndex=AssociatedTextIndex, AssociatedTextContent=NewAssociatedText)
+
+	def DoDeleteAssociatedText(self, Proj, PHAObj, Viewport, PHAElement, Component, DoomedAssociatedTextIndex,
+			Redoing=False):
+		# handle deletion of an associated text (action item/parking lot item) in a Component of a PHAElement
+		assert isinstance(Proj, projects.ProjectItem)
+		assert isinstance(PHAObj, core_classes.PHAModelBaseClass)
+		assert isinstance(DoomedAssociatedTextIndex, int)
+		assert isinstance(Redoing, bool)
+		# request Viewport to update the PHAObj with the new AssociatedText
+		Viewport.DeleteComment(PHAElement=PHAElement, PHAComponent=Component,
+			DoomedAssociatedTextIndex=DoomedAssociatedTextIndex)
+
 	# ControlFrame main body
 	def __init__(self, parent=None, ID=None, title='', Projects=[], FirstProject=None, Viewport=None,
 				 ColScheme=None, zmqContext=None, DatacoreIsLocal=True):
@@ -3433,7 +3477,7 @@ class ControlFrame(wx.Frame):
 		self.DisplayDevices.append(NewDisplayDevice)
 
 	def UpdateAllViewports(self, MessageAsStr='', XMLRoot=None, **Args):
-		# this is a Datacore function.%%%
+		# this is a Datacore function.
 		# refresh Viewports after change to data in datacore. For now, we just redraw all Viewports currently shown
 		# in a display device.
 		# MessageAsStr (str): str containing XML message received requesting update to Viewports (currently not used)

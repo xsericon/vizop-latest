@@ -61,7 +61,7 @@ class ButtonElement(object): # object containing a button and attributes and met
 	# class ButtonObjectNotInElement is a subclass of this
 
 	def __init__(self, FT, Row=0, RowBase=0, ColStart=0, ColSpan=1, RowSpan=1, StartX=0, EndX=200, PosYInCU=0, InternalName='',
-				 HostObject=None, Stati=None, LSingleClickHandler=None, CommentKind=None, AssociatedTextKind=None,
+				 HostObject=None, Stati=None, LSingleClickHandler=None, CommentKind=None, AssociatedTextListAttrib=None,
 				 ControlPanelAspect=None, CommentKindHuman=None, **Args):
 		# FT (FTForDisplay instance): FT containing this button element
 		# InternalName (str): label indicating the kind of function the button has
@@ -69,7 +69,8 @@ class ButtonElement(object): # object containing a button and attributes and met
 		# LSingleClickHandler (str name of callable or None): handler for left mouse button single click on the button
 		# CommentKind (str or None): for comment buttons, it's the name of HostObject's attrib containing the comments,
 		# 	e.g. 'EventDescriptionComments' or 'ValueComments' or None
-		# AssociatedTextKind (str or None): for action item/parking lot item buttons, defines kind of associated text
+		# AssociatedTextListAttrib (str or None): for action item/parking lot item buttons, name of host's attrib
+		# 	containing associated texts
 		assert isinstance(FT, FTForDisplay)
 		assert isinstance(RowSpan, int)
 		assert RowSpan > 0
@@ -77,7 +78,7 @@ class ButtonElement(object): # object containing a button and attributes and met
 		assert isinstance(LSingleClickHandler, str) or (LSingleClickHandler is None)
 		assert isinstance(CommentKind, str) or (CommentKind is None)
 		assert isinstance(CommentKindHuman, str) or (CommentKindHuman is None)
-		assert isinstance(AssociatedTextKind, str) or (AssociatedTextKind is None)
+		assert isinstance(AssociatedTextListAttrib, str) or (AssociatedTextListAttrib is None)
 		assert isinstance(ControlPanelAspect, str) or (ControlPanelAspect is None)
 		object.__init__(self)
 		self.FT = FT
@@ -106,7 +107,7 @@ class ButtonElement(object): # object containing a button and attributes and met
 		self.LSingleClickHandler = None if LSingleClickHandler is None else getattr(self, LSingleClickHandler, None)
 		self.CommentKind = CommentKind
 		self.CommentKindHuman = CommentKindHuman
-		self.AssociatedTextKind = AssociatedTextKind
+		self.AssociatedTextListAttrib = AssociatedTextListAttrib
 		self.ControlPanelAspect = ControlPanelAspect
 		self.ArtProviderName = {'EventLinkedButton': 'FT_LinkButton', 'EventGroupedButton': 'FT_GroupButton',
 			'EventCommentButton': 'FT_CommentButton', 'ConnectButton': 'FT_ConnectButton',
@@ -204,29 +205,32 @@ class ButtonElement(object): # object containing a button and attributes and met
 			SetAsLastSelected=True)
 		# call handler for the specific kind of button clicked
 		if self.LSingleClickHandler is not None:
-			self.LSingleClickHandler(CommentKind=self.CommentKind, AssociatedTextKind=self.AssociatedTextKind)
+			self.LSingleClickHandler(CommentKind=self.CommentKind, AssociatedTextListAttrib=self.AssociatedTextListAttrib)
 
 	def HandleMouseLClickOnCommentButton(self, CommentKind=None, **Args):
 		# handle mouse left button single click on a comment button
-		print('FT188 in comment button handler')
 		assert CommentKind in ['EventDescriptionComments', 'GateDescriptionComments', 'ConnectorDescriptionComments',
 			'ValueComments']
+		# toggle whether comments are visible
 		if 'Description' in CommentKind:
-			self.HostObject.ShowDescriptionComments = not self.HostObject.ShowDescriptionComments # toggle whether comments are visible
+			self.HostObject.ShowDescriptionComments = not self.HostObject.ShowDescriptionComments
 		elif CommentKind == 'ValueComments':
-			self.HostObject.ShowValueComments = not self.HostObject.ShowValueComments # toggle whether comments are visible
+			self.HostObject.ShowValueComments = not self.HostObject.ShowValueComments
 		# redraw the whole FT
 		self.HostObject.FT.DisplDevice.Redraw(FullRefresh=True)
 		# previously we sent a command to datacore to toggle comments; no longer required here, but still need to set
-		# comments on/off in the Viewport shadow when saving project file
+		# comments on/off for each FT element in the Viewport shadow when saving project file
 
 	def HandleMouseLClickOnActionItemButton(self, AssociatedTextItem=None, **Args):
-		# handle mouse left button single click on action item button
-		Show = not self.HostObject.ShowActionItems # toggle whether action items are visible
-		Command = 'RQ_FT_ActionItemsVisible'
-		vizop_misc.SendRequest(Socket=self.FT.C2DSocketREQ, Command=Command,
-			ProjID=self.FT.Proj.ID, PHAObj=self.FT.PHAObj.ID, Viewport=self.FT.ID, Element=self.HostObject.ID,
-			Visible=utilities.Bool2Str(Show))
+		# handle mouse left button single click on associated text (action item or parking lot) button
+		print('FT224 in action item button handler')
+		# toggle whether associated text items are visible
+		if self.AssociatedTextListAttrib == 'ActionItems':
+			self.HostObject.ShowActionItems = not self.HostObject.ShowActionItems
+		elif self.AssociatedTextListAttrib == 'ParkingLotItems':
+			self.HostObject.ShowParkingLotItems = not self.HostObject.ShowParkingLotItems
+		# redraw the whole FT
+		self.HostObject.FT.DisplDevice.Redraw(FullRefresh=True)
 
 	def HandleMouseLClickOnConnectButton(self, **Args):
 		# handle mouse left button single click on a connect button
@@ -1563,10 +1567,12 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 			ControlPanelAspect='CPAspect_Comment', CommentKindHuman=_('Connector value'))
 		self.ConnActionItemButton = ButtonElement(self.FT, Row=2, ColStart=5, ColSpan=1, StartX=225, EndX=249,
 			HostObject=self, InternalName='ConnActionItemButton', Stati=('OutNotExist', 'OutExist'),
-			LSingleClickHandler='HandleMouseLClickOnActionItemButton', AssociatedTextKind='ActionItem')
+			LSingleClickHandler='HandleMouseLClickOnActionItemButton', AssociatedTextListAttrib='ActionItems',
+			ControlPanelAspect='CPAspect_ActionItems') # %%%
 		self.ConnParkingLotItemButton = ButtonElement(self.FT, Row=3, ColStart=6, ColSpan=1, StartX=250, EndX=274,
 			HostObject=self, InternalName='ConnParkingLotItemButton', Stati=('OutNotExist', 'OutExist'),
-			LSingleClickHandler='HandleMouseLClickOnActionItemButton', AssociatedTextKind='ParkingLotItem')
+			LSingleClickHandler='HandleMouseLClickOnActionItemButton', AssociatedTextListAttrib='ParkingLotItems',
+			ControlPanelAspect='CPAspect_ParkingLot')
 		# make lists of elements: TopEls at top of connector, ValueEls relating to connector value
 		TopEls = [ConnKind, ConnName, ConnDescription, ConnGroupedButton, self.ConnDescriptionCommentButton,
 			self.ConnLinkedButton]
@@ -4397,7 +4403,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			ThisElementID = XMLRoot.findtext('Element')
 			ThisFTElement = [e for e in WalkOverAllFTObjs(self) if e.ID == ThisElementID][0]
 			Reply = ThisFTElement.ShowCommentsOnOff(CommentKind='Value', Show=utilities.Bool2Str(XMLRoot.findtext('Visible')))
-		elif Command == 'RQ_FT_ActionItemsVisible': # make action items in/visible in an FT element
+		elif Command == 'RQ_FT_ActionItemsVisible': # make action items in/visible in an FT element; redundant
 			ThisElementID = XMLRoot.findtext('Element')
 			ThisFTElement = [e for e in WalkOverAllFTObjs(self) if e.ID == ThisElementID][0]
 			Reply = ThisFTElement.ShowActionItemsOnOff(Show=utilities.Bool2Str(XMLRoot.findtext('Visible')))
@@ -5911,7 +5917,6 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 				self.DisplDevice.GotoControlPanelAspect(AspectName=AspectRequired, debug=5789,
 					PHAObjInControlPanel=self,
 					PHAElementInControlPanel=PHAElementToShow, ComponentInControlPanel=Args.get('ComponentEdited', None))
-#					CommentKind=Args.get('CommentKind', None))
 
 	def AddNewComment(self, PHAElement, PHAComponent, CommentText):
 		# handle request from ControlFrame for new comment in component PHAComponent of element PHAElement
@@ -5958,6 +5963,51 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			info.PanXTag: str(self.PanX), info.PanYTag: str(self.PanY)}
 		vizop_misc.SendRequest(Socket=self.C2DSocketREQ, Command='RQ_FT_DeleteComment',
 			Proj=self.Proj.ID, PHAObj=self.PHAObjID, PHAElement=PHAElement.ID, CommentKind=PHAComponent.CommentKind,
+			Component=PHAComponent.InternalName, Viewport=self.ID, **ArgsToSend)
+
+	def AddNewAssociatedText(self, PHAElement, PHAComponent, AssociatedTextContent):
+		# handle request from ControlFrame for new AssociatedText in component PHAComponent of element PHAElement
+		# First, store info to enable Viewport to request the AssociatedText aspect in control panel after redraw
+		# PHAComponent: the ButtonElement instance clicked to raise the AssociatedTexts for editing
+		self.PreferredControlPanelAspect = 'CPAspect_%%%'
+		self.ComponentEdited = PHAComponent
+		# handle request to add new AssociatedText to PHAComponent in PHAElement
+		# arg names Zoom, PanX, PanY must match values of info.ZoomTag etc
+		# TODO use info.ZoomTag, as in DeleteAssociatedText()
+		vizop_misc.SendRequest(Socket=self.C2DSocketREQ, Command='RQ_FT_NewAssociatedText',
+			Proj=self.Proj.ID, PHAObj=self.PHAObjID, PHAElement=PHAElement.ID, AssociatedTextListAttrib=PHAComponent.AssociatedTextListAttrib,
+			Component=PHAComponent.InternalName, AssociatedTextContent=AssociatedTextContent, Viewport=self.ID, Zoom=str(self.Zoom),
+			PanX=str(self.PanX), PanY=str(self.PanY))
+
+	def ChangeAssociatedText(self, PHAElement, PHAComponent, AssociatedTextIndex, AssociatedTextContent):
+		# handle request from ControlFrame to change text of AssociatedText at AssociatedTextIndex (int) in component PHAComponent of
+		# element PHAElement
+		# First, store info to enable Viewport to request the AssociatedText aspect in control panel after redraw
+		# PHAComponent: the ButtonElement instance clicked to raise the AssociatedTexts for editing
+		assert isinstance(AssociatedTextIndex, int)
+		self.PreferredControlPanelAspect = 'CPAspect_%%%'
+		self.ComponentEdited = PHAComponent
+		# We use the ArgsToSend dict so that we can get arg names from info module
+		ArgsToSend = {info.AssociatedTextIndexTag: str(AssociatedTextIndex), info.ZoomTag: str(self.Zoom),
+			info.PanXTag: str(self.PanX), info.PanYTag: str(self.PanY),
+			info.AssociatedTextTag: AssociatedTextContent}
+		vizop_misc.SendRequest(Socket=self.C2DSocketREQ, Command='RQ_FT_ChangeAssociatedText',
+			Proj=self.Proj.ID, PHAObj=self.PHAObjID, PHAElement=PHAElement.ID, AssociatedTextListAttrib=PHAComponent.AssociatedTextListAttrib,
+			Component=PHAComponent.InternalName, Viewport=self.ID, **ArgsToSend)
+
+	def DeleteAssociatedText(self, PHAElement, PHAComponent, DoomedAssociatedTextIndex):
+		# handle request from ControlFrame to delete AssociatedText in component PHAComponent of element PHAElement
+		assert isinstance(PHAElement, self.ElementTypesCanHostAssociatedTexts)
+		assert isinstance(DoomedAssociatedTextIndex, int)
+		# First, store info to enable Viewport to request the AssociatedText aspect in control panel after redraw
+		# PHAComponent: the ButtonElement instance clicked to raise the AssociatedTexts for editing
+		self.PreferredControlPanelAspect = 'CPAspect_%%%'
+		self.ComponentEdited = PHAComponent
+		# We use the ArgsToSend dict so that we can get arg names from info module
+		ArgsToSend = {info.AssociatedTextIndexTag: str(DoomedAssociatedTextIndex), info.ZoomTag: str(self.Zoom),
+			info.PanXTag: str(self.PanX), info.PanYTag: str(self.PanY)}
+		vizop_misc.SendRequest(Socket=self.C2DSocketREQ, Command='RQ_FT_DeleteAssociatedText',
+			Proj=self.Proj.ID, PHAObj=self.PHAObjID, PHAElement=PHAElement.ID, AssociatedTextListAttrib=PHAComponent.AssociatedTextListAttrib,
 			Component=PHAComponent.InternalName, Viewport=self.ID, **ArgsToSend)
 
 FTObjectInCore.DefaultViewportType = FTForDisplay # set here (not in FTForDisplay class) due to the order of the
