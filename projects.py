@@ -129,9 +129,11 @@ class ProjectItem(object): # class of PHA project instances
 		self.LastExportFontName = '' # str; system name of font used for last export, e.g. 'Arial'
 		self.LastExportPreferredDateToShow = None # ChoiceItem or None; one of the items in core_classes.DateChoices;
 			# represents date choice used for last export, e.g. today or last edited date
-		# make a default numbering object for comment numbering, containing only a serial number
+		# make a default numbering object for comment numbering, containing only a serial number; likewise for associated texts
 		self.DefaultCommentNumbering = core_classes.NumberingItem()
 		self.DefaultCommentNumbering.NumberStructure = [core_classes.SerialNumberChunkItem()]
+		self.DefaultAssociatedTextNumbering = core_classes.NumberingItem()
+		self.DefaultAssociatedTextNumbering.NumberStructure = [core_classes.SerialNumberChunkItem()]
 		self.ActionItems = [] # list of AssociatedText instances
 		self.ParkingLotItems = [] # list of AssociatedText instances
 

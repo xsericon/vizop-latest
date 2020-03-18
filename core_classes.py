@@ -1304,8 +1304,8 @@ class NumberingItem(object):
 	def __init__(self):
 		object.__init__(self)
 		self.NumberStructure = [] # list of numbering chunks, see comment just above
-		self.ShowInDisplay = True  # whether number is displayed in Viewport
-		self.ShowInOutput = True  # whether number is displayed in PHA model export
+		self.ShowInDisplay = True # whether number is displayed in Viewport
+		self.ShowInOutput = True # whether number is displayed in PHA model export
 
 	def __eq__(self, other): # returns True if self and other (a NumberingItem instance) are considered identical
 		# this method allows comparison of NumberingItem instances simply by (Instance1 == Instance2)

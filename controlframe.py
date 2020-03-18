@@ -1821,7 +1821,7 @@ class ControlFrame(wx.Frame):
 					# submit to datacore as a new associated text
 					self.TopLevelFrame.DoNewAssociatedText(Proj=Proj, PHAObj=CurrentViewport.PHAObj, Viewport=CurrentViewport,
 						PHAElement=ThisPHAElement,
-						Component=ThisComponent, NewAssociatedTextContent=AssociatedTextAsTyped)
+						Component=ThisComponent, AssociatedTextContent=AssociatedTextAsTyped)
 			else: # user typed in an existing associated text
 				# check if edited associated text is different from old associated text
 				if AssociatedTextAsTyped == ThisAssociatedTextList[AssociatedTextWidgetEdited.AssociatedTextIndex]: pass
@@ -1831,27 +1831,32 @@ class ControlFrame(wx.Frame):
 						PHAElement=ThisPHAElement, Component=ThisComponent,
 						AssociatedTextIndex=AssociatedTextWidgetEdited.AssociatedTextIndex, NewAssociatedTextContent=AssociatedTextAsTyped)
 
-		def LineupVariableWidgetsForAssociatedTextAspect(self, TargetElement, AssociatedTextListAttrib, NotebookPage,
-			Aspect):
+		def LineupVariableWidgetsForAssociatedTextAspect(self, TargetElement, AssociatedTextListAttrib,
+			AssociatedTextNumberingListAttrib, NotebookPage, Aspect):
 			# adjust variable widgets in 'action items/parking lot' aspect of Control Panel
 			# depending on number of associated texts belonging to TargetElement
 			# AssociatedTextListAttrib (str): name of attrib of TargetElement containing the appropriate texts
 			# 	(e.g. 'ActionItems')
+			# AssociatedTextNumberingListAttrib (str): similar, name of attrib containing numbering list
 			# NotebookPage: parent window for the variable widgets
 			# Aspect: (AspectItem instance) self.ActionItemsAspect or self.ParkingLotAspect
 			assert isinstance(AssociatedTextListAttrib, str)
+			assert isinstance(AssociatedTextNumberingListAttrib, str)
 			assert hasattr(TargetElement, AssociatedTextListAttrib)
+			assert hasattr(TargetElement, AssociatedTextNumberingListAttrib)
 			# first, deactivate and destroy all existing variable widgets (to avoid memory leak)
 			Aspect.Deactivate(Widgets=Aspect.VariableWidgetList)
 			for ThisWidget in Aspect.VariableWidgetList: ThisWidget.Widget.Destroy()
 			Aspect.VariableWidgetList = []
 			AssociatedTextList = getattr(TargetElement, AssociatedTextListAttrib)
+			AssociatedTextNumberingList = getattr(TargetElement, AssociatedTextNumberingListAttrib)
 			# make a serial widget, textctrl and 'delete' button for each associated text
 			# RowOffset and ColOffset are offsets from the position of the placeholder in FixedWidgetList
 			# The textctrl's min size is forced by NewAssociatedTextCtrl.SetMinSize() below
 			for (ThisAssociatedTextIndex, ThisAssociatedText) in enumerate(AssociatedTextList):
 				Aspect.VariableWidgetList.append(UIWidgetItem(wx.StaticText(NotebookPage, -1,
-					'NumberMe!'), RowOffset=ThisAssociatedTextIndex, ColOffset=1, ColSpan=1, GapX=20))
+					AssociatedTextNumberingList[ThisAssociatedTextIndex]), RowOffset=ThisAssociatedTextIndex,
+					ColOffset=1, ColSpan=1, GapX=20))
 				Aspect.VariableWidgetList.append(UIWidgetItem(wx.TextCtrl(NotebookPage, -1, ThisAssociatedText,
 					style=wx.TE_PROCESS_ENTER), RowOffset=ThisAssociatedTextIndex, ColOffset=2, ColSpan=1,
 					Handler=lambda Event: self.AssociatedTextAspect_OnEditAssociatedText(Event=Event, Aspect=Aspect),
@@ -1867,7 +1872,7 @@ class ControlFrame(wx.Frame):
 				DeleteButtonWidget.Widget.SetBitmap(self.TopLevelFrame.ButtonBitmap(wx.ART_MINUS))
 			# add serial widget and textctrl for a new AssociatedText
 			Aspect.VariableWidgetList.append(UIWidgetItem(wx.StaticText(NotebookPage, -1,
-				'NumberMe!'), RowOffset=len(AssociatedTextList), ColOffset=1, ColSpan=1, GapX=20))
+				_('New')), RowOffset=len(AssociatedTextList), ColOffset=1, ColSpan=1, GapX=20))
 			NewAssociatedTextCtrl = wx.TextCtrl(NotebookPage, -1, '', style=wx.TE_PROCESS_ENTER)
 			NewAssociatedTextCtrl.SetMinSize( (400,20) )
 			NewAssociatedTextCtrl.SetHint(_(Aspect.NewItemHintNotFirst) if AssociatedTextList else
@@ -1903,6 +1908,7 @@ class ControlFrame(wx.Frame):
 			# set up lineup of variable widgets
 			self.LineupVariableWidgetsForAssociatedTextAspect(TargetElement=Args['PHAElementInControlPanel'],
 				AssociatedTextListAttrib=self.TopLevelFrame.ComponentInControlPanel.AssociatedTextListAttrib,
+				AssociatedTextNumberingListAttrib=self.TopLevelFrame.ComponentInControlPanel.AssociatedTextNumberingListAttrib,
 				NotebookPage=Aspect.NotebookPage, Aspect=Aspect)
 
 		def SetWidgetVisibilityforAssociatedTextAspect(self, Aspect, **Args): # set IsVisible attrib for each widget
@@ -3222,14 +3228,14 @@ class ControlFrame(wx.Frame):
 		# request Viewport to update the PHAObj with the new comment
 		Viewport.DeleteComment(PHAElement=PHAElement, PHAComponent=Component, DoomedCommentIndex=DoomedCommentIndex)
 
-	def DoNewAssociatedText(self, Proj, PHAObj, Viewport, PHAElement, Component, NewAssociatedText, Redoing=False):
+	def DoNewAssociatedText(self, Proj, PHAObj, Viewport, PHAElement, Component, AssociatedTextContent, Redoing=False):
 		# handle new associated text (action item/parking lot item) creation in a Component of a PHAElement
 		assert isinstance(Proj, projects.ProjectItem)
 		assert isinstance(PHAObj, core_classes.PHAModelBaseClass)
-		assert isinstance(NewAssociatedText, str)
+		assert isinstance(AssociatedTextContent, str)
 		assert isinstance(Redoing, bool)
 		# request Viewport to update the PHAObj with the new associated text
-		Viewport.AddNewAssociatedText(PHAElement=PHAElement, PHAComponent=Component, AssociatedTextContent=NewAssociatedText)
+		Viewport.AddNewAssociatedText(PHAElement=PHAElement, PHAComponent=Component, AssociatedTextContent=AssociatedTextContent)
 
 	def DoChangeAssociatedText(self, Proj, PHAObj, Viewport, PHAElement, Component, AssociatedTextIndex,
 			NewAssociatedText, Redoing=False):

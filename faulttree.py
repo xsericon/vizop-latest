@@ -108,6 +108,8 @@ class ButtonElement(object): # object containing a button and attributes and met
 		self.CommentKind = CommentKind
 		self.CommentKindHuman = CommentKindHuman
 		self.AssociatedTextListAttrib = AssociatedTextListAttrib
+		if 'AssociatedTextNumberingListAttrib' in Args:
+			self.AssociatedTextNumberingListAttrib = Args['AssociatedTextNumberingListAttrib']
 		self.ControlPanelAspect = ControlPanelAspect
 		self.ArtProviderName = {'EventLinkedButton': 'FT_LinkButton', 'EventGroupedButton': 'FT_GroupButton',
 			'EventCommentButton': 'FT_CommentButton', 'ConnectButton': 'FT_ConnectButton',
@@ -1506,8 +1508,10 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 		self.ShowDescriptionComments = True # whether description comments are visible
 		self.ShowValueComments = True # whether value comments are visible
 		self.ActionItems = [] # str values
+		self.ActionItemNumbering = [] # str; numbers of action items
 		self.ShowActionItems = True
 		self.ParkingLotItems = [] # str values
+		self.ParkingLotItemNumbering = [] # str; numbers of parking lot items
 		self.ShowParkingLotItems = True
 		self.EventCommentWidgets = []
 		self.ValueCommentWidgets = []
@@ -1568,11 +1572,11 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 		self.ConnActionItemButton = ButtonElement(self.FT, Row=2, ColStart=5, ColSpan=1, StartX=225, EndX=249,
 			HostObject=self, InternalName='ConnActionItemButton', Stati=('OutNotExist', 'OutExist'),
 			LSingleClickHandler='HandleMouseLClickOnActionItemButton', AssociatedTextListAttrib='ActionItems',
-			ControlPanelAspect='CPAspect_ActionItems')
+			AssociatedTextNumberingListAttrib='ActionItemNumbering', ControlPanelAspect='CPAspect_ActionItems')
 		self.ConnParkingLotItemButton = ButtonElement(self.FT, Row=3, ColStart=6, ColSpan=1, StartX=250, EndX=274,
 			HostObject=self, InternalName='ConnParkingLotItemButton', Stati=('OutNotExist', 'OutExist'),
 			LSingleClickHandler='HandleMouseLClickOnActionItemButton', AssociatedTextListAttrib='ParkingLotItems',
-			ControlPanelAspect='CPAspect_ParkingLot')
+			AssociatedTextNumberingListAttrib='ParkingLotItemNumbering', ControlPanelAspect='CPAspect_ParkingLot')
 		# make lists of elements: TopEls at top of connector, ValueEls relating to connector value
 		TopEls = [ConnKind, ConnName, ConnDescription, ConnGroupedButton, self.ConnDescriptionCommentButton,
 			self.ConnLinkedButton]
@@ -2156,6 +2160,7 @@ class FTEventInCore(FTElementInCore): # FT event object used in DataCore by FTOb
 		AI = core_classes.AssociatedTextItem(Proj=self.Proj, PHAObjClass=type(self), Host=self)
 		AI.Content = 'Test action item'
 		self.ActionItems.append(AI)
+		self.Proj.ActionItems.append(AI)
 		AI.Numbering = core_classes.NumberingItem()
 		# put a serial number into the numbering object
 		SerialObj = core_classes.SerialNumberChunkItem()
@@ -2840,12 +2845,14 @@ class FTConnectorItemInCore(FTElementInCore): # in- and out-connectors (CX's) to
 		AI.Content = 'Test action item for connector'
 		self.ActionItems.append(AI)
 		AI.Numbering = core_classes.NumberingItem()
+		self.Proj.ActionItems.append(AI)
 		# put a serial number into the numbering object
 		SerialObj = core_classes.SerialNumberChunkItem()
 		AI.Numbering.NumberStructure = [SerialObj]
 		PLI = core_classes.AssociatedTextItem(Proj=self.Proj, PHAObjClass=type(self), Host=self)
 		PLI.Content = 'Test parking lot item for connector'
 		self.ParkingLotItems.append(PLI)
+		self.Proj.ParkingLotItems.append(PLI)
 		PLI.Numbering = core_classes.NumberingItem()
 		# put a serial number into the numbering object
 		SerialObj = core_classes.SerialNumberChunkItem()
@@ -3511,14 +3518,19 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 				El = ElementTree.SubElement(ConnEl, Tag)
 				El.text = str(Attrib)
 			# elements for lists of AssociatedTextItems
-			DataInfo = [(info.ConnectorDescriptionCommentsTag, FTConn.ConnectorDescriptionComments),
-				(info.ValueCommentsTag, FTConn.ValueComments),
-				(info.ActionItemsTag, FTConn.ActionItems),
-				(info.ParkingLotItemsTag, FTConn.ParkingLotItems)]
-			for Tag, ListName in DataInfo:
-				for Item in ListName:
+			# DataInfo tuples contain: XML tag for an instance, list attrib in the connector, list attrib in the project)
+			DataInfo = [(info.ConnectorDescriptionCommentsTag, FTConn.ConnectorDescriptionComments, None),
+				(info.ValueCommentsTag, FTConn.ValueComments, None),
+				(info.ActionItemsTag, FTConn.ActionItems, self.Proj.ActionItems),
+				(info.ParkingLotItemsTag, FTConn.ParkingLotItems, self.Proj.ParkingLotItems)]
+			for Tag, ListInConnector, ListInProj in DataInfo:
+				for Item in ListInConnector:
 					El = ElementTree.SubElement(ConnEl, Tag)
 					El.text = Item.Content # rich text
+					# if AssociatedText is at project level, include its project-level numbering
+					if ListInProj is not None:
+						NumberingEl = ElementTree.SubElement(El, info.NumberingTag)
+						NumberingEl.text = Item.Numbering.HumanValue(PHAItem=Item, Host=ListInProj)[0]
 			# elements for lists of items with IDs
 			for Tag, ListName in [('ConnectTo', FTConn.ConnectTo), ('CollapseGroups', FTConn.CollapseGroups)]:
 				for Item in ListName:
@@ -4495,12 +4507,20 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		# handle request to add new associated text
 		# find the corresponding element
 		ThisPHAElement = [e for e in WalkOverAllFTObjs(self) if e.ID == XMLRoot.findtext('PHAElement')][0]
-		# find the existing associated text list in the element
+		# find the existing associated text list in the element, and in the project
 		AssociatedTextListAttrib = XMLRoot.findtext('AssociatedTextListAttrib') # name of attrib containing associated text list
 		AssociatedTextList = getattr(ThisPHAElement, AssociatedTextListAttrib)
+		AssociatedTextListInProj = getattr(self.Proj, AssociatedTextListAttrib)
+		# make a new AssociatedText object, with numbering object the same as the preceding object in the project's list (if any)
+		NewAssociatedText = core_classes.AssociatedTextItem(Proj=self.Proj, PHAObjClass=type(self), Host=self)
+		NewAssociatedText.Content = XMLRoot.findtext(info.AssociatedTextTag)
+		if AssociatedTextListInProj:
+			NewAssociatedText.Numbering = copy.copy(AssociatedTextListInProj[-1].Numbering)
+		else:
+			NewAssociatedText.Numbering = copy.copy(self.Proj.DefaultAssociatedTextNumbering)
 		# update the AssociatedText in the required AssociatedText list
-		self.DoNewAssociatedText(NewAssociatedTextContent=XMLRoot.findtext(info.AssociatedTextContent),
-			AssociatedTextIndex=int(XMLRoot.findtext(info.AssociatedTextIndexTag)), PHAElement=ThisPHAElement,
+		self.DoNewAssociatedText(NewAssociatedText=NewAssociatedText,
+			PHAElement=ThisPHAElement,
 			AssociatedTextListAttrib=AssociatedTextListAttrib, ComponentName=XMLRoot.findtext(info.ComponentTag),
 			Viewport=Viewport, Redoing=False, Zoom=Zoom, PanX=PanX, PanY=PanY)
 		return vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
@@ -5023,15 +5043,26 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			DataInfoAsBool = [ (info.CanEditValueTag, 'CanEditValue') ]
 			for Tag, Attrib in DataInfoAsBool:
 				setattr(NewConnector, Attrib, bool(XMLObj.findtext(Tag, default='False')))
-			# DataInfoAsList: (Tag of each item in a list, name of the list to put the tag's text into)
-			DataInfoAsList = [ (info.ConnectorDescriptionCommentsTag, 'ConnectorDescriptionComments'),
-				(info.ValueCommentsTag, 'ValueComments'),
-				(info.ActionItemsTag, 'ActionItems'),
-				(info.ParkingLotItemsTag, 'ParkingLotItems'),
-				('ConnectTo', 'ConnectToIDs'),
-				('CollapseGroups', 'CollapseGroups') ]
-			for Tag, Attrib in DataInfoAsList:
-				setattr(NewConnector, Attrib, [El.text for El in XMLObj.findall(Tag)])
+			# DataInfoAsList: (Tag of each item in a list, name of the list to put the tag's text into, name of numbering list)
+			DataInfoAsList = [ (info.ConnectorDescriptionCommentsTag, 'ConnectorDescriptionComments', ''),
+				(info.ValueCommentsTag, 'ValueComments', ''),
+				(info.ActionItemsTag, 'ActionItems', 'ActionItemNumbering'),
+				(info.ParkingLotItemsTag, 'ParkingLotItems', 'ParkingLotItemNumbering'),
+				('ConnectTo', 'ConnectToIDs', ''),
+				('CollapseGroups', 'CollapseGroups', '') ]
+			for Tag, Attrib, NumberingListName in DataInfoAsList:
+				TargetList = getattr(NewConnector, Attrib, []) # find list to put Tag instances into, if it exists
+				TargetList.clear()
+				NumberingList = getattr(NewConnector, NumberingListName, []) # find list to put associated numbering into
+				NumberingList.clear()
+				# extract each instance of Tag found in XMLObj
+				for El in XMLObj.findall(Tag):
+					TargetList.append(El.text)
+					setattr(NewConnector, Attrib, [El.text for El in XMLObj.findall(Tag)])
+					# find associated numbering, if any
+					NumberingTag = El.find(info.NumberingTag)
+					if NumberingTag is not None:
+						NumberingList.append(NumberingTag.text)
 			# populate connector type name: internal name and human name
 			NewConnector.EventType = XMLObj.find('EventType').text
 			NewConnector.EventTypeHumanName = self.EventTypeNameHash[NewConnector.EventType]
