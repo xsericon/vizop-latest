@@ -1826,10 +1826,10 @@ class ControlFrame(wx.Frame):
 				# check if edited associated text is different from old associated text
 				if AssociatedTextAsTyped == ThisAssociatedTextList[AssociatedTextWidgetEdited.AssociatedTextIndex]: pass
 				else:
-					print('CF1815 editing an existing associated text, working here') # %%%
 					self.TopLevelFrame.DoChangeAssociatedText(Proj=Proj, PHAObj=CurrentViewport.PHAObj, Viewport=CurrentViewport,
 						PHAElement=ThisPHAElement, Component=ThisComponent,
-						AssociatedTextIndex=AssociatedTextWidgetEdited.AssociatedTextIndex, NewAssociatedTextContent=AssociatedTextAsTyped)
+						AssociatedTextIndex=AssociatedTextWidgetEdited.AssociatedTextIndex,
+						AssociatedTextContent=AssociatedTextAsTyped)
 
 		def LineupVariableWidgetsForAssociatedTextAspect(self, TargetElement, AssociatedTextListAttrib,
 			AssociatedTextNumberingListAttrib, NotebookPage, Aspect):
@@ -3235,19 +3235,20 @@ class ControlFrame(wx.Frame):
 		assert isinstance(AssociatedTextContent, str)
 		assert isinstance(Redoing, bool)
 		# request Viewport to update the PHAObj with the new associated text
-		Viewport.AddNewAssociatedText(PHAElement=PHAElement, PHAComponent=Component, AssociatedTextContent=AssociatedTextContent)
+		Viewport.AddNewAssociatedText(PHAElement=PHAElement, PHAComponent=Component,
+			AssociatedTextContent=AssociatedTextContent)
 
 	def DoChangeAssociatedText(self, Proj, PHAObj, Viewport, PHAElement, Component, AssociatedTextIndex,
-			NewAssociatedText, Redoing=False):
+			AssociatedTextContent, Redoing=False):
 		# handle change of existing associated text (action item/parking lot item) in a Component of a PHAElement
 		assert isinstance(Proj, projects.ProjectItem)
 		assert isinstance(PHAObj, core_classes.PHAModelBaseClass)
 		assert isinstance(AssociatedTextIndex, int)
-		assert isinstance(NewAssociatedText, str)
+		assert isinstance(AssociatedTextContent, str)
 		assert isinstance(Redoing, bool)
 		# request Viewport to update the PHAObj with the changed AssociatedText
 		Viewport.ChangeAssociatedText(PHAElement=PHAElement, PHAComponent=Component,
-			AssociatedTextIndex=AssociatedTextIndex, AssociatedTextContent=NewAssociatedText)
+			AssociatedTextIndex=AssociatedTextIndex, AssociatedTextContent=AssociatedTextContent)
 
 	def DoDeleteAssociatedText(self, Proj, PHAObj, Viewport, PHAElement, Component, DoomedAssociatedTextIndex,
 			Redoing=False):

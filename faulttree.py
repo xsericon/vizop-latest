@@ -4485,8 +4485,12 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			Reply = vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
 		elif Command == 'RQ_FT_NewAssociatedText':
 			Reply = self.HandleNewAssociatedTextRequest(XMLRoot, Viewport=SourceViewport, Zoom=Zoom, PanX=PanX, PanY=PanY)
+		elif Command == 'RQ_FT_ChangeAssociatedText':
+			Reply = self.HandleChangeAssociatedTextRequest(XMLRoot, Viewport=SourceViewport, Zoom=Zoom, PanX=PanX,
+				PanY=PanY)
 		elif Command == 'OK': # dummy for 'OK' responses - received only to clear the sockets
 			Reply = vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
+		if Reply.tag == 'Fail': print('FT4490 command not recognised: ', Command)
 		return Reply
 
 	def HandleChangeCommentRequest(self, XMLRoot, Viewport, Zoom, PanX, PanY):
@@ -4521,6 +4525,20 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		# update the AssociatedText in the required AssociatedText list
 		self.DoNewAssociatedText(NewAssociatedText=NewAssociatedText,
 			PHAElement=ThisPHAElement,
+			AssociatedTextListAttrib=AssociatedTextListAttrib, ComponentName=XMLRoot.findtext(info.ComponentTag),
+			Viewport=Viewport, Redoing=False, Zoom=Zoom, PanX=PanX, PanY=PanY)
+		return vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
+
+	def HandleChangeAssociatedTextRequest(self, XMLRoot, Viewport, Zoom, PanX, PanY):
+		# handle request to change text content of  existing AssociatedText
+		# find the corresponding element
+		ThisPHAElement = [e for e in WalkOverAllFTObjs(self) if e.ID == XMLRoot.findtext('PHAElement')][0]
+		# find the existing AssociatedText list
+		AssociatedTextListAttrib = XMLRoot.findtext('AssociatedTextListAttrib') # name of attrib containing AssociatedText list
+		AssociatedTextList = getattr(ThisPHAElement, AssociatedTextListAttrib)
+		# update the AssociatedText in the required AssociatedText list
+		self.DoChangeAssociatedText(NewAssociatedText=XMLRoot.findtext(info.AssociatedTextTag),
+			AssociatedTextIndex=int(XMLRoot.findtext(info.AssociatedTextIndexTag)), PHAElement=ThisPHAElement,
 			AssociatedTextListAttrib=AssociatedTextListAttrib, ComponentName=XMLRoot.findtext(info.ComponentTag),
 			Viewport=Viewport, Redoing=False, Zoom=Zoom, PanX=PanX, PanY=PanY)
 		return vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
@@ -4658,6 +4676,34 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		pass
 
 	def NewAssociatedText_Redo(self, Proj, RedoRecord, **Args): # handle redo for add new associated text
+		pass
+
+	def DoChangeAssociatedText(self, NewAssociatedText=None, AssociatedTextIndex=0, PHAElement=None, ComponentName=None,
+						AssociatedTextListAttrib='', Viewport=None, Redoing=False, Zoom=1.0, PanX=0, PanY=0):
+		# Change text of AssociatedText in PHAElement's list in attrib named AssociatedTextListAttrib (str) at
+		# AssociatedTextIndex to NewAssociatedText (str)
+		# ComponentName is the InternalName of the Viewport PHAElement's component that selects the AssociatedText for editing;
+		# needed for undo implementation
+		# Viewport: ViewportShadow corresponding to the Viewport from where the change AssociatedText request was made
+		AssociatedTextList = getattr(PHAElement, AssociatedTextListAttrib)
+		OldAssociatedText = AssociatedTextList[AssociatedTextIndex].Content
+		AssociatedTextList[AssociatedTextIndex].Content = NewAssociatedText
+		UndoEnglishText = 'change %s in' % core_classes.AssociatedTextEnglishNamesSingular[AssociatedTextListAttrib]
+		undo.AddToUndoList(Proj=self.Proj, Redoing=Redoing,
+			UndoObj=undo.UndoItem(UndoHandler=self.ChangeAssociatedText_Undo,
+			RedoHandler=self.ChangeAssociatedText_Redo, OldAssociatedText=OldAssociatedText,
+			AssociatedTextIndex=AssociatedTextIndex,
+#			Chain={False: 'NoChain', True: 'Avalanche', 'NoChain': 'NoChain'}[ChainUndo],
+			PHAElement=PHAElement, ComponentName=ComponentName,
+			AssociatedTextListAttrib=AssociatedTextListAttrib,
+			HumanText=_(UndoEnglishText + ' %s') % type(PHAElement).HumanName,
+			ViewportID=Viewport.ID, Zoom=Zoom,
+			PanX=PanX, PanY=PanY, HostElementID=PHAElement.ID))
+
+	def ChangeAssociatedText_Undo(self, Proj, UndoRecord, **Args): # handle undo for change associated text
+		pass
+
+	def ChangeAssociatedText_Redo(self, Proj, RedoRecord, **Args): # handle redo for change associated text
 		pass
 
 	def UpdateFullExportAttribs(self, Proj, XMLRoot):
@@ -6071,7 +6117,8 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			info.PanXTag: str(self.PanX), info.PanYTag: str(self.PanY),
 			info.AssociatedTextTag: AssociatedTextContent}
 		vizop_misc.SendRequest(Socket=self.C2DSocketREQ, Command='RQ_FT_ChangeAssociatedText',
-			Proj=self.Proj.ID, PHAObj=self.PHAObjID, PHAElement=PHAElement.ID, AssociatedTextListAttrib=PHAComponent.AssociatedTextListAttrib,
+			Proj=self.Proj.ID, PHAObj=self.PHAObjID, PHAElement=PHAElement.ID,
+			AssociatedTextListAttrib=PHAComponent.AssociatedTextListAttrib,
 			Component=PHAComponent.InternalName, Viewport=self.ID, **ArgsToSend)
 
 	def DeleteAssociatedText(self, PHAElement, PHAComponent, DoomedAssociatedTextIndex):
