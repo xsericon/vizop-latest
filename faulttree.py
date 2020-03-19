@@ -4673,7 +4673,24 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 												 PanX=PanX, PanY=PanY, HostElementID=PHAElement.ID))
 
 	def NewAssociatedText_Undo(self, Proj, UndoRecord, **Args): # handle undo for add new associated text
-		pass
+		assert isinstance(Proj, projects.ProjectItem)
+		assert isinstance(UndoRecord, undo.UndoItem)
+		# find out which datacore socket to send messages on
+		SocketFromDatacore = vizop_misc.SocketWithName(TargetName=Args['SocketFromDatacoreName'])
+		# remove the newly added AssociatedText from the host list (doesn't assume it's the last one in the host's list)
+		AssociatedTextListInPHAElement = getattr(UndoRecord.PHAElement, UndoRecord.AssociatedTextListAttrib)
+		AssociatedTextListInProj = getattr(Proj, UndoRecord.AssociatedTextListAttrib)
+		DoomedAssociatedText = AssociatedTextListInPHAElement[-1]
+		AssociatedTextListInPHAElement.remove(DoomedAssociatedText)
+		# also remove it from the project's list, without assuming it's the last one in the list
+#		DoomedTextIndex = AssociatedTextListInProj.index(DoomedAssociatedText)
+		AssociatedTextListInProj.remove(DoomedAssociatedText)
+		# request Control Frame to switch to the Viewport that was visible when the original edit was made
+		self.RedrawAfterUndoOrRedo(UndoRecord, SocketFromDatacore)
+		projects.SaveOnFly(Proj, UpdateData=vizop_misc.MakeXMLMessage(RootName=info.FTTag,
+			Elements={info.IDTag: self.ID, info.ComponentHostIDTag: UndoRecord.PHAElement.ID}))
+		# TODO add data for the changed component to the Save On Fly data
+		return {'Success': True}
 
 	def NewAssociatedText_Redo(self, Proj, RedoRecord, **Args): # handle redo for add new associated text
 		pass
@@ -4701,7 +4718,19 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			PanX=PanX, PanY=PanY, HostElementID=PHAElement.ID))
 
 	def ChangeAssociatedText_Undo(self, Proj, UndoRecord, **Args): # handle undo for change associated text
-		pass
+		assert isinstance(Proj, projects.ProjectItem)
+		assert isinstance(UndoRecord, undo.UndoItem)
+		# find out which datacore socket to send messages on
+		SocketFromDatacore = vizop_misc.SocketWithName(TargetName=Args['SocketFromDatacoreName'])
+		# restore the previous text of the AssociatedText
+		AssociatedTextList = getattr(UndoRecord.PHAElement, UndoRecord.AssociatedTextListAttrib)
+		AssociatedTextList[UndoRecord.AssociatedTextIndex].Content = UndoRecord.OldAssociatedText
+		# request Control Frame to switch to the Viewport that was visible when the original edit was made
+		self.RedrawAfterUndoOrRedo(UndoRecord, SocketFromDatacore)
+		projects.SaveOnFly(Proj, UpdateData=vizop_misc.MakeXMLMessage(RootName=info.FTTag,
+			Elements={info.IDTag: self.ID, info.ComponentHostIDTag: UndoRecord.PHAElement.ID}))
+		# TODO add data for the changed component to the Save On Fly data
+		return {'Success': True}
 
 	def ChangeAssociatedText_Redo(self, Proj, RedoRecord, **Args): # handle redo for change associated text
 		pass
