@@ -18,6 +18,7 @@
 pip install wxPython==4.0.7.post2
 pip install pyzmq
 pip install openpyxl
+pip install reportlab
 ```
 
 * Lauch Vizop: `python vizop.py`
