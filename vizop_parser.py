@@ -225,7 +225,7 @@ def convertProjectToXml(Proj, ProjectFilename):
 				MyXMLRoot_NumberSystem_Chunk_StartSequenceAt.text  = pS(str(each_NumberSystem.StartSequenceAt))
 
 				#SkipTo
-				if each_NumberSystem.SkipTo is None:
+				if each_NumberSystem.SkipTo is not None:
 					MyXMLRoot_NumberSystem_Chunk_SkipTo = ET.SubElement(MyXMLRoot_NumberSystem_Chunk, info.SkipToTag)
 					MyXMLRoot_NumberSystem_Chunk_SkipTo.text = pS(str(each_NumberSystem.SkipTo))
 
@@ -299,8 +299,37 @@ def convertProjectToXml(Proj, ProjectFilename):
 						# TODO J: cannot map Catergory ID
 
 				# Value
-
 				for each_value in each_RiskMatrix.Value:
+					#assert type(each_value) == core_classes.RiskReceptorItem
+					# TODO how risk receptor contains a value? By which attribute?
+
+					assert issubclass(type(each_value), core_classes.NumValueItem)
+					MyXMLRoot_RiskMatrix_Entry = ET.SubElement(MyXMLRoot_RiskMatrix, info.EntryTag)
+
+					if type(each_value) == core_classes.UserNumValueItem:
+						# Kind
+						MyXMLRoot_RiskMatrix_Entry_Kind = ET.SubElement(MyXMLRoot_RiskMatrix_Entry, info.KindTag)
+
+						# RiskReceptor
+						MyXMLRoot_RiskMatrix_Entry_RiskReceptor = ET.SubElement(MyXMLRoot_RiskMatrix_Entry, info.RiskReceptorTag)
+						MyXMLRoot_RiskMatrix_Entry_RiskReceptor.text = None
+
+
+						pass
+					elif type(each_value) == core_classes.ConstantItem:
+
+						pass
+					elif type(each_value) == core_classes.LookupNumValueItem:
+
+						pass
+					elif type(each_value) == core_classes.CategoryNameItem:
+
+						pass
+					elif type(each_value) == core_classes.ParentNumValueItem:
+
+						pass
+
+
 					pass
 
 				pass
@@ -546,7 +575,7 @@ def convertProjectToXml(Proj, ProjectFilename):
 
 						else:
 							#RelatedConnector
-							if each_FTEvent.RelatedCX != None:
+							if each_FTEvent.RelatedCX is not None:
 								each_FTEvent.RelatedCX: faulttree.FTConnectorItemInCore
 								MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTConnector_RelatedConnector = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTConnector, info.RelatedConnectorTag)
 								MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTConnector_RelatedConnector.text = pS(each_FTEvent.RelatedCX.ID)
@@ -610,7 +639,7 @@ def convertProjectToXml(Proj, ProjectFilename):
 					MyXMLRoot_FaultTrees_FaultTree_CollapseGroup.text = pS(str(each_CollapseGroup.ID))
 
 			#ModelGate
-			if each_FaultTree.ModelGate != None:
+			if each_FaultTree.ModelGate is not None:
 				MyXMLRoot_FaultTrees_FaultTree_ModelGate = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree, info.ModelGateTag)
 				each_FaultTree.ModelGate: faulttree.FTGateItemInCore
 				MyXMLRoot_FaultTrees_FaultTree_ModelGate.text = pS(str(each_FaultTree.ModelGate.ID))

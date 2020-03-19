@@ -250,6 +250,7 @@ CollapseGroupTag = 'CollapseGroup'
 CategoriesTag = 'Categories'
 CategoryTag = 'Category'
 ConstValueTag = 'ConstValue'
+KindTag = 'Kind'
 
 FTImagePrefix = 'FT_' # filenames containing all images used in FT must begin with this
 ProjInfoImagePrefix = 'ProjInfo_'
