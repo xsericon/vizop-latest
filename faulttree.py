@@ -225,7 +225,6 @@ class ButtonElement(object): # object containing a button and attributes and met
 
 	def HandleMouseLClickOnActionItemButton(self, AssociatedTextItem=None, **Args):
 		# handle mouse left button single click on associated text (action item or parking lot) button
-		print('FT224 in action item button handler')
 		# toggle whether associated text items are visible
 		if self.AssociatedTextListAttrib == 'ActionItems':
 			self.HostObject.ShowActionItems = not self.HostObject.ShowActionItems
@@ -4488,6 +4487,9 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		elif Command == 'RQ_FT_ChangeAssociatedText':
 			Reply = self.HandleChangeAssociatedTextRequest(XMLRoot, Viewport=SourceViewport, Zoom=Zoom, PanX=PanX,
 				PanY=PanY)
+		elif Command == 'RQ_FT_DeleteAssociatedText':
+			Reply = self.HandleDeleteAssociatedTextRequest(XMLRoot, Viewport=SourceViewport, Zoom=Zoom, PanX=PanX,
+				PanY=PanY)
 		elif Command == 'OK': # dummy for 'OK' responses - received only to clear the sockets
 			Reply = vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
 		if Reply.tag == 'Fail': print('FT4490 command not recognised: ', Command)
@@ -4541,6 +4543,19 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			AssociatedTextIndex=int(XMLRoot.findtext(info.AssociatedTextIndexTag)), PHAElement=ThisPHAElement,
 			AssociatedTextListAttrib=AssociatedTextListAttrib, ComponentName=XMLRoot.findtext(info.ComponentTag),
 			Viewport=Viewport, Redoing=False, Zoom=Zoom, PanX=PanX, PanY=PanY)
+		return vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
+
+	def HandleDeleteAssociatedTextRequest(self, XMLRoot, Viewport, Zoom, PanX, PanY):
+		# handle request to delete existing AssociatedText
+		# find the corresponding element
+		ThisPHAElement = [e for e in WalkOverAllFTObjs(self) if e.ID == XMLRoot.findtext('PHAElement')][0]
+		# find the existing AssociatedText list
+		AssociatedTextListAttrib = XMLRoot.findtext('AssociatedTextListAttrib') # name of attrib containing AssociatedText list
+		# delete the AssociatedText from the required AssociatedText list
+		self.DoDeleteAssociatedText(DoomedAssociatedTextIndex=int(XMLRoot.findtext(info.AssociatedTextIndexTag)),
+							 PHAElement=ThisPHAElement, AssociatedTextListAttrib=AssociatedTextListAttrib,
+							 ComponentName=XMLRoot.findtext(info.ComponentTag), Viewport=Viewport, Redoing=False,
+							 Zoom=Zoom, PanX=PanX, PanY=PanY)
 		return vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
 
 	def DoAddNewComment(self, NewComment=None, PHAElement=None, ComponentName=None, CommentListAttrib='', Viewport=None,
@@ -4733,6 +4748,54 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		return {'Success': True}
 
 	def ChangeAssociatedText_Redo(self, Proj, RedoRecord, **Args): # handle redo for change associated text
+		pass
+
+	def DoDeleteAssociatedText(self, DoomedAssociatedTextIndex=None, PHAElement=None, ComponentName=None, AssociatedTextListAttrib='',
+						Viewport=None, Redoing=False, Zoom=1.0, PanX=0, PanY=0):
+		# delete AssociatedText at DoomedAssociatedTextIndex (int) from PHAElement's list in attrib named AssociatedTextListAttrib (str)
+		# ComponentName is the InternalName of the Viewport PHAElement's component that selects the AssociatedText for editing;
+		# needed for undo implementation
+		# Viewport: ViewportShadow corresponding to the Viewport from where the delete AssociatedText request was made
+		AssociatedTextList = getattr(PHAElement, AssociatedTextListAttrib)
+		AssociatedTextListInProj = getattr(self.Proj, AssociatedTextListAttrib)
+		# remove the doomed AssociatedText from PHAElement's list
+		DoomedAssociatedText = AssociatedTextList.pop(DoomedAssociatedTextIndex)
+		# remove the AssociatedText from the project's list
+		DoomedAssociatedTextIndexInProject = AssociatedTextListInProj.index(DoomedAssociatedText)
+		AssociatedTextListInProj.pop(DoomedAssociatedTextIndexInProject)
+		UndoEnglishText = 'delete %s in' % core_classes.AssociatedTextEnglishNamesSingular[AssociatedTextListAttrib]
+		undo.AddToUndoList(Proj=self.Proj, Redoing=Redoing,
+			UndoObj=undo.UndoItem(UndoHandler=self.DeleteAssociatedText_Undo,
+			RedoHandler=self.DeleteAssociatedText_Redo, DeletedAssociatedText=DoomedAssociatedText,
+			AssociatedTextIndex=DoomedAssociatedTextIndex, AssociatedTextIndexInProj=DoomedAssociatedTextIndexInProject,
+#			Chain={False: 'NoChain', True: 'Avalanche', 'NoChain': 'NoChain'}[ChainUndo],
+			PHAElement=PHAElement, ComponentName=ComponentName,
+			AssociatedTextListAttrib=AssociatedTextListAttrib,
+			HumanText=_(UndoEnglishText + ' %s') % type(PHAElement).HumanName,
+			ViewportID=Viewport.ID, Zoom=Zoom,
+			PanX=PanX, PanY=PanY, HostElementID=PHAElement.ID))
+
+	def DeleteAssociatedText_Undo(self, Proj, UndoRecord, **Args): # handle undo for delete associated text
+		assert isinstance(Proj, projects.ProjectItem)
+		assert isinstance(UndoRecord, undo.UndoItem)
+		# find out which datacore socket to send messages on
+		SocketFromDatacore = vizop_misc.SocketWithName(TargetName=Args['SocketFromDatacoreName'])
+		# reinsert the deleted AssociatedText into the host PHA element
+		AssociatedTextListInPHAElement = getattr(UndoRecord.PHAElement, UndoRecord.AssociatedTextListAttrib)
+		AssociatedTextListInProj = getattr(Proj, UndoRecord.AssociatedTextListAttrib)
+		AssociatedTextListInPHAElement.insert(UndoRecord.AssociatedTextIndex, UndoRecord.DeletedAssociatedText)
+		AssociatedTextListInProj.insert(UndoRecord.AssociatedTextIndexInProj, UndoRecord.DeletedAssociatedText)
+		# put the edited lists back into their hosts
+		setattr(UndoRecord.PHAElement, UndoRecord.AssociatedTextListAttrib, AssociatedTextListInPHAElement)
+		setattr(Proj, UndoRecord.AssociatedTextListAttrib, AssociatedTextListInProj)
+		# request Control Frame to switch to the Viewport that was visible when the original edit was made
+		self.RedrawAfterUndoOrRedo(UndoRecord, SocketFromDatacore)
+		projects.SaveOnFly(Proj, UpdateData=vizop_misc.MakeXMLMessage(RootName=info.FTTag,
+			Elements={info.IDTag: self.ID, info.ComponentHostIDTag: UndoRecord.PHAElement.ID}))
+		# TODO add data for the changed component to the Save On Fly data
+		return {'Success': True}
+
+	def DeleteAssociatedText_Redo(self, Proj, RedoRecord, **Args): # handle redo for delete associated text
 		pass
 
 	def UpdateFullExportAttribs(self, Proj, XMLRoot):
@@ -6153,7 +6216,6 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 	def DeleteAssociatedText(self, PHAElement, PHAComponent, DoomedAssociatedTextIndex):
 		# handle request from ControlFrame to delete AssociatedText in component PHAComponent of element PHAElement
 		# PHAComponent: the ButtonElement instance clicked to raise the AssociatedTexts for editing
-		assert isinstance(PHAElement, self.ElementTypesCanHostAssociatedTexts)
 		assert isinstance(DoomedAssociatedTextIndex, int)
 		# First, store info to enable Viewport to request the AssociatedText aspect in control panel after redraw
 		self.PreferredControlPanelAspect = PHAComponent.ControlPanelAspect # aspect identifier such as 'CPAspect_ActionItems'

@@ -3258,7 +3258,7 @@ class ControlFrame(wx.Frame):
 		assert isinstance(DoomedAssociatedTextIndex, int)
 		assert isinstance(Redoing, bool)
 		# request Viewport to update the PHAObj with the new AssociatedText
-		Viewport.DeleteComment(PHAElement=PHAElement, PHAComponent=Component,
+		Viewport.DeleteAssociatedText(PHAElement=PHAElement, PHAComponent=Component,
 			DoomedAssociatedTextIndex=DoomedAssociatedTextIndex)
 
 	# ControlFrame main body
