@@ -20,12 +20,19 @@ ButtonGraphicColour = (0xd0, 0xd0, 0xff) # blue-white, graphics colour for graph
 GateBorderColour = ButtonBorderColour
 GateBaseColourStr = '0x64, 0x64, 0xa0'
 GateBaseColour = (0x64, 0x64, 0xa0)
+ElementBaseColourSelected = (0xf2, 0xc5, 0xab)  # coral-orange; background colour for selected elements
+ElementHeaderBkgColour = (0xff, 0xff, 0xff) # white
 GateLabelBkgColour = ButtonBorderColour
 GateLabelFgColour = ButtonGraphicColour
 GateTextBkgColour = (0xb0, 0xb0, 0xff) # light grey
 GateTextFgColour = (0x00, 0x00, 0x00) # black
 HighlightColour = (0xfd, 0xf8, 0x47) # yellow
 HighlightColourStr = '253,248,71' # yellow
+# old colours no longer used
+OldHeaderLabelBkg = (0xdb, 0xf7, 0xf0)  # pale green
+OldColourLabelBkg = (0x80, 0x3E, 0x51)  # plum
+OldColourContentBkg = (0x6A, 0xDA, 0xBD)  # mint green
+
 ConnectingLineThicknessInCU = 4 # in canvas coords
 # XMLNames of event types whose value is a frequency or probability
 FTEventTypesWithFreqValue = ['InitiatingEvent', 'SIFFailureEvent', 'IntermediateEvent', 'TopEvent',
@@ -36,7 +43,6 @@ FTEventTypeNameHash = {'InitiatingEvent': _('Initiating event'), 'SIFFailureEven
 	'TopEvent': _('Top event'),
 	'ConnectorIn': _('Inward connector'), 'ConnectorOut': _('Outward connector'),
 	'EnablingCondition': _('Enabling condition'), 'ConditionalModifier': _('Conditional modifier')}
-
 
 def SILTarget(Mode='', RiskRed=1.0):
 	# returns SIL target (str) corresponding to RiskRed (PFH or RRF depending on Mode)
@@ -118,10 +124,9 @@ class ButtonElement(object): # object containing a button and attributes and met
 			'GateLinkedButton': 'FT_LinkButton', 'GateCommentButton': 'FT_CommentButton',
 			'GateActionItemButton': 'FT_ActionButton', 'ValueProblemButton': 'FT_ProblemButton',
 			'GateGroupedButton': 'FT_GroupButton', 'GateStyleButton': 'FT_GateStyleButton',
-			'ConnGroupedButton': 'FT_GroupButton', 'ValueProblemButton': 'FT_ProblemButton',
+			'ValueProblemButton': 'FT_ProblemButton',
 			'ConnDescriptionCommentButton': 'FT_CommentButton', 'ConnValueCommentButton': 'FT_CommentButton',
-			'ConnActionItemButton': 'FT_ActionButton', 'ConnParkingLotItemButton': 'FT_ParkingLotButton',
-			'ConnLinkedButton': 'FT_LinkButton'}[InternalName]
+			'ConnActionItemButton': 'FT_ActionButton', 'ConnParkingLotItemButton': 'FT_ParkingLotButton'}[InternalName]
 			# ArtProviderName is name to pass to ArtProvider + '_' + key of BitmapZoomed
 		self.SizeXInCU = self.SizeYInCU = 30 # no-zoom size in pixels
 		self.SetupImages()
@@ -635,7 +640,7 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 		self.PosXInCU = self.PosYInCU = 0 # X/Y-coord (canvas coords) of text container left end, top edge
 		self.StartY = 0 # Y-coord (canvas coords) of text container top edge, relative to whole of header.
 		self.EndX = self.EndXInCU = EndX # similar for right end of container (not the actual text in the container)
-		self.MinSizeXInCU = 100 # minimum width in canvas coords
+		self.MinSizeXInCU = Args.get('MinSizeX', 100) # minimum width in canvas coords
 		self.MinSizeYInCU = MinHeight # minimum height (canvas coords) for elements that can stretch
 		self.PosZ = 0 # z-coordinate
 		self.FillXSpace = True # whether element should expand to fill available space in X direction
@@ -1545,7 +1550,7 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 		# ConnectorKindHuman: Human description of the kind of comment; shown in Control Panel
 		ConnKind = TextElement(self.FT, Row=0, ColStart=0, ColSpan=4, EndX=199, HostObject=self,
 			InternalName='ConnKind', DisplAttrib='HumanName')
-		ConnName = TextElement(self.FT, Row=0, ColStart=4, ColSpan=3, EndX=274, HostObject=self,
+		ConnName = TextElement(self.FT, Row=0, ColStart=4, ColSpan=3, EndX=274, HostObject=self, MinSizeX=75,
 			InternalName='ConnName')
 		ConnDescription = TextElement(self.FT, Row=1, ColStart=0, ColSpan=4, EndX=199, MinHeight=50, HostObject=self,
 			InternalName='ConnectorDescription', PromptText=_('Type a description'), EditBehaviour='Text')
@@ -1553,12 +1558,12 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 			HostObject=self, InternalName='ConnDescriptionCommentButton', Stati=('OutNotExist', 'OutExist'),
 			LSingleClickHandler='HandleMouseLClickOnCommentButton', CommentKind='ConnectorDescriptionComments',
 			ControlPanelAspect='CPAspect_Comment', CommentKindHuman=_('Connector description'))
-		self.ConnLinkedButton = ButtonElement(self.FT, Row=1, ColStart=5, ColSpan=1, StartX=225, EndX=249,
-			HostObject=self, InternalName='ConnLinkedButton', Stati=('OutNotExist', 'OutExist'),
-			LSingleClickHandler=None)
-		ConnGroupedButton = ButtonElement(self.FT, Row=1, ColStart=6, ColSpan=1, StartX=250, EndX=274,
-			HostObject=self, InternalName='ConnGroupedButton', Stati=('OutNotExist', 'OutExist'),
-			LSingleClickHandler=None)
+#		self.ConnLinkedButton = ButtonElement(self.FT, Row=1, ColStart=5, ColSpan=1, StartX=225, EndX=249,
+#			HostObject=self, InternalName='ConnLinkedButton', Stati=('OutNotExist', 'OutExist'),
+#			LSingleClickHandler=None)
+#		ConnGroupedButton = ButtonElement(self.FT, Row=1, ColStart=6, ColSpan=1, StartX=250, EndX=274,
+#			HostObject=self, InternalName='ConnGroupedButton', Stati=('OutNotExist', 'OutExist'),
+#			LSingleClickHandler=None)
 		self.ConnValue = TextElement(self.FT, Row=2, ColStart=0, ColSpan=1, EndX=99, HostObject=self,
 			InternalName='Value', ControlPanelAspect='CPAspect_NumValue', EditBehaviour='Text')
 		self.ConnValueUnitComponent = TextElement(self.FT, Row=2, ColStart=1, ColSpan=1, EndX=149, HostObject=self,
@@ -1579,26 +1584,25 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 			LSingleClickHandler='HandleMouseLClickOnActionItemButton', AssociatedTextListAttrib='ParkingLotItems',
 			AssociatedTextNumberingListAttrib='ParkingLotItemNumbering', ControlPanelAspect='CPAspect_ParkingLot')
 		# make lists of elements: TopEls at top of connector, ValueEls relating to connector value
-		TopEls = [ConnKind, ConnName, ConnDescription, ConnGroupedButton, self.ConnDescriptionCommentButton,
-			self.ConnLinkedButton]
+		TopEls = [ConnKind, ConnName, ConnDescription, self.ConnDescriptionCommentButton]
 		ValueEls = [self.ConnValue, self.ConnValueUnitComponent, self.ValueProblemButton, self.ConnValueCommentButton,
 			self.ConnActionItemButton, self.ConnParkingLotItemButton]
-		# set text element colours
+		# set text element colours%%%
 		for El in TopEls + ValueEls:
 			if type(El) is TextElement:
-				El.Text.Colour = El.PromptTextObj.Colour = ColourContentFg
-				El.BkgColour = ColourContentBkg
-		ConnKind.BkgColour = HeaderLabelBkg
+				El.Text.Colour = El.PromptTextObj.Colour = GateTextFgColour
+				El.BkgColour = GateTextBkgColour
+		ConnKind.BkgColour = ElementHeaderBkgColour
 		return TopEls, ValueEls
 
 	def CreateVariableTextElements(self):
 		# create elements that vary depending on display settings - currently comments, action items and parking lot items
 		# return list of elements for each of description comments, action items, parking lot items, and value comments
 		# Returned lists are fully populated as if each associated text is visible (so that they can be shown on demand)
-		ColourLabelBkg = (0x80, 0x3E, 0x51) # plum
-		ColourLabelFg = (0xFF, 0xFF, 0xFF) # white
-		ColourContentBkg = (0x6A, 0xDA, 0xBD) # mint green
-		ColourContentFg = (0x00, 0x00, 0x00) # black
+#		ColourLabelBkg = (0x80, 0x3E, 0x51) # plum; now using global colour scheme
+#		ColourLabelFg = (0xFF, 0xFF, 0xFF) # white
+#		ColourContentBkg = (0x6A, 0xDA, 0xBD) # mint green
+#		ColourContentFg = (0x00, 0x00, 0x00) # black
 		# Make description comments, value comments and action items
 		DescrComments = []
 		ValueComments = []
@@ -1614,15 +1618,15 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 					CommentElementList.append(TextElement(self.FT, RowBase=CommentIndex, ColStart=1, ColSpan=6,
 						EndX=274, MinHeight=25, HostObject=self))
 					CommentElementList[-1].Text.Content = Comment
-					CommentElementList[-1].Text.Colour = ColourContentFg
-					CommentElementList[-1].BkgColour = ColourContentBkg
+					CommentElementList[-1].Text.Colour = GateTextFgColour
+					CommentElementList[-1].BkgColour = GateTextBkgColour
 					CommentElementList[-1].Text.ParaHorizAlignment = 'Left'
 				# add item label (e.g. 'Comment') at left side of first row of items, occupying as many rows as comments
 				CommentElementList.append(TextElement(self.FT, RowBase=0, ColStart=0, ColSpan=1, EndX=99,
 					RowSpan=max(1, len(CommentList)), HostObject=self))
 				CommentElementList[-1].Text.Content = CommentLabel
-				CommentElementList[-1].Text.Colour = ColourLabelFg
-				CommentElementList[-1].BkgColour = ColourLabelBkg
+				CommentElementList[-1].Text.Colour = GateLabelFgColour
+				CommentElementList[-1].BkgColour = GateLabelBkgColour
 				CommentElementList[-1].Text.ParaHorizAlignment = 'Centre'
 		return (DescrComments, ValueComments, ActionItems, ParkingLotItems)
 
@@ -1651,8 +1655,9 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 
 		def SetButtonStati(Components):
 			# set 'Status' attributes of buttons in Components; used to determine which bitmap is used to render button
-			for (ButtonName, Flag) in [('ConnLinkedButton', bool(self.LinkedFrom)),
-					('ConnGroupedButton', bool(self.CollapseGroups)),
+			for (ButtonName, Flag) in [
+#					('ConnLinkedButton', bool(self.LinkedFrom)),
+#					('ConnGroupedButton', bool(self.CollapseGroups)),
 					('ConnDescriptionCommentButton', bool(self.ConnectorDescriptionComments)),
 					('ConnActionItemButton', bool(self.ActionItems)),
 					('ConnParkingLotItemButton', bool(self.ParkingLotItems)),
@@ -1664,9 +1669,10 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 			if ValueProblemComponent:
 				ValueProblemComponent.Status = {True: 'Alert', False: 'Out'}[(self.ValueProblemObjectID is None)]
 
-		def DrawBackgroundBox(DC, Zoom): # draw FTConnector's background box in DC
+		def DrawBackgroundBox(DC, Zoom): # draw FTConnector's background box in DC%%%
 			DC.SetPen(wx.Pen(self.BorderColour, width=1)) # for now, a 1 pixel border around the event. TODO make nicer and apply zoom to border
-			BackgColour = self.BackgroundColourSelected if self in self.FT.CurrentElements else self.BackgroundColourUnselected
+#			BackgColour = self.BackgroundColourSelected if self in self.FT.CurrentElements else self.BackgroundColourUnselected
+			BackgColour = ElementBaseColourSelected if self in self.FT.CurrentElements else GateBaseColour
 			DC.SetBrush(wx.Brush(BackgColour))
 			# box is drawn in FTConnector's own bitmap, so coords are relative to element (not using PosX/YInPx, which are relative to column)
 			DC.DrawRectangle(0, 0, self.SizeXInPx, self.SizeYInPx)
@@ -1883,7 +1889,8 @@ class FTColumn(object): # object containing a column of FT objects for display, 
 								  if ((ThisEl.Selected or not SelectedOnly) and (ThisEl.Visible or not VisibleOnly))])
 
 def CalculateRowAndColumnDimensions(Elements, GapBetweenCols, GapBetweenRows, MinColWidth, BorderX, BorderY):
-	# for any kind of components in an FT element, calculate and return column and row sizes in canvas coords (lists), including GapBetweenRows
+	# for any kind of components in an FT element, calculate and return column and row sizes in canvas coords (lists),
+	# including GapBetweenRows%%%
 	# BorderX and BorderY is left and right / top and bottom border to allow
 	# returns lists: ColWidths, ColStartXs, ColEndXs, RowHeights, RowStartYs, RowEndYs
 	# make lists to write into, containing same number of items as the number of columns/rows required
@@ -1902,10 +1909,10 @@ def CalculateRowAndColumnDimensions(Elements, GapBetweenCols, GapBetweenRows, Mi
 		# The 'sum' function calculates the space already assigned in columns prior to the last column
 		if El.ColSpan > 1:
 			ColWidths[El.ColStart + El.ColSpan - 1] = max(ColWidths[El.ColStart + El.ColSpan - 1],
-				El.MinSizeX - sum(ColWidths[El.ColStart:El.ColStart+El.ColSpan-1]))
+				El.MinSizeX - sum(ColWidths[El.ColStart:El.ColStart+El.ColSpan]))
 		if El.RowSpan > 1:
 			RowHeights[El.Row + El.RowSpan - 1] = max(RowHeights[El.Row + El.RowSpan - 1],
-				MinSizeY - sum(RowHeights[El.Row:El.Row+El.RowSpan-1]))
+				MinSizeY - sum(RowHeights[El.Row:El.Row+El.RowSpan]))
 	# add GapBetweenCols to each column width
 	ColWidths = [w + GapBetweenCols for w in ColWidths]
 	# add GapBetweenRows to each row height
