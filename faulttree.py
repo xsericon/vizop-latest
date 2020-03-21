@@ -1084,6 +1084,8 @@ class FTGate(FTBoxyObject): # object containing FT gates for display. These belo
 	Attribs = [(info.IDTag, int, False), ('Algorithm', str, False), ('BackgColour', 'rgb', False), ('Style', str, False), ('Numbering', str, False),
 		('Description', str, False), ('Value', str, False), ('ValueUnit', str, False), ('Status', int, False), ('CanEdit', bool, False),
 		('DescriptionComment', str, True), ('ValueComment', str, True), ('ValueUnitComment', str, True), ('ConnectTo', int, True)]
+	# class human name
+	HumanName = _('gate')
 	# human readable names per algorithm
 	GateKindHash = {'AND': _('AND gate'), 'OR': _('OR gate'), 'MutExcOR': _('Mutually exclusive'),
 		'NAND': _('NAND gate'), 'NOR': _('NOR gate'), '2ooN': _(u'≥2 out of N'), '3ooN': _(u'≥3 out of N')}
@@ -1881,12 +1883,13 @@ class FTColumn(object): # object containing a column of FT objects for display, 
 								  if ((ThisEl.Selected or not SelectedOnly) and (ThisEl.Visible or not VisibleOnly))])
 
 def CalculateRowAndColumnDimensions(Elements, GapBetweenCols, GapBetweenRows, MinColWidth, BorderX, BorderY):
-	# for any kind of FT elements, calculate and return column and row sizes in canvas coords (lists), including GapBetweenRows
+	# for any kind of components in an FT element, calculate and return column and row sizes in canvas coords (lists), including GapBetweenRows
 	# BorderX and BorderY is left and right / top and bottom border to allow
 	# returns lists: ColWidths, ColStartXs, ColEndXs, RowHeights, RowStartYs, RowEndYs
 	# make lists to write into, containing same number of items as the number of columns/rows required
-	ColWidths = [MinColWidth] * (1 + max([El.ColStart + El.ColSpan - 1 for El in Elements]))
-	RowHeights = [0] * (1 + max([El.Row for El in Elements]))
+	# the [0] is to avoid crash if the element has no components
+	ColWidths = [MinColWidth] * (1 + max([El.ColStart + El.ColSpan - 1 for El in Elements] + [0]))
+	RowHeights = [0] * (1 + max([El.Row for El in Elements] + [0]))
 	# put the required max heights in each element in the row heights list
 	for El in Elements:
 		El.MinSizeX, MinSizeY = El.MinSizeInCU
@@ -5250,6 +5253,9 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 				('Unit', 'ValueUnit'), ('ValueProblemID', 'ValueProblemID') ]
 			for Tag, Attrib in DataInfoAsStr:
 				setattr(NewGate, Attrib, XMLObj.findtext(Tag, default=''))
+			# recover preserved attribs from previous Viewport layout; do this after recovering ID
+			NewGate.RecoverPreservedAttribs()
+			print('FT5256 recovered gate is in detailed view: ', NewGate.DetailedView)
 			DataInfoAsBool = [ ('MadeBySystem', 'MadeBySystem'),
 				('ShowDescriptionComments', 'ShowComments'), ('FTGateLinked', 'Linked') ]
 			for Tag, Attrib in DataInfoAsBool:
@@ -5261,8 +5267,8 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 				setattr(NewGate, Attrib, [El.text for El in XMLObj.findall(Tag)])
 			# populate gate kind choice
 			NewGate.GateKind.ObjectChoices = [core_classes.ChoiceItem(XMLName=ThisTag.text,
-														 HumanName=NewGate.GateKindHash[ThisTag.text],
-														 Applicable=utilities.Bool2Str(ThisTag.get(info.ApplicableAttribName)))
+				 HumanName=NewGate.GateKindHash[ThisTag.text],
+				 Applicable=utilities.Bool2Str(ThisTag.get(info.ApplicableAttribName)))
 											  for ThisTag in XMLObj.findall(info.FTGateTypeOptionTag)]
 			# populate gate value unit choice
 			NewGate.GateValueUnit.ObjectChoices = []
@@ -5276,11 +5282,12 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			SetValueProblemButtonStatus(FTElement=NewGate, XMLObj=XMLObj)
 			# create variable elements and build combined element list comprising fixed and variable elements
 			(NewGate.DescriptionCommentEls, NewGate.ActionItemEls) = NewGate.CreateVariableTextElements()
-			NewGate.AllComponents = BuildFullElementList(
-				NewGate.TopFixedEls, NewGate.ValueFixedEls, NewGate.DescriptionCommentEls, NewGate.ActionItemEls)
-			NewGate.PopulateTextElements(NewGate.AllComponents) # put required text values in the components
-			# recover preserved attribs from previous Viewport layout
-			NewGate.RecoverPreservedAttribs()
+			if NewGate.DetailedView: # populate components if gate is shown in detailed view (not just a gate symbol)%%%
+#			if True:
+				NewGate.AllComponents = BuildFullElementList(
+					NewGate.TopFixedEls, NewGate.ValueFixedEls, NewGate.DescriptionCommentEls, NewGate.ActionItemEls)
+				NewGate.PopulateTextElements(NewGate.AllComponents) # put required text values in the components
+			else: NewGate.AllComponents = []
 			return NewGate
 
 		def PopulateDisplayAttribs(FT, DisplayAttribData):
@@ -5517,6 +5524,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 				# set PosX/Y of components within elements
 				if hasattr(ThisElement, 'AllComponents'):
 					for ThisComponent in ThisElement.AllComponents:
+						if not hasattr(ThisComponent, 'PosXInCU'): print('FT5520 component: ', ThisComponent.InternalName) # %%% for debug
 						ThisComponent.PosXInPx = ThisElement.PosXInPx + (ThisComponent.PosXInCU * self.Zoom)
 						ThisComponent.PosYInPx = ThisElement.PosYInPx + (ThisComponent.PosYInCU * self.Zoom)
 				# set overall column width
