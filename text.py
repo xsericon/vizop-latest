@@ -238,6 +238,8 @@ def RequiredPointSize(BasicPointSize, CanvZoomX=1.0, CanvZoomY=1.0, StandOutFrac
 def CalculateTextSizeAndSpacing(El, Text, TextIdentifier, VertAlignment, CanvZoomX, CanvZoomY):
 	# calculate all required values for drawing text, including dividing the text into lines and chunks
 	# returned ScaledPointSizeNoZoom does not take account of zoom
+	# return:
+	#	Sublines (list of str; chars in each subline, rich text)
 
 	def FindYaboveText(El, TextIdentifier, TextLines, FirstYaboveText, LineSpacing, Iterations, VertAlignment, Yhere,
 			Xsofar, IsFmtCmd):
@@ -249,7 +251,7 @@ def CalculateTextSizeAndSpacing(El, Text, TextIdentifier, VertAlignment, CanvZoo
 		MinTopBottomDiffCentreAligned = 0.91  # reciprocal of above
 		MaxTopBottomDiffBottomAligned = 0.1  # target ratio of bottomY:topY when bottom aligned
 		MaxIterations = 10  # to avoid infinite loop
-		Sublines = []  # rich text content of each subline
+		Sublines = [] # rich text content of each subline
 		SublineHeights = []  # list of (height above baseline, descent below baseline) for each subline
 		SublineX = [ [0] ]  # list of [per subline: [x offset from start of line, at left edge of each character]]
 		SublineY = [ [] ]  # list of [per subline: [ (height above baseline, descent below baseline) per character]]
@@ -475,13 +477,17 @@ def TextSize(El, Text, TextIdentifier, CanvZoomX, CanvZoomY, VertAlignment='Top'
 	return (Xsize, YaboveText, YatTextBottom)
 
 def DrawTextInElement(El, dc, Text, TextIdentifier, LayerOffsetX=0, LayerOffsetY=0, CanvZoomX=1.0, CanvZoomY=1.0,
-  	PanX=0, PanY=0, TextSizeRatio=1.0, VertAlignment='Centre'):
+  	PanX=0, PanY=0, TextSizeRatio=1.0, VertAlignment='Centre', DrawCursor=False, CursorIndex=0,
+			CursorColour=(0,0,0)):
 	# draw Text (text object instance) inside element El, correctly positioned in available y-space.
 	# TextIdentifier (int): which text object in El we are drawing; El needs this to work out which Y values to supply
 	# LayerOffsetX/Y is the pixel offset to apply for the display device (compensating for offset of device drawing box within device)
 	# PanX, PanY (int/float): pixel offset for the element within the display device due to panning
 	# TextSizeRatio is enlargement factor for Standout; simply increases the font size
 	# VertAlignment can be 'Centre', 'Top' or 'Bottom'
+	# DrawCursor (bool): whether to draw caret
+	# CursorIndex (int): position in raw text at which to draw caret
+	# CursorColour (3-tuple of int)
 	# Overall strategy:
 	# 1. set up data needed to determine best Y to draw text and where to split lines
 	# 2. recursively select best Y using FindYaboveText() (only needed if VertAlignment is 'Centre')
@@ -562,6 +568,7 @@ def DrawTextInElement(El, dc, Text, TextIdentifier, LayerOffsetX=0, LayerOffsetY
 			SublineHeight = SublineHeights[SublineNo][0]  # Y distance from subline top to baseline
 			SublineTHeight = SublineHeight + SublineHeights[SublineNo][1]  # Y distance from subline top to descender
 			# leftmost available position for text within El, relative to layer, in pixels
+			# TODO consider using FindTextXStart() to replace the following lines
 			MinXavail, DummyY = utilities.ScreenCoords(El.MinTextXat(TextIdentifier,
 				YStart, YStart + SublineTHeight), 0, Zoom=ZoomX, PanX=0, PanY=0)
 			MaxXavail, DummyY = utilities.ScreenCoords(El.MaxTextXat(TextIdentifier,
@@ -611,6 +618,59 @@ def DrawTextInElement(El, dc, Text, TextIdentifier, LayerOffsetX=0, LayerOffsetY
 				CharsSoFar += len(Chunk)
 			YStart += (SublineHeight + SublineHeights[SublineNo][1]) * Text.LineSpacing  # set up for next subline
 
+	def FindTextXYStart(TextIdentifier, YStartInPx, Zoom, SublineNo):
+		# find and return absolute X and Y position to start the specified subline
+		# working here %%%
+		SublineHeight = SublineHeights[SublineNo][0]  # Y distance from subline top to baseline
+		SublineTHeight = SublineHeight + SublineHeights[SublineNo][1]  # Y distance from subline top to descender
+		# find starting Y coord for the specified subline
+		YStartThisSubline = YStartInPx
+		for ThisSublineIndex in range(1, SublineNo + 1):
+			YStartThisSubline += (SublineHeight + SublineHeights[ThisSublineIndex][1]) * Text.LineSpacing
+		# find leftmost available position for text within El, relative to layer, in pixels
+		MinXavail, DummyY = utilities.ScreenCoords(El.MinTextXat(TextIdentifier,
+			YStartThisSubline, YStartThisSubline + SublineTHeight), 0, Zoom=Zoom,
+												   PanX=0, PanY=0)
+		MaxXavail, DummyY = utilities.ScreenCoords(El.MaxTextXat(TextIdentifier,
+			YStartThisSubline, YStartThisSubline + SublineTHeight), 0, Zoom=Zoom,
+												   PanX=0, PanY=0)
+		# calculate starting X, depending on alignment
+		if Text.ParaHorizAlignment == 'Left':
+			XStartAbs = LayerOffsetX + PanX + MinXavail
+		elif Text.ParaHorizAlignment == 'Right':
+			XStartAbs = LayerOffsetX + PanX + MaxXavail - SublineX[SublineNo][-1]
+		elif Text.ParaHorizAlignment == 'Centre':
+			XStartAbs = LayerOffsetX + PanX + (0.5 * (MinXavail + MaxXavail - SublineX[SublineNo][-1]))
+		else:  # bug trapping
+			XStartAbs = LayerOffsetX + PanX + MinXavail
+			print(
+				"Oops, unrecognised text alignment '%s' (problem code TE638). This is a bug, please report it" % Text.ParaHorizAlignment)
+		return XStartAbs, YStartThisSubline
+
+	def DrawTheCursor(TextIdentifier, CursorIndex, CursorColour, YStartInPx, Zoom):
+		assert isinstance(CursorIndex, int)
+		# first, find which subline contains the cursor
+		ThisSublineIndex = 0
+		CumulativeCharCount = 0
+		while (ThisSublineIndex < len(Sublines)) and (CumulativeCharCount < CursorIndex):
+			CumulativeCharCount += len(Sublines[ThisSublineIndex])
+			if (CumulativeCharCount < CursorIndex): ThisSublineIndex += 1
+		# find the starting X, Y position of the subline
+		XStartAbs, YStartAbs = FindTextXYStart(TextIdentifier, YStartInPx, Zoom, ThisSublineIndex)
+		# find the absolute x-coordinate to draw the top left of the cursor
+		# is the cursor beyond the end of the text?
+		if CursorIndex >= len(Text.Content):
+			CursorX = XStartAbs + SublineX[ThisSublineIndex][-1]
+		else:
+			CursorX = XStartAbs + SublineX[ThisSublineIndex][CursorIndex - CumulativeCharCount]
+		CursorY = LayerOffsetY + PanY + YStartAbs
+#		CursorY = LayerOffsetY + PanY + YStartAbs + SublineHeight - SublineY[SublineNo][CursorIndex - CumulativeCharCount][0]
+		# draw the cursor
+		dc.SetPen(wx.Pen(CursorColour, width=max(1, int(round(2 * Zoom)))))
+		print('Drawing cursor at: ', CursorX, CursorY)
+		dc.DrawLine(CursorX, CursorY, CursorX, CursorY + SublineHeights[ThisSublineIndex][0] +
+			SublineHeights[ThisSublineIndex][1])
+
 	# main procedure for DrawTextInElement()
 	if Text.Content.strip(): # don't process if text content is empty or whitespace only
 		(YaboveText, Sublines, SublineHeights, SublineX, SublineY, ScaledPointSizeNoZoom, YatTextBottom) =\
@@ -621,6 +681,8 @@ def DrawTextInElement(El, dc, Text, TextIdentifier, LayerOffsetX=0, LayerOffsetY
 		# actually draw the text
 		RenderText(YStartInPx, Sublines, SublineHeights, SublineX,
 	   		SublineY, ScaledPointSizeNoZoom, El.TextStandoutBackColour(TextIdentifier), ZoomX=CanvZoomX, ZoomY=CanvZoomY)
+		if DrawCursor:
+			DrawTheCursor(TextIdentifier, CursorIndex, CursorColour, YStartInPx, Zoom=CanvZoomY)
 
 def UpdateStoredText(TextObj, Change, ChangePoint, NoOfChars, String):
 	# change the text stored in TextObj. Change is 'Insertion', 'Deletion' or 'Replacement'.

@@ -24,7 +24,7 @@ ElementBaseColourSelected = (0xf2, 0xc5, 0xab)  # coral-orange; background colou
 ElementHeaderBkgColour = (0xff, 0xff, 0xff) # white
 EditingTextFgColour = (0x00, 0x00, 0x00) # black for foregrounds of text components being edited
 EditingTextBkgColour = (0xff, 0xff, 0xff) # white for backgrounds of text components being edited
-EditingTextCursorColour = (0x6a, 0xda, 0xbd) # mint green for cursor in text components being edited
+EditingTextCursorColour = (0xff, 0x00, 0x00) # red for cursor in text components being edited
 EditingTextBorderColour = (0x20, 0x20, 0x30) # deep grey, border colour for border of edit-in-place text box
 DefaultTextFgColour = (0x20, 0x20, 0x20) # dark grey for foreground of text components not being edited
 LabelFgColour = (0xb0, 0xb0, 0xff) # light grey for foreground of label texts in elements
@@ -728,7 +728,6 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 		# Optional arg Highlight (bool): whether to highlight the background box
 		DefaultRound = 3 # default value of BackBoxRoundedness if not supplied
 		EditingText = (self.FT.CurrentEditComponent is self) # whether we are currently editing text in this component
-		print('FT730 EditingText: ', EditingText)
 		# set background colour according to whether to highlight
 		BkgColour = EditingTextBkgColour if EditingText \
 			else HighlightColour if Args.get('Highlight', False) else self.BkgColour
@@ -826,6 +825,8 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 	def StartEditingAsText(self, Zoom): # handle request to edit contents of component as text%%%
 		# First, redraw the FT so that the text component gets its new appearance (colour, border etc)
 		print('FT826 in StartEditingAsText with self.FT.CurrentEditComponent:', self.FT.CurrentEditComponent)
+		# put the cursor at the end of the text being edited
+		self.FT.TextEditCursorIndex = len(self.Text.Content)
 		self.RedrawDuringEditing(Zoom=Zoom)
 #		self.FT.DisplDevice.Redraw(FullRefresh=False) # optimization, could redraw only this element
 
@@ -839,13 +840,15 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 			self.SizeXInCU * Zoom, self.SizeYInCU * Zoom)
 		# populate the box with the current text
 		self.Text.Content = 'Blah'
+		self.FT.TextEditCursorIndex = 2
 		self.Text.Colour = (0,0,0)
 		self.Text.ParaHorizAlignment = 'Left'
 		# 6 in the line below is an adjustment factor to get the text position to look natural
 		text.DrawTextInElement(self, TextEditDC, self.Text, TextIdentifier=0, CanvZoomX=Zoom,
 			CanvZoomY=Zoom, LayerOffsetX=self.TextCtrlPosXInPxWithinDisplDevice,
 			LayerOffsetY=self.TextCtrlPosYInPxWithinDisplDevice - self.SizeYInPx + int(round(6 * Zoom)),
-			VertAlignment='Top')
+			VertAlignment='Top', DrawCursor=True, CursorIndex=self.FT.TextEditCursorIndex,
+			CursorColour=EditingTextCursorColour)
 
 
 	def OnEditChoice(self, Event): # handle click in choice box during editing
