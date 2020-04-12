@@ -22,6 +22,12 @@ GateBaseColourStr = '0x64, 0x64, 0xa0'
 GateBaseColour = (0x64, 0x64, 0xa0)
 ElementBaseColourSelected = (0xf2, 0xc5, 0xab)  # coral-orange; background colour for selected elements
 ElementHeaderBkgColour = (0xff, 0xff, 0xff) # white
+EditingTextFgColour = (0x00, 0x00, 0x00) # black for foregrounds of text components being edited
+EditingTextBkgColour = (0xff, 0xff, 0xff) # white for backgrounds of text components being edited
+EditingTextCursorColour = (0x6a, 0xda, 0xbd) # mint green for cursor in text components being edited
+EditingTextBorderColour = (0x20, 0x20, 0x30) # deep grey, border colour for border of edit-in-place text box
+DefaultTextFgColour = (0x20, 0x20, 0x20) # dark grey for foreground of text components not being edited
+LabelFgColour = (0xb0, 0xb0, 0xff) # light grey for foreground of label texts in elements
 GateLabelBkgColour = ButtonBorderColour
 GateLabelFgColour = ButtonGraphicColour
 GateTextBkgColour = (0xb0, 0xb0, 0xff) # light grey
@@ -347,43 +353,43 @@ class FTHeader(object): # FT header object. Rendered by drawing text into bitmap
 
 		# internal names must match attrib names in FTObjectInCore instance
 		SIFNameLabel = TextElement(self.FT, Row=0, ColStart=0, ColSpan=1, StartX=0, EndX=Col1XStartInCU-1,
-			HostObject=self, InternalName='SIFNameLabel')
+			HostObject=self, InternalName='SIFNameLabel', DefaultFgColour=LabelFgColour)
 		HumanName = TextElement(self.FT, Row=0, ColStart=1, ColSpan=3, StartX=Col1XStartInCU, EndX=999,
 			HostObject=self, InternalName='HumanName', EditBehaviour='Text', MaxWidthInCU=600)
 		RevLabel = TextElement(self.FT, Row=1, ColStart=0, ColSpan=1, StartX=0, EndX=Col1XStartInCU-1,
-			HostObject=self, InternalName='RevLabel')
+			HostObject=self, InternalName='RevLabel', DefaultFgColour=LabelFgColour)
 		Rev = TextElement(self.FT, Row=1, ColStart=1, ColSpan=1, StartX=Col1XStartInCU, EndX=499,
 			HostObject=self, InternalName='Rev', EditBehaviour='Text', MaxWidthInCU=200)
 		ModeLabel = TextElement(self.FT, Row=1, ColStart=2, ColSpan=1, StartX=500, EndX=749,
-			HostObject=self, InternalName='ModeLabel')
+			HostObject=self, InternalName='ModeLabel', DefaultFgColour=LabelFgColour)
 		self.OpModeComponent = TextElement(self.FT, Row=1, ColStart=3, ColSpan=1, StartX=750, EndX=999,
 			HostObject=self, InternalName='OpMode', EditBehaviour='Choice', ObjectChoices=[],
 			DisplAttrib='HumanName')
 		self.RRLabel = TextElement(self.FT, Row=2, ColStart=0, ColSpan=1, StartX=0, EndX=Col1XStartInCU-1,
 			HostObject=self, InternalName='RRLabel', EditBehaviour='Choice', ObjectChoices=[],
-			DisplAttrib='HumanName')
+			DisplAttrib='HumanName', DefaultFgColour=LabelFgColour)
 		self.RRComponent = TextElement(self.FT, Row=2, ColStart=1, ColSpan=3, StartX=Col1XStartInCU, EndX=749,
 			HostObject=self, InternalName='RR', EditBehaviour='Choice', ObjectChoices=[],
 			DisplAttrib='HumanName')
 		SeverityLabel = TextElement(self.FT, Row=3, ColStart=0, ColSpan=1, StartX=0, EndX=Col1XStartInCU-1,
-			HostObject=self, InternalName='SeverityLabel')
+			HostObject=self, InternalName='SeverityLabel', DefaultFgColour=LabelFgColour)
 		self.SeverityComponent = TextElement(self.FT, Row=3, ColStart=1, ColSpan=1, StartX=Col1XStartInCU, EndX=499,
 			HostObject=self, InternalName='Severity', EditBehaviour='Choice', ObjectChoices=[], DisplAttrib='HumanName')
 		TolFreqLabel = TextElement(self.FT, Row=4, ColStart=0, ColSpan=1, StartX=0, EndX=Col1XStartInCU-1,
-			HostObject=self, InternalName='TolFreqLabel')
+			HostObject=self, InternalName='TolFreqLabel', DefaultFgColour=LabelFgColour)
 		TolFreq = TextElement(self.FT, Row=4, ColStart=1, ColSpan=1, StartX=Col1XStartInCU, EndX=499,
 			HostObject=self, InternalName='TolFreq', EditBehaviour='EditInControlPanel',
 			ControlPanelAspect='CPAspect_NumValue')
 		UELLabel = TextElement(self.FT, Row=4, ColStart=2, ColSpan=1, StartX=500, EndX=749,
-			HostObject=self, InternalName='UELLabel')
+			HostObject=self, InternalName='UELLabel', DefaultFgColour=LabelFgColour)
 		UEL = TextElement(self.FT, Row=4, ColStart=3, ColSpan=1, StartX=750, EndX=999,
 			HostObject=self, InternalName='UEL')
 		RRFLabel = TextElement(self.FT, Row=5, ColStart=0, ColSpan=1, StartX=0, EndX=Col1XStartInCU-1,
-			HostObject=self, InternalName='RRFLabel')
+			HostObject=self, InternalName='RRFLabel', DefaultFgColour=LabelFgColour)
 		RRF = TextElement(self.FT, Row=5, ColStart=1, ColSpan=1, StartX=Col1XStartInCU, EndX=499,
 			HostObject=self, InternalName='RRF')
 		SILLabel = TextElement(self.FT, Row=5, ColStart=2, ColSpan=1, StartX=500, EndX=749,
-			HostObject=self, InternalName='SILLabel')
+			HostObject=self, InternalName='SILLabel', DefaultFgColour=LabelFgColour)
 		SIL = TextElement(self.FT, Row=5, ColStart=3, ColSpan=1, StartX=750, EndX=999,
 			HostObject=self, InternalName='SIL')
 		# make lists of label and content elements (used for setting colours, below)
@@ -609,7 +615,7 @@ class FTBoxyObject(object): # superclass of vaguely box-like FT components for u
 				Deselect=(Args['Event'].CmdDown() and (self in self.FT.CurrentElements)))
 
 class TextElement(FTBoxyObject): # object containing a text object and other attributes and methods needed to render it
-	# Consists of a single text inside a coloured box. It's a component of an FTHeader, FTConnector or FTEvent.
+	# Consists of a single text inside a coloured box. It's a component of an FTHeader, FTConnector, FTGate or FTEvent.
 
 	def __init__(self, FT, Row=0, RowBase=0, ColStart=0, ColSpan=1, RowSpan=1, EndX=200, MinHeight=10, InternalName='',
 				 HostObject=None, PromptText='', **Args):
@@ -623,6 +629,7 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 		#		'Text': provide textbox prefilled with the component's display value
 		#		'Choice': provide choice widget
 		#		'EditInControlPanel': don't allow edit-in-place; editing allowed only in a control panel aspect
+		#	DefaultFgColour (3-tuple of int) Normal colour of text; if not supplied, uses DefaultTextFgColour
 		FTBoxyObject.__init__(self, **Args)
 		assert isinstance(FT, FTForDisplay)
 		assert isinstance(RowSpan, int)
@@ -657,7 +664,8 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 		self.PromptTextObj.Content = PromptText
 		self.PromptTextObj.Italics = text.BIUSNoEffectValue + 1 # show prompt text in italics
 		self.InternalName = InternalName # name used to identify specific elements
-		self.BkgColour = (0x40, 0x40, 0x40)
+		self.DefaultFgColour = Args.get('DefaultFgColour', DefaultTextFgColour)
+#		self.BkgColour = (0x40, 0x40, 0x40)
 		self.Visible = True
 		self.Selected = False # whether highlighted as part of user selection
 		self.IsClickable = True
@@ -715,12 +723,15 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 	def UsePromptText(self): # return True if we should display a prompt text instead of the actual text
 		return (self.Text.Content == '')
 
-	def Draw(self, DC, Zoom, **Args): # render text element, including background box, in DC
+	def Draw(self, DC, Zoom, **Args): # render text element, including background box, in DC%%%
 		# Optional arg BackBoxRoundedness: radius of background box corner curvature, in canvas coords
 		# Optional arg Highlight (bool): whether to highlight the background box
 		DefaultRound = 3 # default value of BackBoxRoundedness if not supplied
+		EditingText = (self.FT.CurrentEditComponent is self) # whether we are currently editing text in this component
+		print('FT730 EditingText: ', EditingText)
 		# set background colour according to whether to highlight
-		BkgColour = HighlightColour if Args.get('Highlight', False) else self.BkgColour
+		BkgColour = EditingTextBkgColour if EditingText \
+			else HighlightColour if Args.get('Highlight', False) else self.BkgColour
 		DC.SetPen(wx.Pen(BkgColour))
 		DC.SetBrush(wx.Brush(BkgColour))
 		# find starting coords in pixels relative to the header/column bitmap (need not take Pan into account)
@@ -729,13 +740,13 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 			(self.EndYInCU - self.PosYInCU) * Zoom, radius=Args.get('BackBoxRoundedness', DefaultRound) * Zoom)
 		# if the text content is empty, provide a prompt text from the text component's PromptText attrib, if any
 		TextToShow = self.PromptTextObj if self.UsePromptText() else self.Text
+		TextToShow.Colour = EditingTextFgColour if EditingText else self.DefaultFgColour
 		# draw the text on top of the box
 		text.DrawTextInElement(self, DC, TextToShow, TextIdentifier=0, CanvZoomX=Zoom,
 			CanvZoomY=Zoom, PanX=0, PanY=0, VertAlignment='Top')
 
 	def HandleMouseLClickOnMe(self, **Args): # handle mouse left button single click on TextElement instance
 		# first, request control frame to show appropriate aspect in control panel
-		# first, try to go to any preferred aspect of the Control panel, if our display device has a control panel
 		if getattr(self, 'ControlPanelAspect', None):
 			# if editing a component in the header, get the component name
 			if isinstance(self.HostObject, FTHeader):
@@ -772,26 +783,27 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 			elif self.InternalName == 'EventValueUnit' and ThisEventType == 'SIFFailureEvent': MyEditBehaviour = None
 			elif self.InternalName == 'EventValueKind' and ThisEventType == 'SIFFailureEvent': MyEditBehaviour = None
 			if MyEditBehaviour == 'Text':
-				# make and populate a TextCtrl for editing
-				self.FT.PaintNeeded = False # suppress paint while TextCtrl is in use, as the cursor blinking triggers
-					# needless paint events - see ControlFrame.EditPanel.OnPaint()
-					# TODO resolve issue in MacOS - we get a thick white border during editing
-				self.EditTextCtrl = wx.TextCtrl(parent=self.FT.DisplDevice, value=self.Text.Content,
-					pos=(self.TextCtrlPosXInPxWithinDisplDevice, self.TextCtrlPosYInPxWithinDisplDevice),
-					size=(self.SizeXInCU * Zoom, (self.SizeYInCU + 5) * Zoom),
-					style=wx.TE_PROCESS_ENTER | wx.HSCROLL | wx.TE_BESTWRAP) # + 5 for better visual effect
-				self.EditTextCtrl.SetFocus()
-				self.EditTextCtrl.SetInsertionPointEnd() # set cursor to end of existing text
-				self.EditTextCtrl.SetFont(wx.Font(pointSize=int(round(self.Text.PointSize * Zoom)), family=DefaultFontFamily,
-					style=wx.FONTSTYLE_NORMAL, weight=wx.FONTWEIGHT_NORMAL, faceName=self.Text.Font))
-				self.EditTextCtrl.SetForegroundColour(self.Text.Colour)
-				self.EditTextCtrl.SetBackgroundColour(self.BkgColour)
-				self.EditTextCtrl.Bind(wx.EVT_TEXT_ENTER, self.FT.EndEditingOperation)
-				self.EditTextCtrl.Bind(wx.EVT_KEY_DOWN, self.OnKeyDown) # for detection of Esc keypresses
 				# store info required to close out editing when finished
-				self.FT.CurrentEditTextCtrl = self.EditTextCtrl
-				self.FT.CurrentEditElement = self
+#				self.FT.CurrentEditTextCtrl = self.EditTextCtrl # TODO next, change this to EditTextComponent and set colours when rendered
+				self.FT.CurrentEditComponent = self
 				self.FT.DisplDevice.SetKeystrokeHandlerOnOff(On=False) # turn off keypress shortcut detection in control frame
+				self.StartEditingAsText(Zoom=Zoom)
+#				# make and populate a TextCtrl for editing
+#				self.FT.PaintNeeded = False # suppress paint while TextCtrl is in use, as the cursor blinking triggers
+#					# needless paint events - see ControlFrame.EditPanel.OnPaint()
+#					# TODO resolve issue in MacOS - we get a thick white border during editing
+#				self.EditTextCtrl = wx.TextCtrl(parent=self.FT.DisplDevice, value=self.Text.Content,
+#					pos=(self.TextCtrlPosXInPxWithinDisplDevice, self.TextCtrlPosYInPxWithinDisplDevice),
+#					size=(self.SizeXInCU * Zoom, (self.SizeYInCU + 5) * Zoom),
+#					style=wx.TE_PROCESS_ENTER | wx.HSCROLL | wx.TE_BESTWRAP) # + 5 for better visual effect
+#				self.EditTextCtrl.SetFocus()
+#				self.EditTextCtrl.SetInsertionPointEnd() # set cursor to end of existing text
+#				self.EditTextCtrl.SetFont(wx.Font(pointSize=int(round(self.Text.PointSize * Zoom)), family=DefaultFontFamily,
+#					style=wx.FONTSTYLE_NORMAL, weight=wx.FONTWEIGHT_NORMAL, faceName=self.Text.Font))
+#				self.EditTextCtrl.SetForegroundColour(self.Text.Colour)
+#				self.EditTextCtrl.SetBackgroundColour(self.BkgColour)
+#				self.EditTextCtrl.Bind(wx.EVT_TEXT_ENTER, self.FT.EndEditingOperation)
+#				self.EditTextCtrl.Bind(wx.EVT_KEY_DOWN, self.OnKeyDown) # for detection of Esc keypresses
 			elif MyEditBehaviour == 'Choice':
 				# make and populate a Choice widget
 				self.EditChoice = wx.Choice(parent=self.FT.DisplDevice,
@@ -805,11 +817,36 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 				# pre-select the current selection in the choice box
 				self.EditChoice.SetSelection([c.Applicable for c in self.ObjectChoices].index(True))
 				self.FT.CurrentEditChoice = self.EditChoice
-				self.FT.CurrentEditElement = self
+				self.FT.CurrentEditComponent = self
 				self.FT.DisplDevice.SetKeystrokeHandlerOnOff(On=False) # turn off keypress shortcut detection in control frame
 				self.EditChoice.Bind(wx.EVT_CHOICE, self.OnEditChoice) # bind handler for click in choice box
 			elif MyEditBehaviour == 'EditInControlPanel': # can't edit in place, editing in control panel only
 				pass
+
+	def StartEditingAsText(self, Zoom): # handle request to edit contents of component as text%%%
+		# First, redraw the FT so that the text component gets its new appearance (colour, border etc)
+		print('FT826 in StartEditingAsText with self.FT.CurrentEditComponent:', self.FT.CurrentEditComponent)
+		self.RedrawDuringEditing(Zoom=Zoom)
+#		self.FT.DisplDevice.Redraw(FullRefresh=False) # optimization, could redraw only this element
+
+	def RedrawDuringEditing(self, Zoom):
+		# redraw the text component during editing, with cursor
+		TextEditDC = wx.BufferedDC(wx.ClientDC(self.FT.DisplDevice))
+		# draw background box
+		TextEditDC.SetPen(wx.Pen(EditingTextBorderColour))
+		TextEditDC.SetBrush(wx.Brush(EditingTextBkgColour))
+		TextEditDC.DrawRectangle(self.TextCtrlPosXInPxWithinDisplDevice, self.TextCtrlPosYInPxWithinDisplDevice,
+			self.SizeXInCU * Zoom, self.SizeYInCU * Zoom)
+		# populate the box with the current text
+		self.Text.Content = 'Blah'
+		self.Text.Colour = (0,0,0)
+		self.Text.ParaHorizAlignment = 'Left'
+		# 6 in the line below is an adjustment factor to get the text position to look natural
+		text.DrawTextInElement(self, TextEditDC, self.Text, TextIdentifier=0, CanvZoomX=Zoom,
+			CanvZoomY=Zoom, LayerOffsetX=self.TextCtrlPosXInPxWithinDisplDevice,
+			LayerOffsetY=self.TextCtrlPosYInPxWithinDisplDevice - self.SizeYInPx + int(round(6 * Zoom)),
+			VertAlignment='Top')
+
 
 	def OnEditChoice(self, Event): # handle click in choice box during editing
 		self.FT.EndEditingOperation()
@@ -898,7 +935,8 @@ class FTEvent(FTBoxyObject): # FT event object
 		# EditInOpModes attrib: which OpModes the component can be user-edited in (if omitted, allowed in all OpModes)
 		self.EventTypeComponent = TextElement(self.FT, Row=0, ColStart=0, ColSpan=7, EndX=399,
 			HostObject=self, InternalName='EventType', EditBehaviour='Choice', ObjectChoices=[],
-			DisplAttrib='HumanName') # DisplAttrib is the attrib of the ChoiceItem instance to display in the choice box
+			DisplAttrib='HumanName', DefaultFgColour=LabelFgColour)
+			# DisplAttrib is the attrib of the ChoiceItem instance to display in the choice box
 		self.EventNumberingComponent = TextElement(self.FT, Row=1, ColStart=0, ColSpan=1, EndX=399,
 			HostObject=self, InternalName=info.NumberingTag)
 		self.EventDescriptionComponent = TextElement(self.FT, Row=1, ColStart=1, ColSpan=5, EndX=299, MinHeight=25,
@@ -972,7 +1010,7 @@ class FTEvent(FTBoxyObject): # FT event object
 					CommentElementList[-1].Text.ParaHorizAlignment = 'Left'
 				# add item label (e.g. 'Comment') at left side of first row of items
 				CommentElementList.append(TextElement(self.FT, RowBase=0, ColStart=0, ColSpan=1, EndX=99,
-					HostObject=self))
+					HostObject=self, DefaultFgColour=LabelFgColour))
 				CommentElementList[-1].Text.Content = CommentLabel
 				CommentElementList[-1].Text.Colour = ColourLabelFg
 				CommentElementList[-1].BkgColour = ColourLabelBkg
@@ -1138,7 +1176,8 @@ class FTGate(FTBoxyObject): # object containing FT gates for display. These belo
 		# Elements in variable row number (after Comments) have RowBase parm, which defines the row number if there
 		# are no comments visible
 		self.GateKind = TextElement(self.FT, Row=0, ColStart=0, ColSpan=4, EndX=299, HostObject=self,
-			InternalName='GateKind', EditBehaviour='Choice', ObjectChoices=[], DisplAttrib='HumanName')
+			InternalName='GateKind', EditBehaviour='Choice', ObjectChoices=[], DisplAttrib='HumanName',
+			DefaultFgColour=LabelFgColour)
 		self.GateStyleButton = ButtonElement(self.FT, Row=0, ColStart=4, ColSpan=1, StartX=200, EndX=249,
 			HostObject=self, InternalName='GateStyleButton', Stati=['Default'],
 			LSingleClickHandler='HandleMouseLClickOnGateStyleButton')
@@ -1196,7 +1235,7 @@ class FTGate(FTBoxyObject): # object containing FT gates for display. These belo
 					CommentElementList[-1].Text.ParaHorizAlignment = 'Left'
 				# add item label (e.g. 'Comment') at left side of first row of items
 				CommentElementList.append(TextElement(self.FT, RowBase=0, ColStart=0, ColSpan=1, EndX=99,
-					HostObject=self))
+					HostObject=self, DefaultFgColour=LabelFgColour))
 				CommentElementList[-1].Text.Content = CommentLabel
 				CommentElementList[-1].Text.Colour = GateLabelFgColour
 				CommentElementList[-1].BkgColour = GateLabelBkgColour
@@ -1540,7 +1579,7 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 		ColourLabelBkg = (0x80, 0x3E, 0x51) # plum; however not used in FTConnector
 		ColourLabelFg = (0xFF, 0xFF, 0xFF) # white; however not used in FTConnector
 		ColourContentBkg = (0x6A, 0xDA, 0xBD) # mint green
-		ColourContentFg = (0x00, 0x00, 0x00) # black
+#		ColourContentFg = (0x00, 0x00, 0x00) # black
 		ColourPromptText = (0x80, 0x80, 0x80) # mid grey
 
 		# column widths: 100, 50, 25, 25, 25, 25, 25; see attrib MinColWidth in RenderIntoBitmap()
@@ -1549,7 +1588,7 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 		# Stati: valid self.Status settings for buttons
 		# ConnectorKindHuman: Human description of the kind of comment; shown in Control Panel
 		ConnKind = TextElement(self.FT, Row=0, ColStart=0, ColSpan=4, EndX=199, HostObject=self,
-			InternalName='ConnKind', DisplAttrib='HumanName')
+			InternalName='ConnKind', DisplAttrib='HumanName', DefaultFgColour=LabelFgColour)
 		ConnName = TextElement(self.FT, Row=0, ColStart=4, ColSpan=3, EndX=274, HostObject=self, MinSizeX=75,
 			InternalName='ConnName')
 		ConnDescription = TextElement(self.FT, Row=1, ColStart=0, ColSpan=4, EndX=199, MinHeight=50, HostObject=self,
@@ -1558,9 +1597,6 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 			HostObject=self, InternalName='ConnDescriptionCommentButton', Stati=('OutNotExist', 'OutExist'),
 			LSingleClickHandler='HandleMouseLClickOnCommentButton', CommentKind='ConnectorDescriptionComments',
 			ControlPanelAspect='CPAspect_Comment', CommentKindHuman=_('Connector description'))
-#		self.ConnLinkedButton = ButtonElement(self.FT, Row=1, ColStart=5, ColSpan=1, StartX=225, EndX=249,
-#			HostObject=self, InternalName='ConnLinkedButton', Stati=('OutNotExist', 'OutExist'),
-#			LSingleClickHandler=None)
 #		ConnGroupedButton = ButtonElement(self.FT, Row=1, ColStart=6, ColSpan=1, StartX=250, EndX=274,
 #			HostObject=self, InternalName='ConnGroupedButton', Stati=('OutNotExist', 'OutExist'),
 #			LSingleClickHandler=None)
@@ -1623,7 +1659,7 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 					CommentElementList[-1].Text.ParaHorizAlignment = 'Left'
 				# add item label (e.g. 'Comment') at left side of first row of items, occupying as many rows as comments
 				CommentElementList.append(TextElement(self.FT, RowBase=0, ColStart=0, ColSpan=1, EndX=99,
-					RowSpan=max(1, len(CommentList)), HostObject=self))
+					RowSpan=max(1, len(CommentList)), HostObject=self, DefaultFgColour=LabelFgColour))
 				CommentElementList[-1].Text.Content = CommentLabel
 				CommentElementList[-1].Text.Colour = GateLabelFgColour
 				CommentElementList[-1].BkgColour = GateLabelBkgColour
@@ -1656,7 +1692,6 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 		def SetButtonStati(Components):
 			# set 'Status' attributes of buttons in Components; used to determine which bitmap is used to render button
 			for (ButtonName, Flag) in [
-#					('ConnLinkedButton', bool(self.LinkedFrom)),
 #					('ConnGroupedButton', bool(self.CollapseGroups)),
 					('ConnDescriptionCommentButton', bool(self.ConnectorDescriptionComments)),
 					('ConnActionItemButton', bool(self.ActionItems)),
@@ -4921,7 +4956,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		# initialize zoom widget
 		self.MyZoomWidget = display_utilities.ZoomWidgetObj(Viewport=self, InitialZoom=self.Zoom)
 		self.LastElLClicked = self.LastElMClicked = self.LastElRClicked = None
-		self.CurrentEditElement = None # which text component is currently being edited with a TextCtrl
+		self.CurrentEditComponent = None # which text component is currently being edited with a TextCtrl
 		self.PaintNeeded = True # whether to execute DoRedraw() in display device's OnPaint() handler (bool)
 		self.OpMode = core_classes.DefaultOpMode
 		self.EditingConnection = False # whether user is currently editing a connection between elements
@@ -5732,7 +5767,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 				ElToHandleLClick = HitWithHighestZ['Element']
 				ElHotspotToHandle = HitWithHighestZ['Hotspot']
 			# check if the topmost clicked element is already doing an editing operation - if so, ignore the click
-			if ElToHandleLClick != self.CurrentEditElement:
+			if ElToHandleLClick != self.CurrentEditComponent:
 				self.EndEditingOperation() # close out any operation in progress
 				self.LastElLClicked = ElToHandleLClick # needed for drag handler
 				self.LastElLClickedHotspot = ElHotspotToHandle
@@ -5966,46 +6001,46 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		# Currently handles plain text only with no embedded format commands
 		assert isinstance(AcceptEdits, bool) or (AcceptEdits is None)
 		# check if any editing operation was in progress
-		if self.CurrentEditElement:
+		if self.CurrentEditComponent:
 			if isinstance(AcceptEdits, bool): AcceptEditsThisTime = AcceptEdits
 			else: AcceptEditsThisTime = self.DisplDevice.Parent.EditAllowed
-			CurrentEditBehaviour = getattr(self.CurrentEditElement,'EditBehaviour', None)
+			CurrentEditBehaviour = getattr(self.CurrentEditComponent,'EditBehaviour', None)
 			# check if it was a text editing operation
 			if CurrentEditBehaviour == 'Text':
 				# get the text typed by the user
 				TextEntered = self.CurrentEditTextCtrl.GetValue().strip()
 				# check if any changes made
-				if AcceptEditsThisTime and (TextEntered != self.CurrentEditElement.Text.Content):
-					if isinstance(self.CurrentEditElement.HostObject, FTHeader): ElementID = 'Header'
-					else: ElementID = self.CurrentEditElement.HostObject.ID
-					EditComponentInternalName = self.CurrentEditElement.InternalName
+				if AcceptEditsThisTime and (TextEntered != self.CurrentEditComponent.Text.Content):
+					if isinstance(self.CurrentEditComponent.HostObject, FTHeader): ElementID = 'Header'
+					else: ElementID = self.CurrentEditComponent.HostObject.ID
+					EditComponentInternalName = self.CurrentEditComponent.InternalName
 					# destroy the TextCtrl (to avoid memory leak) (do this before SendRequest() so that the FT gets fully
 					# refreshed by ControlFrame's OnPaint() afterwards)
 					self.CurrentEditTextCtrl.Destroy()
-					self.CurrentEditElement = self.CurrentEditTextCtrl = None
+					self.CurrentEditComponent = self.CurrentEditTextCtrl = None
 					self.PaintNeeded = True # turn off paint suppression while TextCtrl was in use
 					# request PHA object in datacore to update text attribute
 					self.RequestChangeText(ElementID, EditComponentInternalName, NewValue=TextEntered)
 				else: # no change made, or change rejected; destroy the textctrl widget
 					self.CurrentEditTextCtrl.Destroy()
-					self.CurrentEditElement = self.CurrentEditTextCtrl = None
+					self.CurrentEditComponent = self.CurrentEditTextCtrl = None
 					self.PaintNeeded = True # turn off paint suppression while TextCtrl was in use
 			elif CurrentEditBehaviour == 'Choice': # it was a choice editing operation
 				# get the option selected by the user
 				TextSelected = self.CurrentEditChoice.GetStringSelection()
 				# check if any changes made
-				if AcceptEditsThisTime and (TextSelected != self.CurrentEditElement.Text.Content):
-					if isinstance(self.CurrentEditElement.HostObject, FTHeader):
+				if AcceptEditsThisTime and (TextSelected != self.CurrentEditComponent.Text.Content):
+					if isinstance(self.CurrentEditComponent.HostObject, FTHeader):
 						ElementID = 'Header'
 					else:
-						ElementID = self.CurrentEditElement.HostObject.ID
-					EditComponentInternalName = self.CurrentEditElement.InternalName
+						ElementID = self.CurrentEditComponent.HostObject.ID
+					EditComponentInternalName = self.CurrentEditComponent.InternalName
 					# get matching XMLName of user's selection
-					ChosenXMLName = [i.XMLName for i in self.CurrentEditElement.ObjectChoices if i.HumanName == TextSelected][0]
+					ChosenXMLName = [i.XMLName for i in self.CurrentEditComponent.ObjectChoices if i.HumanName == TextSelected][0]
 					# destroy the Choice widget (to avoid memory leak) (do this before SendRequest() so that the FT gets fully
 					# refreshed by ControlFrame's OnPaint() afterwards)
 					self.CurrentEditChoice.Destroy()
-					self.CurrentEditElement = self.CurrentEditChoice = None
+					self.CurrentEditComponent = self.CurrentEditChoice = None
 					# request PHA object to update choice attribute by sending message through zmq
 					vizop_misc.SendRequest(Socket=self.C2DSocketREQ, Command='RQ_FT_ChangeChoice',
 						ProjID=self.Proj.ID, PHAObj=self.PHAObjID, Viewport=self.ID, Zoom=str(self.Zoom)(),
@@ -6018,7 +6053,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 						print('FT5374 in EndEditingOperation; self.CurrentElementIDsToSelectOnRefresh:', self.CurrentElementIDsToSelectOnRefresh)
 				else: # no change made, or change rejected; destroy the choice widget
 					self.CurrentEditChoice.Destroy()
-					self.CurrentEditElement = self.CurrentEditChoice = None
+					self.CurrentEditComponent = self.CurrentEditChoice = None
 				self.DisplDevice.SetKeystrokeHandlerOnOff(On=True) # turn on keypress shortcut detection in control frame
 
 	def RequestChangeText(self, ElementID, EditComponentInternalName, NewValue):
