@@ -271,6 +271,7 @@ NO_RedrawAfterUndo = 'NO_RedrawAfterUndo'
 CommandSymbol = u'\u2318' # cloverleaf symbol on Mac keyboard's Command key
 CommandKeyName = CommandSymbol if system() == 'Darwin' else 'Ctrl'
 InfinitySymbol = u'\u221e'
+NewlineSymbol = u'\u21a9'
 
 # remove the dummy definition of _()
 del _

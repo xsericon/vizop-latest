@@ -801,8 +801,6 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 #					style=wx.FONTSTYLE_NORMAL, weight=wx.FONTWEIGHT_NORMAL, faceName=self.Text.Font))
 #				self.EditTextCtrl.SetForegroundColour(self.Text.Colour)
 #				self.EditTextCtrl.SetBackgroundColour(self.BkgColour)
-#				self.EditTextCtrl.Bind(wx.EVT_TEXT_ENTER, self.FT.EndEditingOperation)
-#				self.EditTextCtrl.Bind(wx.EVT_KEY_DOWN, self.OnKeyDown) # for detection of Esc keypresses
 			elif MyEditBehaviour == 'Choice':
 				# make and populate a Choice widget
 				self.EditChoice = wx.Choice(parent=self.FT.DisplDevice,
@@ -826,7 +824,15 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 		# First, redraw the FT so that the text component gets its new appearance (colour, border etc)
 		print('FT826 in StartEditingAsText with self.FT.CurrentEditComponent:', self.FT.CurrentEditComponent)
 		# put the cursor at the end of the text being edited
+		self.FT.DisplDevice.Bind(wx.EVT_TEXT_ENTER, self.FT.EndEditingOperation)
+		self.FT.DisplDevice.Bind(wx.EVT_KEY_DOWN, self.OnKeyDown) # for detection of Esc keypresses
 		self.FT.TextEditCursorIndex = len(self.Text.Content)
+		self.Text.Content = 'Blah\nsocks'
+		self.FT.TextEditCursorIndex = 8 # for testing
+		self.Text.Colour = (0,0,0)
+		self.Text.ParaHorizAlignment = 'Left'
+		# insert a visible newline character before each newline
+		self.Text.Content = self.Text.Content.replace('\n', info.NewlineSymbol + '\n')
 		self.RedrawDuringEditing(Zoom=Zoom)
 #		self.FT.DisplDevice.Redraw(FullRefresh=False) # optimization, could redraw only this element
 
@@ -839,10 +845,6 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 		TextEditDC.DrawRectangle(self.TextCtrlPosXInPxWithinDisplDevice, self.TextCtrlPosYInPxWithinDisplDevice,
 			self.SizeXInCU * Zoom, self.SizeYInCU * Zoom)
 		# populate the box with the current text
-		self.Text.Content = 'Blah'
-		self.FT.TextEditCursorIndex = 2
-		self.Text.Colour = (0,0,0)
-		self.Text.ParaHorizAlignment = 'Left'
 		# 6 in the line below is an adjustment factor to get the text position to look natural
 		text.DrawTextInElement(self, TextEditDC, self.Text, TextIdentifier=0, CanvZoomX=Zoom,
 			CanvZoomY=Zoom, LayerOffsetX=self.TextCtrlPosXInPxWithinDisplDevice,
@@ -850,12 +852,17 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 			VertAlignment='Top', DrawCursor=True, CursorIndex=self.FT.TextEditCursorIndex,
 			CursorColour=EditingTextCursorColour)
 
-
 	def OnEditChoice(self, Event): # handle click in choice box during editing
 		self.FT.EndEditingOperation()
 
-	def OnKeyDown(self, Event): # handle key press during editing; used for catching Esc key
-		if Event.KeyCode == wx.WXK_ESCAPE: self.FT.EndEditingOperation(AcceptEdits=False)
+	def OnKeyDown(self, Event): # handle key press during editing; formerly used for catching Esc key
+		if Event.KeyCode == wx.WXK_LEFT:
+			self.FT.TextEditCursorIndex = max(0, self.FT.TextEditCursorIndex - 1)
+			self.RedrawDuringEditing(Zoom=self.FT.Zoom)
+		elif Event.KeyCode == wx.WXK_RIGHT:
+			self.FT.TextEditCursorIndex = min(len(self.Text.Content) - 1, self.FT.TextEditCursorIndex + 1)
+			self.RedrawDuringEditing(Zoom=self.FT.Zoom)
+		elif Event.KeyCode == wx.WXK_ESCAPE: self.FT.EndEditingOperation(AcceptEdits=False)
 		else: Event.Skip() # allow editing widget to handle keypress normally
 
 class FTEvent(FTBoxyObject): # FT event object

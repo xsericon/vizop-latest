@@ -22,7 +22,7 @@ DefaultTextColour = (0xE6, 0xE6, 0xFA)  # grey-blue
 DefaultTextHorizAlignment = 'Centre'
 DefaultTextVertAlignment = 'Centre'
 MinTextLineSpacing = 0.1
-DefaultTextLineSpacing = 1.2
+DefaultTextLineSpacing = 1.0
 MaxTextLineSpacing = 10
 DefaultBIUSValue = 1 # default value of bold, italic, underlined, standout attrib of TextObjects
 BIUSNoEffectValue = 1 # value of bold/(etc) attrib meaning "no effect", ie not bold/(etc)
@@ -652,14 +652,16 @@ def DrawTextInElement(El, dc, Text, TextIdentifier, LayerOffsetX=0, LayerOffsetY
 		# first, find which subline contains the cursor
 		ThisSublineIndex = 0
 		CumulativeCharCount = 0
-		while (ThisSublineIndex < len(Sublines)) and (CumulativeCharCount < CursorIndex):
+		# step to next subline if the cursor is beyond the end of the current subline
+		while (ThisSublineIndex < len(Sublines)) and (CursorIndex > CumulativeCharCount + len(Sublines[ThisSublineIndex])):
 			CumulativeCharCount += len(Sublines[ThisSublineIndex])
 			if (CumulativeCharCount < CursorIndex): ThisSublineIndex += 1
 		# find the starting X, Y position of the subline
 		XStartAbs, YStartAbs = FindTextXYStart(TextIdentifier, YStartInPx, Zoom, ThisSublineIndex)
 		# find the absolute x-coordinate to draw the top left of the cursor
-		# is the cursor beyond the end of the text?
-		if CursorIndex >= len(Text.Content):
+		print('TE661 ThisSublineIndex, CumulativeCharCount, CursorIndex, Sublines:', ThisSublineIndex, CumulativeCharCount, CursorIndex, Sublines)
+		# is the cursor beyond the end of the subline?
+		if CursorIndex - CumulativeCharCount >= len(Sublines[ThisSublineIndex]):
 			CursorX = XStartAbs + SublineX[ThisSublineIndex][-1]
 		else:
 			CursorX = XStartAbs + SublineX[ThisSublineIndex][CursorIndex - CumulativeCharCount]
