@@ -31,10 +31,11 @@ StandoutBoxXOverhang = 5  # amount by which L and R edges of box drawn behind st
 StandoutBoxYOverhang = 5
 
 # embeddable text formatting commands
-TextFormatCommandHash = {'B': 'Bold', 'U': 'Underlined', 'I': 'Italics', 'S': 'Standout', 'F': 'Font', 'f': 'Font-Default', 'Z': 'Scale', 'z': 'No-Scale',
+TextFormatCommandHash = {'B': 'Bold', 'U': 'Underlined', 'I': 'Italics', 'S': 'Standout', 'H': 'Highlight',
+	'F': 'Font', 'f': 'Font-Default', 'Z': 'Scale', 'z': 'No-Scale',
 	'V': 'Vert-Offset', 'v': 'No-Vert-Offset', 'X': 'All-Default', 'C': 'Colour', 'c': 'Colour-Default', 'T': 'Tag'}
 TakesStringArg = 'FT' # string arg expected after these commands
-TakesIntArg = 'BUISZV' # integer arg expected after these commands
+TakesIntArg = 'BUISZVH' # integer arg expected after these commands
 TakesHexArg = 'C' # hex string expected after this command
 # make reverse of above hash table
 TextFormatCommandRevHash = {}
@@ -42,6 +43,12 @@ for (p, q) in TextFormatCommandHash.items(): TextFormatCommandRevHash[q] = p
 
 def BrighterThan(OldCol, PercentBrighter=50):  # return colour that is a notional % brighter than OldCol
 	return tuple([min(255, d + PercentBrighter) for d in OldCol[:3]]) + OldCol[3:]  # don't increment alpha parm, if any
+
+def ReverseColour(OldCol): # return colour that shows up clearly in reverse-video against OldCol; used for highlighting
+	if False in [100 < OldCol[c] < 160 for c in range(3)]: # it's not mid-grey; flip each colour channel to 255-c
+		return tuple([255 - OldCol[c] for c in range(3)])
+	else: # special case: mid-grey colours are converted to light blue
+		return (0xAF, 0xDE, 0xF3)
 
 class TextObject(object):
 	# text contained within an element, along with its formatting attributes
@@ -51,7 +58,7 @@ class TextObject(object):
 		assert isinstance(Content, str)
 		self.Content = Content # text to display (str)
 			# Can contain <CR> (chr(13)) and escape sequences consisting of <elements.text.TextEscStartChar> followed by:
-			# B: bold*; U: underlined*; I: italics*; S: standout*; X: revert all formatting to default
+			# B: bold*; U: underlined*; I: italics*; S: standout*; H: highlight*; X: revert all formatting to default
 			# (commands marked * take integer arg: 0 = default, 1 = no effect, 2 = minimum effect (eg single underline), 255 = maximum effect)
 			# C rrggbbaa: change colour as specified (8 hex digits); c: revert to default colour
 			# F fontname <TextEscEndChar>: change font; f: revert to default font
@@ -60,7 +67,7 @@ class TextObject(object):
 			# changes to the syntax need to be reflected in ParseFormatCommand() and InterpretFormatCommand()
 		self.Font = DefaultElementTextFont
 		self.PointSize = DefaultTextPointSize # basic (user-specified) size before adjusting for zoom, standout etc.
-		self.Bold = self.Underlined = self.Italics = self.Standout = DefaultBIUSValue
+		self.Bold = self.Underlined = self.Italics = self.Standout = self.Highlight = DefaultBIUSValue
 		self.Colour = DefaultTextColour
 		self.ParaHorizAlignment = DefaultTextHorizAlignment
 		self.ParaVertAlignment = DefaultTextVertAlignment
@@ -112,7 +119,7 @@ def ParseFormatCommand(CmdString, CheckForEscChar=False):  # parse format comman
 		else: return (Command, None, CmdString)  # command found; no arg expected
 	else: return ('', None, CmdString)  # command not found
 
-def StripOutEscapeSequences(RichText, CommandType=[]):  # Returns RichText with formatting command sequences removed
+def StripOutEscapeSequences(RichText, CommandType=[]): # Returns RichText with formatting command sequences removed
 	# If CommandType is [], all commands are removed, otherwise removes only commands listed (uses long form, eg 'Font')
 	index = 0  # read along RichText, looking for command sequences
 	while (index < len(RichText)):
@@ -167,13 +174,13 @@ def InsertFormatCommand(RichStr, Pos, CommandType, *args):
 
 def CurrentFormatStatus(TextObj, RichStr, Pos, FmtParm='Font'):  # return state of formatting parm supplied at Pos'th visible char in RichStr. Returns:
 	# FmtParm = 'Font', 'Colour': return name of font/colour value
-	# FmtParm = 'Scale', 'Vert-Offset', 'Bold', 'Underlined', 'Italics', 'Standout': return parm value
+	# FmtParm = 'Scale', 'Vert-Offset', 'Bold', 'Underlined', 'Italics', 'Standout', 'Highlight': return parm value
 	# Takes account of default format, if no relevant format commands found
 
 	def DefaultParmState(TextObj, FmtParm):  # returns default state of FmtParm
 		if FmtParm == 'Scale': return DefaultTextVertFactor
 		if FmtParm == 'Vert-Offset': return 0
-		if FmtParm in ['Bold', 'Italics', 'Underlined', 'Standout']: return 1
+		if FmtParm in ['Bold', 'Italics', 'Underlined', 'Standout', 'Highlight']: return 1
 		return TextObj.__dict__[CmdHash[FmtParm]['Parm']]
 
 	CmdHash = {'Font': {'Set': 'Font', 'Unset': 'Font-Default', 'ArgExpected': True, 'Parm': 'Font'}, \
@@ -181,6 +188,7 @@ def CurrentFormatStatus(TextObj, RichStr, Pos, FmtParm='Font'):  # return state 
 		'Underlined': {'Set': 'Underlined', 'Unset': 'Underlined', 'ArgExpected': True, 'Parm': 'Underlined'}, \
 		'Italics': {'Set': 'Italics', 'Unset': 'Italics', 'ArgExpected': True, 'Parm': 'Italics'}, \
 		'Standout': {'Set': 'Standout', 'Unset': 'Standout', 'ArgExpected': True, 'Parm': 'Standout'}, \
+		'Highlight': {'Set': 'Highlight', 'Unset': 'Highlight', 'ArgExpected': True, 'Parm': 'Highlight'}, \
 		'Scale': {'Set': 'Scale', 'Unset': 'No-Scale', 'ArgExpected': True, 'Parm': None}, \
 		'Vert-Offset': {'Set': 'Vert-Offset', 'Unset': 'No-Vert-Offset', 'ArgExpected': True, 'Parm': None}, \
 		'Colour': {'Set': 'Colour', 'Unset': 'Colour-Default', 'ArgExpected': True, 'Parm': 'Colour'} }
@@ -365,12 +373,14 @@ def CalculateTextSizeAndSpacing(El, Text, TextIdentifier, VertAlignment, CanvZoo
 					LineSpacing, Iterations + 1, VertAlignment, Yhere, Xsofar, IsFmtCmd)
 		return (FinalYaboveText, Sublines, SublineHeights, SublineX, SublineY, YatTextBottom)
 
-	def InterpretFormatCommand(Command, Arg, TextInstance, Bold, Underlined, Italics, Standout, Font, Scale, VertOffset, Colour):
+	def InterpretFormatCommand(Command, Arg, TextInstance, Bold, Underlined, Italics, Standout, Highlight,
+		Font, Scale, VertOffset, Colour):
 		# returns values of all args based on input Command and Arg
 		if Command == 'Bold': Bold = Arg
 		elif Command == 'Underlined': Underlined = Arg
 		elif Command == 'Italics': Italics = Arg
 		elif Command == 'Standout': Standout = Arg
+		elif Command == 'Highlight': Highlight = Arg
 		elif Command == 'Font': Font = Arg
 		elif Command == 'Font-Default': Font = TextInstance.Font
 		elif Command == 'Scale': Scale = Arg
@@ -381,24 +391,24 @@ def CalculateTextSizeAndSpacing(El, Text, TextIdentifier, VertAlignment, CanvZoo
 			Bold = TextInstance.Bold
 			Underlined = TextInstance.Underlined
 			Italics = TextInstance.Italics
+			Highlight = TextInstance.Highlight
 			Font = TextInstance.Font
 			Colour = TextInstance.Colour
 		elif Command == 'Colour':
 			Colour = utilities.str2HexTuple(Arg)
 		elif Command == 'Colour-Default': Colour = TextInstance.Colour
 		else: print("Oops, unrecognised formatting command %s (problem code TE378).  This is a bug, please report it" % Command)
-		return (Bold, Underlined, Italics, Standout, Font, Scale, VertOffset, Colour)
+		return (Bold, Underlined, Italics, Standout, Highlight, Font, Scale, VertOffset, Colour)
 
 	# Main procedure for CalculateTextSizeAndSpacing()
 	# First, set initial format settings; intentionally NOT allowing for standout, as standing-out text doesn't get any extra space
 	# Find target point size, allowing for change of Element size
-#	Text = El.Text # fetch the text object from supplied element; now using Text supplied as arg, to allow us to use
-#	# a substitute text instead
 	ScaledPointSizeNoZoom = Text.RequiredTextPointSizeInCU(TextIdentifier, Text.PointSize, Text.ParentSizeBasis)
 	ItalicsNow = Text.Italics
 	BoldNow = Text.Bold
 	UnderlinedNow = Text.Underlined
 	StandoutNow = Text.Standout
+	HighlightNow = Text.Highlight
 	FontNow = Text.Font
 	ScaleNow = DefaultTextVertFactor
 	VertOffsetNow = 0
@@ -424,8 +434,8 @@ def CalculateTextSizeAndSpacing(El, Text, TextIdentifier, VertAlignment, CanvZoo
 			# change font, if chunk begins with fmt cmd
 			(Command, Arg, ChunkRaw) = ParseFormatCommand(Chunk, CheckForEscChar=True)
 			if Command:
-				(BoldNow, UnderlinedNow, ItalicsNow, StandoutNow, FontNow, ScaleNow, VertOffsetNow, ColourNow) = InterpretFormatCommand(Command, Arg,
-					Text, BoldNow, UnderlinedNow, ItalicsNow, StandoutNow, FontNow, ScaleNow, VertOffsetNow, ColourNow)  # change parms accordingly
+				(BoldNow, UnderlinedNow, ItalicsNow, StandoutNow, HighlightNow, FontNow, ScaleNow, VertOffsetNow, ColourNow) = InterpretFormatCommand(Command, Arg,
+					Text, BoldNow, UnderlinedNow, ItalicsNow, StandoutNow, HighlightNow, FontNow, ScaleNow, VertOffsetNow, ColourNow)  # change parms accordingly
 				dc.SetFont(FontInstance(RequiredPointSize(ScaledPointSizeNoZoom * ScaleNow * 0.01, CanvZoomX=CanvZoomX,
 			  		CanvZoomY=CanvZoomY, TextSizeRatio=1.0),
 					ItalicsNow, BoldNow, UnderlinedNow, FontNow))  # change font, taking no account of Standout (as no extra space is allowed for standout)
@@ -533,21 +543,24 @@ def DrawTextInElement(El, dc, Text, TextIdentifier, LayerOffsetX=0, LayerOffsetY
 						SublineY[SublineNo][i] = (SublineY[SublineNo][i][0] + VertAdjust, SublineY[SublineNo][i][1])
 			return (SublineX, SublineY, StandoutNow)
 
-		def InitializeFont():  # set all parms to "default" for this text
-			dc.SetTextForeground(Text.Colour)
-			dc.SetBackgroundMode(wx.TRANSPARENT)  # no text background colour; Rappin p380
+		def InitializeFont(): # set all parms to "default" for this text
+			dc.SetTextForeground(Text.Colour if Text.Highlight == BIUSNoEffectValue else ReverseColour(Text.Colour))
+			dc.SetBackgroundMode(wx.TRANSPARENT) # no text background colour; Rappin p380
 			ItalicsNow = Text.Italics
 			BoldNow = Text.Bold
 			UnderlinedNow = Text.Underlined
 			StandoutNow = Text.Standout
+			HighlightNow = Text.Highlight
 			FontNow = Text.Font
 			ScaleNow = DefaultTextVertFactor
 			VertOffsetNow = 0
 			ColourNow = Text.Colour
-			return (BoldNow, UnderlinedNow, ItalicsNow, StandoutNow, FontNow, ScaleNow, VertOffsetNow, ColourNow)
+			return (BoldNow, UnderlinedNow, ItalicsNow, StandoutNow, HighlightNow, FontNow, ScaleNow, VertOffsetNow,
+				ColourNow)
 
 		# start of RenderText(): initialize font
-		(BoldNow, UnderlinedNow, ItalicsNow, StandoutNow, FontNow, ScaleNow, VertOffsetNow, ColourNow) = InitializeFont()
+		(BoldNow, UnderlinedNow, ItalicsNow, StandoutNow, HighlightNow, FontNow, ScaleNow, VertOffsetNow,
+			ColourNow) = InitializeFont()
 		FontInstanceNow = FontInstance(RequiredPointSize(ScaledPointSizeNoZoom, CanvZoomX=ZoomX, CanvZoomY=ZoomY, TextSizeRatio=TextSizeRatio), Text.Italics, \
 									   Text.Bold, Text.Underlined, Text.Font)
 		dc.SetFont(FontInstanceNow)
@@ -588,14 +601,26 @@ def DrawTextInElement(El, dc, Text, TextIdentifier, LayerOffsetX=0, LayerOffsetY
 			for (ChunkNo, Chunk) in enumerate(SplitSubLine):  # for each chunk, get any fmt command and its arg
 				(Command, Arg, Remainder) = FmtCmds[SublineNo][ChunkNo]
 				if Command:  # change parms accordingly
-					(BoldNow, UnderlinedNow, ItalicsNow, StandoutNow, FontNow, ScaleNow, VertOffsetNow, ColourNow) = InterpretFormatCommand(Command, Arg, \
-						Text, BoldNow, UnderlinedNow, ItalicsNow, StandoutNow, FontNow, ScaleNow, VertOffsetNow, ColourNow)
+					(BoldNow, UnderlinedNow, ItalicsNow, StandoutNow, HighlightNow, FontNow, ScaleNow, VertOffsetNow,
+						ColourNow) = InterpretFormatCommand(Command, Arg, Text, BoldNow, UnderlinedNow, ItalicsNow,
+						StandoutNow, HighlightNow, FontNow, ScaleNow, VertOffsetNow, ColourNow)
 					FontInstanceNow = FontInstance(RequiredPointSize(ScaledPointSizeNoZoom * ScaleNow * 0.01,
 				 		CanvZoomX=CanvZoomX, CanvZoomY=CanvZoomY, StandOutFraction=StandoutNow * StandoutIncrement,
 					 	TextSizeRatio=TextSizeRatio), ItalicsNow, BoldNow, UnderlinedNow, FontNow)
-					dc.SetFont(FontInstanceNow)  # change font
-					dc.SetTextForeground(ColourNow)
+					dc.SetFont(FontInstanceNow) # change font
+					dc.SetTextForeground(Text.Colour if HighlightNow == BIUSNoEffectValue else ReverseColour(Text.Colour))
 				VertOffset = VertOffsetNow
+				# if text is highlighted, draw background box in original text colour
+				if HighlightNow != BIUSNoEffectValue:
+					dc.SetPen(wx.Pen( wx.Colour(ColourNow) ))
+					dc.SetBrush(wx.Brush( wx.Colour(ColourNow), style=wx.SOLID ))
+					xL = XStartAbs + SublineX[SublineNo][CharsSoFar]
+					yT = max(El.TextYOffsetInElementInCU(TextIdentifier) * CanvZoomY + LayerOffsetY + PanY,
+						 YStart + (1 - 0.01 * VertOffset) *
+						 (SublineHeight - SublineY[SublineNo][CharsSoFar][0]) + LayerOffsetY + PanY)
+					xR = XStartAbs + SublineX[SublineNo][CharsSoFar + len(Chunk)]
+					yB = min(El.MaxTextY(TextIdentifier) * CanvZoomY + LayerOffsetY + PanY, yT + SublineTHeight)
+					dc.DrawRectangle(x=xL, y=yT, width=xR - xL, height=yB - yT)
 				if StandoutNow != BIUSNoEffectValue: # is the text currently standing out?
 					# draw bkgnd-coloured box behind standing-out text, keeping it within El.TextYOffsetInElementInCU .. El.MaxTextY
 					dc.SetPen(wx.Pen('white', 1, wx.TRANSPARENT))
@@ -620,7 +645,6 @@ def DrawTextInElement(El, dc, Text, TextIdentifier, LayerOffsetX=0, LayerOffsetY
 
 	def FindTextXYStart(TextIdentifier, YStartInPx, Zoom, SublineNo):
 		# find and return absolute X and Y position to start the specified subline
-		# working here %%%
 		SublineHeight = SublineHeights[SublineNo][0]  # Y distance from subline top to baseline
 		SublineTHeight = SublineHeight + SublineHeights[SublineNo][1]  # Y distance from subline top to descender
 		# find starting Y coord for the specified subline
@@ -720,6 +744,25 @@ def UpdateStoredText(TextObj, Change, ChangePoint, NoOfChars, String):
 		RichText = RichText[:DeletionPoint] + Tail[:InsertionPoint] + String + Tail[InsertionPoint:]
 			# delete the removed chars from RichText, and insert any formatting commands, then the new chars, then the remainder of the string
 	TextObj.Content = RichText  # update element text
+
+def SetHighlightRange(Text, StartIndex, EndIndex):
+	# set the content of TextObj to be highlighted from StartIndex to EndIndex (stripped text indices, ignoring
+	# embedded format commands)
+	assert isinstance(Text, str)
+	assert isinstance(StartIndex, int)
+	assert isinstance(EndIndex, int)
+	# first, remove all existing highlight commands
+	FinalText = StripOutEscapeSequences(RichText=Text, CommandType=['Highlight'])
+	print('TE756 removing highlight command: text length old, new: ', len(Text), len(FinalText))
+	# set highlight only if requested range is longer than zero
+	if EndIndex > StartIndex:
+		StartIndexRich = FindnthChar(RichStr=FinalText, n=StartIndex)
+		# insert 'start highlight' command
+		FinalText = FinalText[:StartIndexRich] + TextEscStartChar + 'H2' + TextEscEndChar + FinalText[StartIndexRich:]
+		EndIndexRich = FindnthChar(RichStr=FinalText, n=EndIndex)
+		# insert 'end highlight' command
+		FinalText = FinalText[:EndIndexRich] + TextEscStartChar + 'H1' + TextEscEndChar + FinalText[EndIndexRich:]
+	return FinalText
 
 def WrappedText(InText, Font, PixelsAvail, BreakAfter=' `~!)-=]}\\;>/?', MinLengthPercent=30, StripLeadingSpaces=True):
 	# Splits InText (str) into lines to wrap within PixelsAvail space
