@@ -1,12 +1,12 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
-# Module text: part of Vizop, (c) 2018 Peter Clarke
+# Module text: part of Vizop, (c) 2020 Peter Clarke
 
 from __future__ import division  # makes a/b yield exact, not truncated, result
 import wx, os
 
 # vizop modules
-import utilities
+import utilities, info
 
 TextEscStartChar = chr(1) # character used to initiate formatting command in text strings
 TextEscEndChar = chr(2) # character used to terminate formatting command in text strings
@@ -29,6 +29,8 @@ BIUSNoEffectValue = 1 # value of bold/(etc) attrib meaning "no effect", ie not b
 StandoutIncrement = 0.5  # fraction by which point size of text is increased for normal degree of Standout
 StandoutBoxXOverhang = 5  # amount by which L and R edges of box drawn behind standing out text exceeds size of text, in canvas coords
 StandoutBoxYOverhang = 5
+WordBreakCharsToRight = ' `~)-=]}\\;>/\n' + info.NewlineSymbol
+WordBreakCharsToLeft = ' `~(-=[{\\;</\n' + info.NewlineSymbol
 
 # embeddable text formatting commands
 TextFormatCommandHash = {'B': 'Bold', 'U': 'Underlined', 'I': 'Italics', 'S': 'Standout', 'H': 'Highlight',
@@ -103,13 +105,13 @@ def ParseFormatCommand(CmdString, CheckForEscChar=False):  # parse format comman
 	if CommandChar in TextFormatCommandHash:
 		Command = TextFormatCommandHash[CommandChar]
 		CmdString = CmdString[1:]  # chop off the command char
-		if CommandChar in (TakesStringArg + TakesIntArg + TakesHexArg):  # try to get arg. If TextEscEndChar missing, read to end of line
-			if not (TextEscEndChar in CmdString): CmdString += TextEscEndChar  # bug trapping
+		if CommandChar in (TakesStringArg + TakesIntArg + TakesHexArg): # try to get arg. If TextEscEndChar missing, read to end of line
+			if not (TextEscEndChar in CmdString): CmdString += TextEscEndChar # bug trapping
 			SplitAtTerminator = CmdString.split(TextEscEndChar, 1)
 			ArgString = SplitAtTerminator[0]
 			CmdString = SplitAtTerminator[1]  # balance of input string after terminator
-			if CommandChar in IntegerExpectedAfter:  # convert to integer if necessary. Can't use int(), may raise ValueError
-				if ArgString[0] == '-':  # trap negative value
+			if CommandChar in TakesIntArg: # convert to integer if necessary. Can't use int(), may raise ValueError
+				if ArgString[0] == '-': # trap negative value
 					Factor = -1
 					ArgString = ArgString[1:]  # chop off the negative sign
 				else: Factor = 1
@@ -121,9 +123,10 @@ def ParseFormatCommand(CmdString, CheckForEscChar=False):  # parse format comman
 
 def StripOutEscapeSequences(RichText, CommandType=[]): # Returns RichText with formatting command sequences removed
 	# If CommandType is [], all commands are removed, otherwise removes only commands listed (uses long form, eg 'Font')
+	assert isinstance(RichText, str)
 	index = 0  # read along RichText, looking for command sequences
 	while (index < len(RichText)):
-		if RichText[index] == TextEscStartChar:  # command found; chop it out of RichText
+		if RichText[index] == TextEscStartChar: # command found; chop it out of RichText
 			(Command, v, Tail) = ParseFormatCommand(RichText[index + 1:])
 			if (CommandType == []) or (Command in CommandType):
 				RichText = RichText[:index] + Tail  # remove this command
@@ -131,16 +134,40 @@ def StripOutEscapeSequences(RichText, CommandType=[]): # Returns RichText with f
 		else: index += 1  # command not found; step on to next char
 	return RichText
 
-def FindnthChar(RichStr, n):  # find the index of the n'th visible character in RichStr (counting from zero), skipping over escape sequences
-	OrigRichStrLength = len(RichStr)
-	while (n >= 0) and (RichStr != ''):  # chop chars and command sequences off RichStr one by one
-		while ((RichStr + 'X')[0] == TextEscStartChar):  # look for commands. The +'X' is to avoid crash when end of RichStr reached
-			(c, v, RichStr) = ParseFormatCommand(RichStr[1:])  # found a command sequence: chop off the whole sequence
-		if (n != 0): RichStr = RichStr[1:]  # chop off a single non-command char (use the 'if' to avoid problems if RichStr is already empty)
-		n -= 1
-	return OrigRichStrLength - len(RichStr)
+def RemoveHighlightCommands(RichText):
+	# remove any highlight commands from RichText. Provided as a convenience function for calling from other modules
+	# TODO optimization: could run faster if we just search for the index of highlight commands specifically
+	return StripOutEscapeSequences(RichText, CommandType='Highlight')
 
-def FindFormatCommandBeforeNthChar(RichStr, n):  # find index of the first format command before Nth visible char in RichStr
+def FindnthChar(RichStr, n, IgnoreNewlines=False):
+	# find the index of the n'th visible character in RichStr (counting from zero), skipping over escape sequences
+	# IgnoreNewlines (bool): whether to skip \n characters
+	assert isinstance(IgnoreNewlines, bool)
+	ExtendedRichStr = RichStr + 'X' # The +'X' is to avoid crash when end of RichStr reached
+	OrigRichStrLength = len(ExtendedRichStr)
+#	ChoppedChar = ''
+	while (n >= 0) and (ExtendedRichStr != 'X'): # chop chars and command sequences off ExtendedRichStr one by one
+		# look for commands and newlines
+		while (ExtendedRichStr[0] == TextEscStartChar) or (IgnoreNewlines and ExtendedRichStr[0] == '\n'):
+			# did we find a command sequence? If so, remove it
+			if ExtendedRichStr[0] == TextEscStartChar:
+				(c, v, ExtendedRichStr) = ParseFormatCommand(ExtendedRichStr[1:])
+			# did we find a newline? If so, remove it
+			else:
+				ExtendedRichStr = ExtendedRichStr[1:]
+#		while IgnoreNewlines and (RichStr + 'X')[0] == '\n': # skip over newline characters, if required
+#			RichStr = RichStr[1:]
+#		# chop off a single non-command char
+#		ChoppedChar = (RichStr + ' ')[0] # the + ' ' is in case RichStr is empty
+		if n != 0: ExtendedRichStr = ExtendedRichStr[1:] # chop off a single non-command if we haven't reached the target count
+#		# decrement char counter unless we found a newline and we're supposed to ignore newlines
+#		if not (IgnoreNewlines and ChoppedChar == '\n'):
+		# decrement char counter
+		n -= 1
+	return OrigRichStrLength - len(ExtendedRichStr)
+
+def FindFormatCommandBeforeNthChar(RichStr, n):
+	# find index of the first format command before Nth visible char in RichStr
 	# if Nth char is not preceded by a format command, returns same as FindnthChar()
 	if (n == 0): return 0
 	return FindnthChar(RichStr, n - 1) + 1
@@ -243,6 +270,33 @@ def RequiredPointSize(BasicPointSize, CanvZoomX=1.0, CanvZoomY=1.0, StandOutFrac
 	return int(round(BasicPointSize * 0.5 * (CanvZoomX + CanvZoomY) * (1 + StandOutFraction * StandoutIncrement)
 		* TextSizeRatio))
 
+def InterpretFormatCommand(Command, Arg, TextInstance, Bold, Underlined, Italics, Standout, Highlight,
+	Font, Scale, VertOffset, Colour):
+	# returns values of all args based on input Command and Arg
+	if Command == 'Bold': Bold = Arg
+	elif Command == 'Underlined': Underlined = Arg
+	elif Command == 'Italics': Italics = Arg
+	elif Command == 'Standout': Standout = Arg
+	elif Command == 'Highlight': Highlight = Arg
+	elif Command == 'Font': Font = Arg
+	elif Command == 'Font-Default': Font = TextInstance.Font
+	elif Command == 'Scale': Scale = Arg
+	elif Command == 'No-Scale': Scale = DefaultTextVertFactor
+	elif Command == 'Vert-Offset': VertOffset = Arg
+	elif Command == 'No-Vert-Offset': VertOffset = 0
+	elif Command == 'All-Default':
+		Bold = TextInstance.Bold
+		Underlined = TextInstance.Underlined
+		Italics = TextInstance.Italics
+		Highlight = TextInstance.Highlight
+		Font = TextInstance.Font
+		Colour = TextInstance.Colour
+	elif Command == 'Colour':
+		Colour = utilities.str2HexTuple(Arg)
+	elif Command == 'Colour-Default': Colour = TextInstance.Colour
+	else: print("Oops, unrecognised formatting command %s (problem code TE378).  This is a bug, please report it" % Command)
+	return (Bold, Underlined, Italics, Standout, Highlight, Font, Scale, VertOffset, Colour)
+
 def CalculateTextSizeAndSpacing(El, Text, TextIdentifier, VertAlignment, CanvZoomX, CanvZoomY):
 	# calculate all required values for drawing text, including dividing the text into lines and chunks
 	# returned ScaledPointSizeNoZoom does not take account of zoom
@@ -253,7 +307,7 @@ def CalculateTextSizeAndSpacing(El, Text, TextIdentifier, VertAlignment, CanvZoo
 			Xsofar, IsFmtCmd):
 		# recursively find optimal Y position for text
 		# work through each line of text, split into sublines
-		BreakAfter = ' `~)-=]}\\;>/'  # chars to split line after
+		BreakAfter = ' `~)-=]}\\;>/'  # chars to split line after. TODO use WordBreakChars global variable
 		MinLineFill = 0.55  # fraction of total X available that must be used up when considering where to split sublines (ie no line will be shorter than this)
 		MaxTopBottomDiffCentreAligned = 1.1  # target ratio of bottomY:topY when centre aligned
 		MinTopBottomDiffCentreAligned = 0.91  # reciprocal of above
@@ -307,6 +361,7 @@ def CalculateTextSizeAndSpacing(El, Text, TextIdentifier, VertAlignment, CanvZoo
 						# MaxYInSubline is initialized to -1 to ensure Xavail is set on 1st iteration
 					# check if there's enough space to add next char. If so, add it, else start another subline
 					XafterNextChar = (Xsofar[LineNo][IndexInLine] - XatStartofSubline)
+#					if getattr(Text, 'debug', False): print('TE338 XafterNextChar: ', XafterNextChar,XatStartofSubline)
 					if (XafterNextChar <= Xavail) or not ThisSubline:  # 'or not' ensures >= 1 char per subline, to avoid infinite loop
 						ThisSubline += Line[IndexInLine]
 						SublineX[-1].append(XafterNextChar)
@@ -373,33 +428,6 @@ def CalculateTextSizeAndSpacing(El, Text, TextIdentifier, VertAlignment, CanvZoo
 					LineSpacing, Iterations + 1, VertAlignment, Yhere, Xsofar, IsFmtCmd)
 		return (FinalYaboveText, Sublines, SublineHeights, SublineX, SublineY, YatTextBottom)
 
-	def InterpretFormatCommand(Command, Arg, TextInstance, Bold, Underlined, Italics, Standout, Highlight,
-		Font, Scale, VertOffset, Colour):
-		# returns values of all args based on input Command and Arg
-		if Command == 'Bold': Bold = Arg
-		elif Command == 'Underlined': Underlined = Arg
-		elif Command == 'Italics': Italics = Arg
-		elif Command == 'Standout': Standout = Arg
-		elif Command == 'Highlight': Highlight = Arg
-		elif Command == 'Font': Font = Arg
-		elif Command == 'Font-Default': Font = TextInstance.Font
-		elif Command == 'Scale': Scale = Arg
-		elif Command == 'No-Scale': Scale = DefaultTextVertFactor
-		elif Command == 'Vert-Offset': VertOffset = Arg
-		elif Command == 'No-Vert-Offset': VertOffset = 0
-		elif Command == 'All-Default':
-			Bold = TextInstance.Bold
-			Underlined = TextInstance.Underlined
-			Italics = TextInstance.Italics
-			Highlight = TextInstance.Highlight
-			Font = TextInstance.Font
-			Colour = TextInstance.Colour
-		elif Command == 'Colour':
-			Colour = utilities.str2HexTuple(Arg)
-		elif Command == 'Colour-Default': Colour = TextInstance.Colour
-		else: print("Oops, unrecognised formatting command %s (problem code TE378).  This is a bug, please report it" % Command)
-		return (Bold, Underlined, Italics, Standout, Highlight, Font, Scale, VertOffset, Colour)
-
 	# Main procedure for CalculateTextSizeAndSpacing()
 	# First, set initial format settings; intentionally NOT allowing for standout, as standing-out text doesn't get any extra space
 	# Find target point size, allowing for change of Element size
@@ -454,7 +482,7 @@ def CalculateTextSizeAndSpacing(El, Text, TextIdentifier, VertAlignment, CanvZoo
 		IsFmtCmd.append([])
 		Xlast = 0  # X loc of last char added to Xsofar
 		for (ChunkNo, Chunk) in enumerate(ChunkText[LineNo]):
-			(a, b, ChunkAfterCmd) = ParseFormatCommand(Chunk, CheckForEscChar=True)  # split chunk into command and text
+			(a, b, ChunkAfterCmd) = ParseFormatCommand(Chunk, CheckForEscChar=True) # split chunk into command and text
 			# insert values into lists for the fmt cmd chars, if any
 			HowManyFmtChars = len(Chunk) - len(ChunkAfterCmd)
 			Xsofar[-1] += [Xlast] * HowManyFmtChars
@@ -581,7 +609,7 @@ def DrawTextInElement(El, dc, Text, TextIdentifier, LayerOffsetX=0, LayerOffsetY
 			SublineHeight = SublineHeights[SublineNo][0]  # Y distance from subline top to baseline
 			SublineTHeight = SublineHeight + SublineHeights[SublineNo][1]  # Y distance from subline top to descender
 			# leftmost available position for text within El, relative to layer, in pixels
-			# TODO consider using FindTextXStart() to replace the following lines
+			# TODO consider using FindTextXYStart() to replace the following lines
 			MinXavail, DummyY = utilities.ScreenCoords(El.MinTextXat(TextIdentifier,
 				YStart, YStart + SublineTHeight), 0, Zoom=ZoomX, PanX=0, PanY=0)
 			MaxXavail, DummyY = utilities.ScreenCoords(El.MaxTextXat(TextIdentifier,
@@ -594,13 +622,16 @@ def DrawTextInElement(El, dc, Text, TextIdentifier, LayerOffsetX=0, LayerOffsetY
 				XStartAbs = LayerOffsetX + PanX + MinXavail
 				print("Oops, unrecognised text alignment '%s' (problem code TE309). This is a bug, please report it" % Text.ParaHorizAlignment)
 			# process Standout: adjust SublineX for any standing-out chars
-			(SublineX, SublineY, StandoutAtSublineStart) = ProcessStandout(Sublines, SublineNo, SublineX, SublineY, SublineHeight, FmtCmds, ChunkLength,
-				StandoutAtSublineStart)
+			# TODO optimization: set a flag HasStandout elsewhere, and don't call ProcessStandout() if the flag is False
+			# FIXME ProcessStandout() call commented out because it messes up SublineX when there's highlight
+#			(SublineX, SublineY, StandoutAtSublineStart) = ProcessStandout(Sublines, SublineNo, SublineX, SublineY, SublineHeight, FmtCmds, ChunkLength,
+#				StandoutAtSublineStart)
 			# make required font changes for each chunk, then draw the chunk
 			CharsSoFar = 0
+#			if getattr(Text, 'debug', False): print('TE602 drawing with SublineX:', SublineX)
 			for (ChunkNo, Chunk) in enumerate(SplitSubLine):  # for each chunk, get any fmt command and its arg
 				(Command, Arg, Remainder) = FmtCmds[SublineNo][ChunkNo]
-				if Command:  # change parms accordingly
+				if Command: # change parms accordingly
 					(BoldNow, UnderlinedNow, ItalicsNow, StandoutNow, HighlightNow, FontNow, ScaleNow, VertOffsetNow,
 						ColourNow) = InterpretFormatCommand(Command, Arg, Text, BoldNow, UnderlinedNow, ItalicsNow,
 						StandoutNow, HighlightNow, FontNow, ScaleNow, VertOffsetNow, ColourNow)
@@ -673,27 +704,28 @@ def DrawTextInElement(El, dc, Text, TextIdentifier, LayerOffsetX=0, LayerOffsetY
 
 	def DrawTheCursor(TextIdentifier, CursorIndex, CursorColour, YStartInPx, Zoom):
 		assert isinstance(CursorIndex, int)
+		# find the target index of the character at which to draw the cursor, ignoring escape sequences and newlines%%%
+		TargetIndex = FindnthChar(RichStr=Text.Content, n=CursorIndex, IgnoreNewlines=False)
 		# first, find which subline contains the cursor
 		ThisSublineIndex = 0
 		CumulativeCharCount = 0
 		# step to next subline if the cursor is beyond the end of the current subline
-		while (ThisSublineIndex < len(Sublines)) and (CursorIndex > CumulativeCharCount + len(Sublines[ThisSublineIndex])):
+		while (ThisSublineIndex < len(Sublines)) and (TargetIndex > CumulativeCharCount + len(Sublines[ThisSublineIndex])):
 			CumulativeCharCount += len(Sublines[ThisSublineIndex])
-			if (CumulativeCharCount < CursorIndex): ThisSublineIndex += 1
+			if (CumulativeCharCount < TargetIndex): ThisSublineIndex += 1
 		# find the starting X, Y position of the subline
 		XStartAbs, YStartAbs = FindTextXYStart(TextIdentifier, YStartInPx, Zoom, ThisSublineIndex)
 		# find the absolute x-coordinate to draw the top left of the cursor
-		print('TE661 ThisSublineIndex, CumulativeCharCount, CursorIndex, Sublines:', ThisSublineIndex, CumulativeCharCount, CursorIndex, Sublines)
 		# is the cursor beyond the end of the subline?
-		if CursorIndex - CumulativeCharCount >= len(Sublines[ThisSublineIndex]):
+		if TargetIndex - CumulativeCharCount >= len(Sublines[ThisSublineIndex]):
 			CursorX = XStartAbs + SublineX[ThisSublineIndex][-1]
 		else:
-			CursorX = XStartAbs + SublineX[ThisSublineIndex][CursorIndex - CumulativeCharCount]
+			CursorX = XStartAbs + SublineX[ThisSublineIndex][TargetIndex - CumulativeCharCount]
 		CursorY = LayerOffsetY + PanY + YStartAbs
 #		CursorY = LayerOffsetY + PanY + YStartAbs + SublineHeight - SublineY[SublineNo][CursorIndex - CumulativeCharCount][0]
 		# draw the cursor
 		dc.SetPen(wx.Pen(CursorColour, width=max(1, int(round(2 * Zoom)))))
-		print('Drawing cursor at: ', CursorX, CursorY)
+#		print('TE699 Drawing cursor at: ', CursorX, CursorY)
 		dc.DrawLine(CursorX, CursorY, CursorX, CursorY + SublineHeights[ThisSublineIndex][0] +
 			SublineHeights[ThisSublineIndex][1])
 
@@ -708,6 +740,7 @@ def DrawTextInElement(El, dc, Text, TextIdentifier, LayerOffsetX=0, LayerOffsetY
 		RenderText(YStartInPx, Sublines, SublineHeights, SublineX,
 	   		SublineY, ScaledPointSizeNoZoom, El.TextStandoutBackColour(TextIdentifier), ZoomX=CanvZoomX, ZoomY=CanvZoomY)
 		if DrawCursor:
+#			print('TE726 drawing cursor at index: ', CursorIndex)
 			DrawTheCursor(TextIdentifier, CursorIndex, CursorColour, YStartInPx, Zoom=CanvZoomY)
 
 def UpdateStoredText(TextObj, Change, ChangePoint, NoOfChars, String):
@@ -753,15 +786,18 @@ def SetHighlightRange(Text, StartIndex, EndIndex):
 	assert isinstance(EndIndex, int)
 	# first, remove all existing highlight commands
 	FinalText = StripOutEscapeSequences(RichText=Text, CommandType=['Highlight'])
-	print('TE756 removing highlight command: text length old, new: ', len(Text), len(FinalText))
+	print('TE756 setting highlight with EndIndex, StartIndex: ', EndIndex, StartIndex)
 	# set highlight only if requested range is longer than zero
 	if EndIndex > StartIndex:
-		StartIndexRich = FindnthChar(RichStr=FinalText, n=StartIndex)
+		StartIndexRich = FindnthChar(RichStr=FinalText, n=StartIndex, IgnoreNewlines=True)
 		# insert 'start highlight' command
 		FinalText = FinalText[:StartIndexRich] + TextEscStartChar + 'H2' + TextEscEndChar + FinalText[StartIndexRich:]
-		EndIndexRich = FindnthChar(RichStr=FinalText, n=EndIndex)
+		print('TE788 FinalText before adding end highlight command: ', [ord(c) for c in FinalText])
+		EndIndexRich = FindnthChar(RichStr=FinalText, n=EndIndex, IgnoreNewlines=True)
+		print('TE789 EndIndexRich:', EndIndexRich)
 		# insert 'end highlight' command
 		FinalText = FinalText[:EndIndexRich] + TextEscStartChar + 'H1' + TextEscEndChar + FinalText[EndIndexRich:]
+		print('TE765 inserted highlight command: ', FinalText)
 	return FinalText
 
 def WrappedText(InText, Font, PixelsAvail, BreakAfter=' `~!)-=]}\\;>/?', MinLengthPercent=30, StripLeadingSpaces=True):
@@ -826,3 +862,47 @@ def WrappedText(InText, Font, PixelsAvail, BreakAfter=' `~!)-=]}\\;>/?', MinLeng
 			OutText += os.linesep + InText[LineStart:].lstrip()
 		else:   OutText += os.linesep + InText[LineStart:]
 	return (OutText[len(os.linesep):], LineCount) # the [x:] removes the unwanted newline at the start
+
+def FindWordBreakInLeanText(LeanText, StartIndex, ToRight):
+	# find and return index of next word start in LeanText (str, text with no command sequences).
+	# StartIndex (int): index in LeanText to start from.
+	# ToRight (bool): if True, search to right, else to left
+
+	def AtTextLimit(Text, Index, ToRight):
+		# return bool: whether Index at the end of Text (if ToRight) or at 0 (if not ToRight)
+		assert isinstance(Text, str)
+		assert isinstance(Index, int)
+		assert isinstance(ToRight, bool)
+		return (ToRight and (ThisIndex == len(Text))) or ((not ToRight) and (ThisIndex == 0))
+
+	# start of FindWordBreakInLeanText
+	xor = lambda a, b: bool(int(a) ^ int(b)) # make a boolean xor function
+	assert isinstance(LeanText, str)
+	assert isinstance(StartIndex, int)
+	assert isinstance(ToRight, bool)
+	WordBreakChars = WordBreakCharsToRight if ToRight else WordBreakCharsToLeft
+	# check if we're already at the end of the text
+	if ToRight:
+		if StartIndex >= len(LeanText): return len(LeanText)
+	else:
+		if StartIndex <= 0: return 0
+	Increment = 1 if ToRight else -1 # distance to step per iteration
+	ThisIndex = StartIndex
+	WordBreakFound = False
+	# while not AtTextLimit(LeanText, ThisIndex, ToRight):
+	# do 3 searches: 1. step over word breaks (in case we started on a word break);
+	# 	2. step over non-word breaks (to reach the limit of the current word);
+	# 	3. step over word breaks (to reach next word)
+	for SearchingForWordBreak, SecondWordBreak in [(True, False), (False, False), (True, True)]:
+		# step over unwanted characters
+		CheckingForUnwantedChars = not AtTextLimit(LeanText, ThisIndex, ToRight)
+		while CheckingForUnwantedChars:
+			if not xor(SearchingForWordBreak, LeanText[ThisIndex] in WordBreakChars):
+				if SecondWordBreak: WordBreakFound = True # flag indicating we reached and found a new word break
+				ThisIndex += Increment
+			else: CheckingForUnwantedChars = False # stop stepping if a non-wordbreak character found
+			CheckingForUnwantedChars &= not AtTextLimit(LeanText, ThisIndex, ToRight) # stop if text limit reached
+	# special case: if moving to the left and we reached a word break,
+	# move 1 char to the right (so that we are sitting at the end of the preceding word)
+	if (not ToRight) and WordBreakFound: ThisIndex += 1
+	return ThisIndex

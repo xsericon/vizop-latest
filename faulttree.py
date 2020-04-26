@@ -826,15 +826,18 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 		# put the cursor at the end of the text being edited
 		self.FT.DisplDevice.Bind(wx.EVT_TEXT_ENTER, self.FT.EndEditingOperation)
 		self.FT.DisplDevice.Bind(wx.EVT_KEY_DOWN, self.OnKeyDown) # for detection of Esc keypresses
+		# initialise variables used during editing
+		self.Text.Highlighted = False # whether any characters in the text are highlighted
+		self.Text.HighlightStartIndex = 0 # cursor position when highlight was first extended
 		self.FT.TextEditCursorIndex = len(self.Text.Content)
-		self.Text.Content = 'Blah\nsocks'
-		self.FT.TextEditCursorIndex = 8 # for testing
+		self.Text.Content = 'Blah foo\nsocks'
+		self.Text.debug = True
+		self.FT.TextEditCursorIndex = 1 # for testing
 		self.Text.Colour = (0,0,0)
 		self.Text.ParaHorizAlignment = 'Left'
 		# insert a visible newline character before each newline
 		self.Text.Content = self.Text.Content.replace('\n', info.NewlineSymbol + '\n')
 		self.RedrawDuringEditing(Zoom=Zoom)
-#		self.FT.DisplDevice.Redraw(FullRefresh=False) # optimization, could redraw only this element
 
 	def RedrawDuringEditing(self, Zoom):
 		# redraw the text component during editing, with cursor
@@ -856,12 +859,54 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 		self.FT.EndEditingOperation()
 
 	def OnKeyDown(self, Event): # handle key press during editing; formerly used for catching Esc key
+
+		def MoveCursorTo(Event, OldIndex, NewIndex): # handle request to move cursor to new index
+			# if Shift key is pressed, extend highlight selection
+			if Event.ShiftDown():
+				# if cursor position has returned to highlight start position, clear highlight
+				if self.Text.Highlighted and (NewIndex == self.Text.HighlightStartIndex):
+					print('FT867 returned to highlight start')
+					self.Text.Highlighted = False
+					self.FT.TextEditCursorIndex = self.Text.HighlightStartIndex = NewIndex # move cursor to NewIndex
+				else:
+					if self.Text.Highlighted:
+						self.FT.TextEditCursorIndex = NewIndex # move cursor to NewIndex
+					else:
+						# if not previously highlighting, set current cursor index as highlight start index
+						self.Text.Highlighted = True
+						self.Text.HighlightStartIndex = OldIndex
+						self.FT.TextEditCursorIndex = NewIndex # move cursor to NewIndex
+				if True or self.Text.Highlighted:
+					# set the highlight in the text
+					print('FT871 setting highlight range: ', self.Text.HighlightStartIndex, self.FT.TextEditCursorIndex)
+					self.Text.Content = text.SetHighlightRange(Text=self.Text.Content,
+						StartIndex=min(self.Text.HighlightStartIndex, self.FT.TextEditCursorIndex),
+						EndIndex=max(self.Text.HighlightStartIndex, self.FT.TextEditCursorIndex))
+			else: # shift key not pressed; clear highlight
+				self.Text.Highlighted = False
+				self.Text.Content = text.RemoveHighlightCommands(self.Text.Content) # remove highlight commands
+				self.FT.TextEditCursorIndex = self.Text.HighlightStartIndex = NewIndex # move cursor to NewIndex
+			print('FT886 new cursor index: ', self.FT.TextEditCursorIndex)
+			self.RedrawDuringEditing(Zoom=self.FT.Zoom)
+
+		# start of OnKeyDown()
+		# get the lean text
+		LeanText = text.StripOutEscapeSequences(RichText=self.Text.Content)
+		print('FT895 modifiers, AltDown, CmdDown, CtrlDown, MetaDown: ', Event.GetModifiers(), Event.AltDown(), Event.CmdDown(), Event.ControlDown() , Event.MetaDown())
 		if Event.KeyCode == wx.WXK_LEFT:
-			self.FT.TextEditCursorIndex = max(0, self.FT.TextEditCursorIndex - 1)
-			self.RedrawDuringEditing(Zoom=self.FT.Zoom)
+			if Event.AltDown(): # Option (Mac) key pressed; step wordwise
+				NewIndex = text.FindWordBreakInLeanText(LeanText=LeanText, StartIndex=self.FT.TextEditCursorIndex,
+					ToRight=False)
+			else: # move a single character
+					NewIndex = max(0, self.FT.TextEditCursorIndex - 1)
+			MoveCursorTo(Event=Event, OldIndex=self.FT.TextEditCursorIndex, NewIndex=NewIndex)
 		elif Event.KeyCode == wx.WXK_RIGHT:
-			self.FT.TextEditCursorIndex = min(len(self.Text.Content) - 1, self.FT.TextEditCursorIndex + 1)
-			self.RedrawDuringEditing(Zoom=self.FT.Zoom)
+			# adjust cursor position if starting to highlight, or if reducing highlight to zero characters
+			if Event.ShiftDown(): pass
+#				if not self.Text.Highlighted:
+#					self.FT.TextEditCursorIndex = min(len(LeanText) - 1, self.FT.TextEditCursorIndex + 1)
+			MoveCursorTo(Event=Event, OldIndex=self.FT.TextEditCursorIndex,
+				NewIndex=min(len(LeanText) - 1, self.FT.TextEditCursorIndex + 1))
 		elif Event.KeyCode == wx.WXK_ESCAPE: self.FT.EndEditingOperation(AcceptEdits=False)
 		else: Event.Skip() # allow editing widget to handle keypress normally
 
