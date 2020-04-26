@@ -315,7 +315,7 @@ def CalculateTextSizeAndSpacing(El, Text, TextIdentifier, VertAlignment, CanvZoo
 		MaxIterations = 10  # to avoid infinite loop
 		Sublines = [] # rich text content of each subline
 		SublineHeights = []  # list of (height above baseline, descent below baseline) for each subline
-		SublineX = [ [0] ]  # list of [per subline: [x offset from start of line, at left edge of each character]]
+		Text.SublineX = [ [0] ]  # list of [per subline: [x offset from start of line, at left edge of each character]]
 		SublineY = [ [] ]  # list of [per subline: [ (height above baseline, descent below baseline) per character]]
 		FinalYaboveText = FirstYaboveText  # starting position for 1st line
 		# work through each line
@@ -330,7 +330,7 @@ def CalculateTextSizeAndSpacing(El, Text, TextIdentifier, VertAlignment, CanvZoo
 			EndOfSubline = False
 			XatStartofSubline = 0
 			if StripOutEscapeSequences(Line) == '':  # handle empty line
-				SublineX[-1] = [0, 1]
+				Text.SublineX[-1] = [0, 1]
 				# set height = preceding subline, or = height of first actual char in text if it's the first subline
 				# the (10, 5) is a notional value in case no actual chars are found in text
 				if (LineNo == 0): SublineY[-1] = [ (sum(Yhere, []) + [ (10, 5) ])[0] ]
@@ -345,7 +345,7 @@ def CalculateTextSizeAndSpacing(El, Text, TextIdentifier, VertAlignment, CanvZoo
 				ThisSublineIndexStart = IndexInLine
 				LastExtraLineSpace = MaxYinSubline * (Text.LineSpacing - 1)
 				MaxYinSubline = 0
-				SublineX.append([0])
+				Text.SublineX.append([0])
 				SublineY.append([])
 			else:  # non-empty line: find last char that will fit in subline by adding in successive chars
 				while (IndexInLine < len(Line)):
@@ -364,7 +364,7 @@ def CalculateTextSizeAndSpacing(El, Text, TextIdentifier, VertAlignment, CanvZoo
 #					if getattr(Text, 'debug', False): print('TE338 XafterNextChar: ', XafterNextChar,XatStartofSubline)
 					if (XafterNextChar <= Xavail) or not ThisSubline:  # 'or not' ensures >= 1 char per subline, to avoid infinite loop
 						ThisSubline += Line[IndexInLine]
-						SublineX[-1].append(XafterNextChar)
+						Text.SublineX[-1].append(XafterNextChar)
 						SublineY[-1].append((FontHeightHere, FontDescentHere))
 						IndexInLine += 1
 					else: # reached end of subline. Work out suitable place to split it
@@ -378,7 +378,7 @@ def CalculateTextSizeAndSpacing(El, Text, TextIdentifier, VertAlignment, CanvZoo
 						if SplittableIndices:
 							IndexInLine -= (len(ThisSubline) - SplittableIndices[-1] - 1)
 							ThisSubline = ThisSubline[:SplittableIndices[-1] + 1]
-							SublineX[-1] = SublineX[-1][:SplittableIndices[-1] + 2]  # 2 because SublineX has extra 0 at the start
+							Text.SublineX[-1] = Text.SublineX[-1][:SplittableIndices[-1] + 2]  # 2 because SublineX has extra 0 at the start
 							SublineY[-1] = SublineY[-1][:SplittableIndices[-1] + 1]
 					if EndOfSubline or (IndexInLine == len(Line)):
 						# reached end of subline, or entire line; close out the subline
@@ -388,12 +388,12 @@ def CalculateTextSizeAndSpacing(El, Text, TextIdentifier, VertAlignment, CanvZoo
 							while (len(ThisSubline) > 1) and (ThisSubline[0] == ' '):
 								ThisSubline = ThisSubline[1:]
 								# chop off 2nd item (the space) in SublineX[-1], and reduce other values by the x-size of the space removed
-								SublineX[-1][1:] = [SublineX[-1][i + 2] - SublineX[-1][1] for i in range(len(SublineX[-1]) - 2)]
+								Text.SublineX[-1][1:] = [Text.SublineX[-1][i + 2] - Text.SublineX[-1][1] for i in range(len(Text.SublineX[-1]) - 2)]
 								SublineY[-1] = SublineY[-1][1:]
 							# remove any trailing spaces but leave at least one char in subline
 							while (len(ThisSubline) > 1) and (ThisSubline[-1] == ' '):
 								ThisSubline = ThisSubline[:-1]
-								SublineX[-1] = SublineX[-1][:-1]
+								Text.SublineX[-1] = Text.SublineX[-1][:-1]
 								SublineY[-1] = SublineY[-1][:-1]
 						Sublines.append(ThisSubline)
 						SublineHeights.append((MaxHeightInSubline, MaxYinSubline - MaxHeightInSubline))
@@ -403,7 +403,7 @@ def CalculateTextSizeAndSpacing(El, Text, TextIdentifier, VertAlignment, CanvZoo
 						ThisSublineIndexStart = IndexInLine
 						LastExtraLineSpace = MaxYinSubline * (Text.LineSpacing - 1)
 						MaxYinSubline = 0
-						SublineX.append([0])
+						Text.SublineX.append([0])
 						SublineY.append([])
 		# after final line, remove the extra gap
 		YatTextBottom = YatSublineTop - LastExtraLineSpace
@@ -414,7 +414,7 @@ def CalculateTextSizeAndSpacing(El, Text, TextIdentifier, VertAlignment, CanvZoo
 			if ((Ratio > MaxTopBottomDiffCentreAligned) or (Ratio < MinTopBottomDiffCentreAligned)) and (Iterations < MaxIterations):
 				# ratio out of range: try again, adjusting top space by half the difference between top and bottom space
 				# the max(0, ) is to avoid the text spilling off the top of the element
-				(FinalYaboveText, Sublines, SublineHeights, SublineX, SublineY, YatTextBottom) = FindYaboveText(El, TextIdentifier, TextLines,
+				(FinalYaboveText, Sublines, SublineHeights, Text.SublineX, SublineY, YatTextBottom) = FindYaboveText(El, TextIdentifier, TextLines,
 					max(0, FirstYaboveText - (0.5 * (FirstYaboveText - (El.MaxTextY(TextIdentifier) * CanvZoomY) + YatTextBottom))),
 					LineSpacing, Iterations + 1, VertAlignment, Yhere, Xsofar, IsFmtCmd)
 		elif VertAlignment == 'Bottom':
@@ -423,10 +423,10 @@ def CalculateTextSizeAndSpacing(El, Text, TextIdentifier, VertAlignment, CanvZoo
 			if ((Ratio > MaxTopBottomDiffBottomAligned) or (Ratio < 0)) and (Iterations < MaxIterations):
 				# ratio out of range: try again, increasing top space by 90% of bottom space
 				# the max(0, ) is to avoid the text spilling off the top of the element
-				(FinalYaboveText, Sublines, SublineHeights, SublineX, SublineY, YatTextBottom) = FindYaboveText(El, TextIdentifier, TextLines,
+				(FinalYaboveText, Sublines, SublineHeights, Text.SublineX, SublineY, YatTextBottom) = FindYaboveText(El, TextIdentifier, TextLines,
 					max(0, FirstYaboveText + (0.9 * ((El.MaxTextY(TextIdentifier) * CanvZoomY) - YatTextBottom))),
 					LineSpacing, Iterations + 1, VertAlignment, Yhere, Xsofar, IsFmtCmd)
-		return (FinalYaboveText, Sublines, SublineHeights, SublineX, SublineY, YatTextBottom)
+		return (FinalYaboveText, Sublines, SublineHeights, Text.SublineX, SublineY, YatTextBottom)
 
 	# Main procedure for CalculateTextSizeAndSpacing()
 	# First, set initial format settings; intentionally NOT allowing for standout, as standing-out text doesn't get any extra space
@@ -502,16 +502,16 @@ def CalculateTextSizeAndSpacing(El, Text, TextIdentifier, VertAlignment, CanvZoo
 		MaxYaboveText = (El.MaxTextY(TextIdentifier) * CanvZoomY) - (FirstValInYhere[0] + FirstValInYhere[1])
 	else:  # assume Top alignment
 		MaxYaboveText = 0
-	(YaboveText, Sublines, SublineHeights, SublineX, SublineY, YatTextBottom) = FindYaboveText(
+	(YaboveText, Sublines, SublineHeights, Text.SublineX, SublineY, YatTextBottom) = FindYaboveText(
 		El, TextIdentifier, TextLines, MaxYaboveText, Text.LineSpacing, 0, VertAlignment, Yhere, Xsofar, IsFmtCmd)
-	return YaboveText, Sublines, SublineHeights, SublineX, SublineY, ScaledPointSizeNoZoom, YatTextBottom
+	return YaboveText, Sublines, SublineHeights, Text.SublineX, SublineY, ScaledPointSizeNoZoom, YatTextBottom
 
 def TextSize(El, Text, TextIdentifier, CanvZoomX, CanvZoomY, VertAlignment='Top'):
 	# returns (Xsize, Ystart, Yend) for text in El
-	(YaboveText, Sublines, SublineHeights, SublineX, SublineY, ScaledPointSizeNoZoom, YatTextBottom) =\
+	(YaboveText, Sublines, SublineHeights, Text.SublineX, SublineY, ScaledPointSizeNoZoom, YatTextBottom) =\
 		CalculateTextSizeAndSpacing(El, Text, TextIdentifier, VertAlignment, CanvZoomX, CanvZoomY)
 	# get Xsize from the X-coord of the end of the longest subline
-	Xsize = max([ThisSubline[-1] for ThisSubline in SublineX])
+	Xsize = max([ThisSubline[-1] for ThisSubline in Text.SublineX])
 	return (Xsize, YaboveText, YatTextBottom)
 
 def DrawTextInElement(El, dc, Text, TextIdentifier, LayerOffsetX=0, LayerOffsetY=0, CanvZoomX=1.0, CanvZoomY=1.0,
@@ -693,9 +693,9 @@ def DrawTextInElement(El, dc, Text, TextIdentifier, LayerOffsetX=0, LayerOffsetY
 		if Text.ParaHorizAlignment == 'Left':
 			XStartAbs = LayerOffsetX + PanX + MinXavail
 		elif Text.ParaHorizAlignment == 'Right':
-			XStartAbs = LayerOffsetX + PanX + MaxXavail - SublineX[SublineNo][-1]
+			XStartAbs = LayerOffsetX + PanX + MaxXavail - Text.SublineX[SublineNo][-1]
 		elif Text.ParaHorizAlignment == 'Centre':
-			XStartAbs = LayerOffsetX + PanX + (0.5 * (MinXavail + MaxXavail - SublineX[SublineNo][-1]))
+			XStartAbs = LayerOffsetX + PanX + (0.5 * (MinXavail + MaxXavail - Text.SublineX[SublineNo][-1]))
 		else:  # bug trapping
 			XStartAbs = LayerOffsetX + PanX + MinXavail
 			print(
@@ -718,9 +718,9 @@ def DrawTextInElement(El, dc, Text, TextIdentifier, LayerOffsetX=0, LayerOffsetY
 		# find the absolute x-coordinate to draw the top left of the cursor
 		# is the cursor beyond the end of the subline?
 		if TargetIndex - CumulativeCharCount >= len(Sublines[ThisSublineIndex]):
-			CursorX = XStartAbs + SublineX[ThisSublineIndex][-1]
+			CursorX = XStartAbs + Text.SublineX[ThisSublineIndex][-1]
 		else:
-			CursorX = XStartAbs + SublineX[ThisSublineIndex][TargetIndex - CumulativeCharCount]
+			CursorX = XStartAbs + Text.SublineX[ThisSublineIndex][TargetIndex - CumulativeCharCount]
 		CursorY = LayerOffsetY + PanY + YStartAbs
 #		CursorY = LayerOffsetY + PanY + YStartAbs + SublineHeight - SublineY[SublineNo][CursorIndex - CumulativeCharCount][0]
 		# draw the cursor
@@ -731,13 +731,13 @@ def DrawTextInElement(El, dc, Text, TextIdentifier, LayerOffsetX=0, LayerOffsetY
 
 	# main procedure for DrawTextInElement()
 	if Text.Content.strip(): # don't process if text content is empty or whitespace only
-		(YaboveText, Sublines, SublineHeights, SublineX, SublineY, ScaledPointSizeNoZoom, YatTextBottom) =\
+		(YaboveText, Sublines, SublineHeights, Text.SublineX, SublineY, ScaledPointSizeNoZoom, YatTextBottom) =\
 			CalculateTextSizeAndSpacing(El, Text, TextIdentifier, VertAlignment, CanvZoomX, CanvZoomY)
 		# find the actual Y coordinate in pixels to start drawing the text. max(0, ) avoids text spilling over top of element
 		DummyX, YStartInPx = utilities.ScreenCoords(0, El.MinTextY(TextIdentifier) + max(0, YaboveText),
 			Zoom=CanvZoomY, PanX=PanX, PanY=PanY)
 		# actually draw the text
-		RenderText(YStartInPx, Sublines, SublineHeights, SublineX,
+		RenderText(YStartInPx, Sublines, SublineHeights, Text.SublineX,
 	   		SublineY, ScaledPointSizeNoZoom, El.TextStandoutBackColour(TextIdentifier), ZoomX=CanvZoomX, ZoomY=CanvZoomY)
 		if DrawCursor:
 #			print('TE726 drawing cursor at index: ', CursorIndex)
@@ -906,3 +906,45 @@ def FindWordBreakInLeanText(LeanText, StartIndex, ToRight):
 	# move 1 char to the right (so that we are sitting at the end of the preceding word)
 	if (not ToRight) and WordBreakFound: ThisIndex += 1
 	return ThisIndex
+
+def FindCharAtPosXInLine(TextObj, PosX, TargetLineIndex):
+	# find the rich-text index of the character in line number TargetLineIndex (int) in content of TextObj
+	# that starts nearest to PosX (int; x coord)
+	# return: rich-text character index (int)
+	assert isinstance(TextObj, TextObject)
+	assert isinstance(PosX, int)
+	assert isinstance(TargetLineIndex, int)
+	assert 0 <= TargetLineIndex < len(TextObj.SublineX)
+	TargetSublineX = TextObj.SublineX[TargetLineIndex]
+	# find X distance to nearest char in the target line
+	# first, find which chunk contains PosX
+	ChunksXStart = [TargetSublineX[ChunkNo][0] for ChunkNo in range(len(TargetSublineX))]
+	ChunksXEnd = [TargetSublineX[ChunkNo][-1] for ChunkNo in range(len(TargetSublineX))]
+	ChunkContainsPosX = [(ChunksXStart[ChunkNo] <= PosX <= ChunksXEnd[ChunkNo] for ChunkNo in range(len(TargetSublineX)))]
+	if True in ChunkContainsPosX: # PosX is within range of a chunk
+		# find which chunk contains PosX
+		TargetChunkNo = ChunkContainsPosX.index(True)
+		# make a list indicating, for each character in this chunk, whether it's to the right of PosX
+		CharIsToRight = [TargetSublineX[TargetChunkNo][CharNo] >= PosX for CharNo in range(len(TargetSublineX[TargetChunkNo]))]
+		# is the 0th character to the right of PosX? If so, pick the 0th character
+		if CharIsToRight[0]: TargetCharIndexInChunk = 0
+		else:
+			# find X of the first char to the right of PosX, and X of the char to the left of this
+			FirstCharToRightIndex = CharIsToRight.index(True)
+			FirstCharToRightX = TargetSublineX[TargetChunkNo][FirstCharToRightIndex]
+			FirstCharToLeftX = TargetSublineX[TargetChunkNo][FirstCharToRightIndex - 1]
+			# find out which one is closer to PosX
+			if (PosX - FirstCharToLeftX) < (FirstCharToRightX - PosX):
+				TargetCharIndexInChunk = FirstCharToRightIndex - 1
+			else: TargetCharIndexInChunk = FirstCharToRightIndex
+	else: # no chunk contains PosX
+		# if 0th chunk starts to the right of PosX, take the 0th char of 0th chunk
+		if ChunksXStart[0] > PosX:
+			TargetChunkNo = TargetCharIndexInChunk = 0
+		else: # take the last char of the last chunk
+			TargetChunkNo = len(TargetSublineX) - 1
+			TargetCharIndexInChunk = TargetSublineX[TargetChunkNo][-1]
+	# find how many chars (in rich text) occur before the target chunk
+	CharsInPrecedingChunks = 0
+	for ThisChunk in TargetSublineX[:TargetChunkNo]: CharsInPrecedingChunks += len(ThisChunk)
+	return CharsInPrecedingChunks + TargetCharIndexInChunk

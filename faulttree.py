@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
-# Module faulttree: part of Vizop, (c) 2019 xSeriCon
+# Module faulttree: part of Vizop, (c) 2020 xSeriCon
 
 # library modules
 from __future__ import division # makes a/b yield exact, not truncated, result. Must be 1st import
 import wx # provides basic GUI functions
 import zmq, copy
 import xml.etree.ElementTree as ElementTree # XML handling
+from platform import system
 
 # other vizop modules required here
 import text, utilities, core_classes, info, vizop_misc, projects, art, display_utilities, undo, project_display
@@ -893,20 +894,27 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 		# get the lean text
 		LeanText = text.StripOutEscapeSequences(RichText=self.Text.Content)
 		print('FT895 modifiers, AltDown, CmdDown, CtrlDown, MetaDown: ', Event.GetModifiers(), Event.AltDown(), Event.CmdDown(), Event.ControlDown() , Event.MetaDown())
+		# find out whether to step by word, if user held down Control (Windows) or Option (Mac) key
+		StepWordwise = (system() == 'Darwin' and Event.AltDown()) or (system() == 'Windows' and Event.ControlDown())
 		if Event.KeyCode == wx.WXK_LEFT:
-			if Event.AltDown(): # Option (Mac) key pressed; step wordwise
+			if StepWordwise:
 				NewIndex = text.FindWordBreakInLeanText(LeanText=LeanText, StartIndex=self.FT.TextEditCursorIndex,
 					ToRight=False)
 			else: # move a single character
 					NewIndex = max(0, self.FT.TextEditCursorIndex - 1)
 			MoveCursorTo(Event=Event, OldIndex=self.FT.TextEditCursorIndex, NewIndex=NewIndex)
 		elif Event.KeyCode == wx.WXK_RIGHT:
-			# adjust cursor position if starting to highlight, or if reducing highlight to zero characters
-			if Event.ShiftDown(): pass
-#				if not self.Text.Highlighted:
-#					self.FT.TextEditCursorIndex = min(len(LeanText) - 1, self.FT.TextEditCursorIndex + 1)
-			MoveCursorTo(Event=Event, OldIndex=self.FT.TextEditCursorIndex,
-				NewIndex=min(len(LeanText) - 1, self.FT.TextEditCursorIndex + 1))
+			if StepWordwise:
+				NewIndex = text.FindWordBreakInLeanText(LeanText=LeanText, StartIndex=self.FT.TextEditCursorIndex,
+					ToRight=True)
+			else: # move a single character
+				NewIndex = min(len(LeanText) - 1, self.FT.TextEditCursorIndex + 1)
+			MoveCursorTo(Event=Event, OldIndex=self.FT.TextEditCursorIndex, NewIndex=NewIndex)
+		elif Event.KeyCode == wx.WXK_UP: pass
+			# working here. Steps:
+			# 1. Find X coord of current char (to do)
+			# 2. Find corresponding char in line above: use text.FindCharAtPosXInLine (coded, not text) to get rich
+			# char index, then convert to lean char index (to do)
 		elif Event.KeyCode == wx.WXK_ESCAPE: self.FT.EndEditingOperation(AcceptEdits=False)
 		else: Event.Skip() # allow editing widget to handle keypress normally
 
