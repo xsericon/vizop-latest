@@ -307,7 +307,7 @@ def CalculateTextSizeAndSpacing(El, Text, TextIdentifier, VertAlignment, CanvZoo
 			Xsofar, IsFmtCmd):
 		# recursively find optimal Y position for text
 		# work through each line of text, split into sublines
-		BreakAfter = ' `~)-=]}\\;>/'  # chars to split line after. TODO use WordBreakChars global variable
+		BreakAfter = ' `~)-=]}\\;>/' # chars to split line after. TODO use WordBreakChars global variable
 		MinLineFill = 0.55  # fraction of total X available that must be used up when considering where to split sublines (ie no line will be shorter than this)
 		MaxTopBottomDiffCentreAligned = 1.1  # target ratio of bottomY:topY when centre aligned
 		MinTopBottomDiffCentreAligned = 0.91  # reciprocal of above
@@ -710,14 +710,14 @@ def DrawTextInElement(El, dc, Text, TextIdentifier, LayerOffsetX=0, LayerOffsetY
 		ThisSublineIndex = 0
 		CumulativeCharCount = 0
 		# step to next subline if the cursor is beyond the end of the current subline
-		while (ThisSublineIndex < len(Sublines)) and (TargetIndex > CumulativeCharCount + len(Sublines[ThisSublineIndex])):
-			CumulativeCharCount += len(Sublines[ThisSublineIndex])
+		while (ThisSublineIndex < len(Text.Sublines)) and (TargetIndex > CumulativeCharCount + len(Text.Sublines[ThisSublineIndex])):
+			CumulativeCharCount += len(Text.Sublines[ThisSublineIndex])
 			if (CumulativeCharCount < TargetIndex): ThisSublineIndex += 1
 		# find the starting X, Y position of the subline
 		XStartAbs, YStartAbs = FindTextXYStart(TextIdentifier, YStartInPx, Zoom, ThisSublineIndex)
 		# find the absolute x-coordinate to draw the top left of the cursor
 		# is the cursor beyond the end of the subline?
-		if TargetIndex - CumulativeCharCount >= len(Sublines[ThisSublineIndex]):
+		if TargetIndex - CumulativeCharCount >= len(Text.Sublines[ThisSublineIndex]):
 			CursorX = XStartAbs + Text.SublineX[ThisSublineIndex][-1]
 		else:
 			CursorX = XStartAbs + Text.SublineX[ThisSublineIndex][TargetIndex - CumulativeCharCount]
@@ -731,13 +731,13 @@ def DrawTextInElement(El, dc, Text, TextIdentifier, LayerOffsetX=0, LayerOffsetY
 
 	# main procedure for DrawTextInElement()
 	if Text.Content.strip(): # don't process if text content is empty or whitespace only
-		(YaboveText, Sublines, SublineHeights, Text.SublineX, SublineY, ScaledPointSizeNoZoom, YatTextBottom) =\
+		(YaboveText, Text.Sublines, SublineHeights, Text.SublineX, SublineY, ScaledPointSizeNoZoom, YatTextBottom) =\
 			CalculateTextSizeAndSpacing(El, Text, TextIdentifier, VertAlignment, CanvZoomX, CanvZoomY)
 		# find the actual Y coordinate in pixels to start drawing the text. max(0, ) avoids text spilling over top of element
 		DummyX, YStartInPx = utilities.ScreenCoords(0, El.MinTextY(TextIdentifier) + max(0, YaboveText),
 			Zoom=CanvZoomY, PanX=PanX, PanY=PanY)
 		# actually draw the text
-		RenderText(YStartInPx, Sublines, SublineHeights, Text.SublineX,
+		RenderText(YStartInPx, Text.Sublines, SublineHeights, Text.SublineX,
 	   		SublineY, ScaledPointSizeNoZoom, El.TextStandoutBackColour(TextIdentifier), ZoomX=CanvZoomX, ZoomY=CanvZoomY)
 		if DrawCursor:
 #			print('TE726 drawing cursor at index: ', CursorIndex)
@@ -908,7 +908,7 @@ def FindWordBreakInLeanText(LeanText, StartIndex, ToRight):
 	return ThisIndex
 
 def FindCharAtPosXInLine(TextObj, PosX, TargetLineIndex):
-	# find the rich-text index of the character in line number TargetLineIndex (int) in content of TextObj
+	# find the rich-text index of the character in subline number TargetLineIndex (int) in content of TextObj
 	# that starts nearest to PosX (int; x coord)
 	# return: rich-text character index (int)
 	assert isinstance(TextObj, TextObject)
@@ -917,34 +917,98 @@ def FindCharAtPosXInLine(TextObj, PosX, TargetLineIndex):
 	assert 0 <= TargetLineIndex < len(TextObj.SublineX)
 	TargetSublineX = TextObj.SublineX[TargetLineIndex]
 	# find X distance to nearest char in the target line
-	# first, find which chunk contains PosX
-	ChunksXStart = [TargetSublineX[ChunkNo][0] for ChunkNo in range(len(TargetSublineX))]
-	ChunksXEnd = [TargetSublineX[ChunkNo][-1] for ChunkNo in range(len(TargetSublineX))]
-	ChunkContainsPosX = [(ChunksXStart[ChunkNo] <= PosX <= ChunksXEnd[ChunkNo] for ChunkNo in range(len(TargetSublineX)))]
-	if True in ChunkContainsPosX: # PosX is within range of a chunk
-		# find which chunk contains PosX
-		TargetChunkNo = ChunkContainsPosX.index(True)
-		# make a list indicating, for each character in this chunk, whether it's to the right of PosX
-		CharIsToRight = [TargetSublineX[TargetChunkNo][CharNo] >= PosX for CharNo in range(len(TargetSublineX[TargetChunkNo]))]
-		# is the 0th character to the right of PosX? If so, pick the 0th character
-		if CharIsToRight[0]: TargetCharIndexInChunk = 0
-		else:
-			# find X of the first char to the right of PosX, and X of the char to the left of this
-			FirstCharToRightIndex = CharIsToRight.index(True)
-			FirstCharToRightX = TargetSublineX[TargetChunkNo][FirstCharToRightIndex]
-			FirstCharToLeftX = TargetSublineX[TargetChunkNo][FirstCharToRightIndex - 1]
-			# find out which one is closer to PosX
-			if (PosX - FirstCharToLeftX) < (FirstCharToRightX - PosX):
-				TargetCharIndexInChunk = FirstCharToRightIndex - 1
-			else: TargetCharIndexInChunk = FirstCharToRightIndex
-	else: # no chunk contains PosX
-		# if 0th chunk starts to the right of PosX, take the 0th char of 0th chunk
-		if ChunksXStart[0] > PosX:
-			TargetChunkNo = TargetCharIndexInChunk = 0
-		else: # take the last char of the last chunk
-			TargetChunkNo = len(TargetSublineX) - 1
-			TargetCharIndexInChunk = TargetSublineX[TargetChunkNo][-1]
-	# find how many chars (in rich text) occur before the target chunk
-	CharsInPrecedingChunks = 0
-	for ThisChunk in TargetSublineX[:TargetChunkNo]: CharsInPrecedingChunks += len(ThisChunk)
-	return CharsInPrecedingChunks + TargetCharIndexInChunk
+#	# first, find which chunk contains PosX
+#	ChunksXStart = TargetSublineX[0]
+#	ChunksXEnd = [TargetSublineX[ChunkNo][-1]
+#	ChunkContainsPosX = [(ChunksXStart[ChunkNo] <= PosX <= ChunksXEnd[ChunkNo] for ChunkNo in range(len(TargetSublineX)))]
+#	if True in ChunkContainsPosX: # PosX is within range of a chunk
+#		# find which chunk contains PosX
+#		TargetChunkNo = ChunkContainsPosX.index(True)
+	# make a list indicating, for each character in this subline, whether it's to the right of PosX
+	CharIsToRight = [ThisCharX >= PosX for ThisCharX in TargetSublineX]
+	# is the 0th character to the right of PosX? If so, pick the 0th character
+	if CharIsToRight[0]: TargetCharIndexInSubline = 0
+	# is the last char to the left of PosX? If so, pick the last character
+	if not CharIsToRight[-1]: TargetCharIndexInSubline = len(CharIsToRight) - 1
+	else:
+		# find X of the first char to the right of PosX, and X of the char to the left of this
+		FirstCharToRightIndex = CharIsToRight.index(True)
+		FirstCharToRightX = TargetSublineX[FirstCharToRightIndex]
+		FirstCharToLeftX = TargetSublineX[FirstCharToRightIndex - 1]
+		# find out which one is closer to PosX
+		if (PosX - FirstCharToLeftX) < (FirstCharToRightX - PosX):
+			TargetCharIndexInSubline = FirstCharToRightIndex - 1
+		else: TargetCharIndexInSubline = FirstCharToRightIndex
+#	else: # no chunk contains PosX
+#		# if 0th chunk starts to the right of PosX, take the 0th char of 0th chunk
+#		if ChunksXStart[0] > PosX:
+#			TargetChunkNo = TargetCharIndexInChunk = 0
+#		else: # take the last char of the last chunk
+#			TargetChunkNo = len(TargetSublineX) - 1
+#			TargetCharIndexInChunk = TargetSublineX[TargetChunkNo][-1]
+	# find how many chars (in rich text) occur before the target subline
+	CharsInPrecedingSublines = 0
+	for ThisSubline in TextObj.SublineX[:TargetLineIndex]: CharsInPrecedingSublines += len(ThisSubline)
+	return CharsInPrecedingSublines + TargetCharIndexInSubline
+
+def XCoordOfChar(TextObj, CharIndexLean):
+	# return the x coordinate of the character with index CharIndexLean (int) in lean text (ignoring command sequences)
+	# if CharIndexLean is out of range, returns X coord of 0th or last char as appropriate
+	# first, find the rich char index in the whole text
+	CharIndexRich = FindnthChar(RichStr=TextObj.Content, n=CharIndexLean)
+	# the short way: make a list of all char X-coords in the text
+	AllCharX = utilities.Flatten(TextObj.SublineX)
+	TargetX = AllCharX[CharIndexRich]
+	# or, the long way: work through sublines and chunks (not tested yet)
+#	# find which subline contains the index
+#	SublineLengthsBefore = [0] # make a list of cumulative subline lengths
+#	for ThisLine in TextObj.Sublines[1:]: SublineLengthsBefore.append(SublineLengthsBefore[-1] + len(ThisLine))
+#	AfterTargetChar = [(SublineLengthsBefore[i] > CharIndexRich) for i in range(len(SublineLengthsBefore))]
+#	if True in AfterTargetChar: # target char is in one of the sublines; find which subline
+#		TargetSubline = AfterTargetChar.index(True) - 1
+#		# find which chunk of the subline the char is in
+#		ChunkLengthsBefore = [0]
+#		for ThisChunk in TextObj.SublineX[TargetSubline]: ChunkLengthsBefore.append(ChunkLengthsBefore[-1] + len(ThisChunk))
+#		ChunkAfterTargetChar = [(ChunkLengthsBefore[i] > (CharIndexRich - SublineLengthsBefore[TargetSubline]))
+#			for i in range(len(ChunkLengthsBefore))]
+#		if True in ChunkAfterTargetChar: # target char is in one of the chunks
+#			TargetChunk = ChunkAfterTargetChar.index(True) - 1
+#			TargetCharIndexInChunk = CharIndexRich - SublineLengthsBefore[TargetSubline] - ChunkLengthsBefore[TargetChunk]
+#			TargetX = TextObj.SublineX[TargetSubline][TargetChunk][TargetCharIndexInChunk]
+#		else: # target char is at the beginning of the 0th chunk
+#			TargetCharIndexInChunk = CharIndexRich - SublineLengthsBefore[TargetSubline]
+#			TargetX = TextObj.SublineX[TargetSubline][0][0]
+#	else: # target char is at the beginning of the 0th subline, 0th chunk
+#		TargetX = TextObj.SublineX[0][0][0]
+	return TargetX
+
+def SublineIndexContainingChar(TextObj, CharIndexLean):
+	# return the number of the subline containing the char at CharIndexLean (int) in lean text
+
+#	def Sum(MyList): # return sum of integer values in MyList (iterable)
+#		Total = 0
+#		for i in MyList: Total += i
+#		return Total
+
+	CharIndexRich = FindnthChar(RichStr=TextObj.Content, n=CharIndexLean)
+	# count along sublines until target index is reached
+	CharsSoFar = 0
+	ThisSublineIndex = 0
+	print('TE995 SublineX: ', TextObj.SublineX)
+	while CharsSoFar < CharIndexRich and ThisSublineIndex < len(TextObj.SublineX):
+#		CharsSoFar += Sum([len(ThisChunk) for ThisChunk in TextObj.SublineX[ThisSublineIndex]])
+		CharsSoFar += len(TextObj.SublineX[ThisSublineIndex])
+		if CharsSoFar < CharIndexRich: ThisSublineIndex += 1
+	return min(ThisSublineIndex, len(TextObj.SublineX) - 1)
+
+def FindnthCharLean(TextObj, CharIndexRich):
+	# find the corresponding lean char index in TextObj's content corresponding to rich text index CharIndexRich (int)
+	assert isinstance(TextObj, TextObject)
+	assert isinstance(CharIndexRich, int)
+	assert 0 <= CharIndexRich < len(TextObj.Content)
+	return len(StripOutEscapeSequences(TextObj.Content[:CharIndexRich]))
+
+def HowManyLinesInText(TextObj):
+	# return the number of sublines (i.e. lines as displayed) in TextObj's content
+	assert isinstance(TextObj, TextObject)
+	return len(TextObj.SublineX) - 1

@@ -910,11 +910,29 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 			else: # move a single character
 				NewIndex = min(len(LeanText) - 1, self.FT.TextEditCursorIndex + 1)
 			MoveCursorTo(Event=Event, OldIndex=self.FT.TextEditCursorIndex, NewIndex=NewIndex)
-		elif Event.KeyCode == wx.WXK_UP: pass
-			# working here. Steps:
-			# 1. Find X coord of current char (to do)
-			# 2. Find corresponding char in line above: use text.FindCharAtPosXInLine (coded, not text) to get rich
-			# char index, then convert to lean char index (to do)
+		elif Event.KeyCode == wx.WXK_UP:
+			# 1. Find line number of current char (as displayed, i.e. "subline" number)
+			CurrentLine = text.SublineIndexContainingChar(TextObj=self.Text, CharIndexLean=self.FT.TextEditCursorIndex)
+			if CurrentLine > 0: # not already in top line?
+				# 2. Find X coord of current char
+				CurrentCharX = text.XCoordOfChar(TextObj=self.Text, CharIndexLean=self.FT.TextEditCursorIndex)
+				# 3. Find corresponding char index in line above
+				TargetCharIndexRich = text.FindCharAtPosXInLine(TextObj=self.Text, PosX=CurrentCharX, TargetLineIndex=CurrentLine - 1)
+				# convert to lean char index
+				NewIndex = text.FindnthCharLean(TextObj=self.Text, CharIndexRich=TargetCharIndexRich)
+				MoveCursorTo(Event=Event, OldIndex=self.FT.TextEditCursorIndex, NewIndex=NewIndex)
+		elif Event.KeyCode == wx.WXK_DOWN:
+			# 1. Find line number of current char (as displayed, i.e. "subline" number)
+			CurrentLine = text.SublineIndexContainingChar(TextObj=self.Text, CharIndexLean=self.FT.TextEditCursorIndex)
+			if (CurrentLine + 1) < text.HowManyLinesInText(TextObj=self.Text): # not already in bottom line?
+				# 2. Find X coord of current char
+				CurrentCharX = text.XCoordOfChar(TextObj=self.Text, CharIndexLean=self.FT.TextEditCursorIndex)
+				# 3. Find corresponding char index in line above
+				TargetCharIndexRich = text.FindCharAtPosXInLine(TextObj=self.Text, PosX=CurrentCharX,
+																TargetLineIndex=CurrentLine + 1)
+				# convert to lean char index
+				NewIndex = text.FindnthCharLean(TextObj=self.Text, CharIndexRich=TargetCharIndexRich)
+				MoveCursorTo(Event=Event, OldIndex=self.FT.TextEditCursorIndex, NewIndex=NewIndex)
 		elif Event.KeyCode == wx.WXK_ESCAPE: self.FT.EndEditingOperation(AcceptEdits=False)
 		else: Event.Skip() # allow editing widget to handle keypress normally
 
