@@ -823,10 +823,11 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 
 	def StartEditingAsText(self, Zoom): # handle request to edit contents of component as text%%%
 		# First, redraw the FT so that the text component gets its new appearance (colour, border etc)
-		print('FT826 in StartEditingAsText with self.FT.CurrentEditComponent:', self.FT.CurrentEditComponent)
 		# put the cursor at the end of the text being edited
 		self.FT.DisplDevice.Bind(wx.EVT_TEXT_ENTER, self.FT.EndEditingOperation)
-		self.FT.DisplDevice.Bind(wx.EVT_KEY_DOWN, self.OnKeyDown) # for detection of Esc keypresses
+		self.FT.DisplDevice.Bind(wx.EVT_CHAR, self.OnKeyDown) # keypress handler.
+			# Using wx.EVT_CHAR instead of wx.EVT_KEY_DOWN, wx.EVT_CHAR_HOOK so that the case of the char is detected,
+			# and non-ASCII characters can be entered
 		# initialise variables used during editing
 		self.Text.Highlighted = False # whether any characters in the text are highlighted
 		self.Text.HighlightStartIndex = 0 # cursor position when highlight was first extended
@@ -861,9 +862,10 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 
 	def OnKeyDown(self, Event): # handle key press during editing; formerly used for catching Esc key
 
-		def MoveCursorTo(Event, OldIndex, NewIndex): # handle request to move cursor to new index
+		def MoveCursorTo(Event, OldIndex, NewIndex, IgnoreShift=False): # handle request to move cursor to new index
+			# IgnoreShift (bool): whether to ignore shift key - used during deleting
 			# if Shift key is pressed, extend highlight selection
-			if Event.ShiftDown():
+			if Event.ShiftDown() and not IgnoreShift:
 				# if cursor position has returned to highlight start position, clear highlight
 				if self.Text.Highlighted and (NewIndex == self.Text.HighlightStartIndex):
 					print('FT867 returned to highlight start')
@@ -877,7 +879,7 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 						self.Text.Highlighted = True
 						self.Text.HighlightStartIndex = OldIndex
 						self.FT.TextEditCursorIndex = NewIndex # move cursor to NewIndex
-				if True or self.Text.Highlighted:
+				if self.Text.Highlighted:
 					# set the highlight in the text
 					print('FT871 setting highlight range: ', self.Text.HighlightStartIndex, self.FT.TextEditCursorIndex)
 					self.Text.Content = text.SetHighlightRange(Text=self.Text.Content,
@@ -891,50 +893,102 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 			self.RedrawDuringEditing(Zoom=self.FT.Zoom)
 
 		# start of OnKeyDown()
-		# get the lean text
-		LeanText = text.StripOutEscapeSequences(RichText=self.Text.Content)
-		print('FT895 modifiers, AltDown, CmdDown, CtrlDown, MetaDown: ', Event.GetModifiers(), Event.AltDown(), Event.CmdDown(), Event.ControlDown() , Event.MetaDown())
-		# find out whether to step by word, if user held down Control (Windows) or Option (Mac) key
-		StepWordwise = (system() == 'Darwin' and Event.AltDown()) or (system() == 'Windows' and Event.ControlDown())
-		if Event.KeyCode == wx.WXK_LEFT:
-			if StepWordwise:
-				NewIndex = text.FindWordBreakInLeanText(LeanText=LeanText, StartIndex=self.FT.TextEditCursorIndex,
-					ToRight=False)
-			else: # move a single character
-					NewIndex = max(0, self.FT.TextEditCursorIndex - 1)
-			MoveCursorTo(Event=Event, OldIndex=self.FT.TextEditCursorIndex, NewIndex=NewIndex)
-		elif Event.KeyCode == wx.WXK_RIGHT:
-			if StepWordwise:
-				NewIndex = text.FindWordBreakInLeanText(LeanText=LeanText, StartIndex=self.FT.TextEditCursorIndex,
-					ToRight=True)
-			else: # move a single character
-				NewIndex = min(len(LeanText) - 1, self.FT.TextEditCursorIndex + 1)
-			MoveCursorTo(Event=Event, OldIndex=self.FT.TextEditCursorIndex, NewIndex=NewIndex)
-		elif Event.KeyCode == wx.WXK_UP:
-			# 1. Find line number of current char (as displayed, i.e. "subline" number)
-			CurrentLine = text.SublineIndexContainingChar(TextObj=self.Text, CharIndexLean=self.FT.TextEditCursorIndex)
-			if CurrentLine > 0: # not already in top line?
-				# 2. Find X coord of current char
-				CurrentCharX = text.XCoordOfChar(TextObj=self.Text, CharIndexLean=self.FT.TextEditCursorIndex)
-				# 3. Find corresponding char index in line above
-				TargetCharIndexRich = text.FindCharAtPosXInLine(TextObj=self.Text, PosX=CurrentCharX, TargetLineIndex=CurrentLine - 1)
-				# convert to lean char index
-				NewIndex = text.FindnthCharLean(TextObj=self.Text, CharIndexRich=TargetCharIndexRich)
+		Propagate = True # whether to propagate the keypress event to other handlers
+		if Event.KeyCode == wx.WXK_BACK: # check for backspace key (we do this first, as it also generates ASCII code)
+			print('FT946 detected delete key')
+			# backspace key (Windows) / delete key (Mac) deletes highlighted text or, if none, deletes the char
+			# to the left of the cursor
+			# store an undo record TODO
+			if self.Text.Highlighted: # if text is highlighted, delete the highlighted chars
+				# find the index of the start and end of the highlight in the rich and lean text
+				HighlightStartIndexLean = min(self.FT.TextEditCursorIndex, self.Text.HighlightStartIndex)
+				HighlightEndIndexLean = max(self.FT.TextEditCursorIndex, self.Text.HighlightStartIndex)
+				HighlightStartIndexRich = text.FindnthChar(RichStr=self.Text.Content,
+														   n=HighlightStartIndexLean)
+				HighlightEndIndexRich = text.FindnthChar(RichStr=self.Text.Content, n=HighlightEndIndexLean)
+				# if the last character to be deleted is the newline symbol, extend the selection to delete the actual
+				# newline character as well
+				if self.Text.Content[text.FindnthChar(RichStr=self.Text.Content, n=HighlightEndIndexLean) - 1] ==\
+						info.NewlineSymbol:
+					HighlightEndIndexRich = text.FindnthChar(RichStr=self.Text.Content, n=HighlightEndIndexLean + 1)
+				self.Text.Content = self.Text.Content[:HighlightStartIndexRich] + \
+									self.Text.Content[HighlightEndIndexRich:]
+				MoveCursorTo(Event=Event, OldIndex=self.FT.TextEditCursorIndex, NewIndex=HighlightStartIndexLean,
+							 IgnoreShift=True)
+			Propagate = False
+		# check if the key doesn't correspond to a printable character
+		elif Event.GetUnicodeKey() == wx.WXK_NONE:
+			# process as an editing command
+			# get the lean text
+			LeanText = text.StripOutEscapeSequences(RichText=self.Text.Content)
+			# find out whether to step by word, if user held down Control (Windows) or Option (Mac) key
+			StepWordwise = (system() == 'Darwin' and Event.AltDown()) or (system() == 'Windows' and Event.ControlDown())
+			if Event.KeyCode == wx.WXK_LEFT:
+				if StepWordwise:
+					NewIndex = text.FindWordBreakInLeanText(LeanText=LeanText, StartIndex=self.FT.TextEditCursorIndex,
+						ToRight=False)
+				else: # move a single character
+						NewIndex = max(0, self.FT.TextEditCursorIndex - 1)
 				MoveCursorTo(Event=Event, OldIndex=self.FT.TextEditCursorIndex, NewIndex=NewIndex)
-		elif Event.KeyCode == wx.WXK_DOWN:
-			# 1. Find line number of current char (as displayed, i.e. "subline" number)
-			CurrentLine = text.SublineIndexContainingChar(TextObj=self.Text, CharIndexLean=self.FT.TextEditCursorIndex)
-			if (CurrentLine + 1) < text.HowManyLinesInText(TextObj=self.Text): # not already in bottom line?
-				# 2. Find X coord of current char
-				CurrentCharX = text.XCoordOfChar(TextObj=self.Text, CharIndexLean=self.FT.TextEditCursorIndex)
-				# 3. Find corresponding char index in line above
-				TargetCharIndexRich = text.FindCharAtPosXInLine(TextObj=self.Text, PosX=CurrentCharX,
-																TargetLineIndex=CurrentLine + 1)
-				# convert to lean char index
-				NewIndex = text.FindnthCharLean(TextObj=self.Text, CharIndexRich=TargetCharIndexRich)
+				Propagate = False
+			elif Event.KeyCode == wx.WXK_RIGHT:
+				if StepWordwise:
+					NewIndex = text.FindWordBreakInLeanText(LeanText=LeanText, StartIndex=self.FT.TextEditCursorIndex,
+						ToRight=True)
+				else: # move a single character
+					NewIndex = min(len(LeanText) - 1, self.FT.TextEditCursorIndex + 1)
 				MoveCursorTo(Event=Event, OldIndex=self.FT.TextEditCursorIndex, NewIndex=NewIndex)
-		elif Event.KeyCode == wx.WXK_ESCAPE: self.FT.EndEditingOperation(AcceptEdits=False)
-		else: Event.Skip() # allow editing widget to handle keypress normally
+				Propagate = False
+			elif Event.KeyCode == wx.WXK_UP:
+				# 1. Find line number of current char (as displayed, i.e. "subline" number)
+				CurrentLine = text.SublineIndexContainingChar(TextObj=self.Text, CharIndexLean=self.FT.TextEditCursorIndex)
+				if CurrentLine > 0: # not already in top line?
+					# 2. Find X coord of current char
+					CurrentCharX = text.XCoordOfChar(TextObj=self.Text, CharIndexLean=self.FT.TextEditCursorIndex)
+					# 3. Find corresponding char index in line above
+					TargetCharIndexRich = text.FindCharAtPosXInLine(TextObj=self.Text, PosX=CurrentCharX, TargetLineIndex=CurrentLine - 1)
+					# convert to lean char index
+					NewIndex = text.FindnthCharLean(TextObj=self.Text, CharIndexRich=TargetCharIndexRich)
+					MoveCursorTo(Event=Event, OldIndex=self.FT.TextEditCursorIndex, NewIndex=NewIndex)
+					Propagate = False
+			elif Event.KeyCode == wx.WXK_DOWN:
+				# 1. Find line number of current char (as displayed, i.e. "subline" number)
+				CurrentLine = text.SublineIndexContainingChar(TextObj=self.Text, CharIndexLean=self.FT.TextEditCursorIndex)
+				if (CurrentLine + 1) < text.HowManyLinesInText(TextObj=self.Text): # not already in bottom line?
+					# 2. Find X coord of current char
+					CurrentCharX = text.XCoordOfChar(TextObj=self.Text, CharIndexLean=self.FT.TextEditCursorIndex)
+					# 3. Find corresponding char index in line above
+					TargetCharIndexRich = text.FindCharAtPosXInLine(TextObj=self.Text, PosX=CurrentCharX,
+																	TargetLineIndex=CurrentLine + 1)
+					# convert to lean char index
+					NewIndex = text.FindnthCharLean(TextObj=self.Text, CharIndexRich=TargetCharIndexRich)
+					MoveCursorTo(Event=Event, OldIndex=self.FT.TextEditCursorIndex, NewIndex=NewIndex)
+					Propagate = False
+			elif Event.KeyCode == wx.WXK_ESCAPE:
+				self.FT.EndEditingOperation(AcceptEdits=False)
+				Propagate = False # TODO test if modifiers are pressed; we don't want to suppress eg command + Escape
+		else:
+			# process as a printable char
+			CharTyped = chr(Event.GetUnicodeKey())
+			# store an undo record TODO
+			# is any text highlighted? if so, replace the highlighted text with the new char
+			if self.Text.Highlighted:
+				# find the index of the start and end of the highlight in the rich and lean text
+				HighlightStartIndexLean = min(self.FT.TextEditCursorIndex, self.Text.HighlightStartIndex)
+				HighlightStartIndexRich = text.FindnthChar(RichStr=self.Text.Content,
+					n=HighlightStartIndexLean)
+				HighlightEndIndexRich = text.FindnthChar(RichStr=self.Text.Content,
+					n=max(self.FT.TextEditCursorIndex, self.Text.HighlightStartIndex))
+				self.Text.Content = self.Text.Content[:HighlightStartIndexRich] + CharTyped +\
+					self.Text.Content[HighlightEndIndexRich:]
+				MoveCursorTo(Event=Event, OldIndex=self.FT.TextEditCursorIndex, NewIndex=HighlightStartIndexLean + 1)
+			else: # no text highlighted; insert the new char
+				InsertIndexRich = text.FindnthChar(RichStr=self.Text.Content, n=self.FT.TextEditCursorIndex)
+				self.Text.Content = self.Text.Content[:InsertIndexRich] + CharTyped +\
+					self.Text.Content[InsertIndexRich:]
+				MoveCursorTo(Event=Event, OldIndex=self.FT.TextEditCursorIndex, NewIndex=self.FT.TextEditCursorIndex + 1)
+			Propagate = False
+			if Propagate: Event.Skip() # pass on the keypress event to other handlers if not fully handled here
 
 class FTEvent(FTBoxyObject): # FT event object
 	# Used for causes, IPLs, intermediate events, final events
