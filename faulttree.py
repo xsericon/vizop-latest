@@ -724,7 +724,7 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 	def UsePromptText(self): # return True if we should display a prompt text instead of the actual text
 		return (self.Text.Content == '')
 
-	def Draw(self, DC, Zoom, **Args): # render text element, including background box, in DC%%%
+	def Draw(self, DC, Zoom, **Args): # render text element, including background box, in DC
 		# Optional arg BackBoxRoundedness: radius of background box corner curvature, in canvas coords
 		# Optional arg Highlight (bool): whether to highlight the background box
 		DefaultRound = 3 # default value of BackBoxRoundedness if not supplied
@@ -822,8 +822,8 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 				pass
 
 	def StartEditingAsText(self, Zoom): # handle request to edit contents of component as text%%%
-		# First, redraw the FT so that the text component gets its new appearance (colour, border etc)
-		# put the cursor at the end of the text being edited
+		# first, store the current content of the text component, in case the edit is rejected
+		self.Text.OldContent = self.Text.Content
 		self.FT.DisplDevice.Bind(wx.EVT_TEXT_ENTER, self.FT.EndEditingOperation)
 		self.FT.DisplDevice.Bind(wx.EVT_CHAR, self.OnKeyDown) # keypress handler.
 			# Using wx.EVT_CHAR instead of wx.EVT_KEY_DOWN, wx.EVT_CHAR_HOOK so that the case of the char is detected,
@@ -831,10 +831,11 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 		# initialise variables used during editing
 		self.Text.Highlighted = False # whether any characters in the text are highlighted
 		self.Text.HighlightStartIndex = 0 # cursor position when highlight was first extended
+		# put the cursor at the end of the text being edited
 		self.FT.TextEditCursorIndex = len(self.Text.Content)
-		self.Text.Content = 'Blah foo\nsocks'
-		self.Text.debug = True
-		self.FT.TextEditCursorIndex = 1 # for testing
+#		self.Text.Content = 'Blah foo\nsocks'
+#		self.Text.debug = True
+#		self.FT.TextEditCursorIndex = 1 # for testing
 		self.Text.Colour = (0,0,0)
 		self.Text.ParaHorizAlignment = 'Left'
 		# insert a visible newline character before each newline
@@ -892,10 +893,57 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 			print('FT886 new cursor index: ', self.FT.TextEditCursorIndex)
 			self.RedrawDuringEditing(Zoom=self.FT.Zoom)
 
+		def InsertChars(CharsToInsert, InsertIndexLean=0, IgnoreShift=False):
+			# insert CharsToInsert (str) into self.Text.Content at InsertIndexLean (int) if there's no highlight, else
+			# the highlighted text is replaced and InsertIndexLean is ignored
+			# IgnoreShift (bool): whether MoveCursorTo() should ignore shift key
+			assert isinstance(CharsToInsert, str)
+			assert isinstance(InsertIndexLean, int)
+			assert 0 <= InsertIndexLean
+			assert isinstance(IgnoreShift, bool)
+			# store an undo record TODO
+			# is any text highlighted? if so, replace the highlighted text with the new char
+			if self.Text.Highlighted:
+				# find the index of the start and end of the highlight in the rich and lean text
+				HighlightStartIndexLean = min(self.FT.TextEditCursorIndex, self.Text.HighlightStartIndex)
+				HighlightEndIndexLean = max(self.FT.TextEditCursorIndex, self.Text.HighlightStartIndex)
+				HighlightStartIndexRich = text.FindnthChar(RichStr=self.Text.Content,
+					n=HighlightStartIndexLean)
+				HighlightEndIndexRich = text.FindnthChar(RichStr=self.Text.Content,
+					n=max(self.FT.TextEditCursorIndex, self.Text.HighlightStartIndex))
+				# if the last character highlighted is the newline symbol, extend the selection to delete the actual
+				# newline character as well
+#				if self.Text.Content[text.FindnthChar(RichStr=self.Text.Content, n=HighlightEndIndexLean) - 1] ==\
+#						info.NewlineSymbol:
+				if CharIsNewlineSymbol(CharIndexLean=HighlightEndIndexLean - 1):
+					HighlightEndIndexRich = text.FindnthChar(RichStr=self.Text.Content, n=HighlightEndIndexLean + 1)
+				# update the text content, replacing highlighted chars with CharsToInsert
+				self.Text.Content = self.Text.Content[:HighlightStartIndexRich] + CharsToInsert +\
+					self.Text.Content[HighlightEndIndexRich:]
+				MoveCursorTo(Event=Event, OldIndex=self.FT.TextEditCursorIndex,
+					NewIndex=HighlightStartIndexLean + len(CharsToInsert), IgnoreShift=IgnoreShift)
+			else: # no text highlighted; insert the new char
+				# if the cursor is immediately to the right of a newline symbol, insert CharsToInsert after the newline
+				if self.FT.TextEditCursorIndex > 0: # don't do the check if we're at the start of the text
+					if CharIsNewlineSymbol(CharIndexLean=self.FT.TextEditCursorIndex - 1):
+						InsertIndexRich = text.FindnthChar(RichStr=self.Text.Content, n=InsertIndexLean + 1)
+					else: InsertIndexRich = text.FindnthChar(RichStr=self.Text.Content, n=InsertIndexLean)
+				else: InsertIndexRich = text.FindnthChar(RichStr=self.Text.Content, n=0) # insert at start of text
+				self.Text.Content = self.Text.Content[:InsertIndexRich] + CharsToInsert +\
+					self.Text.Content[InsertIndexRich:]
+				MoveCursorTo(Event=Event, OldIndex=self.FT.TextEditCursorIndex,
+					NewIndex=InsertIndexLean + len(CharsToInsert), IgnoreShift=IgnoreShift)
+			Propagate = False
+
+		def CharIsNewlineSymbol(CharIndexLean):
+			# return (bool) whether the char in self.Text.Content at CharIndexLean is the newline symbol (not an actual
+			# newline character)
+			return self.Text.Content[text.FindnthChar(RichStr=self.Text.Content, n=CharIndexLean)] == info.NewlineSymbol
+
 		# start of OnKeyDown()
+		# %%% next to do: resolve crash when space is pressed; make Esc key work
 		Propagate = True # whether to propagate the keypress event to other handlers
 		if Event.KeyCode == wx.WXK_BACK: # check for backspace key (we do this first, as it also generates ASCII code)
-			print('FT946 detected delete key')
 			# backspace key (Windows) / delete key (Mac) deletes highlighted text or, if none, deletes the char
 			# to the left of the cursor
 			# store an undo record TODO
@@ -907,7 +955,7 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 														   n=HighlightStartIndexLean)
 				HighlightEndIndexRich = text.FindnthChar(RichStr=self.Text.Content, n=HighlightEndIndexLean)
 				# if the last character to be deleted is the newline symbol, extend the selection to delete the actual
-				# newline character as well
+				# newline character as well. TODO consider using CharIsNewlineSymbol()
 				if self.Text.Content[text.FindnthChar(RichStr=self.Text.Content, n=HighlightEndIndexLean) - 1] ==\
 						info.NewlineSymbol:
 					HighlightEndIndexRich = text.FindnthChar(RichStr=self.Text.Content, n=HighlightEndIndexLean + 1)
@@ -915,7 +963,22 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 									self.Text.Content[HighlightEndIndexRich:]
 				MoveCursorTo(Event=Event, OldIndex=self.FT.TextEditCursorIndex, NewIndex=HighlightStartIndexLean,
 							 IgnoreShift=True)
+			else: # no highlight; delete the character to the left of the cursor
+				if self.FT.TextEditCursorIndex > 0: # don't do anything if cursor is at the beginning of the text
+					IndexToDeleteRich = text.FindnthChar(RichStr=self.Text.Content, n=self.FT.TextEditCursorIndex - 1)
+					# remove just the visible character, leaving behind any formatting command between the doomed
+					# character and the cursor position
+					self.Text.Content = self.Text.Content[:IndexToDeleteRich] + self.Text.Content[IndexToDeleteRich + 1:]
+					MoveCursorTo(Event=Event, OldIndex=self.FT.TextEditCursorIndex,
+						NewIndex=self.FT.TextEditCursorIndex - 1, IgnoreShift=True)
 			Propagate = False
+		elif Event.KeyCode in [wx.WXK_RETURN, wx.WXK_NUMPAD_ENTER]: # check for return/enter key
+			# if any modifier is pressed, insert a line break
+			if Event.HasAnyModifiers():
+				InsertChars(CharsToInsert=info.NewlineSymbol + '\n', InsertIndexLean=self.FT.TextEditCursorIndex,
+					IgnoreShift=True)
+			else: # bare Enter key: end editing
+				self.FT.EndEditingOperation(AcceptEdits=True)
 		# check if the key doesn't correspond to a printable character
 		elif Event.GetUnicodeKey() == wx.WXK_NONE:
 			# process as an editing command
@@ -969,24 +1032,26 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 				Propagate = False # TODO test if modifiers are pressed; we don't want to suppress eg command + Escape
 		else:
 			# process as a printable char
-			CharTyped = chr(Event.GetUnicodeKey())
-			# store an undo record TODO
-			# is any text highlighted? if so, replace the highlighted text with the new char
-			if self.Text.Highlighted:
-				# find the index of the start and end of the highlight in the rich and lean text
-				HighlightStartIndexLean = min(self.FT.TextEditCursorIndex, self.Text.HighlightStartIndex)
-				HighlightStartIndexRich = text.FindnthChar(RichStr=self.Text.Content,
-					n=HighlightStartIndexLean)
-				HighlightEndIndexRich = text.FindnthChar(RichStr=self.Text.Content,
-					n=max(self.FT.TextEditCursorIndex, self.Text.HighlightStartIndex))
-				self.Text.Content = self.Text.Content[:HighlightStartIndexRich] + CharTyped +\
-					self.Text.Content[HighlightEndIndexRich:]
-				MoveCursorTo(Event=Event, OldIndex=self.FT.TextEditCursorIndex, NewIndex=HighlightStartIndexLean + 1)
-			else: # no text highlighted; insert the new char
-				InsertIndexRich = text.FindnthChar(RichStr=self.Text.Content, n=self.FT.TextEditCursorIndex)
-				self.Text.Content = self.Text.Content[:InsertIndexRich] + CharTyped +\
-					self.Text.Content[InsertIndexRich:]
-				MoveCursorTo(Event=Event, OldIndex=self.FT.TextEditCursorIndex, NewIndex=self.FT.TextEditCursorIndex + 1)
+			InsertChars(CharsToInsert=chr(Event.GetUnicodeKey()), InsertIndexLean=self.FT.TextEditCursorIndex,
+				IgnoreShift=True)
+#			CharTyped = chr(Event.GetUnicodeKey())
+#			# store an undo record TODO
+#			# is any text highlighted? if so, replace the highlighted text with the new char
+#			if self.Text.Highlighted:
+#				# find the index of the start and end of the highlight in the rich and lean text
+#				HighlightStartIndexLean = min(self.FT.TextEditCursorIndex, self.Text.HighlightStartIndex)
+#				HighlightStartIndexRich = text.FindnthChar(RichStr=self.Text.Content,
+#					n=HighlightStartIndexLean)
+#				HighlightEndIndexRich = text.FindnthChar(RichStr=self.Text.Content,
+#					n=max(self.FT.TextEditCursorIndex, self.Text.HighlightStartIndex))
+#				self.Text.Content = self.Text.Content[:HighlightStartIndexRich] + CharTyped +\
+#					self.Text.Content[HighlightEndIndexRich:]
+#				MoveCursorTo(Event=Event, OldIndex=self.FT.TextEditCursorIndex, NewIndex=HighlightStartIndexLean + 1)
+#			else: # no text highlighted; insert the new char
+#				InsertIndexRich = text.FindnthChar(RichStr=self.Text.Content, n=self.FT.TextEditCursorIndex)
+#				self.Text.Content = self.Text.Content[:InsertIndexRich] + CharTyped +\
+#					self.Text.Content[InsertIndexRich:]
+#				MoveCursorTo(Event=Event, OldIndex=self.FT.TextEditCursorIndex, NewIndex=self.FT.TextEditCursorIndex + 1)
 			Propagate = False
 			if Propagate: Event.Skip() # pass on the keypress event to other handlers if not fully handled here
 
@@ -3989,7 +4054,8 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		assert isinstance(ElementID, str)
 		assert isinstance(TextComponentName, str)
 		assert isinstance(NewValue, str)
-		assert isinstance(Viewport, FTObjectInCore)
+#		assert isinstance(Viewport, FTObjectInCore)
+		print('FT4059 changing text to: ', NewValue)
 		ChangeAccepted = True
 		# find relevant element containing the component
 		if ElementID == 'Header':
@@ -4005,12 +4071,12 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			if ValueReceived != 'junk': # we got a recognisable number; update value in all applicable risk receptors
 				ChangeAccepted = self.DoChangeTextInValueField(Proj, ComponentToUpdate=ComponentToUpdate, ComponentHost=ComponentHost,
 					TargetValue=ValueReceived, ViewportID=Viewport.ID,
-					ViewportClass=type(Viewport), Zoom=Viewport.Zoom, PanX=Viewport.PanX, PanY=Viewport.PanY,
+					ViewportClass=type(Viewport), Zoom=Zoom, PanX=PanX, PanY=PanY,
 					HostElementID=ElementID, Redoing=False, RRGroup=self.RiskReceptorGroupOnDisplay)
 		else: # updating another field
 			self.DoChangeTextInTextField(Proj=Proj, ComponentToUpdate=ComponentToUpdate, ComponentHost=ComponentHost,
-				TargetValue=NewValue, ViewportID=Viewport.ID, ViewportClass=type(Viewport), Zoom=Viewport.Zoom,
-				PanX=Viewport.PanX, PanY=Viewport.PanY, HostElementID=ElementID, Redoing=False)
+				TargetValue=NewValue, ViewportID=Viewport.ID, ViewportClass=type(Viewport), Zoom=Zoom,
+				PanX=PanX, PanY=PanY, HostElementID=ElementID, Redoing=False)
 #			OldValue = getattr(ComponentHost, ComponentToUpdate) # get old value for saving in Undo record
 #			setattr(ComponentHost, ComponentToUpdate, NewValue) # write new value to component
 #			# store undo record. FIXME ViewportClass arg is useless, as it's the Viewport shadow class. Needed?
@@ -5459,7 +5525,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			SetValueProblemButtonStatus(FTElement=NewGate, XMLObj=XMLObj)
 			# create variable elements and build combined element list comprising fixed and variable elements
 			(NewGate.DescriptionCommentEls, NewGate.ActionItemEls) = NewGate.CreateVariableTextElements()
-			if NewGate.DetailedView: # populate components if gate is shown in detailed view (not just a gate symbol)%%%
+			if NewGate.DetailedView: # populate components if gate is shown in detailed view (not just a gate symbol)
 #			if True:
 				NewGate.AllComponents = BuildFullElementList(
 					NewGate.TopFixedEls, NewGate.ValueFixedEls, NewGate.DescriptionCommentEls, NewGate.ActionItemEls)
@@ -5701,7 +5767,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 				# set PosX/Y of components within elements
 				if hasattr(ThisElement, 'AllComponents'):
 					for ThisComponent in ThisElement.AllComponents:
-						if not hasattr(ThisComponent, 'PosXInCU'): print('FT5520 component: ', ThisComponent.InternalName) # %%% for debug
+#						if not hasattr(ThisComponent, 'PosXInCU'): print('FT5520 component: ', ThisComponent.InternalName)
 						ThisComponent.PosXInPx = ThisElement.PosXInPx + (ThisComponent.PosXInCU * self.Zoom)
 						ThisComponent.PosYInPx = ThisElement.PosYInPx + (ThisComponent.PosYInCU * self.Zoom)
 				# set overall column width
@@ -6130,7 +6196,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		self.DisplDevice.Redraw(FullRefresh=True)
 
 	def EndEditingOperation(self, Event=None, AcceptEdits=None):
-		# tidy up after user has selected from a choice or typed in a TextElement, then clicked out
+		# tidy up after user has selected from a choice or typed in a TextElement, then clicked out%%%
 		# Event: placeholder for Event arg supplied from events that bind to this procedure.
 		# AcceptEdits (bool or None): whether to retain the edits made, or discard them. If None, use global project setting.
 		# Currently handles plain text only with no embedded format commands
@@ -6143,23 +6209,32 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			# check if it was a text editing operation
 			if CurrentEditBehaviour == 'Text':
 				# get the text typed by the user
-				TextEntered = self.CurrentEditTextCtrl.GetValue().strip()
+#				TextEntered = self.CurrentEditTextCtrl.GetValue().strip()
+				TextEntered = self.CurrentEditComponent.Text.Content
 				# check if any changes made
-				if AcceptEditsThisTime and (TextEntered != self.CurrentEditComponent.Text.Content):
+				print('FT6216 wrapping up after editing with AcceptEdits, AcceptEditsThisTime, TextEntered: ', AcceptEdits, AcceptEditsThisTime, TextEntered)
+				if AcceptEditsThisTime and (TextEntered != self.CurrentEditComponent.Text.OldContent):
 					if isinstance(self.CurrentEditComponent.HostObject, FTHeader): ElementID = 'Header'
 					else: ElementID = self.CurrentEditComponent.HostObject.ID
 					EditComponentInternalName = self.CurrentEditComponent.InternalName
-					# destroy the TextCtrl (to avoid memory leak) (do this before SendRequest() so that the FT gets fully
-					# refreshed by ControlFrame's OnPaint() afterwards)
-					self.CurrentEditTextCtrl.Destroy()
-					self.CurrentEditComponent = self.CurrentEditTextCtrl = None
-					self.PaintNeeded = True # turn off paint suppression while TextCtrl was in use
+#					# destroy the TextCtrl (to avoid memory leak) (do this before SendRequest() so that the FT gets fully
+#					# refreshed by ControlFrame's OnPaint() afterwards)
+#					self.CurrentEditTextCtrl.Destroy()
+#					self.CurrentEditComponent = None
+#					self.PaintNeeded = True # turn off paint suppression while TextCtrl was in use; redundant?
 					# request PHA object in datacore to update text attribute
 					self.RequestChangeText(ElementID, EditComponentInternalName, NewValue=TextEntered)
-				else: # no change made, or change rejected; destroy the textctrl widget
-					self.CurrentEditTextCtrl.Destroy()
-					self.CurrentEditComponent = self.CurrentEditTextCtrl = None
-					self.PaintNeeded = True # turn off paint suppression while TextCtrl was in use
+				else: # no change made, or change rejected
+					# revert the text to its original state
+					self.CurrentEditComponent.Text.Content = self.CurrentEditComponent.Text.OldContent
+					# redraw
+#					self.CurrentEditTextCtrl.Destroy()
+#					self.CurrentEditComponent = None
+#					self.PaintNeeded = True # turn off paint suppression while TextCtrl was in use; redundant?
+				# redraw the element containing the edited component
+#				self.CurrentEditComponent.RedrawDuringEditing(Zoom=self.Zoom)
+				self.CurrentEditComponent = None
+				self.PaintNeeded = True # turn off paint suppression while TextCtrl was in use; redundant?
 			elif CurrentEditBehaviour == 'Choice': # it was a choice editing operation
 				# get the option selected by the user
 				TextSelected = self.CurrentEditChoice.GetStringSelection()
@@ -6195,8 +6270,8 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		# send request to Datacore to update text attribute. Also used for updating value fields, in which case
 		# at this stage, NewValue has not been validated - could be unacceptable
 		vizop_misc.SendRequest(Socket=self.C2DSocketREQ, Command='RQ_FT_ChangeText',
-			Proj=self.Proj.ID, PHAObj=self.PHAObjID, Viewport=self.ID, Zoom=str(self.FT.Zoom), PanX=str(self.FT.PanX),
-			PanY=str(self.FT.PanY),
+			Proj=self.Proj.ID, PHAObj=self.PHAObjID, Viewport=self.ID, Zoom=str(self.Zoom), PanX=str(self.PanX),
+			PanY=str(self.PanY),
 			Element=ElementID, TextComponent=EditComponentInternalName, NewValue=NewValue)
 
 	def RequestChangeChoice(self, ElementID, EditComponentInternalName, AttribName, NewValue):
