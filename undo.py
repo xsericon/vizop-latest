@@ -352,5 +352,19 @@ def RemoveLastInstanceOfAttribInUndoList(Proj, AttribName):
 				AttribStillToRemove = False
 			ThisIndex -= 1
 
+class UndoRecordDuringTextEditing(object):
+	# undo record used during text editing
+
+	def __init__(self, OldTextContentRich='', NewTextContentRich='', EditAction='', CursorIndexLean=0, **Args):
+		object.__init__(self)
+		assert isinstance(OldTextContentRich, str)
+		assert isinstance(NewTextContentRich, str)
+		assert isinstance(EditAction, str)
+		assert isinstance(CursorIndexLean, int)
+		self.OldTextContentRich = OldTextContentRich
+		self.NewTextContentRich = NewTextContentRich
+		self.EditAction = EditAction
+		self.CursorIndexLean = CursorIndexLean
+		
 # remove the dummy definition of _()
 del _

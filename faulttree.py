@@ -745,8 +745,9 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 		text.DrawTextInElement(self, DC, TextToShow, TextIdentifier=0, CanvZoomX=Zoom,
 			CanvZoomY=Zoom, PanX=0, PanY=0, VertAlignment='Top')
 
-	def HandleMouseLClickOnMe(self, **Args): # handle mouse left button single click on TextElement instance
+	def HandleMouseLClickOnMe(self, **Args): # handle mouse left button single click on TextElement instance when not editing
 		# first, request control frame to show appropriate aspect in control panel
+		print('FT750 in mouse click handler for text component')
 		if getattr(self, 'ControlPanelAspect', None):
 			# if editing a component in the header, get the component name
 			if isinstance(self.HostObject, FTHeader):
@@ -831,6 +832,7 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 		# initialise variables used during editing
 		self.Text.Highlighted = False # whether any characters in the text are highlighted
 		self.Text.HighlightStartIndex = 0 # cursor position when highlight was first extended
+		self.UndoListDuringTextEditing = []
 		# put the cursor at the end of the text being edited
 		self.FT.TextEditCursorIndex = len(self.Text.Content)
 #		self.Text.Content = 'Blah foo\nsocks'
@@ -841,6 +843,10 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 		# insert a visible newline character before each newline
 		self.Text.Content = self.Text.Content.replace('\n', info.NewlineSymbol + '\n')
 		self.RedrawDuringEditing(Zoom=Zoom)
+
+	def HandleMouseLClickOnMeDuringEditing(self, **Args): # handle mouse left single click on text element during editing
+		# available in Args: HitHotspot=HitHotspot, HostViewport=self, MouseX=ClickXInPx, MouseY=ClickYInPx
+		print('FT848 in click handler during editing')
 
 	def RedrawDuringEditing(self, Zoom):
 		# redraw the text component during editing, with cursor
@@ -861,7 +867,7 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 	def OnEditChoice(self, Event): # handle click in choice box during editing
 		self.FT.EndEditingOperation()
 
-	def OnKeyDown(self, Event): # handle key press during editing; formerly used for catching Esc key
+	def OnKeyDown(self, Event): # handle key press in text box during editing
 
 		def MoveCursorTo(Event, OldIndex, NewIndex, IgnoreShift=False): # handle request to move cursor to new index
 			# IgnoreShift (bool): whether to ignore shift key - used during deleting
@@ -946,24 +952,25 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 		if Event.KeyCode == wx.WXK_BACK: # check for backspace key (we do this first, as it also generates ASCII code)
 			# backspace key (Windows) / delete key (Mac) deletes highlighted text or, if none, deletes the char
 			# to the left of the cursor
-			# store an undo record TODO
+			OldTextContentRich = self.Text.Content # for undo record
 			if self.Text.Highlighted: # if text is highlighted, delete the highlighted chars
 				# find the index of the start and end of the highlight in the rich and lean text
 				HighlightStartIndexLean = min(self.FT.TextEditCursorIndex, self.Text.HighlightStartIndex)
 				HighlightEndIndexLean = max(self.FT.TextEditCursorIndex, self.Text.HighlightStartIndex)
-				HighlightStartIndexRich = text.FindnthChar(RichStr=self.Text.Content,
-														   n=HighlightStartIndexLean)
-				HighlightEndIndexRich = text.FindnthChar(RichStr=self.Text.Content, n=HighlightEndIndexLean)
+				HighlightStartIndexRich = text.FindnthChar(RichStr=self.Text.Content, n=HighlightStartIndexLean)
 				# if the last character to be deleted is the newline symbol, extend the selection to delete the actual
 				# newline character as well. TODO consider using CharIsNewlineSymbol()
 				if self.Text.Content[text.FindnthChar(RichStr=self.Text.Content, n=HighlightEndIndexLean) - 1] ==\
 						info.NewlineSymbol:
-					HighlightEndIndexRich = text.FindnthChar(RichStr=self.Text.Content, n=HighlightEndIndexLean + 1)
+					HighlightEndIndexLean = HighlightEndIndexLean + 1
+				HighlightEndIndexRich = text.FindnthChar(RichStr=self.Text.Content, n=HighlightEndIndexLean)
+				OldCursorIndexLean = HighlightEndIndexLean  # for undo record
 				self.Text.Content = self.Text.Content[:HighlightStartIndexRich] + \
 									self.Text.Content[HighlightEndIndexRich:]
 				MoveCursorTo(Event=Event, OldIndex=self.FT.TextEditCursorIndex, NewIndex=HighlightStartIndexLean,
 							 IgnoreShift=True)
 			else: # no highlight; delete the character to the left of the cursor
+				OldCursorIndexLean = self.FT.TextEditCursorIndex  # for undo record
 				if self.FT.TextEditCursorIndex > 0: # don't do anything if cursor is at the beginning of the text
 					IndexToDeleteRich = text.FindnthChar(RichStr=self.Text.Content, n=self.FT.TextEditCursorIndex - 1)
 					# remove just the visible character, leaving behind any formatting command between the doomed
@@ -972,6 +979,9 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 					MoveCursorTo(Event=Event, OldIndex=self.FT.TextEditCursorIndex,
 						NewIndex=self.FT.TextEditCursorIndex - 1, IgnoreShift=True)
 			Propagate = False
+			self.FT.StoreUndoRecordDuringTextEditing(OldTextContentRich=OldTextContentRich,
+				NewTextContentRich=self.Text.Content, CursorIndexLean=OldCursorIndexLean,
+				EditAction='DeleteChars')
 		elif Event.KeyCode in [wx.WXK_RETURN, wx.WXK_NUMPAD_ENTER]: # check for return/enter key
 			# if any modifier is pressed, insert a line break
 			if Event.HasAnyModifiers():
@@ -1031,29 +1041,47 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 				self.FT.EndEditingOperation(AcceptEdits=False)
 				Propagate = False # TODO test if modifiers are pressed; we don't want to suppress eg command + Escape
 		else:
-			# process as a printable char
-			InsertChars(CharsToInsert=chr(Event.GetUnicodeKey()), InsertIndexLean=self.FT.TextEditCursorIndex,
-				IgnoreShift=True)
-#			CharTyped = chr(Event.GetUnicodeKey())
-#			# store an undo record TODO
-#			# is any text highlighted? if so, replace the highlighted text with the new char
-#			if self.Text.Highlighted:
-#				# find the index of the start and end of the highlight in the rich and lean text
-#				HighlightStartIndexLean = min(self.FT.TextEditCursorIndex, self.Text.HighlightStartIndex)
-#				HighlightStartIndexRich = text.FindnthChar(RichStr=self.Text.Content,
-#					n=HighlightStartIndexLean)
-#				HighlightEndIndexRich = text.FindnthChar(RichStr=self.Text.Content,
-#					n=max(self.FT.TextEditCursorIndex, self.Text.HighlightStartIndex))
-#				self.Text.Content = self.Text.Content[:HighlightStartIndexRich] + CharTyped +\
-#					self.Text.Content[HighlightEndIndexRich:]
-#				MoveCursorTo(Event=Event, OldIndex=self.FT.TextEditCursorIndex, NewIndex=HighlightStartIndexLean + 1)
-#			else: # no text highlighted; insert the new char
-#				InsertIndexRich = text.FindnthChar(RichStr=self.Text.Content, n=self.FT.TextEditCursorIndex)
-#				self.Text.Content = self.Text.Content[:InsertIndexRich] + CharTyped +\
-#					self.Text.Content[InsertIndexRich:]
-#				MoveCursorTo(Event=Event, OldIndex=self.FT.TextEditCursorIndex, NewIndex=self.FT.TextEditCursorIndex + 1)
-			Propagate = False
+			# check if Ctrl/Cmd key is pressed; attempt to process as a formatting/editing command
+			if Event.GetModifiers() == wx.MOD_CONTROL: # %%% working here
+				if chr(Event.GetUnicodeKey()) in ['Z', 'z']: # process undo request
+					NewCursorIndexLean = self.PerformUndoDuringTextEdit()
+					print('FT1041 undo: moving cursor to: ', NewCursorIndexLean)
+					if NewCursorIndexLean is not None: # was any undo performed?
+						MoveCursorTo(Event=Event, OldIndex=self.FT.TextEditCursorIndex, NewIndex=NewCursorIndexLean)
+				Propagate = False
+			else:
+				# process as a printable char
+				InsertChars(CharsToInsert=chr(Event.GetUnicodeKey()), InsertIndexLean=self.FT.TextEditCursorIndex,
+					IgnoreShift=True)
+	#			CharTyped = chr(Event.GetUnicodeKey())
+	#			# store an undo record TODO
+	#			# is any text highlighted? if so, replace the highlighted text with the new char
+	#			if self.Text.Highlighted:
+	#				# find the index of the start and end of the highlight in the rich and lean text
+	#				HighlightStartIndexLean = min(self.FT.TextEditCursorIndex, self.Text.HighlightStartIndex)
+	#				HighlightStartIndexRich = text.FindnthChar(RichStr=self.Text.Content,
+	#					n=HighlightStartIndexLean)
+	#				HighlightEndIndexRich = text.FindnthChar(RichStr=self.Text.Content,
+	#					n=max(self.FT.TextEditCursorIndex, self.Text.HighlightStartIndex))
+	#				self.Text.Content = self.Text.Content[:HighlightStartIndexRich] + CharTyped +\
+	#					self.Text.Content[HighlightEndIndexRich:]
+	#				MoveCursorTo(Event=Event, OldIndex=self.FT.TextEditCursorIndex, NewIndex=HighlightStartIndexLean + 1)
+	#			else: # no text highlighted; insert the new char
+	#				InsertIndexRich = text.FindnthChar(RichStr=self.Text.Content, n=self.FT.TextEditCursorIndex)
+	#				self.Text.Content = self.Text.Content[:InsertIndexRich] + CharTyped +\
+	#					self.Text.Content[InsertIndexRich:]
+	#				MoveCursorTo(Event=Event, OldIndex=self.FT.TextEditCursorIndex, NewIndex=self.FT.TextEditCursorIndex + 1)
+				Propagate = False
 			if Propagate: Event.Skip() # pass on the keypress event to other handlers if not fully handled here
+
+	def PerformUndoDuringTextEdit(self):
+		# execute undo during text editing. Return new lean cursor index (int), or None if no undo was performed
+		# any edit to undo?
+		if self.FT.UndoListDuringTextEditing:
+			ThisUndoRecord = self.FT.UndoListDuringTextEditing.pop()
+			self.Text.Content = ThisUndoRecord.OldTextContentRich
+			return ThisUndoRecord.CursorIndexLean
+		else: return None # no undo to do
 
 class FTEvent(FTBoxyObject): # FT event object
 	# Used for causes, IPLs, intermediate events, final events
@@ -5180,6 +5208,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		self.PreferredControlPanelAspect = 'CPAspect_FaultTree' # initial control panel aspect to show when FT is displayed
 		self.ComponentEdited = '' # last FT element component edited (e.g. a comment button clicked);
 			# to enable control panel aspect to show required comments
+		self.UndoListDuringTextEditing = [] # list of undo.UndoRecordDuringTextEditing instances
 		self.PersistentFTAttribs = {} # keys are attrib names of self; values are values to reinstate when object is
 			# refreshed from datacore. Not needed, as attribs are not wiped?
 
@@ -5957,6 +5986,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		# Find out which element(s), if any, are clicked
 		assert ClickKind in [X + Y for X in ['Left', 'Centre', 'Right'] for Y in ['Single', 'Long', 'Double', 'Triple']]
 		Hits = [] # list of dict of elements/hotspots clicked
+		Handler = '?' # name of click handler method to invoke
 		for ThisEl in self.AllClickableObjects():
 			HitHotspot = ThisEl.MouseHit(ClickXInPx, ClickYInPx, TolXInPx=TolXInPx, TolYInPx=TolYInPx)
 			if HitHotspot: Hits.append({'Element': ThisEl, 'Hotspot': HitHotspot})
@@ -5967,14 +5997,23 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			if ClickKind.startswith('Left'):
 				ElToHandleLClick = HitWithHighestZ['Element']
 				ElHotspotToHandle = HitWithHighestZ['Hotspot']
-			# check if the topmost clicked element is already doing an editing operation - if so, ignore the click
-			if ElToHandleLClick != self.CurrentEditComponent:
-				self.EndEditingOperation() # close out any operation in progress
-				self.LastElLClicked = ElToHandleLClick # needed for drag handler
-				self.LastElLClickedHotspot = ElHotspotToHandle
+			# check if the topmost clicked element is already doing an editing operation, and call appropriate handler
+			if ElToHandleLClick is self.CurrentEditComponent:
+				print('FT5996 handling mouse click during editing')
+				# identify appropriate handler for click
+				if ClickKind == 'LeftSingle': Handler = 'HandleMouseLClickOnMeDuringEditing'
+				elif ClickKind == 'LeftDouble': Handler = 'HandleMouseLDClickOnMeDuringEditing'
+				# invoke handler, if clicked element has implemented it
+				if hasattr(ElToHandleLClick, Handler):
+					getattr(ElToHandleLClick, Handler)(HitHotspot=HitHotspot, HostViewport=self, MouseX=ClickXInPx,
+						MouseY=ClickYInPx, **Args)
+			else:
 				# identify appropriate handler for click
 				if ClickKind == 'LeftSingle': Handler = 'HandleMouseLClickOnMe'
 				elif ClickKind == 'LeftDouble': Handler = 'HandleMouseLDClickOnMe'
+				self.EndEditingOperation() # close out any operation in progress
+				self.LastElLClicked = ElToHandleLClick # needed for drag handler
+				self.LastElLClickedHotspot = ElHotspotToHandle
 				# invoke handler, if clicked element has implemented it
 				if hasattr(ElToHandleLClick, Handler):
 					getattr(ElToHandleLClick, Handler)(HitHotspot=HitHotspot, HostViewport=self, MouseX=ClickXInPx,
@@ -6487,6 +6526,18 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			Proj=self.Proj.ID, PHAObj=self.PHAObjID, PHAElement=PHAElement.ID,
 			AssociatedTextListAttrib=PHAComponent.AssociatedTextListAttrib,
 			Component=PHAComponent.InternalName, Viewport=self.ID, **ArgsToSend)
+
+	def StoreUndoRecordDuringTextEditing(self, OldTextContentRich, NewTextContentRich, CursorIndexLean, EditAction):
+		# store an undo record for editing action during text editing
+		# if the edit action is the same as the previous one, collapse the new action into the previous one
+		CollapseIntoPreviousRecord = False
+		if self.UndoListDuringTextEditing:
+			if self.UndoListDuringTextEditing[-1].EditAction == EditAction: CollapseIntoPreviousRecord = True
+		if CollapseIntoPreviousRecord:
+			self.UndoListDuringTextEditing[-1].NewTextContentRich = NewTextContentRich
+		else: # make a new undo record
+			self.UndoListDuringTextEditing.append(undo.UndoRecordDuringTextEditing(OldTextContentRich=OldTextContentRich,
+				NewTextContentRich=NewTextContentRich, EditAction=EditAction, CursorIndexLean=CursorIndexLean))
 
 FTObjectInCore.DefaultViewportType = FTForDisplay # set here (not in FTForDisplay class) due to the order of the
 	# class definitions
