@@ -836,7 +836,7 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 		# put the cursor at the end of the text being edited
 		self.FT.TextEditCursorIndex = len(self.Text.Content)
 #		self.Text.Content = 'Blah foo\nsocks'
-#		self.Text.debug = True
+		self.Text.debug = True
 #		self.FT.TextEditCursorIndex = 1 # for testing
 		self.Text.Colour = (0,0,0)
 		self.Text.ParaHorizAlignment = 'Left'
@@ -846,7 +846,9 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 
 	def HandleMouseLClickOnMeDuringEditing(self, **Args): # handle mouse left single click on text element during editing
 		# available in Args: HitHotspot=HitHotspot, HostViewport=self, MouseX=ClickXInPx, MouseY=ClickYInPx
-		print('FT848 in click handler during editing')
+		print('FT848 in click handler during editing: ', Args['MouseX'], Args['MouseY'], self.TextCtrlPosXInPxWithinDisplDevice)
+		TargetCharIndexLean = text.NearestCharIndexLeanAtXY(TextObj=self.Text, TargetX=Args['MouseX'] - self.PosXInPx, TargetY=Args['MouseY'] - self.PosYInPx)
+		print('FT851 TargetCharIndexLean: ', TargetCharIndexLean)
 
 	def RedrawDuringEditing(self, Zoom):
 		# redraw the text component during editing, with cursor
@@ -858,6 +860,8 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 			self.SizeXInCU * Zoom, self.SizeYInCU * Zoom)
 		# populate the box with the current text
 		# 6 in the line below is an adjustment factor to get the text position to look natural
+		print('FT863 requesting text drawn at X offset: ', self.TextCtrlPosXInPxWithinDisplDevice)
+		print('FT864 text content is now: ', [ord(c) for c in self.Text.Content])
 		text.DrawTextInElement(self, TextEditDC, self.Text, TextIdentifier=0, CanvZoomX=Zoom,
 			CanvZoomY=Zoom, LayerOffsetX=self.TextCtrlPosXInPxWithinDisplDevice,
 			LayerOffsetY=self.TextCtrlPosYInPxWithinDisplDevice - self.SizeYInPx + int(round(6 * Zoom)),
@@ -896,7 +900,6 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 				self.Text.Highlighted = False
 				self.Text.Content = text.RemoveHighlightCommands(self.Text.Content) # remove highlight commands
 				self.FT.TextEditCursorIndex = self.Text.HighlightStartIndex = NewIndex # move cursor to NewIndex
-			print('FT886 new cursor index: ', self.FT.TextEditCursorIndex)
 			self.RedrawDuringEditing(Zoom=self.FT.Zoom)
 
 		def InsertChars(CharsToInsert, InsertIndexLean=0, IgnoreShift=False):
@@ -947,8 +950,9 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 			return self.Text.Content[text.FindnthChar(RichStr=self.Text.Content, n=CharIndexLean)] == info.NewlineSymbol
 
 		# start of OnKeyDown()
-		# %%% next to do: resolve crash when space is pressed; make Esc key work
+		# %%% next to do: resolve crash when space is pressed; make Esc key work; resolve crash on typing char after newline
 		Propagate = True # whether to propagate the keypress event to other handlers
+		OldTextContentLean = text.StripOutEscapeSequences(self.Text.Content)
 		if Event.KeyCode == wx.WXK_BACK: # check for backspace key (we do this first, as it also generates ASCII code)
 			# backspace key (Windows) / delete key (Mac) deletes highlighted text or, if none, deletes the char
 			# to the left of the cursor
@@ -985,6 +989,7 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 		elif Event.KeyCode in [wx.WXK_RETURN, wx.WXK_NUMPAD_ENTER]: # check for return/enter key
 			# if any modifier is pressed, insert a line break
 			if Event.HasAnyModifiers():
+				print('FT991 inserting line break')
 				InsertChars(CharsToInsert=info.NewlineSymbol + '\n', InsertIndexLean=self.FT.TextEditCursorIndex,
 					IgnoreShift=True)
 			else: # bare Enter key: end editing
@@ -992,24 +997,27 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 		# check if the key doesn't correspond to a printable character
 		elif Event.GetUnicodeKey() == wx.WXK_NONE:
 			# process as an editing command
-			# get the lean text
-			LeanText = text.StripOutEscapeSequences(RichText=self.Text.Content)
+#			# get the lean text
+#			LeanText = text.StripOutEscapeSequences(RichText=self.Text.Content)
 			# find out whether to step by word, if user held down Control (Windows) or Option (Mac) key
 			StepWordwise = (system() == 'Darwin' and Event.AltDown()) or (system() == 'Windows' and Event.ControlDown())
 			if Event.KeyCode == wx.WXK_LEFT:
 				if StepWordwise:
-					NewIndex = text.FindWordBreakInLeanText(LeanText=LeanText, StartIndex=self.FT.TextEditCursorIndex,
+					NewIndex = text.FindWordBreakInLeanText(LeanText=OldTextContentLean, StartIndex=self.FT.TextEditCursorIndex,
 						ToRight=False)
 				else: # move a single character
-						NewIndex = max(0, self.FT.TextEditCursorIndex - 1)
+					NewIndex = max(0, self.FT.TextEditCursorIndex - 1)
+					# if the new cursor location is a newline character, move another place to the left, onto the newline symbol
+					if OldTextContentLean[NewIndex] == '\n': NewIndex -= 1
 				MoveCursorTo(Event=Event, OldIndex=self.FT.TextEditCursorIndex, NewIndex=NewIndex)
 				Propagate = False
 			elif Event.KeyCode == wx.WXK_RIGHT:
 				if StepWordwise:
-					NewIndex = text.FindWordBreakInLeanText(LeanText=LeanText, StartIndex=self.FT.TextEditCursorIndex,
+					NewIndex = text.FindWordBreakInLeanText(LeanText=OldTextContentLean, StartIndex=self.FT.TextEditCursorIndex,
 						ToRight=True)
 				else: # move a single character
-					NewIndex = min(len(LeanText) - 1, self.FT.TextEditCursorIndex + 1)
+					NewIndex = min(len(OldTextContentLean), self.FT.TextEditCursorIndex + 1)
+					print('FT1020 moving cursor position to: ', NewIndex)
 				MoveCursorTo(Event=Event, OldIndex=self.FT.TextEditCursorIndex, NewIndex=NewIndex)
 				Propagate = False
 			elif Event.KeyCode == wx.WXK_UP:
@@ -1032,7 +1040,7 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 					CurrentCharX = text.XCoordOfChar(TextObj=self.Text, CharIndexLean=self.FT.TextEditCursorIndex)
 					# 3. Find corresponding char index in line above
 					TargetCharIndexRich = text.FindCharAtPosXInLine(TextObj=self.Text, PosX=CurrentCharX,
-																	TargetLineIndex=CurrentLine + 1)
+						TargetLineIndex=CurrentLine + 1)
 					# convert to lean char index
 					NewIndex = text.FindnthCharLean(TextObj=self.Text, CharIndexRich=TargetCharIndexRich)
 					MoveCursorTo(Event=Event, OldIndex=self.FT.TextEditCursorIndex, NewIndex=NewIndex)
@@ -1820,7 +1828,8 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 		ConnName = TextElement(self.FT, Row=0, ColStart=4, ColSpan=3, EndX=274, HostObject=self, MinSizeX=75,
 			InternalName='ConnName')
 		ConnDescription = TextElement(self.FT, Row=1, ColStart=0, ColSpan=4, EndX=199, MinHeight=50, HostObject=self,
-			InternalName='ConnectorDescription', PromptText=_('Type a description'), EditBehaviour='Text')
+			InternalName='ConnectorDescription', PromptText=_('Type a description'), EditBehaviour='Text',
+			HorizAlignment='Left')
 		self.ConnDescriptionCommentButton = ButtonElement(self.FT, Row=1, ColStart=4, ColSpan=1, StartX=200, EndX=224,
 			HostObject=self, InternalName='ConnDescriptionCommentButton', Stati=('OutNotExist', 'OutExist'),
 			LSingleClickHandler='HandleMouseLClickOnCommentButton', CommentKind='ConnectorDescriptionComments',
@@ -5797,8 +5806,8 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 				if hasattr(ThisElement, 'AllComponents'):
 					for ThisComponent in ThisElement.AllComponents:
 #						if not hasattr(ThisComponent, 'PosXInCU'): print('FT5520 component: ', ThisComponent.InternalName)
-						ThisComponent.PosXInPx = ThisElement.PosXInPx + (ThisComponent.PosXInCU * self.Zoom)
-						ThisComponent.PosYInPx = ThisElement.PosYInPx + (ThisComponent.PosYInCU * self.Zoom)
+						ThisComponent.PosXInPx = int(round(ThisElement.PosXInPx + (ThisComponent.PosXInCU * self.Zoom)))
+						ThisComponent.PosYInPx = int(round(ThisElement.PosYInPx + (ThisComponent.PosYInCU * self.Zoom)))
 				# set overall column width
 				ColWidthInCU = max(ColWidthInCU, ThisElement.PosXInCU + ThisElement.SizeXInCU)
 				# calculate Y-coord of next item in this column, if any
@@ -6095,10 +6104,10 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		UseEndYInPx = max(self.StripMinYInPx + self.Header.SizeYInPx + HalfButtonSizeYInPx,
 			min(self.StripMaxYInPx - HalfButtonSizeYInPx, MouseY))
 		# work out the buffer starting and ending coords relative to display device
-		BufferStartX = min(RubberBandToXInPx + [UseEndXInPx]) - self.ConnectButtonBufferBorderX - HalfButtonSizeXInPx
-		BufferStartY = min(RubberBandToYInPx + [UseEndYInPx]) - self.ConnectButtonBufferBorderY - HalfButtonSizeYInPx
-		BufferEndX = max(RubberBandToXInPx + [UseEndXInPx]) + self.ConnectButtonBufferBorderX + HalfButtonSizeXInPx
-		BufferEndY = max(RubberBandToYInPx + [UseEndYInPx]) + self.ConnectButtonBufferBorderY + HalfButtonSizeYInPx
+		BufferStartX = int(round(min(RubberBandToXInPx + [UseEndXInPx]) - self.ConnectButtonBufferBorderX - HalfButtonSizeXInPx))
+		BufferStartY = int(round(min(RubberBandToYInPx + [UseEndYInPx]) - self.ConnectButtonBufferBorderY - HalfButtonSizeYInPx))
+		BufferEndX = int(round(max(RubberBandToXInPx + [UseEndXInPx]) + self.ConnectButtonBufferBorderX + HalfButtonSizeXInPx))
+		BufferEndY = int(round(max(RubberBandToYInPx + [UseEndYInPx]) + self.ConnectButtonBufferBorderY + HalfButtonSizeYInPx))
 		# make buffer to draw connecting line
 		ConnectButtonBitmap = wx.Bitmap(
 			width=(BufferEndX - BufferStartX) + 2 * (HalfButtonSizeXInPx + self.ConnectButtonBufferBorderX),
@@ -6239,6 +6248,12 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		# Event: placeholder for Event arg supplied from events that bind to this procedure.
 		# AcceptEdits (bool or None): whether to retain the edits made, or discard them. If None, use global project setting.
 		# Currently handles plain text only with no embedded format commands
+
+		def RemoveNewlineSymbols(TextContentLean):
+			# remove newline symbol from before each newline \n in TextContentLean (str) and return the text (str)
+			assert isinstance(TextContentLean, str)
+			return TextContentLean.replace(info.NewlineSymbol + '\n', '\n')
+
 		assert isinstance(AcceptEdits, bool) or (AcceptEdits is None)
 		# check if any editing operation was in progress
 		if self.CurrentEditComponent:
@@ -6247,9 +6262,8 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			CurrentEditBehaviour = getattr(self.CurrentEditComponent,'EditBehaviour', None)
 			# check if it was a text editing operation
 			if CurrentEditBehaviour == 'Text':
-				# get the text typed by the user
-#				TextEntered = self.CurrentEditTextCtrl.GetValue().strip()
-				TextEntered = self.CurrentEditComponent.Text.Content
+				# get the text typed by the user, and remove newline symbols
+				TextEntered = RemoveNewlineSymbols(self.CurrentEditComponent.Text.Content)
 				# check if any changes made
 				print('FT6216 wrapping up after editing with AcceptEdits, AcceptEditsThisTime, TextEntered: ', AcceptEdits, AcceptEditsThisTime, TextEntered)
 				if AcceptEditsThisTime and (TextEntered != self.CurrentEditComponent.Text.OldContent):
