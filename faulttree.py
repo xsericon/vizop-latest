@@ -842,6 +842,7 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 		self.Text.ParaHorizAlignment = 'Left'
 		# insert a visible newline character before each newline
 		self.Text.Content = self.Text.Content.replace('\n', info.NewlineSymbol + '\n')
+		print('FT845 calling DrawTextInElement')
 		self.RedrawDuringEditing(Zoom=Zoom)
 
 	def HandleMouseLClickOnMeDuringEditing(self, **Args): # handle mouse left single click on text element during editing

@@ -712,7 +712,7 @@ def DrawTextInElement(El, dc, Text, TextIdentifier, LayerOffsetX=0, LayerOffsetY
 
 	def DrawTheCursor(TextIdentifier, CursorIndex, CursorColour, YStartInPx, Zoom):
 		assert isinstance(CursorIndex, int)
-		# find the target index of the character at which to draw the cursor, ignoring escape sequences and newlines%%%
+		# find the target index of the character at which to draw the cursor, ignoring escape sequences and newlines
 		TargetIndex = FindnthChar(RichStr=Text.Content, n=CursorIndex, IgnoreNewlines=False)
 		# first, find which subline contains the cursor
 		ThisSublineIndex = 0
@@ -741,18 +741,29 @@ def DrawTextInElement(El, dc, Text, TextIdentifier, LayerOffsetX=0, LayerOffsetY
 			SublineHeights[ThisSublineIndex][1])
 
 	# main procedure for DrawTextInElement()
-	if Text.Content.strip(): # don't process if text content is empty or whitespace only
-		(YaboveText, Text.Sublines, SublineHeights, Text.SublineX, SublineY, ScaledPointSizeNoZoom, YatTextBottom) =\
-			CalculateTextSizeAndSpacing(El, Text, TextIdentifier, VertAlignment, CanvZoomX, CanvZoomY)
-		# find the actual Y coordinate in pixels to start drawing the text. max(0, ) avoids text spilling over top of element
-		DummyX, YStartInPx = utilities.ScreenCoords(0, El.MinTextY(TextIdentifier) + max(0, YaboveText),
-			Zoom=CanvZoomY, PanX=PanX, PanY=PanY)
-		# actually draw the text
+	# if text is empty (or whitespace only) and we need to draw cursor, add dummy content so that we can calculate
+	# correct position for cursor
+	if DrawCursor and not Text.Content.strip():
+		UsingDummyText = True
+		OldText = Text.Content
+		Text.Content = 'y'
+	else: UsingDummyText = False
+#	if Text.Content.strip(): # don't process if text content is empty or whitespace only
+	# calculate text position, size and spacing
+	(YaboveText, Text.Sublines, SublineHeights, Text.SublineX, SublineY, ScaledPointSizeNoZoom, YatTextBottom) =\
+		CalculateTextSizeAndSpacing(El, Text, TextIdentifier, VertAlignment, CanvZoomX, CanvZoomY)
+	# find the actual Y coordinate in pixels to start drawing the text. max(0, ) avoids text spilling over top of element
+	DummyX, YStartInPx = utilities.ScreenCoords(0, El.MinTextY(TextIdentifier) + max(0, YaboveText),
+		Zoom=CanvZoomY, PanX=PanX, PanY=PanY)
+	# actually draw the text (unless we are using dummy content)
+	if not UsingDummyText:
 		RenderText(YStartInPx, Text.Sublines, SublineHeights, Text.SublineX,
-	   		SublineY, ScaledPointSizeNoZoom, El.TextStandoutBackColour(TextIdentifier), ZoomX=CanvZoomX, ZoomY=CanvZoomY)
-		if DrawCursor:
+			SublineY, ScaledPointSizeNoZoom, El.TextStandoutBackColour(TextIdentifier), ZoomX=CanvZoomX, ZoomY=CanvZoomY)
+	if DrawCursor:
 #			print('TE726 drawing cursor at index: ', CursorIndex)
-			DrawTheCursor(TextIdentifier, CursorIndex, CursorColour, YStartInPx, Zoom=CanvZoomY)
+		DrawTheCursor(TextIdentifier, CursorIndex, CursorColour, YStartInPx, Zoom=CanvZoomY)
+	# restore original text if we substituted dummy text
+	if UsingDummyText: Text.Content = OldText
 
 def UpdateStoredText(TextObj, Change, ChangePoint, NoOfChars, String):
 	# change the text stored in TextObj. Change is 'Insertion', 'Deletion' or 'Replacement'.
