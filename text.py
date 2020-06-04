@@ -522,7 +522,7 @@ def TextSize(El, Text, TextIdentifier, CanvZoomX, CanvZoomY, VertAlignment='Top'
 
 def DrawTextInElement(El, dc, Text, TextIdentifier, LayerOffsetX=0, LayerOffsetY=0, CanvZoomX=1.0, CanvZoomY=1.0,
   	PanX=0, PanY=0, TextSizeRatio=1.0, VertAlignment='Centre', DrawCursor=False, CursorIndex=0,
-			CursorColour=(0,0,0)):
+			CursorColour=(0,0,0), debug=False):
 	# draw Text (text object instance) inside element El, correctly positioned in available y-space.
 	# TextIdentifier (int): which text object in El we are drawing; El needs this to work out which Y values to supply
 	# LayerOffsetX/Y is the pixel offset to apply for the display device (compensating for offset of device drawing box within device)
@@ -636,7 +636,6 @@ def DrawTextInElement(El, dc, Text, TextIdentifier, LayerOffsetX=0, LayerOffsetY
 			Text.SublineXStart.append(XStartAbs)
 			# make required font changes for each chunk, then draw the chunk
 			CharsSoFar = 0
-#			if getattr(Text, 'debug', False): print('TE602 drawing with SublineX:', SublineX)
 			for (ChunkNo, Chunk) in enumerate(SplitSubLine):  # for each chunk, get any fmt command and its arg
 				(Command, Arg, Remainder) = FmtCmds[SublineNo][ChunkNo]
 				if Command: # change parms accordingly
@@ -677,6 +676,7 @@ def DrawTextInElement(El, dc, Text, TextIdentifier, LayerOffsetX=0, LayerOffsetY
 					dc.SetPen(wx.Pen(BrighterThan(StandoutBoxColour, 50), 2))
 					dc.DrawLine(xL, yB + 1, xR, yB + 1)
 				# draw the text in this chunk
+				if debug: print('TE679 rendering text at y: ', LayerOffsetY, PanY, YStart, VertOffset, SublineHeight, SublineY[SublineNo][CharsSoFar][0])
 				dc.DrawText(Remainder, XStartAbs + SublineX[SublineNo][CharsSoFar],
 					LayerOffsetY + PanY + (YStart + (1 - 0.01 * VertOffset) * (SublineHeight - SublineY[SublineNo][CharsSoFar][0])))
 				CharsSoFar += len(Chunk)
@@ -728,15 +728,16 @@ def DrawTextInElement(El, dc, Text, TextIdentifier, LayerOffsetX=0, LayerOffsetY
 		# find the absolute x-coordinate to draw the top left of the cursor
 		# is the cursor beyond the end of the subline?
 		if TargetIndex - CumulativeCharCount >= len(Text.Sublines[ThisSublineIndex]):
-#		if TargetIndex > CumulativeCharCount:
 			CursorX = XStartAbs + Text.SublineX[ThisSublineIndex][-1]
-		else:
+		# is the cursor at the start of a subline? if so, offset CursorX slightly to the right, to avoid clash with box
+		elif TargetIndex == CumulativeCharCount:
+			CursorX = XStartAbs + Text.SublineX[ThisSublineIndex][0] + info.EditCursorXOffsetAtLeftEdge
+		else: # cursor is in the middle of a subline
 			CursorX = XStartAbs + Text.SublineX[ThisSublineIndex][TargetIndex - CumulativeCharCount]
 		CursorY = LayerOffsetY + PanY + YStartAbs
 #		CursorY = LayerOffsetY + PanY + YStartAbs + SublineHeight - SublineY[SublineNo][CursorIndex - CumulativeCharCount][0]
 		# draw the cursor
 		dc.SetPen(wx.Pen(CursorColour, width=max(1, int(round(2 * Zoom)))))
-#		print('TE699 Drawing cursor at: ', CursorX, CursorY)
 		dc.DrawLine(CursorX, CursorY, CursorX, CursorY + SublineHeights[ThisSublineIndex][0] +
 			SublineHeights[ThisSublineIndex][1])
 
@@ -808,18 +809,14 @@ def SetHighlightRange(Text, StartIndex, EndIndex):
 	assert isinstance(EndIndex, int)
 	# first, remove all existing highlight commands
 	FinalText = StripOutEscapeSequences(RichText=Text, CommandType=['Highlight'])
-	print('TE756 setting highlight with EndIndex, StartIndex: ', EndIndex, StartIndex)
 	# set highlight only if requested range is longer than zero
 	if EndIndex > StartIndex:
 		StartIndexRich = FindnthChar(RichStr=FinalText, n=StartIndex, IgnoreNewlines=True)
 		# insert 'start highlight' command
 		FinalText = FinalText[:StartIndexRich] + TextEscStartChar + 'H2' + TextEscEndChar + FinalText[StartIndexRich:]
-		print('TE788 FinalText before adding end highlight command: ', [ord(c) for c in FinalText])
 		EndIndexRich = FindnthChar(RichStr=FinalText, n=EndIndex, IgnoreNewlines=True)
-		print('TE789 EndIndexRich:', EndIndexRich)
 		# insert 'end highlight' command
 		FinalText = FinalText[:EndIndexRich] + TextEscStartChar + 'H1' + TextEscEndChar + FinalText[EndIndexRich:]
-		print('TE765 inserted highlight command: ', FinalText)
 	return FinalText
 
 def WrappedText(InText, Font, PixelsAvail, BreakAfter=' `~!)-=]}\\;>/?', MinLengthPercent=30, StripLeadingSpaces=True):
@@ -1032,7 +1029,7 @@ def FindnthCharLean(TextObj, CharIndexRich):
 	# find the corresponding lean char index in TextObj's content corresponding to rich text index CharIndexRich (int)
 	assert isinstance(TextObj, TextObject)
 	assert isinstance(CharIndexRich, int)
-	assert 0 <= CharIndexRich < len(TextObj.Content)
+	assert 0 <= CharIndexRich <= len(TextObj.Content)
 	return len(StripOutEscapeSequences(TextObj.Content[:CharIndexRich]))
 
 def HowManyLinesInText(TextObj):
@@ -1056,4 +1053,5 @@ def NearestCharIndexLeanAtXY(TextObj, TargetX, TargetY):
 #	# add element for the last char in the subline, assuming same spacing between last 3 characters
 #	if len(SublineX)
 #	DistanceXFromChars.append(abs(int(TargetX + (0.5 * TextObj.SublineX[-2]) - (1.5 * TextObj.SublineX[-1]))))
-	return FindnthChar(RichStr=TextObj.Content, n=CharIndexRich)
+#	return FindnthChar(RichStr=TextObj.Content, n=CharIndexRich)
+	return FindnthCharLean(TextObj=TextObj, CharIndexRich=CharIndexRich)

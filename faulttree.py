@@ -675,7 +675,7 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 		for (Attrib, Value) in Args.items(): setattr(self, Attrib, Value)
 
 	def MinTextXat(self, TextIdentifier=0, StartY=0, EndY=10):
-		# returns minimum X coord (canvas coords) available for text within element in the Y-range StartY to EndY
+		# returns minimum X coord (canvas coords) available for text within element in the Y-range StartY to EndY%%%
 		return self.PosXInCU
 
 	def MaxComponentXat(self, TextIdentifier=0, StartY=0, EndY=10):
@@ -691,9 +691,11 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 		return self.EndXInCU - 1
 
 	def MinTextY(self, TextIdentifier=0): # returns min Y coord (canvas coords) at which text will be drawn in the element
-		# (relative to canvas, not relative to element)
-		# this is used by text drawing routines in text module
-		return self.StartY + TextElementTopBufferInCU
+		# this is used by text drawing routine in module text
+		# if currently editing this component, return position relative to the edit buffer. 0.8 is a fudge to make it look right
+		if self.FT.CurrentEditComponent == self: return 0.8 * self.SizeYInCU
+		# otherwise, return position relative to the canvas
+		else: return self.StartY + TextElementTopBufferInCU
 
 	def MaxTextY(self, TextIdentifier=0): # returns max Y coord (canvas coords) at which text can be drawn in the element
 		return self.StartY + 999 # effectively unlimited Y-space for text
@@ -743,7 +745,7 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 		TextToShow.Colour = EditingTextFgColour if EditingText else self.DefaultFgColour
 		# draw the text on top of the box
 		text.DrawTextInElement(self, DC, TextToShow, TextIdentifier=0, CanvZoomX=Zoom,
-			CanvZoomY=Zoom, PanX=0, PanY=0, VertAlignment='Top')
+			CanvZoomY=Zoom, PanX=0, PanY=0, VertAlignment='Top', debug=getattr(self, 'debug', False))
 
 	def HandleMouseLClickOnMe(self, **Args): # handle mouse left button single click on TextElement instance when not editing
 		# first, request control frame to show appropriate aspect in control panel
@@ -842,66 +844,79 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 		self.Text.ParaHorizAlignment = 'Left'
 		# insert a visible newline character before each newline
 		self.Text.Content = self.Text.Content.replace('\n', info.NewlineSymbol + '\n')
-		print('FT845 calling DrawTextInElement')
 		self.RedrawDuringEditing(Zoom=Zoom)
 
 	def HandleMouseLClickOnMeDuringEditing(self, **Args): # handle mouse left single click on text element during editing
-		# available in Args: HitHotspot=HitHotspot, HostViewport=self, MouseX=ClickXInPx, MouseY=ClickYInPx
+		# available in Args: HitHotspot=HitHotspot, HostViewport=self, MouseX=ClickXInPx, MouseY=ClickYInPx, Event
 		print('FT848 in click handler during editing: ', Args['MouseX'], Args['MouseY'], self.TextCtrlPosXInPxWithinDisplDevice)
-		TargetCharIndexLean = text.NearestCharIndexLeanAtXY(TextObj=self.Text, TargetX=Args['MouseX'] - self.PosXInPx, TargetY=Args['MouseY'] - self.PosYInPx)
-		print('FT851 TargetCharIndexLean: ', TargetCharIndexLean)
+		TargetCharIndexLean = text.NearestCharIndexLeanAtXY(TextObj=self.Text, TargetX=Args['MouseX'] - self.PosXInPx,
+			TargetY=Args['MouseY'] - self.PosYInPx)
+		self.MoveCursorTo(Event=Args['Event'], OldIndex=self.FT.TextEditCursorIndex, NewIndex=TargetCharIndexLean,
+			ExtendSelection=Args['Event'].ShiftDown())
+		# set drag start position, in case user drags mouse
+		self.FT.LDragStartIndexLean = TargetCharIndexLean
+
+	def HandleMouseLDragOnMe(self, MouseX, MouseY, Event, **Args): # handle mouse left button drag on text element during editing
+		TargetCharIndexLean = text.NearestCharIndexLeanAtXY(TextObj=self.Text, TargetX=MouseX - self.PosXInPx,
+			TargetY=MouseY - self.PosYInPx)
+		self.MoveCursorTo(Event=Event, OldIndex=self.FT.TextEditCursorIndex, NewIndex=TargetCharIndexLean,
+			ExtendSelection=True)
 
 	def RedrawDuringEditing(self, Zoom):
 		# redraw the text component during editing, with cursor
-		TextEditDC = wx.BufferedDC(wx.ClientDC(self.FT.DisplDevice))
+		Buffer = wx.Bitmap(width=self.SizeXInCU * Zoom, height=self.SizeYInCU * Zoom, depth=wx.BITMAP_SCREEN_DEPTH)
+		Buffer = wx.Bitmap(width=1000, height=500, depth=wx.BITMAP_SCREEN_DEPTH)
+		TextEditDC = wx.MemoryDC(Buffer)
 		# draw background box
 		TextEditDC.SetPen(wx.Pen(EditingTextBorderColour))
 		TextEditDC.SetBrush(wx.Brush(EditingTextBkgColour))
-		TextEditDC.DrawRectangle(self.TextCtrlPosXInPxWithinDisplDevice, self.TextCtrlPosYInPxWithinDisplDevice,
-			self.SizeXInCU * Zoom, self.SizeYInCU * Zoom)
+		TextEditDC.DrawRectangle(0, 0, self.SizeXInCU * Zoom, self.SizeYInCU * Zoom)
 		# populate the box with the current text
-		# 6 in the line below is an adjustment factor to get the text position to look natural
-		print('FT863 requesting text drawn at X offset: ', self.TextCtrlPosXInPxWithinDisplDevice)
-		print('FT864 text content is now: ', [ord(c) for c in self.Text.Content])
-		text.DrawTextInElement(self, TextEditDC, self.Text, TextIdentifier=0, CanvZoomX=Zoom,
-			CanvZoomY=Zoom, LayerOffsetX=self.TextCtrlPosXInPxWithinDisplDevice,
-			LayerOffsetY=self.TextCtrlPosYInPxWithinDisplDevice - self.SizeYInPx + int(round(6 * Zoom)),
+		# factor of 8 for LayerOffsetY is a fudge factor to get the text position to look natural
+		print('FT873 redrawing text with LayerOffsetX/Y, StartY: ', -self.MinTextXat() * Zoom, -self.SizeYInCU * Zoom + int(round(8 * Zoom)), self.StartY)
+		text.DrawTextInElement(self, TextEditDC, self.Text, TextIdentifier=0, CanvZoomX=Zoom, debug=True,
+			CanvZoomY=Zoom, LayerOffsetX=-self.MinTextXat() * Zoom,
+			LayerOffsetY=-self.SizeYInCU * Zoom + int(round(8 * Zoom)),
 			VertAlignment='Top', DrawCursor=True, CursorIndex=self.FT.TextEditCursorIndex,
 			CursorColour=EditingTextCursorColour)
+		# copy TextEditDC into display device
+		DisplDeviceDC = wx.BufferedDC(wx.ClientDC(self.FT.DisplDevice))
+		DisplDeviceDC.DrawBitmap(Buffer, self.PosXInPx, self.PosYInPx, useMask=False)
 
 	def OnEditChoice(self, Event): # handle click in choice box during editing
 		self.FT.EndEditingOperation()
 
-	def OnKeyDown(self, Event): # handle key press in text box during editing
-
-		def MoveCursorTo(Event, OldIndex, NewIndex, IgnoreShift=False): # handle request to move cursor to new index
-			# IgnoreShift (bool): whether to ignore shift key - used during deleting
-			# if Shift key is pressed, extend highlight selection
-			if Event.ShiftDown() and not IgnoreShift:
-				# if cursor position has returned to highlight start position, clear highlight
-				if self.Text.Highlighted and (NewIndex == self.Text.HighlightStartIndex):
-					print('FT867 returned to highlight start')
-					self.Text.Highlighted = False
-					self.FT.TextEditCursorIndex = self.Text.HighlightStartIndex = NewIndex # move cursor to NewIndex
-				else:
-					if self.Text.Highlighted:
-						self.FT.TextEditCursorIndex = NewIndex # move cursor to NewIndex
-					else:
-						# if not previously highlighting, set current cursor index as highlight start index
-						self.Text.Highlighted = True
-						self.Text.HighlightStartIndex = OldIndex
-						self.FT.TextEditCursorIndex = NewIndex # move cursor to NewIndex
-				if self.Text.Highlighted:
-					# set the highlight in the text
-					print('FT871 setting highlight range: ', self.Text.HighlightStartIndex, self.FT.TextEditCursorIndex)
-					self.Text.Content = text.SetHighlightRange(Text=self.Text.Content,
-						StartIndex=min(self.Text.HighlightStartIndex, self.FT.TextEditCursorIndex),
-						EndIndex=max(self.Text.HighlightStartIndex, self.FT.TextEditCursorIndex))
-			else: # shift key not pressed; clear highlight
+	def MoveCursorTo(self, Event, OldIndex, NewIndex, ExtendSelection=False, IgnoreShift=False):  # handle request to move cursor to new index
+		# ExtendSelection (bool): whether to extend highlight selection (e.g. when navigating with Shift key pressed)
+		# IgnoreShift (bool): whether to ignore shift key - used during deleting
+		assert isinstance(ExtendSelection, bool)
+		# if required, extend highlight selection
+		if ExtendSelection:
+			# if cursor position has returned to highlight start position, clear highlight
+			if self.Text.Highlighted and (NewIndex == self.Text.HighlightStartIndex):
+				print('FT867 returned to highlight start')
 				self.Text.Highlighted = False
-				self.Text.Content = text.RemoveHighlightCommands(self.Text.Content) # remove highlight commands
 				self.FT.TextEditCursorIndex = self.Text.HighlightStartIndex = NewIndex # move cursor to NewIndex
-			self.RedrawDuringEditing(Zoom=self.FT.Zoom)
+			else:
+				if self.Text.Highlighted:
+					self.FT.TextEditCursorIndex = NewIndex # move cursor to NewIndex
+				else:
+					# if not previously highlighting, set current cursor index as highlight start index
+					self.Text.Highlighted = True
+					self.Text.HighlightStartIndex = OldIndex
+					self.FT.TextEditCursorIndex = NewIndex # move cursor to NewIndex
+			if self.Text.Highlighted:
+				# set the highlight in the text
+				self.Text.Content = text.SetHighlightRange(Text=self.Text.Content,
+				   StartIndex=min(self.Text.HighlightStartIndex, self.FT.TextEditCursorIndex),
+				   EndIndex=max(self.Text.HighlightStartIndex, self.FT.TextEditCursorIndex))
+		else: # not extending selection; clear highlight
+			self.Text.Highlighted = False
+			self.Text.Content = text.RemoveHighlightCommands(self.Text.Content)  # remove highlight commands
+			self.FT.TextEditCursorIndex = self.Text.HighlightStartIndex = NewIndex  # move cursor to NewIndex
+		self.RedrawDuringEditing(Zoom=self.FT.Zoom)
+
+	def OnKeyDown(self, Event): # handle key press in text box during editing
 
 		def InsertChars(CharsToInsert, InsertIndexLean=0, IgnoreShift=False):
 			# insert CharsToInsert (str) into self.Text.Content at InsertIndexLean (int) if there's no highlight, else
@@ -930,8 +945,8 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 				# update the text content, replacing highlighted chars with CharsToInsert
 				self.Text.Content = self.Text.Content[:HighlightStartIndexRich] + CharsToInsert +\
 					self.Text.Content[HighlightEndIndexRich:]
-				MoveCursorTo(Event=Event, OldIndex=self.FT.TextEditCursorIndex,
-					NewIndex=HighlightStartIndexLean + len(CharsToInsert), IgnoreShift=IgnoreShift)
+				self.MoveCursorTo(Event=Event, OldIndex=self.FT.TextEditCursorIndex,
+					NewIndex=HighlightStartIndexLean + len(CharsToInsert), ExtendSelection=Event.ShiftDown() and not IgnoreShift)
 			else: # no text highlighted; insert the new char
 				# if the cursor is immediately to the right of a newline symbol, insert CharsToInsert after the newline
 				if self.FT.TextEditCursorIndex > 0: # don't do the check if we're at the start of the text
@@ -941,8 +956,8 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 				else: InsertIndexRich = text.FindnthChar(RichStr=self.Text.Content, n=0) # insert at start of text
 				self.Text.Content = self.Text.Content[:InsertIndexRich] + CharsToInsert +\
 					self.Text.Content[InsertIndexRich:]
-				MoveCursorTo(Event=Event, OldIndex=self.FT.TextEditCursorIndex,
-					NewIndex=InsertIndexLean + len(CharsToInsert), IgnoreShift=IgnoreShift)
+				self.MoveCursorTo(Event=Event, OldIndex=self.FT.TextEditCursorIndex,
+					NewIndex=InsertIndexLean + len(CharsToInsert), ExtendSelection=Event.ShiftDown() and not IgnoreShift)
 			Propagate = False
 
 		def CharIsNewlineSymbol(CharIndexLean):
@@ -951,7 +966,6 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 			return self.Text.Content[text.FindnthChar(RichStr=self.Text.Content, n=CharIndexLean)] == info.NewlineSymbol
 
 		# start of OnKeyDown()
-		# %%% next to do: resolve crash when space is pressed; make Esc key work; resolve crash on typing char after newline
 		Propagate = True # whether to propagate the keypress event to other handlers
 		OldTextContentLean = text.StripOutEscapeSequences(self.Text.Content)
 		if Event.KeyCode == wx.WXK_BACK: # check for backspace key (we do this first, as it also generates ASCII code)
@@ -972,8 +986,8 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 				OldCursorIndexLean = HighlightEndIndexLean  # for undo record
 				self.Text.Content = self.Text.Content[:HighlightStartIndexRich] + \
 									self.Text.Content[HighlightEndIndexRich:]
-				MoveCursorTo(Event=Event, OldIndex=self.FT.TextEditCursorIndex, NewIndex=HighlightStartIndexLean,
-							 IgnoreShift=True)
+				self.MoveCursorTo(Event=Event, OldIndex=self.FT.TextEditCursorIndex, NewIndex=HighlightStartIndexLean,
+					ExtendSelection=False)
 			else: # no highlight; delete the character to the left of the cursor
 				OldCursorIndexLean = self.FT.TextEditCursorIndex  # for undo record
 				if self.FT.TextEditCursorIndex > 0: # don't do anything if cursor is at the beginning of the text
@@ -981,8 +995,8 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 					# remove just the visible character, leaving behind any formatting command between the doomed
 					# character and the cursor position
 					self.Text.Content = self.Text.Content[:IndexToDeleteRich] + self.Text.Content[IndexToDeleteRich + 1:]
-					MoveCursorTo(Event=Event, OldIndex=self.FT.TextEditCursorIndex,
-						NewIndex=self.FT.TextEditCursorIndex - 1, IgnoreShift=True)
+					self.MoveCursorTo(Event=Event, OldIndex=self.FT.TextEditCursorIndex,
+						NewIndex=self.FT.TextEditCursorIndex - 1, ExtendSelection=False)
 			Propagate = False
 			self.FT.StoreUndoRecordDuringTextEditing(OldTextContentRich=OldTextContentRich,
 				NewTextContentRich=self.Text.Content, CursorIndexLean=OldCursorIndexLean,
@@ -990,7 +1004,6 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 		elif Event.KeyCode in [wx.WXK_RETURN, wx.WXK_NUMPAD_ENTER]: # check for return/enter key
 			# if any modifier is pressed, insert a line break
 			if Event.HasAnyModifiers():
-				print('FT991 inserting line break')
 				InsertChars(CharsToInsert=info.NewlineSymbol + '\n', InsertIndexLean=self.FT.TextEditCursorIndex,
 					IgnoreShift=True)
 			else: # bare Enter key: end editing
@@ -1010,7 +1023,7 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 					NewIndex = max(0, self.FT.TextEditCursorIndex - 1)
 					# if the new cursor location is a newline character, move another place to the left, onto the newline symbol
 					if OldTextContentLean[NewIndex] == '\n': NewIndex -= 1
-				MoveCursorTo(Event=Event, OldIndex=self.FT.TextEditCursorIndex, NewIndex=NewIndex)
+				self.MoveCursorTo(Event=Event, OldIndex=self.FT.TextEditCursorIndex, NewIndex=NewIndex, ExtendSelection=Event.ShiftDown())
 				Propagate = False
 			elif Event.KeyCode == wx.WXK_RIGHT:
 				if StepWordwise:
@@ -1019,7 +1032,7 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 				else: # move a single character
 					NewIndex = min(len(OldTextContentLean), self.FT.TextEditCursorIndex + 1)
 					print('FT1020 moving cursor position to: ', NewIndex)
-				MoveCursorTo(Event=Event, OldIndex=self.FT.TextEditCursorIndex, NewIndex=NewIndex)
+				self.MoveCursorTo(Event=Event, OldIndex=self.FT.TextEditCursorIndex, NewIndex=NewIndex, ExtendSelection=Event.ShiftDown())
 				Propagate = False
 			elif Event.KeyCode == wx.WXK_UP:
 				# 1. Find line number of current char (as displayed, i.e. "subline" number)
@@ -1031,7 +1044,7 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 					TargetCharIndexRich = text.FindCharAtPosXInLine(TextObj=self.Text, PosX=CurrentCharX, TargetLineIndex=CurrentLine - 1)
 					# convert to lean char index
 					NewIndex = text.FindnthCharLean(TextObj=self.Text, CharIndexRich=TargetCharIndexRich)
-					MoveCursorTo(Event=Event, OldIndex=self.FT.TextEditCursorIndex, NewIndex=NewIndex)
+					self.MoveCursorTo(Event=Event, OldIndex=self.FT.TextEditCursorIndex, NewIndex=NewIndex, ExtendSelection=Event.ShiftDown())
 					Propagate = False
 			elif Event.KeyCode == wx.WXK_DOWN:
 				# 1. Find line number of current char (as displayed, i.e. "subline" number)
@@ -1044,42 +1057,24 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 						TargetLineIndex=CurrentLine + 1)
 					# convert to lean char index
 					NewIndex = text.FindnthCharLean(TextObj=self.Text, CharIndexRich=TargetCharIndexRich)
-					MoveCursorTo(Event=Event, OldIndex=self.FT.TextEditCursorIndex, NewIndex=NewIndex)
+					self.MoveCursorTo(Event=Event, OldIndex=self.FT.TextEditCursorIndex, NewIndex=NewIndex, ExtendSelection=Event.ShiftDown())
 					Propagate = False
 			elif Event.KeyCode == wx.WXK_ESCAPE:
 				self.FT.EndEditingOperation(AcceptEdits=False)
 				Propagate = False # TODO test if modifiers are pressed; we don't want to suppress eg command + Escape
 		else:
 			# check if Ctrl/Cmd key is pressed; attempt to process as a formatting/editing command
-			if Event.GetModifiers() == wx.MOD_CONTROL: # %%% working here
+			if Event.GetModifiers() == wx.MOD_CONTROL:
 				if chr(Event.GetUnicodeKey()) in ['Z', 'z']: # process undo request
 					NewCursorIndexLean = self.PerformUndoDuringTextEdit()
 					print('FT1041 undo: moving cursor to: ', NewCursorIndexLean)
 					if NewCursorIndexLean is not None: # was any undo performed?
-						MoveCursorTo(Event=Event, OldIndex=self.FT.TextEditCursorIndex, NewIndex=NewCursorIndexLean)
+						self.MoveCursorTo(Event=Event, OldIndex=self.FT.TextEditCursorIndex, NewIndex=NewCursorIndexLean)
 				Propagate = False
 			else:
 				# process as a printable char
 				InsertChars(CharsToInsert=chr(Event.GetUnicodeKey()), InsertIndexLean=self.FT.TextEditCursorIndex,
 					IgnoreShift=True)
-	#			CharTyped = chr(Event.GetUnicodeKey())
-	#			# store an undo record TODO
-	#			# is any text highlighted? if so, replace the highlighted text with the new char
-	#			if self.Text.Highlighted:
-	#				# find the index of the start and end of the highlight in the rich and lean text
-	#				HighlightStartIndexLean = min(self.FT.TextEditCursorIndex, self.Text.HighlightStartIndex)
-	#				HighlightStartIndexRich = text.FindnthChar(RichStr=self.Text.Content,
-	#					n=HighlightStartIndexLean)
-	#				HighlightEndIndexRich = text.FindnthChar(RichStr=self.Text.Content,
-	#					n=max(self.FT.TextEditCursorIndex, self.Text.HighlightStartIndex))
-	#				self.Text.Content = self.Text.Content[:HighlightStartIndexRich] + CharTyped +\
-	#					self.Text.Content[HighlightEndIndexRich:]
-	#				MoveCursorTo(Event=Event, OldIndex=self.FT.TextEditCursorIndex, NewIndex=HighlightStartIndexLean + 1)
-	#			else: # no text highlighted; insert the new char
-	#				InsertIndexRich = text.FindnthChar(RichStr=self.Text.Content, n=self.FT.TextEditCursorIndex)
-	#				self.Text.Content = self.Text.Content[:InsertIndexRich] + CharTyped +\
-	#					self.Text.Content[InsertIndexRich:]
-	#				MoveCursorTo(Event=Event, OldIndex=self.FT.TextEditCursorIndex, NewIndex=self.FT.TextEditCursorIndex + 1)
 				Propagate = False
 			if Propagate: Event.Skip() # pass on the keypress event to other handlers if not fully handled here
 
@@ -1830,7 +1825,7 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 			InternalName='ConnName')
 		ConnDescription = TextElement(self.FT, Row=1, ColStart=0, ColSpan=4, EndX=199, MinHeight=50, HostObject=self,
 			InternalName='ConnectorDescription', PromptText=_('Type a description'), EditBehaviour='Text',
-			HorizAlignment='Left')
+			HorizAlignment='Left', debug=True)
 		self.ConnDescriptionCommentButton = ButtonElement(self.FT, Row=1, ColStart=4, ColSpan=1, StartX=200, EndX=224,
 			HostObject=self, InternalName='ConnDescriptionCommentButton', Stati=('OutNotExist', 'OutExist'),
 			LSingleClickHandler='HandleMouseLClickOnCommentButton', CommentKind='ConnectorDescriptionComments',
@@ -1839,7 +1834,7 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 #			HostObject=self, InternalName='ConnGroupedButton', Stati=('OutNotExist', 'OutExist'),
 #			LSingleClickHandler=None)
 		self.ConnValue = TextElement(self.FT, Row=2, ColStart=0, ColSpan=1, EndX=99, HostObject=self,
-			InternalName='Value', ControlPanelAspect='CPAspect_NumValue', EditBehaviour='Text')
+			InternalName='Value', ControlPanelAspect='CPAspect_NumValue', EditBehaviour='Text', HorizAlignment='Left')
 		self.ConnValueUnitComponent = TextElement(self.FT, Row=2, ColStart=1, ColSpan=1, EndX=149, HostObject=self,
 			InternalName='ConnValueUnit')
 		self.ValueProblemButton = ButtonElement(self.FT, Row=2, ColStart=2, ColSpan=1, StartX=150, EndX=174,
@@ -1861,7 +1856,7 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 		TopEls = [ConnKind, ConnName, ConnDescription, self.ConnDescriptionCommentButton]
 		ValueEls = [self.ConnValue, self.ConnValueUnitComponent, self.ValueProblemButton, self.ConnValueCommentButton,
 			self.ConnActionItemButton, self.ConnParkingLotItemButton]
-		# set text element colours%%%
+		# set text element colours
 		for El in TopEls + ValueEls:
 			if type(El) is TextElement:
 				El.Text.Colour = El.PromptTextObj.Colour = GateTextFgColour
@@ -1942,7 +1937,7 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 			if ValueProblemComponent:
 				ValueProblemComponent.Status = {True: 'Alert', False: 'Out'}[(self.ValueProblemObjectID is None)]
 
-		def DrawBackgroundBox(DC, Zoom): # draw FTConnector's background box in DC%%%
+		def DrawBackgroundBox(DC, Zoom): # draw FTConnector's background box in DC
 			DC.SetPen(wx.Pen(self.BorderColour, width=1)) # for now, a 1 pixel border around the event. TODO make nicer and apply zoom to border
 #			BackgColour = self.BackgroundColourSelected if self in self.FT.CurrentElements else self.BackgroundColourUnselected
 			BackgColour = ElementBaseColourSelected if self in self.FT.CurrentElements else GateBaseColour
@@ -2163,7 +2158,7 @@ class FTColumn(object): # object containing a column of FT objects for display, 
 
 def CalculateRowAndColumnDimensions(Elements, GapBetweenCols, GapBetweenRows, MinColWidth, BorderX, BorderY):
 	# for any kind of components in an FT element, calculate and return column and row sizes in canvas coords (lists),
-	# including GapBetweenRows%%%
+	# including GapBetweenRows
 	# BorderX and BorderY is left and right / top and bottom border to allow
 	# returns lists: ColWidths, ColStartXs, ColEndXs, RowHeights, RowStartYs, RowEndYs
 	# make lists to write into, containing same number of items as the number of columns/rows required
@@ -5992,7 +5987,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		# ClickX/YInPx (int): coord of mouse click in pixels relative to display device, i.e. directly comparable with
 		# PosX/YInPx of FT elements
 		# ClickKind (str): 'XY' where X is Left, Centre or Right; Y is Single, Long, Double, Triple
-		# Args can include: CanStartDrag, CanSelect
+		# Args can include: CanStartDrag, CanSelect, Event
 		# Find out which element(s), if any, are clicked
 		assert ClickKind in [X + Y for X in ['Left', 'Centre', 'Right'] for Y in ['Single', 'Long', 'Double', 'Triple']]
 		Hits = [] # list of dict of elements/hotspots clicked
@@ -6009,7 +6004,6 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 				ElHotspotToHandle = HitWithHighestZ['Hotspot']
 			# check if the topmost clicked element is already doing an editing operation, and call appropriate handler
 			if ElToHandleLClick is self.CurrentEditComponent:
-				print('FT5996 handling mouse click during editing')
 				# identify appropriate handler for click
 				if ClickKind == 'LeftSingle': Handler = 'HandleMouseLClickOnMeDuringEditing'
 				elif ClickKind == 'LeftDouble': Handler = 'HandleMouseLDClickOnMeDuringEditing'
@@ -6036,14 +6030,17 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 	def HandleMouseLClick(self, ClickXInPx, ClickYInPx, TolXInPx, TolYInPx, **Args):
 		self.HandleMouseAnyClick(ClickXInPx, ClickYInPx, TolXInPx, TolYInPx, ClickKind='LeftSingle', **Args)
 
-	def HandleMouseLDrag(self, MouseX, MouseY):
+	def HandleMouseLDrag(self, MouseX, MouseY, Event):
 		# handle mouse drag with left button pressed
+		if self.CurrentEditComponent: # dragging during text editing-in-place
+			print('FT6046 in drag handler')
+			self.CurrentEditComponent.HandleMouseLDragOnMe(MouseX=MouseX, MouseY=MouseY, Event=Event)
 		if self.EditingConnection: # dragging from a connect button
 			self.HandleMouseLDragEditingConnection(MouseX, MouseY)
 		elif self.LastElLClicked: # did we click on an element?
 			if hasattr(self.LastElLClicked, 'HandleMouseLDragOnMe'):
 				self.LastElLClicked.HandleMouseLDragOnMe(Hotspot=self.LastElLClickedHotspot, HostViewport=self,
-					MouseX=MouseX, MouseY=MouseY)
+					MouseX=MouseX, MouseY=MouseY, Event=Event)
 		else: # dragging in empty space: pan PHA model display
 			# set mouse pointer
 			wx.SetCursor(wx.Cursor(display_utilities.StockCursors['+Arrow']))
@@ -6245,7 +6242,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		self.DisplDevice.Redraw(FullRefresh=True)
 
 	def EndEditingOperation(self, Event=None, AcceptEdits=None):
-		# tidy up after user has selected from a choice or typed in a TextElement, then clicked out%%%
+		# tidy up after user has selected from a choice or typed in a TextElement, then clicked out
 		# Event: placeholder for Event arg supplied from events that bind to this procedure.
 		# AcceptEdits (bool or None): whether to retain the edits made, or discard them. If None, use global project setting.
 		# Currently handles plain text only with no embedded format commands

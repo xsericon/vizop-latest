@@ -48,6 +48,7 @@ SciThresholdLower = 9.9999e-4
 ZeroThreshold = 1e-20 # numbers with absolute value less than this are treated as zero
 CantDisplayValueOnScreen = '- - -' # undisplayable values are shown on screen like this
 EditPanelModes = ['Edit', 'Select', 'Blocked', 'Widgets'] # modes defining mouse pointer and bindings
+EditCursorXOffsetAtLeftEdge = 2 # X offset of edit cursor when at left edge of text edit box, to avoid clash with box
 
 # export-related constants
 DefaultPaperSize = 'A4'

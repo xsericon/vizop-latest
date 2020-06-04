@@ -2176,12 +2176,12 @@ class ControlFrame(wx.Frame):
 				Viewport.HandleMouseLDragEnd(ScreenX, ScreenY, Dragged=(self.LDragStatus == 'Dragging'))
 			display_utilities.SetPointer(Viewport, self, Event, Mode=Mode)
 
-		def OnDragElement(self, event): # handle mouse dragging of selected element(s).
+		def OnDragElement(self, Event): # handle mouse dragging of selected element(s).
 			Viewport = self.ViewportOwner.CurrentViewport
 			if hasattr(Viewport, 'HandleMouseLDrag'):
-				(ScreenX, ScreenY) = event.GetPosition() # get mouse coords. See Rappin p150
+				(ScreenX, ScreenY) = Event.GetPosition() # get mouse coords. See Rappin p150
 				self.LDragStatus = 'Dragging'
-				Viewport.HandleMouseLDrag(ScreenX, ScreenY)
+				Viewport.HandleMouseLDrag(ScreenX, ScreenY, Event)
 
 		def OnMouseDoubleLClick(self, event=None, CanStartDrag=False, CanSelect=False, **Args):
 			# handle left double click, or equivalent keypress: may invoke text edit mode
