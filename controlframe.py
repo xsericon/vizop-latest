@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Module: controlframe. This file is part of Vizop. Copyright xSeriCon, 2019
+# Module: controlframe. This file is part of Vizop. Copyright xSeriCon, 2020
 # Encodes the main control and navigation frame seen by the user when a project is open.
 # Code tidying done on 1 Dec 2018
 
@@ -14,7 +14,9 @@ import xml.etree.ElementTree as ElementTree
 from platform import system
 # vizop modules needed:
 import settings, text, vizop_misc, art, display_utilities, info, utilities, core_classes, projects, project_display
-import undo, faulttree, ft_full_report
+import undo
+# modules containing Viewport and PHA model definitions
+import faulttree, ft_full_report, assoc_text_view
 from display_utilities import UIWidgetItem, UIWidgetPlaceholderItem
 
 # ColourSwatchButtonSize = (60,20) # size for 'change colour' buttons. Not applied in all cases, yet
@@ -674,8 +676,8 @@ class ControlFrame(wx.Frame):
 				# set up keyboard shortcuts for selecting Viewport types
 				for (KeyStroke, ViewportClass) in self.NewViewportKbdHash.items():
 					KeyPressHash = vizop_misc.RegisterKeyPressHandler(KeyPressHash, KeyCode=ord(KeyStroke),
-						Handler=self.TopLevelFrame.DoNewViewportCommand, Args={'ViewportClass': ViewportClass,
-						'Chain': False})
+						Handler=self.TopLevelFrame.DoNewViewportCommand, Args={
+						'ViewportArgs': {'ViewportClass': ViewportClass}, 'Chain': False})
 				return WidgList
 
 			# main procedure for GotoControlPanelAspect
@@ -748,7 +750,7 @@ class ControlFrame(wx.Frame):
 			# replacing the placeholder with the variable widgets inserted in the correct position according to their
 			# RowOffset and ColOffset attribs (NB row posn doesn't consider any GapY defined in variable widgets)
 			# doesn't check whether this causes position clashes with existing widgets
-			# doesn't take accound of RowOffset, ColOffset attribs
+			# doesn't take account of RowOffset, ColOffset attribs; actually resets RowOffset to 0 (to avoid double offsetting)
 			# return: CombinedWidgets
 			# The overall algorithm is:
 			# 1. Find the applicable placeholder in FixedWidgets. Transfer all widgets before the placeholder to
@@ -788,7 +790,8 @@ class ControlFrame(wx.Frame):
 			CombinedWidgets = FixedWidgets[:FixedWidgetIndex]
 			# assign row and column positions to variable widgets
 			for ThisVarWidget in VariableWidgets:
-				ThisVarWidget.ActualRow = ThisRow + ThisVarWidget.RowOffset
+#				ThisVarWidget.ActualRow = ThisRow + ThisVarWidget.RowOffset
+				ThisVarWidget.ActualRow = ThisRow # not adding RowOffset here because it is added in display_utilities.PopulateSizer()
 				ThisVarWidget.ActualCol = NextCol + ThisVarWidget.ColOffset
 			# copy remaining FixedWidgets and all VariableWidgets into CombinedWidgets in the correct order
 			FixedWidgetIndex += 1 # skip over the placeholder
@@ -809,8 +812,9 @@ class ControlFrame(wx.Frame):
 					# are there any more variable widgets?
 					if VarWidgetsFinished: StopAddingFixedWidgets = False # if not, keep adding fixed widgets
 					else:
-						# check if ThisFixedWidget is to the right of, or below, the next variable widget
-						StopAddingFixedWidgets = (ThisRow > NextVarWidgetRow) or (ThisFixedWidget.ColLoc > NextVarWidgetCol)
+						# check if ThisFixedWidget is [to the right of, and on the same row as], or below, the next variable widget
+						StopAddingFixedWidgets = ((ThisFixedWidget.ColLoc > NextVarWidgetCol) and (ThisRow == NextVarWidgetRow)) or \
+													 (ThisRow > NextVarWidgetRow)
 					# if it isn't, add it to the combined list and move to the next fixed widget
 					if not StopAddingFixedWidgets:
 						CombinedWidgets.append(ThisFixedWidget)
@@ -823,6 +827,7 @@ class ControlFrame(wx.Frame):
 					if NextVarWidgetRow > ThisRow: # moving to next row
 						ThisVariableWidget.NewRow = True
 						ThisRow += 1
+					else: ThisVariableWidget.NewRow = False
 					ThisVariableWidget.ColLoc = NextVarWidgetCol
 					# add next variable widget to combined list
 					CombinedWidgets.append(ThisVariableWidget)
@@ -1767,22 +1772,30 @@ class ControlFrame(wx.Frame):
 			# make fixed widgets (this aspect also has variable widgets depending on the associated texts defined)
 			self.MakeStandardWidgets(Scope=NewAspect, NotebookPage=MyNotebookPage)
 			NewAspect.HeaderLabel = UIWidgetItem(wx.StaticText(MyNotebookPage, -1, _(HeaderLabel)),
-				ColLoc=3, ColSpan=1, GapX=20, Font=self.TopLevelFrame.Fonts['SmallHeadingFont'])
+				ColLoc=3, ColSpan=2, GapX=20, Font=self.TopLevelFrame.Fonts['SmallHeadingFont'])
 			NewAspect.ElementKindLabel = UIWidgetItem(wx.StaticText(MyNotebookPage, -1),
 				ColLoc=3, ColSpan=1, Font=self.TopLevelFrame.Fonts['SmallHeadingFont'])
 			NewAspect.ElementNameLabel = UIWidgetItem(wx.StaticText(MyNotebookPage, -1),
 				ColLoc=4, ColSpan=1, Font=self.TopLevelFrame.Fonts['SmallHeadingFont'])
 			NewAspect.AssociatedTextPlaceholder = UIWidgetPlaceholderItem(Name='AssociatedTexts')
-			# make list of all fixed widgets in this aspect
+			NewAspect.FullAssociatedTextListButton = UIWidgetItem(wx.Button(MyNotebookPage, -1, _('Show full list')),
+				Handler=lambda Event: self.AssociatedTextAspect_OnFullAssociatedTextListButton(Event, Aspect=NewAspect),
+				Events=[wx.EVT_BUTTON], ColLoc=13, ColSpan=1, GapX=20,
+				Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_LEFT | wx.EXPAND)
+			# make list of all fixed widgets in this aspect%%%
 			NewAspect.FixedWidgetList = [NewAspect.NavigateBackButton,
 				NewAspect.NavigateForwardButton,
 				NewAspect.HeaderLabel,
-				NewAspect.AssociatedTextPlaceholder,
+				NewAspect.AssociatedTextPlaceholder, NewAspect.FullAssociatedTextListButton,
 				NewAspect.UndoButton, NewAspect.RedoButton, NewAspect.ElementKindLabel,
 				NewAspect.ElementNameLabel]
 			NewAspect.VariableWidgetList = [] # populated in LineupVariableWidgetsForXXXAspect()
 			NewAspect.WidgetList = [] # complete widget list, populated in Lineup...()
 			return NewAspect
+
+		def AssociatedTextAspect_OnFullAssociatedTextListButton(self, Event, Aspect):
+			print('CF1792 in full list button handler')
+			self.TopLevelFrame.OnShowActionItemsRequest(Event=Event)
 
 		def AssociatedTextAspect_OnDeleteItemButton(self, Event, Aspect):
 			# get the UIWidgetItem containing the delete button just clicked
@@ -1856,7 +1869,7 @@ class ControlFrame(wx.Frame):
 			for (ThisAssociatedTextIndex, ThisAssociatedText) in enumerate(AssociatedTextList):
 				Aspect.VariableWidgetList.append(UIWidgetItem(wx.StaticText(NotebookPage, -1,
 					AssociatedTextNumberingList[ThisAssociatedTextIndex]), RowOffset=ThisAssociatedTextIndex,
-					ColOffset=1, ColSpan=1, GapX=20))
+					ColOffset=1, ColSpan=1, GapX=20))# %%%
 				Aspect.VariableWidgetList.append(UIWidgetItem(wx.TextCtrl(NotebookPage, -1, ThisAssociatedText,
 					style=wx.TE_PROCESS_ENTER), RowOffset=ThisAssociatedTextIndex, ColOffset=2, ColSpan=1,
 					Handler=lambda Event: self.AssociatedTextAspect_OnEditAssociatedText(Event=Event, Aspect=Aspect),
@@ -2235,8 +2248,12 @@ class ControlFrame(wx.Frame):
 		self.Destroy() # kills Control frame, raises EVT_CLOSE which calls self.OnClose()
 
 	def SetupMenus(self): # initialize menus at the top of the screen
-		# Any menu item which should be enabled/disabled depending on the current state of the Viewport should have
-		# attributes "HostMenu" (wx.Menu instance) and  "InternalName" (str). Used in UpdateMenuStatus()
+		# Any menu item which should be enabled/disabled depending on the current state of the Viewport should:
+		# - have attributes "HostMenu" (wx.Menu instance) and  "InternalName" (str);
+		# - be appended to self.ViewportMenuItems;
+		# - be mentioned in the MenuCommandsAvailable attrib of all Viewport classes that require the menu item
+		# - be listed in InsertBeforeMe attrib of one other menu item
+
 		# Set up the "File" menu
 		FileMenu = wx.Menu()
 		Openmitem = FileMenu.Append(-1, _('&Open Vizop project...'), '')
@@ -2244,13 +2261,21 @@ class ControlFrame(wx.Frame):
 		Savemitem = FileMenu.Append(-1, _('&Save Vizop project'), '')
 		self.Bind(wx.EVT_MENU, projects.SaveEntireProjectRequest, Savemitem)
 		FileMenu.AppendSeparator() # add a separating line in the menu
+
 		self.FTFullReportmitem = FileMenu.Append(-1, _('Export full Fault Tree...'), '')
 		self.Bind(wx.EVT_MENU, self.OnExportFullFTRequest, self.FTFullReportmitem)
 		self.FTFullReportmitem.HostMenu = FileMenu
 		self.FTFullReportmitem.InternalName = 'FTFullExport'
+
+		print('CF2263 adding action items to File menu')
+		self.ActionItemsmitem = FileMenu.Append(-1, _('Action items'), '')
+		self.Bind(wx.EVT_MENU, self.OnShowActionItemsRequest, self.ActionItemsmitem)
+		self.ActionItemsmitem.HostMenu = FileMenu
+		self.ActionItemsmitem.InternalName = 'ShowActionItems'
+
 		self.FileMenuSeparatorAfterViewportCommands = FileMenu.AppendSeparator()
 		# InsertBeforeMe: list of  menu items to insert above this location
-		self.FileMenuSeparatorAfterViewportCommands.InsertBeforeMe = [self.FTFullReportmitem]
+		self.FileMenuSeparatorAfterViewportCommands.InsertBeforeMe = [self.FTFullReportmitem, self.ActionItemsmitem]
 		Aboutmitem = FileMenu.Append(-1, _('About &Vizop...'), '')
 		self.Bind(wx.EVT_MENU, vizop_misc.OnAboutRequest, Aboutmitem) # OnAboutRequest is shared with welcome frame
 		Quitmitem = FileMenu.Append(-1, _('E&xit Vizop'), '')
@@ -2271,7 +2296,8 @@ class ControlFrame(wx.Frame):
 		self.MenuBar.Append(FileMenu, _('&File'))
 		self.MenuBar.Append(EditMenu, _('&Edit'))
 		self.SetMenuBar(self.MenuBar) # Add MenuBar to ControlFrame
-		self.ViewportMenuItems = [self.FTFullReportmitem] #  menu items relating to Viewports that may need to be inserted/removed
+		# make list of menu items relating to Viewports that may need to be inserted/removed
+		self.ViewportMenuItems = [self.FTFullReportmitem, self.ActionItemsmitem]
 
 	def UpdateMenuStatus(self): # update texts and stati of menu items in control frame
 		Proj = self.CurrentProj
@@ -2538,18 +2564,22 @@ class ControlFrame(wx.Frame):
 		ReplyXML = Handler(Proj=Proj, XMLRoot=ParsedMsgRoot)
 		return ReplyXML
 
-	def DoNewViewportCommand(self, Proj, Redoing=False, **Args):
+	def DoNewViewportCommand(self, Proj, Redoing=False, ViewportArgs={}, **Args):
 		# handle request for new Viewport in project Proj
 		# Redoing (bool): whether we are redoing an undone "new Viewport" operation (currently not used)
-		# Expected Args: ViewportClass (class of new Viewport); not needed if Redoing
-		#	PHAModel (instance) to attach the Viewport to,
-		#	Chain (bool): whether this new Viewport creation call is chained from another event (e.g. new PHA model)
-		#	ViewportInRedoRecord (Viewport instance) if Redoing
-		# Optional Args:
+		# ViewportArgs (dict): args to send to ViewportClass when creating
+		# Optional Args in ViewportArgs:
 		#	ViewportToRevertTo (Viewport instance): Viewport to redisplay when this Viewport is destroyed
 		#	OriginatingViewport (Viewport instance): Viewport that initiated this new Viewport; passed so that the new
 		#		Viewport can interrogate the originating Viewport
+		# Expected Args:
+		# 	ViewportClass (class of new Viewport); not needed if Redoing
+		#	PHAModel (instance) to attach the Viewport to,
+		#	Chain (bool): whether this new Viewport creation call is chained from another event (e.g. new PHA model)
+		#	ViewportInRedoRecord (Viewport instance) if Redoing
 		assert isinstance(Redoing, bool)
+		assert isinstance(ViewportArgs, dict)
+		assert all(isinstance(k, str) for k in ViewportArgs.keys()) # confirm all keys of ViewportArgs are str
 		assert 'PHAModel' in Args
 		assert isinstance(Args['Chain'], bool)
 		if Redoing:
@@ -2564,11 +2594,11 @@ class ControlFrame(wx.Frame):
 			NewViewport = Args['ViewportInRedoRecord']
 			RequestToDatacore = 'RQ_NewViewport_Redo'
 		else:
-			# prepare dict of additional args for Viewport creation
-			ArgsToSend = {}
-			for ThisArg in ['ViewportToRevertTo','OriginatingViewport']:
-				if Args.get(ThisArg, None) is not None:
-					ArgsToSend[ThisArg] = Args[ThisArg]
+			# prepare dict of additional args for Viewport creation (used to fetch selectively from Args, now using ViewportArgs)
+			ArgsToSend = ViewportArgs
+#			for ThisArg in ['ViewportToRevertTo','OriginatingViewport']:
+#				if Args.get(ThisArg, None) is not None:
+#					ArgsToSend[ThisArg] = Args[ThisArg]
 			# create the Viewport
 			NewViewport, D2CSocketNo, C2DSocketNo, VizopTalksArgs, VizopTalksTips = display_utilities.CreateViewport(Proj,
 				Args['ViewportClass'], DisplDevice=self.MyEditPanel, PHAObj=Args['PHAModel'], Fonts=self.Fonts,
@@ -2616,7 +2646,7 @@ class ControlFrame(wx.Frame):
 		ViewportType = NewPHAObjType.DefaultViewportType
 		self.DoNewViewportCommand(Proj, ViewportClass=ViewportType, Chain=True,
 			PHAModel=utilities.ObjectWithID(Proj.PHAObjShadows,
-				TargetID=utilities.TextAsString(XMLRoot.find(info.PHAModelIDTag))))
+			TargetID=utilities.TextAsString(XMLRoot.find(info.PHAModelIDTag))))
 		return vizop_misc.MakeXMLMessage('Null', 'Null')
 
 	def PostProcessNewPHAModel_Undo(self, XMLRoot=None):
@@ -3165,8 +3195,16 @@ class ControlFrame(wx.Frame):
 #			SystemFontNames=self.SystemFontNames, FT=self.CurrentViewport)
 		# make a FTFullExport Viewport. DoNewViewportCommand() provides the new Viewport as self.TrialViewport
 		self.DoNewViewportCommand(Proj=self.CurrentProj, ViewportClass=ft_full_report.FTFullExportViewport,
-			Chain=True, PHAModel=self.CurrentViewport.PHAObj, ViewportToRevertTo=self.CurrentViewport,
-			OriginatingViewport=self.CurrentViewport)
+			Chain=True, PHAModel=self.CurrentViewport.PHAObj, ViewportArgs={'ViewportToRevertTo': self.CurrentViewport,
+			'OriginatingViewport': self.CurrentViewport})
+
+	def OnShowActionItemsRequest(self, Event): # handle menu request to show all action items in the project
+		# make a AssocTextList Viewport. DoNewViewportCommand() provides the new Viewport as self.TrialViewport
+		print('CF3191 requesting action items viewport')
+		print('CF3200 registered viewports: ', [v.HumanName for v in display_utilities.ViewportMetaClass.ViewportClasses])
+		self.DoNewViewportCommand(Proj=self.CurrentProj, ViewportClass=assoc_text_view.AssocTextListViewport,
+			Chain=True, PHAModel=None, ViewportArgs={'ViewportToRevertTo': self.CurrentViewport,
+			'OriginatingViewport': self.CurrentViewport, 'AssocTextKind': 'ActionItems'})
 
 	def GotoEditPanelAspect(self, NewAspect, **Args):
 		# switch to a dialogue aspect in edit panel.

@@ -53,7 +53,7 @@ class ViewportBaseClass(object, metaclass=ViewportMetaClass): # base class for a
 
 def CreateViewport(Proj, ViewportClass, DisplDevice=None, PHAObj=None, DatacoreIsLocal=True, Fonts=[], **Args):
 	# create new Viewport instance of class ViewportClass in project Proj, and attach it to DisplDevice.
-	# PHAObj: PHA object shadow to which the Viewport belongs
+	# PHAObj: PHA object shadow to which the Viewport belongs, if any (None if the Viewport is project-wide)
 	# DatacoreIsLocal (bool): whether datacore is in this instance of Vizop
 	# Fonts: (dict) keys are strings such as 'SmallHeadingFont'; values are wx.Font instances
 	# Return the Viewport instance, and D2C and C2D socket numbers (2 x int)
@@ -63,8 +63,8 @@ def CreateViewport(Proj, ViewportClass, DisplDevice=None, PHAObj=None, DatacoreI
 	# prepare dict of args to send to new Viewport
 	ArgsToSupply = Args
 	ArgsToSupply.update({'DateChoices': core_classes.DateChoices})
-	NewViewport = ViewportClass(Proj=Proj, PHAObjID=PHAObj.ID, ParentWindow=DisplDevice, DisplDevice=DisplDevice,
-		Fonts=Fonts, **ArgsToSupply)
+	NewViewport = ViewportClass(Proj=Proj, PHAObjID=getattr(PHAObj, 'ID', None), ParentWindow=DisplDevice,
+		DisplDevice=DisplDevice, Fonts=Fonts, **ArgsToSupply)
 	# append the Viewport to the project's list
 #	NewViewport.ID = str(utilities.NextID(Proj.ActiveViewports)) # generate unique ID; stored as str
 	NewViewport.ID = str(Proj.GetNewID()) # generate unique ID; stored as str. FIXME this is getting ID from client side Proj!

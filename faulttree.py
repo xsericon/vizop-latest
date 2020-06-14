@@ -786,6 +786,7 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 			elif self.InternalName == 'EventValueUnit' and ThisEventType == 'SIFFailureEvent': MyEditBehaviour = None
 			elif self.InternalName == 'EventValueKind' and ThisEventType == 'SIFFailureEvent': MyEditBehaviour = None
 			if MyEditBehaviour == 'Text':
+				print('FT789 detected edit behaviour = Text')
 				# store info required to close out editing when finished
 #				self.FT.CurrentEditTextCtrl = self.EditTextCtrl # TODO next, change this to EditTextComponent and set colours when rendered
 				self.FT.CurrentEditComponent = self
@@ -824,7 +825,7 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 			elif MyEditBehaviour == 'EditInControlPanel': # can't edit in place, editing in control panel only
 				pass
 
-	def StartEditingAsText(self, Zoom): # handle request to edit contents of component as text%%%
+	def StartEditingAsText(self, Zoom): # handle request to edit contents of component as text
 		# first, store the current content of the text component, in case the edit is rejected
 		self.Text.OldContent = self.Text.Content
 		self.FT.DisplDevice.Bind(wx.EVT_TEXT_ENTER, self.FT.EndEditingOperation)
@@ -835,15 +836,14 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 		self.Text.Highlighted = False # whether any characters in the text are highlighted
 		self.Text.HighlightStartIndex = 0 # cursor position when highlight was first extended
 		self.UndoListDuringTextEditing = []
-		# put the cursor at the end of the text being edited
+		# put the cursor at the end of the text being edited. TODO if activated by mouse click, detect the nearest char
 		self.FT.TextEditCursorIndex = len(self.Text.Content)
-#		self.Text.Content = 'Blah foo\nsocks'
 		self.Text.debug = True
-#		self.FT.TextEditCursorIndex = 1 # for testing
 		self.Text.Colour = (0,0,0)
 		self.Text.ParaHorizAlignment = 'Left'
 		# insert a visible newline character before each newline
 		self.Text.Content = self.Text.Content.replace('\n', info.NewlineSymbol + '\n')
+		self.FT.DisplDevice.SetFocus() # ensure keystrokes go to our handler, even if this component raises a control panel aspect
 		self.RedrawDuringEditing(Zoom=Zoom)
 
 	def HandleMouseLClickOnMeDuringEditing(self, **Args): # handle mouse left single click on text element during editing
@@ -865,7 +865,7 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 	def RedrawDuringEditing(self, Zoom):
 		# redraw the text component during editing, with cursor
 		Buffer = wx.Bitmap(width=self.SizeXInCU * Zoom, height=self.SizeYInCU * Zoom, depth=wx.BITMAP_SCREEN_DEPTH)
-		Buffer = wx.Bitmap(width=1000, height=500, depth=wx.BITMAP_SCREEN_DEPTH)
+#		Buffer = wx.Bitmap(width=1000, height=500, depth=wx.BITMAP_SCREEN_DEPTH)
 		TextEditDC = wx.MemoryDC(Buffer)
 		# draw background box
 		TextEditDC.SetPen(wx.Pen(EditingTextBorderColour))
@@ -873,7 +873,6 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 		TextEditDC.DrawRectangle(0, 0, self.SizeXInCU * Zoom, self.SizeYInCU * Zoom)
 		# populate the box with the current text
 		# factor of 8 for LayerOffsetY is a fudge factor to get the text position to look natural
-		print('FT873 redrawing text with LayerOffsetX/Y, StartY: ', -self.MinTextXat() * Zoom, -self.SizeYInCU * Zoom + int(round(8 * Zoom)), self.StartY)
 		text.DrawTextInElement(self, TextEditDC, self.Text, TextIdentifier=0, CanvZoomX=Zoom, debug=True,
 			CanvZoomY=Zoom, LayerOffsetX=-self.MinTextXat() * Zoom,
 			LayerOffsetY=-self.SizeYInCU * Zoom + int(round(8 * Zoom)),
@@ -886,7 +885,8 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 	def OnEditChoice(self, Event): # handle click in choice box during editing
 		self.FT.EndEditingOperation()
 
-	def MoveCursorTo(self, Event, OldIndex, NewIndex, ExtendSelection=False, IgnoreShift=False):  # handle request to move cursor to new index
+	def MoveCursorTo(self, Event, OldIndex, NewIndex, ExtendSelection=False, IgnoreShift=False):
+		# handle request to move cursor to new index
 		# ExtendSelection (bool): whether to extend highlight selection (e.g. when navigating with Shift key pressed)
 		# IgnoreShift (bool): whether to ignore shift key - used during deleting
 		assert isinstance(ExtendSelection, bool)
@@ -966,6 +966,7 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 			return self.Text.Content[text.FindnthChar(RichStr=self.Text.Content, n=CharIndexLean)] == info.NewlineSymbol
 
 		# start of OnKeyDown()
+		print('FT969 starting OnKeyDown')
 		Propagate = True # whether to propagate the keypress event to other handlers
 		OldTextContentLean = text.StripOutEscapeSequences(self.Text.Content)
 		if Event.KeyCode == wx.WXK_BACK: # check for backspace key (we do this first, as it also generates ASCII code)
@@ -1833,7 +1834,7 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 #		ConnGroupedButton = ButtonElement(self.FT, Row=1, ColStart=6, ColSpan=1, StartX=250, EndX=274,
 #			HostObject=self, InternalName='ConnGroupedButton', Stati=('OutNotExist', 'OutExist'),
 #			LSingleClickHandler=None)
-		self.ConnValue = TextElement(self.FT, Row=2, ColStart=0, ColSpan=1, EndX=99, HostObject=self,
+		self.ConnValue = TextElement(self.FT, Row=2, ColStart=0, ColSpan=1, EndX=99, HostObject=self, debug=True,
 			InternalName='Value', ControlPanelAspect='CPAspect_NumValue', EditBehaviour='Text', HorizAlignment='Left')
 		self.ConnValueUnitComponent = TextElement(self.FT, Row=2, ColStart=1, ColSpan=1, EndX=149, HostObject=self,
 			InternalName='ConnValueUnit')
@@ -5138,7 +5139,8 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 	MinZoom = 0.1 # min and max zoom factors allowed for display of this Viewport
 	MaxZoom = 10.0
 	InitialEditPanelMode = 'Select'
-	MenuCommandsAvailable = ['FTFullExport'] # InternalNames of menu commands to enable when this Viewport is visible
+	# InternalNames of menu commands to enable when this Viewport is visible
+	MenuCommandsAvailable = ['FTFullExport', 'ShowActionItems']
 
 	class SeverityCatInFT(object): # represents a severity category in FTForDisplay instance
 		# (so far, it's identical to ChoiceItem class)

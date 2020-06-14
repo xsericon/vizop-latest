@@ -676,7 +676,6 @@ def DrawTextInElement(El, dc, Text, TextIdentifier, LayerOffsetX=0, LayerOffsetY
 					dc.SetPen(wx.Pen(BrighterThan(StandoutBoxColour, 50), 2))
 					dc.DrawLine(xL, yB + 1, xR, yB + 1)
 				# draw the text in this chunk
-				if debug: print('TE679 rendering text at y: ', LayerOffsetY, PanY, YStart, VertOffset, SublineHeight, SublineY[SublineNo][CharsSoFar][0])
 				dc.DrawText(Remainder, XStartAbs + SublineX[SublineNo][CharsSoFar],
 					LayerOffsetY + PanY + (YStart + (1 - 0.01 * VertOffset) * (SublineHeight - SublineY[SublineNo][CharsSoFar][0])))
 				CharsSoFar += len(Chunk)
