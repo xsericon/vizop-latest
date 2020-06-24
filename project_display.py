@@ -787,8 +787,9 @@ class EditPanelAspectItem(object): # class whose instances are aspects of the Ed
 		# if WidgetsToActivate arg is provided, activate (bind) these widgets; otherwise bind all visible widgets
 		# if TextWidgets arg is provided, set text widgets to check for loss of focus in OnIdle
 		WidgetsToActivate = Args.get('WidgetsToActivate', [w for w in self.WidgetList if w.IsVisible])
-		self.TopLevelFrame.ActivateWidgetsInPanel(Widgets=self.WidgetList[:], Sizer=self.MySizer,
-			ActiveWidgetList=WidgetsToActivate, **Args)
+		display_utilities.ActivateWidgetsInPanel(Widgets=self.WidgetList[:], Sizer=self.MySizer,
+			ActiveWidgetList=WidgetsToActivate, DefaultFont=self.TopLevelFrame.Fonts['NormalWidgetFont'],
+			HighlightBkgColour=self.TopLevelFrame.ColScheme.BackHighlight, **Args)
 		# set text widgets to check for loss of focus in OnIdle
 		if 'TextWidgets' in Args: self.ParentFrame.TextWidgActive = Args['TextWidgets'][:]
 

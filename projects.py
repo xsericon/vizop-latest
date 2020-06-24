@@ -75,7 +75,8 @@ class ProjectItem(object): # class of PHA project instances
 		self.ActiveViewports = [] # list of all actual Viewports (not Viewport shadows) currently displayed in a display device.
 			# This attrib is used on the "display side" (client side) project instance, not in datacore
 		self.AllViewportShadows = [] # list of all Viewport shadows (belonging to datacore)
-		#	should be ViewportShadow instances, but might be Viewport instances, i.e. ViewportBaseClass subclass instances FIXME
+		# should be ViewportShadow instances, but might be Viewport instances, i.e. ViewportBaseClass subclass instances FIXME
+		self.ViewportsWithoutPHAObjs = [] # datacore: any Viewport instances that don't belong to PHA objects (e.g. action item view)
 		self.IPLKinds = []
 		self.CauseKinds = []
 		self.RiskReceptors = [core_classes.RiskReceptorItem(XMLName='People', HumanName=_('People'))] # instances of RiskReceptorItem defined for this project
@@ -134,7 +135,7 @@ class ProjectItem(object): # class of PHA project instances
 		self.DefaultCommentNumbering.NumberStructure = [core_classes.SerialNumberChunkItem()]
 		self.DefaultAssociatedTextNumbering = core_classes.NumberingItem()
 		self.DefaultAssociatedTextNumbering.NumberStructure = [core_classes.SerialNumberChunkItem()]
-		self.ActionItems = [] # list of AssociatedText instances
+		self.ActionItems = [] # list of AssociatedText instances for entire project
 		self.ParkingLotItems = [] # list of AssociatedText instances
 
 		# Attributes saved in actual project file
@@ -193,6 +194,13 @@ class ProjectItem(object): # class of PHA project instances
 			for v in self.ActiveViewports if v.PHAObjID == ParentPHAObjID] + [0])
 		# assign HumanName to Viewport
 		Viewport.HumanName = HumanNameStub + str(HighestSuffix + 1)
+
+	def WalkOverAllPHAElements(self):
+		# a generator yielding PHA elements from all PHA models in the project. For datacore or display version of FT
+		for ThisPHAObj in self.PHAObjs:
+			for ThisPHAElement in ThisPHAObj.WalkOverAllElements():
+				yield ThisPHAElement
+		return
 
 def TestProjectsOpenable(ProjectFilenames, ReadOnly=False):
 	"""

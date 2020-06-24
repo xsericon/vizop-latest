@@ -494,8 +494,8 @@ class FTHeader(object): # FT header object. Rendered by drawing text into bitmap
 		return [ThisEl for ThisEl in self.Elements
 			if ((ThisEl.Selected or not SelectedOnly) and (ThisEl.Visible or not VisibleOnly))]
 
-class FTBoxyObject(object): # superclass of vaguely box-like FT components for use in FTForDisplay. Used to avoid duplicate
-	# definitions of some attributes and methods
+class FTBoxyObject(object): # superclass of vaguely box-like FT components for use in FTForDisplay. Provides
+	# definitions of some common attributes and methods
 
 	def __init__(self, **Args):
 		object.__init__(self)
@@ -1088,7 +1088,7 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 			return ThisUndoRecord.CursorIndexLean
 		else: return None # no undo to do
 
-class FTEvent(FTBoxyObject): # FT event object
+class FTEvent(FTBoxyObject): # FT event object in Viewport
 	# Used for causes, IPLs, intermediate events, final events
 	NeedsConnectButton = True # whether to provide connect buttons
 	# Attribs are used by ParseFTData() to populate object's attributes from data transferred from datacore (may be redundant)
@@ -1354,7 +1354,7 @@ class FTEvent(FTBoxyObject): # FT event object
 
 	AcceptableUnits = property(fget=GetMyAcceptableUnits) # this is accessed in PrefillWidgetsForNumericalValueAspect()
 
-class FTGate(FTBoxyObject): # object containing FT gates for display. These belong to FTColumn's.
+class FTGate(FTBoxyObject): # object containing FT gates for display in Viewport. These belong to FTColumn's.
 	NeedsConnectButton = True # whether to provide connect buttons
 	# Attribs are used by ParseFTData() to populate object's attributes from data transferred from datacore (may be redundant)
 	Attribs = [(info.IDTag, int, False), ('Algorithm', str, False), ('BackgColour', 'rgb', False), ('Style', str, False), ('Numbering', str, False),
@@ -1754,7 +1754,7 @@ class FTGate(FTBoxyObject): # object containing FT gates for display. These belo
 		self.DetailedView = True
 		self.FT.DisplDevice.Redraw(FullRefresh=True) # refresh the display to show detailed gate style
 
-class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for display. These belong to FTColumn's.
+class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for display in Viewport. These belong to FTColumn's.
 	# Is the superclass of FTConnectorIn and FTConnectorOut
 #	HumanName = {True: _('Inward connector'), False: _('Outward connector')} # class name; now set in subclasses
 	ConnectorStyles = ['Default'] # future, will define various connector appearances (squares, arrows, circles etc)
@@ -2104,7 +2104,7 @@ class FTBuilder(FTBoxyObject): # 'add' button object within an FTColumn.
 class FTColumn(object): # object containing a column of FT objects for display, including:
 	# FTEvent (including IPL), FTGate, FTConnectorIn/Out, collapse groups, and builder buttons
 	# Used to populate Columns[] in FTForDisplay instance
-	# This class declaration has to be below the declaration of FTEvent and FTGate
+	# This class definition has to be below the declaration of FTEvent and FTGate
 
 	def __init__(self, FT, ColNo): # ColNo: column number, counting from zero (int)
 		object.__init__(self)
@@ -2248,13 +2248,17 @@ class FTColumnInCore(object): # FT column object used in DataCore by FTObjectInC
 		self.FT = FT
 		self.FTElements = []
 
-class FTElementInCore(object): # superclass used to contain common methods for FT events and FT connectors
+class FTElementInCore(object): # superclass containing common methods and properties for FT events and FT connectors
 	# event types whose value is a frequency or probability
 	EventTypesWithFreqValue = FTEventTypesWithFreqValue
 	EventTypesWithProbValue = FTEventTypesWithProbValue
 
 	def __init__(self):
 		object.__init__(self)
+
+	HostPHAObj = property(fget=lambda s: s.FT) # provide required properties HostPHAObj and Siblings
+	# Siblings: return list of sibling objects in the same column of the same type as the target element
+	Siblings = property(fget=lambda s: [e for e in s.Column.FTElements if type(e) is type(s)])
 
 	def CheckValue(self, NumValueInstance=None):
 		# check whether value in NumValueInstance (a UserNumValueItem instance) is acceptable in the FT element
@@ -2811,6 +2815,9 @@ class FTGateItemInCore(object): # logic gate in a Fault Tree, used in DataCore
 			self.BackgColour = GateBaseColourStr
 			self.Style = FTGateItemInCore.DefaultGateStyle # must be in GateStyles
 			self.Numbering = core_classes.NumberingItem()
+
+	HostPHAObj = property(fget=lambda s: s.FT) # provide required properties HostPHAObj and Siblings
+	Siblings = property(fget=lambda s: [e for e in s.Column.FTElements if isinstance(e, FTGateItemInCore)])
 
 	def AcceptableValueKinds(self): # return list of value kinds (subclasses of NumValueItem) for gate
 		return [core_classes.AutoNumValueItem]
@@ -3491,8 +3498,9 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		# Args: can include ExtraXMLTagsAsTags (ElementTree XML element to append directly to XML tree)
 
 		def PopulateOverallData(El): # put data relating to FT as a whole into XML element El
-			# add FT object's ID as text of El, then OpMode as a tag
+			# add FT object's ID as text of El, PHA model kind as an attribute, then OpMode as a subelement
 			El.text = self.ID
+			El.set(info.PHAModelTypeTag, self.InternalName)
 			OpModeEl = ElementTree.SubElement(El, info.OpModeTag)
 			OpModeEl.text = self.OpMode.XMLName
 			# add HumanNames of risk receptors, appropriately grouped together
@@ -3961,9 +3969,8 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 				else: raise TypeError("No routine provided to put object data in column XML")
 
 		# GetFullRedrawData main procedure
-		# First, make the root element
-#		RootElement = ElementTree.Element(ViewportClass.InternalName)
-		RootElement = ElementTree.Element(info.FTTag)
+		# First, make the root element: a <PHAModelRedrawData> tag
+		RootElement = ElementTree.Element(info.PHAModelRedrawDataTag)
 		# populate with overall FT-related data
 		PopulateOverallData(RootElement)
 		# populate with header data
@@ -5107,6 +5114,8 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			NotFoundValue=core_classes.DateChoices[0])
 		return vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
 
+	def WalkOverAllElements(self): # generator to return all FT elements
+		return WalkOverAllFTObjs(FT=self)
 
 class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all data needed to display full FT on screen
 	# Each separate sub-object (header, cause etc) has attributes whose names are assumed to be same as in the data message from DataCore
@@ -5593,7 +5602,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 #		ElementTree.dump(XMLData) # print all data received, for debugging
 		self.Wipe() # start with a blank FT
 		# find the outer tag containing the FT data
-		FTData = [t for t in XMLData.iter(info.FTTag)][0]
+		FTData = [t for t in XMLData.iter(info.PHAModelRedrawDataTag)][0]
 		# populate display-related attributes specific to this Viewport, such as zoom, pan, selection, collapse groups,
 		# and highlights
 		DisplayAttribData = FTData.find(info.FTDisplayAttribTag)
@@ -6495,8 +6504,8 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 	def AddNewAssociatedText(self, PHAElement, PHAComponent, AssociatedTextContent):
 		# handle request from ControlFrame for new AssociatedText in component PHAComponent of element PHAElement
 		# This method is for a completely new AssociatedText that doesn't exist in the project
-		# First, store info to enable Viewport to request the AssociatedText aspect in control panel after redraw
 		# PHAComponent: the ButtonElement instance clicked to raise the AssociatedTexts for editing
+		# First, store info to enable Viewport to request the AssociatedText aspect in control panel after redraw
 		self.PreferredControlPanelAspect = PHAComponent.ControlPanelAspect # aspect identifier such as 'CPAspect_ActionItems'
 		self.ComponentEdited = PHAComponent
 		# handle request to add new AssociatedText to PHAComponent in PHAElement

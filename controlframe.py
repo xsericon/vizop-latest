@@ -1982,8 +1982,11 @@ class ControlFrame(wx.Frame):
 
 			def Activate(self, **Args): # activate widgets for this aspect
 				Proj = self.ParentFrame.CurrentProj
-				self.TopLevelFrame.ActivateWidgetsInPanel(Widgets=self.WidgetList, Sizer=self.MySizer,
-					ActiveWidgetList=[w for w in self.WidgetList if w.IsVisible], **Args)
+				# self.TopLevelFrame.ActivateWidgetsInPanel(Widgets=self.WidgetList, Sizer=self.MySizer,
+				display_utilities.ActivateWidgetsInPanel(Widgets=self.WidgetList, Sizer=self.MySizer,
+					ActiveWidgetList=[w for w in self.WidgetList if w.IsVisible],
+					DefaultFont=self.TopLevelFrame.Fonts['NormalWidgetFont'],
+					HighlightBkgColour=self.TopLevelFrame.ColScheme.BackHighlight, **Args)
 
 			def Deactivate(self, Widgets=[], **Args): # deactivate widgets for this aspect
 				self.TopLevelFrame.DeactivateWidgetsInPanel(Widgets=Widgets, **Args)
@@ -1994,28 +1997,31 @@ class ControlFrame(wx.Frame):
 			def SetWidgetVisibility(self, **Args): # set IsVisible attrib of each widget in self.WidgetList
 				self.SetWidgetVisibilityMethod(**Args)
 
-	def ActivateWidgetsInPanel(self, Widgets=[], Sizer=None, ActiveWidgetList=[], **Args):
-		# activate widgets that are about to be displayed in a panel of the Control Frame
-		# Args may contain TextWidgets (list of text widgets to check for loss of focus in OnIdle)
-		assert isinstance(Widgets, list)
-		assert isinstance(Sizer, wx.GridBagSizer)
-		assert isinstance(ActiveWidgetList, list)
-		# set up widgets in their sizer
-		display_utilities.PopulateSizer(Sizer=Sizer, Widgets=Widgets, ActiveWidgetList=ActiveWidgetList,
-			DefaultFont=self.Fonts['NormalWidgetFont'], HighlightBkgColour=self.ColScheme.BackHighlight)
-		# set widget event handlers for active widgets
-		global KeyPressHash
-		for ThisWidget in ActiveWidgetList:
-			if ThisWidget.Handler:
-				for Event in ThisWidget.Events:
-					ThisWidget.Widget.Bind(Event, ThisWidget.Handler)
-			# set keyboard shortcuts
-			if getattr(ThisWidget, 'KeyStroke', None):
-				KeyPressHash = vizop_misc.RegisterKeyPressHandler(
-					KeyPressHash, ThisWidget.KeyStroke, ThisWidget.Handler, getattr(ThisWidget, 'KeyPressHandlerArgs', {}))
-
+	# moved to module display_utilities
+	# def ActivateWidgetsInPanel(self, Widgets=[], Sizer=None, ActiveWidgetList=[], DefaultFont=None,
+	# 		HighlightBkgColour=None, **Args):
+	# 	# activate widgets that are about to be displayed in a panel of the Control Frame
+	# 	# Args may contain TextWidgets (list of text widgets to check for loss of focus in OnIdle)
+	# 	assert isinstance(Widgets, list)
+	# 	assert isinstance(Sizer, wx.GridBagSizer)
+	# 	assert isinstance(ActiveWidgetList, list)
+	# 	# set up widgets in their sizer
+	# 	display_utilities.PopulateSizer(Sizer=Sizer, Widgets=Widgets, ActiveWidgetList=ActiveWidgetList,
+	# 		DefaultFont=DefaultFont, HighlightBkgColour=HighlightBkgColour)
+	# 	# set widget event handlers for active widgets
+	# 	global KeyPressHash
+	# 	for ThisWidget in ActiveWidgetList:
+	# 		if ThisWidget.Handler:
+	# 			for Event in ThisWidget.Events:
+	# 				ThisWidget.Widget.Bind(Event, ThisWidget.Handler)
+	# 		# set keyboard shortcuts
+	# 		if getattr(ThisWidget, 'KeyStroke', None):
+	# 			KeyPressHash = vizop_misc.RegisterKeyPressHandler(
+	# 				KeyPressHash, ThisWidget.KeyStroke, ThisWidget.Handler, getattr(ThisWidget, 'KeyPressHandlerArgs', {}))
+	#
 	def DeactivateWidgetsInPanel(self, Widgets=[], **Args):
 		# deactivate widgets that are ceasing to be displayed in a panel of the Control Frame
+		# TODO: as ActivateWidgetsInPanel was moved to module display_utilities, also move this function
 		# TODO: do we need to delete any variable widgets?
 		# unbind widget event handlers
 		assert isinstance(Widgets, list)
@@ -2609,7 +2615,8 @@ class ControlFrame(wx.Frame):
 		# request datacore to create new viewport shadow
 		NewViewportAttribs = {'ControlFrame': self.ID, info.SkipRefreshTag: utilities.Bool2Str(Args['Chain']),
 			'ViewportClass': Args['ViewportClass'].InternalName, info.ProjIDTag: Proj.ID, 'Viewport': NewViewport.ID,
-			info.PHAModelIDTag: Args['PHAModel'].ID, info.PHAModelTypeTag: Args['PHAModel'].InternalName,
+			info.PHAModelIDTag: getattr(Args['PHAModel'], 'ID', ''),
+			info.PHAModelTypeTag: getattr(Args['PHAModel'], 'InternalName', ''),
 			info.MilestoneIDTag: NewMilestone.ID, info.D2CSocketNoTag: str(D2CSocketNo),
 			info.C2DSocketNoTag: str(C2DSocketNo), info.HumanNameTag: NewViewport.HumanName}
 		vizop_misc.SendRequest(self.zmqOutwardSocket, Command=RequestToDatacore, **NewViewportAttribs)
@@ -2864,9 +2871,9 @@ class ControlFrame(wx.Frame):
 		ThisComponent = None
 		if XMLRoot is not None:
 			# find the expected XML tag of the Viewport, e.g. "FTTreeView"; now changed to info.FTTag
-			ViewportTagName = info.FTTag
-			# find the corresponding tag in XMLRoot
-			ViewportTag = XMLRoot.find(ViewportTagName)
+			print('CF2868 SwitchToViewport: XMLRoot: ', ElementTree.tostring(XMLRoot))
+			# find the redraw data start tag in XMLRoot
+			ViewportTag = XMLRoot.find(info.PHAModelRedrawDataTag)
 			# find DisplayAttribs tag inside ViewportTag
 			DisplayAttribsTag = ViewportTag.find(info.FTDisplayAttribTag)
 			# if tag found, extract zoom, PanX and PanY from it
@@ -2895,9 +2902,10 @@ class ControlFrame(wx.Frame):
 		# update other GUI elements
 		self.RefreshGUIAfterDataChange(Proj=Proj)
 		# show appropriate aspect in Control Panel
-		self.MyControlPanel.GotoControlPanelAspect(NewAspect=self.CurrentViewport.PreferredControlPanelAspect,
-			PHAObjInControlPanel=self.CurrentViewport, PHAElementInControlPanel=PHAElement,
-			ComponentInControlPanel=ThisComponent, debug=2673)
+		if hasattr(self.CurrentViewport, 'PreferredControlPanelAspect'):
+			self.MyControlPanel.GotoControlPanelAspect(NewAspect=self.CurrentViewport.PreferredControlPanelAspect,
+				PHAObjInControlPanel=self.CurrentViewport, PHAElementInControlPanel=PHAElement,
+				ComponentInControlPanel=ThisComponent, debug=2673)
 		return vizop_misc.MakeXMLMessage('Null', 'Null')
 
 	def DestroyViewport(self, Proj, DoomedViewport, **Args):
@@ -2987,19 +2995,23 @@ class ControlFrame(wx.Frame):
 			NewViewportClass = ClassList[[Cls.InternalName for Cls in ClassList].index(XMLRoot.find('ViewportClass').text)]
 			NewViewportID = XMLRoot.find('Viewport').text
 			NewViewportHumanName = XMLRoot.find(info.HumanNameTag).text
-			ExistingPHAObj = utilities.ObjectWithID(ThisProj.PHAObjs, XMLRoot.find(info.PHAModelIDTag).text)
+			PHAModelID = XMLRoot.find(info.PHAModelIDTag).text # will be '' if this Viewport has no associated PHAModel
+			ExistingPHAObj = utilities.ObjectWithID(ThisProj.PHAObjs, PHAModelID) if PHAModelID else None
 			Chain = 'Stepwise' # TODO need 'NoChain' if we are adding new Viewport to existing PHA model
 		# check if we can proceed to create the Viewport; we may need editing rights (TODO remove this requirement)
 		if Proj.EditAllowed:
 			# make the Viewport shadow
 			NewViewport = ViewportShadow(ThisProj, NewViewportID, MyClass=NewViewportClass,
-										 HumanName=NewViewportHumanName,
-										 D2CSocketNumber=int(XMLRoot.find(info.D2CSocketNoTag).text),
-										 C2DSocketNumber=int(XMLRoot.find(info.C2DSocketNoTag).text), PHAObj=ExistingPHAObj)
+				 HumanName=NewViewportHumanName,
+				 D2CSocketNumber=int(XMLRoot.find(info.D2CSocketNoTag).text),
+				 C2DSocketNumber=int(XMLRoot.find(info.C2DSocketNoTag).text), PHAObj=ExistingPHAObj)
 			# attach existing PHA object to the Viewport
 			NewViewport.PHAObj = ExistingPHAObj
 			NewViewport.IsOnDisplay = True # set flag that ensures NewViewport will get redrawn
-			ExistingPHAObj.Viewports.append(NewViewport) # add Viewport to list in the PHA object
+			if ExistingPHAObj is None:
+				Proj.ViewportsWithoutPHAObjs.append(NewViewport) # add Viewport to list in the PHA object
+			else:
+				ExistingPHAObj.Viewports.append(NewViewport) # add Viewport to list in the PHA object
 			# fetch full redraw data of new PHA object, and include in reply message to send to control frame
 			Reply = self.MakeXMLMessageForDrawViewport(MessageHead='RP_NewViewport', PHAObj=ExistingPHAObj,
 				Viewport=NewViewport, ViewportID=NewViewportID)
@@ -3011,6 +3023,7 @@ class ControlFrame(wx.Frame):
 			Reply = vizop_misc.MakeXMLMessage(RootName='RP_NewViewport', RootText="Null",
 				Elements={'CantComply': 'EditingBlocked'})
 		# send the info back to control frame as a reply message (via ListenToSocket)
+		print('CF3019 ending DatacoreDoNewViewport')
 		return Reply
 
 	def DatacoreDestroyViewport(self, XMLRoot=None):
@@ -3029,14 +3042,19 @@ class ControlFrame(wx.Frame):
 	def MakeXMLMessageForDrawViewport(self, MessageHead, PHAObj, Viewport, ViewportID):
 		# make and return XML element containing message required for SwitchToViewport, with all required redraw data
 		# MessageHead: command string required as XML root, e.g. 'RP_NewViewport'
+		# PHAObj: PHAObj to which Viewport belongs, or None if Viewport doesn't have an associated PHAObj
 		assert isinstance(MessageHead, str)
-		assert isinstance(PHAObj, core_classes.PHAModelBaseClass)
+		assert isinstance(PHAObj, core_classes.PHAModelBaseClass) or (PHAObj is None)
 		assert isinstance(Viewport, ViewportShadow)
 		assert isinstance(ViewportID, str)
-		# fetch full redraw data of new PHA object
-		RedrawXMLData = PHAObj.GetFullRedrawData(Viewport=Viewport, ViewportClass=Viewport.MyClass)
+		# fetch full redraw data for Viewport from PHA object, or from the Viewport itself if it doesn't have a PHAObj
+		if PHAObj is None:
+			RedrawXMLData = Viewport.MyClass.GetFullRedrawData(Proj=self.CurrentProj)
+		else:
+			RedrawXMLData = PHAObj.GetFullRedrawData(Viewport=Viewport, ViewportClass=Viewport.MyClass)
 		# put ID of PHA object, followed by full redraw data, into XML element
-		Reply = vizop_misc.MakeXMLMessage(RootName=MessageHead, RootText=ViewportID, Elements={info.IDTag: PHAObj.ID})
+		Reply = vizop_misc.MakeXMLMessage(RootName=MessageHead, RootText=ViewportID,
+			Elements={info.IDTag: getattr(PHAObj, 'ID', '')})
 		Reply.append(RedrawXMLData)
 		return Reply
 
@@ -3071,6 +3089,7 @@ class ControlFrame(wx.Frame):
 		if XMLRoot.find(info.DoomedViewportIDTag) is not None:
 			self.DatacoreDestroyViewport(XMLRoot=XMLRoot)
 		# send the info back to control frame as a reply message (via ListenToSocket)
+		print('CF3085 ending DatacoreSwitchToViewport')
 		return Reply
 
 	def UpdateAllViewportsAfterUndo(self, XMLRoot=None):
@@ -3657,7 +3676,7 @@ class ViewportShadow(object): # defines objects that represent Viewports in the 
 		# ID (str) is the same as the ID of the corresponding "real" Viewport
 		# MyClass (ViewportClasses instance): class of actual Viewport shadowed by this one
 		# D2CSocketNumber and C2DSocketNumber (2 x int): socket numbers assigned in display_utilities.CreateViewport
-		# PHAObj: PHA object owning the real Viewport
+		# PHAObj: PHA object owning the real Viewport (if any) or None (if Viewport is not owned by a PHA object)
 		# HumanName: HumanName assigned to the real Viewport
 		assert isinstance(Proj, projects.ProjectItem)
 		assert isinstance(ID, str)
@@ -3669,7 +3688,7 @@ class ViewportShadow(object): # defines objects that represent Viewports in the 
 		self.ID = ID
 		self.MyClass = MyClass
 		self.HumanName = HumanName
-		self.PHAObjID = PHAObj.ID # storing ID, not the actual PHAObj, for consistency with real Viewports
+		self.PHAObjID = getattr(PHAObj, 'ID', '') # storing ID, not the actual PHAObj, for consistency with real Viewports
 		self.IsOnDisplay = False # whether the Viewport shadow is currently displayed on any display device
 		# set up sockets using socket numbers provided
 		self.C2DSocketREP, self.C2DSocketREPObj, C2DSocketNumberReturned = vizop_misc.SetupNewSocket(SocketType='REP',

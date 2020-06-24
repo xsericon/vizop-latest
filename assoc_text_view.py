@@ -4,6 +4,7 @@
 
 # library modules
 import os, os.path, wx, platform # wx provides basic GUI functions
+import xml.etree.ElementTree as ElementTree # XML handling
 
 import core_classes, project_display, vizop_misc, info, utilities, faulttree, display_utilities
 from project_display import EditPanelAspectItem
@@ -81,7 +82,7 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 			SystemFontNames=SystemFontNames, DateChoices=Args['DateChoices'])
 		# initialize attributes
 		self.AssocTexts = [] # list of AssocTextItemInDisplay instances
-		self.TextFilterText = '' # currently applied text filter
+		self.TextFilterValue = '' # currently applied text filter
 		self.ActionChoices = []  # list of ChoiceItem instances; choices currently offered in Action choice box
 		self.FilterApplied = False # whether filter is currently applied to AT display
 		self.InitializeActionChoices()
@@ -134,6 +135,8 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 			self.WidgetsToActivate = [self.MainHeaderLabel,
 				self.TextFilterLabel, self.TextFilterText, self.ActionLabel, self.ActionChoice, self.ActionGoButton]
 
+		def SetupAssocTextListSizer(): pass
+
 		# start of SetupViewport()
 		self.MainSizer = wx.BoxSizer(orient=wx.VERTICAL)
 		self.HeaderSizer = wx.GridBagSizer(vgap=0, hgap=0) # for header widgets
@@ -160,29 +163,40 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 		self.ApplyFilters() # mark each associated text as whether currently visible, based on current filters
 		self.Prefill(SystemFontNames=self.SystemFontNames)
 		self.SetWidgetVisibility()
-		self.Activate(WidgetsToActivate=self.DialogueAspect.WidgetsToActivate[:],
-			TextWidgets=self.DialogueAspect.TextWidgets)
-		# display aspect's sizer (containing all the visible widgets) in the edit panel
-		self.DisplDevice.SetSizer(self.DialogueAspect.MySizer)
+		# place header widgets in sizer, bind event handlers and register keyboard shortcuts
+		display_utilities.ActivateWidgetsInPanel(Widgets=self.WidgetsToActivate, Sizer=self.HeaderSizer,
+			ActiveWidgetList=[w for w in self.FixedWidgets if w.IsVisible],
+			DefaultFont=self.DisplDevice.TopLevelFrame.Fonts['NormalWidgetFont'],
+			HighlightBkgColour=self.DisplDevice.TopLevelFrame.ColScheme.BackHighlight)
+		# display main sizer (containing all the visible widgets) in the display device
+		self.DisplDevice.SetSizer(self.MainSizer)
 
-	def UnpackDataFromDatacore(self, XMLTree): pass
+	def UnpackDataFromDatacore(self, XMLTree):
+		print('AT172 in UnpackDataFromDatacore')
+
+	def ApplyFilters(self):
+		print('AT175 in ApplyFilters')
 
 	def Prefill(self, SystemFontNames): # prefill widgets for associated text display
 		# set header to e.g. "Showing 5 of 10 action items in the project"
-		self.MainHeaderLabel.SetLabel(_('Showing %d of %d %s in the project') % \
+		self.MainHeaderLabel.Widget.SetLabel(_('Showing %d of %d %s in the project') % \
 			([i.FilteredIn for i in self.AssocTexts].count(True), len(self.AssocTexts),
 			self.AssocTextName(Plural=bool(len(self.AssocTexts) - 1))))
-		self.TextFilterText.ChangeValue(self.TextFilterText)
+		self.TextFilterText.Widget.ChangeValue(self.TextFilterValue)
 		# set available choices in "action" choice box
 		self.UpdateActionChoices()
 		# enable action Go button if any actions are available, apart from the prompt
-		self.ActionGoButton.Enable(len(self.ActionChoices) > 1)
+		self.ActionGoButton.Widget.Enable(len(self.ActionChoices) > 1)
+
+	def SetWidgetVisibility(self, **Args):
+		# set IsVisible attribs for all widgets
+		for ThisWidget in self.FixedWidgets: ThisWidget.IsVisible = True
 
 	def AssocTextName(self, Plural=True):
 		# return (str) name of associated text kind; plural if Plural (bool)
 		assert isinstance(Plural, bool)
 		return [(_('action item'), _('action items')), (_('parking lot item'), _('parking lot items'))][\
-			self.AssocTextKind.index(['ActionItems', 'ParkingLot'])][int(Plural)]
+			['ActionItems', 'ParkingLot'].index(self.AssocTextKind)][int(Plural)]
 
 	def UpdateActionChoices(self): # update choices available in "Action" choice box
 		# set "Applicable" flag for each possible choice
@@ -200,7 +214,77 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 		self.PromptOption.HumanName = _('Select an action...') if len(self.ActionChoices) > 1 \
 			else _('(No actions available)')
 		# set available options in choice box
-		self.ActionChoice.Set([a.HumanName for a in self.ActionChoices])
+		self.ActionChoice.Widget.Set([a.HumanName for a in self.ActionChoices])
 		# set the current option as the prompt
-		self.ActionChoice.SetSelection(self.ActionChoices.index(self.PromptOption))
+		self.ActionChoice.Widget.SetSelection(self.ActionChoices.index(self.PromptOption))
 
+	@classmethod
+	def GetFullRedrawData(cls, Viewport=None, ViewportClass=None, **Args):
+		# a datacore method. Provide data for redraw of this Viewport
+		# return the data as XML string
+
+		def MakeAssocTextLookupTable(Proj):
+			# make and return dictionary with keys = action items, values = list of PHA elements containing the action item
+			ATTable = {}
+			for ThisPHAElement in Proj.WalkOverAllPHAElements():
+				for ThisAT in getattr(ThisPHAElement, 'ActionItems', []):
+					if ThisAT in ATTable: ATTable[ThisAT].append(ThisPHAElement)
+					else: ATTable[ThisAT] = [ThisPHAElement]
+			return ATTable
+
+		# start of GetFullRedrawData()
+		print('AT213 in GetFullRedrawData')
+		Proj = Args['Proj']
+		# get a lookup table of all action items in the project
+		ATTable = MakeAssocTextLookupTable(Proj=Proj)
+		# First, make the root element
+		RootElement = ElementTree.Element(info.PHAModelRedrawDataTag)
+		RootElement.set(info.PHAModelTypeTag, cls.InternalName)
+		# add a subelement containing the kind of associated text
+		ATKindEl = ElementTree.SubElement(RootElement, info.AssociatedTextKindTag)
+		ATKindEl.text = 'ActionItems'
+		AssocTextMasterList = Proj.ActionItems # identify master list containing all associated text items to show
+		# add a tag for each action item in the project
+		for ThisAssocTextItem in AssocTextMasterList:
+			ATEl = ElementTree.SubElement(RootElement, info.AssociatedTextTag)
+			# set element text = associated item numbering
+			ATEl.text = ThisAssocTextItem.Numbering.HumanValue(PHAItem=ThisAssocTextItem, Host=AssocTextMasterList)[0]
+			# make subelements for AT content, responsibility, deadline and status
+			ContentEl = ElementTree.SubElement(ATEl, info.ContentTag)
+			ContentEl.text = ThisAssocTextItem.Content
+			ResponsibilityEl = ElementTree.SubElement(ATEl, info.ResponsibilityTag)
+			ResponsibilityEl.text = ThisAssocTextItem.Responsibility
+			DeadlineEl = ElementTree.SubElement(ATEl, info.DeadlineTag)
+			DeadlineEl.text = ThisAssocTextItem.Deadline
+			StatusEl = ElementTree.SubElement(ATEl, info.StatusTag)
+			StatusEl.text = ThisAssocTextItem.Status
+			# make subelement for each PHA element using this AT, if any. Set its text to the displayable name of the
+			# element. Add an attribute containing the PHA element's ID.
+			for ThisPHAElement in ATTable.get(ThisAssocTextItem, []):
+				PHAElUsingEl = ElementTree.SubElement(ATEl, info.PHAElementTag)
+				PHAElUsingEl.text = ThisPHAElement.HostPHAObj.HumanName + ' ' + \
+					ThisPHAElement.Numbering.HumanValue(PHAItem=ThisPHAElement, Host=ThisPHAElement.Siblings)[0]
+				PHAElUsingEl.set(info.IDTag, ThisPHAElement.ID)
+
+		# populate any extra tags requested (currently used by undo for specifying display-specific tags)
+		if 'ExtraXMLTagsAsDict' in Args:
+			assert isinstance(Args['ExtraXMLTagsAsDict'], dict)
+			for (ThisTag, ThisText) in Args['ExtraXMLTagsAsDict'].items():
+				assert isinstance(ThisTag, str)
+				assert isinstance(ThisText, str)
+				ThisElement = ElementTree.SubElement(RootElement, ThisTag)
+				ThisElement.text = ThisText
+		if 'ExtraXMLTagsAsTags' in Args:
+			assert isinstance(Args['ExtraXMLTagsAsTags'], ElementTree.Element)
+			RootElement.append(Args['ExtraXMLTagsAsTags'])
+		# TODO add info.FTDisplayAttribTag with zoom and pan data
+		print('AT270 ending GetFullRedrawData with RootElement: ', ElementTree.tostring(RootElement))
+		return RootElement
+
+	def AllClickableObjects(self, **Args):
+		# no graphical objects requiring special mouse click handlers
+		return []
+
+	def RenderInDC(self, DC, **Args):
+		# currently no graphics to render in a DC. For future, may provide a zoom tool
+		pass

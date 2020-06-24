@@ -1330,15 +1330,15 @@ class NumberingItem(object):
 		# returns (string containing the number as displayed, number of numerical chunks returned (int))
 		# returns only the last <Levels> numerical items (not counting string chunks, which are assumed to be separators)
 		# PHAObjectsReferenced is for circular reference trapping
-		NumString = ''  # build up the number string chunkwise
-		NumChunksAdded = 0  # counter for numerical chunks added
+		NumString = '' # build up the number string chunkwise
+		NumChunksAdded = 0 # counter for numerical chunks added
 		for Chunk in [self.NumberStructure[-Index] for Index in
 					  range(len(self.NumberStructure))]:  # work through list of chunks in reverse
 			if type(Chunk) is str:
-				NumString = Chunk + NumString  # prepend string chunk as-is
+				NumString = Chunk + NumString # prepend string chunk as-is
 			elif type(Chunk) is ParentNumberChunkItem:
 				(ParentChunk, LevelsAdded) = Chunk.Result(Levels=Levels - NumChunksAdded,
-														  PHAObjectsReferenced=PHAObjectsReferenced)
+					PHAObjectsReferenced=PHAObjectsReferenced)
 				NumString = ParentChunk + NumString
 				NumChunksAdded += LevelsAdded
 			elif type(Chunk) is SerialNumberChunkItem:
@@ -1589,7 +1589,7 @@ class TextItem(object):  # text forming part of a PHA object, such as a descript
 			PHAObjClass, Host):  # PHAObjectClass is the class of PHA object with which the text is associated
 		# Host: the parent PHA object (e.g. FTEvent)
 		object.__init__(self)
-		self.Content = ''  # content as rich string with embedded formatting commands
+		self.Content = '' # content as rich string with embedded formatting commands
 		self.ParaHorizAlignment = TextItem.DefaultTextHorizAlignment
 		self.ParaVertAlignment = TextItem.DefaultTextVertAlignment
 		self.InitialTextStyle = Proj.MostRecentInitialTextStyle.get(PHAObjClass,
@@ -1601,6 +1601,9 @@ class AssociatedTextItem(TextItem):  # 'smart text' used for comments, action it
 		TextItem.__init__(self, Proj, PHAObjClass, Host)
 		self.Tack = None  # reference to a position object on a PIDItem, or another PHA object, referred to by this text
 		self.Numbering = NumberingItem()
+		self.Responsibility = '' # who is responsible for closing out the item
+		self.Deadline = '' # deadline for closeout
+		self.Status = '' # whether item is open, closed etc
 
 # English names for associated text kinds. Translated at point of use, because they could be subject or object
 AssociatedTextEnglishNamesSingular = {'ActionItems': 'action item', 'ParkingLotItems': 'parking lot item'}

@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
-# Module display_utilities: part of Vizop, (c) 2019 xSeriCon. Contains common class definitions and functions for all Viewports
+# Module display_utilities: part of Vizop, (c) 2020 xSeriCon. Contains common class definitions and functions for all Viewports
 
 # library modules
-from __future__ import division # makes a/b yield exact, not truncated, result. Must be 1st import
+# from __future__ import division # makes a/b yield exact, not truncated, result. Must be 1st import
 import wx, wx.grid, wx.lib.gridmovers, zmq, math # wx provides basic GUI functions
 from wx.lib.expando import ExpandoTextCtrl, EVT_ETC_LAYOUT_NEEDED
 import wx.lib.buttons as buttons
@@ -264,6 +264,28 @@ class BitmapButtonWidget(GUIWidget):  # widget showing button with image - not u
 		if Zoom != self.BitmapZoomLevel: self.ChangeZoom(Zoom)
 		DC.DrawBitmap(self.BitmapZoomed.get(self.Status, self.BitmapZoomed['Default']), self.PosXInCU * Zoom,
 			self.PosYInCU * Zoom, useMask=False)
+
+def ActivateWidgetsInPanel(Widgets=[], Sizer=None, ActiveWidgetList=[], DefaultFont=None,
+		HighlightBkgColour=None, **Args):
+	# activate widgets that are about to be displayed in a panel: put them in Sizer, bind event handlers, and register
+	# keyboard shortcuts
+	# Args may contain TextWidgets (list of text widgets to check for loss of focus in OnIdle) (currently not used)
+	assert isinstance(Widgets, list)
+	assert isinstance(Sizer, wx.GridBagSizer)
+	assert isinstance(ActiveWidgetList, list)
+	# set up widgets in their sizer
+	PopulateSizer(Sizer=Sizer, Widgets=Widgets, ActiveWidgetList=ActiveWidgetList,
+		DefaultFont=DefaultFont, HighlightBkgColour=HighlightBkgColour)
+	# set widget event handlers for active widgets
+	global KeyPressHash
+	for ThisWidget in ActiveWidgetList:
+		if ThisWidget.Handler:
+			for Event in ThisWidget.Events:
+				ThisWidget.Widget.Bind(Event, ThisWidget.Handler)
+		# set keyboard shortcuts; TODO rethink where KeyPressHash should be stored, maybe in RegisterKeyPressHandler
+		if getattr(ThisWidget, 'KeyStroke', None): pass
+#			KeyPressHash = vizop_misc.RegisterKeyPressHandler(
+#				KeyPressHash, ThisWidget.KeyStroke, ThisWidget.Handler, getattr(ThisWidget, 'KeyPressHandlerArgs', {}))
 
 class ZoomWidgetObj(object):
 	# widget allowing user to control zoom of a Viewport
