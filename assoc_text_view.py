@@ -43,6 +43,10 @@ class AssocTextItemInDisplay(object):
 
 	def __init__(self):
 		object.__init__(self)
+		self.ID = ''
+		print('AT47 reminder, need to fetch ID of action items')
+		self.Content = ''
+		self.Numbering = ''
 		self.FilteredIn = True # bool; whether this item shows up in the current filters. Defined only if filters are applied.
 		self.Selected = False # bool; whether this item is currently selected by the user
 		self.PHAElements = [] # list of PHAElementItem instances; all elements in which this AT appears
@@ -54,7 +58,7 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 	HumanName = _('Action item/parking lot list')
 	PreferredKbdShortcut = 'A'
 	NewPHAObjRequired = None # which datacore PHA object class this Viewport spawns on creation.
-		# Should be None if the model shouldn't create a PHA object
+		# Should be None as the model doesn't create a PHA object
 	# VizopTalks message when a new associated text list is created.
 	# NB don't set Priority here, as it is overridden in DoNewViewportCommand()
 	NewViewportVizopTalksArgs = {'Title': 'Action items/Parking lot list',
@@ -85,6 +89,7 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 		self.TextFilterValue = '' # currently applied text filter
 		self.ActionChoices = []  # list of ChoiceItem instances; choices currently offered in Action choice box
 		self.FilterApplied = False # whether filter is currently applied to AT display
+		self.FilterText = '' # filter text currently applied to AT display; might not be the same as contents of TextCtrl
 		self.InitializeActionChoices()
 
 	def InitializeActionChoices(self):
@@ -111,29 +116,35 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 			# set up widgets for header. MainHeaderLabel is set in self.Prefill()
 			# HostPanel: a wx.Panel instance. Widgets will be set to have HostPanel as parent.
 			self.MainHeaderLabel = UIWidgetItem(wx.StaticText(HostPanel, -1, ''),
-				Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_LEFT | wx.EXPAND, GapY=10,
-				ColLoc=0, ColSpan=10, Font=Fonts['BigHeadingFont'], NewRow=True)
+				Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_LEFT | wx.EXPAND, GapX=20, GapY=10,
+				ColLoc=1, ColSpan=10, Font=Fonts['BigHeadingFont'], NewRow=True)
 			self.TextFilterLabel = UIWidgetItem(wx.StaticText(HostPanel, -1, _('Filter on text:')),
-				Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_LEFT | wx.EXPAND, GapY=10,
-				ColLoc=0, ColSpan=1, NewRow=True)
-			self.TextFilterText = UIWidgetItem(wx.TextCtrl(HostPanel, -1, style=wx.TE_PROCESS_ENTER),
-				MinSizeY=25, Events=[wx.EVT_TEXT_ENTER], Handler=self.OnFilterText, GapX=5,
 				Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_LEFT | wx.EXPAND,
-				MinSizeX=100, ColLoc=2, ColSpan=1, DisplayMethod='StaticFromText')
+#				ColLoc=1, ColSpan=1, NewRow=True)
+				ColLoc=1, ColSpan=1)
+			self.TextFilterText = UIWidgetItem(wx.TextCtrl(HostPanel, -1, style=wx.TE_PROCESS_ENTER),
+				MinSizeY=25, Events=[wx.EVT_TEXT_ENTER], Handler=self.OnFilterText, GapX=10,
+				Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_LEFT | wx.EXPAND,
+				MinSizeX=200, ColLoc=3, ColSpan=1, DisplayMethod='StaticFromText')
 			self.ActionLabel = UIWidgetItem(wx.StaticText(HostPanel, -1, _('Select action:')),
-				Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_LEFT | wx.EXPAND, GapX=10,
-				ColLoc=4, ColSpan=1)
-			self.ActionChoice = UIWidgetItem(wx.Choice(HostPanel, -1, size=(70, 25),
-				choices=[]),
-				Handler=self.OnActionChoice, Events=[wx.EVT_CHOICE], ColLoc=5, ColSpan=1)
+				Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_LEFT | wx.EXPAND, GapX=20,
+				ColLoc=5, ColSpan=1)
+			self.ActionChoice = UIWidgetItem(wx.Choice(HostPanel, -1, size=(180, 25),
+				choices=[]), GapX=10,
+				Handler=self.OnActionChoice, Events=[wx.EVT_CHOICE], ColLoc=7, ColSpan=1)
 			self.ActionGoButton = UIWidgetItem(wx.Button(HostPanel, -1, _('Go')),
 				Handler=self.OnActionGoButton, Events=[wx.EVT_BUTTON],
-				ColLoc=6, ColSpan=1, Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_LEFT | wx.EXPAND)
+				ColLoc=8, ColSpan=1, Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_LEFT | wx.EXPAND)
+			self.FinishedButton = UIWidgetItem(wx.Button(HostPanel, -1, _('Finished')), GapX=20,
+				Handler=self.OnFinishedButton, Events=[wx.EVT_BUTTON],
+				ColLoc=10, ColSpan=1, Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_LEFT | wx.EXPAND)
 			self.FixedWidgets = [self.MainHeaderLabel,
-				self.TextFilterLabel, self.TextFilterText, self.ActionLabel, self.ActionChoice, self.ActionGoButton]
+				self.TextFilterLabel, self.TextFilterText, self.ActionLabel, self.ActionChoice, self.ActionGoButton,
+				self.FinishedButton]
 			# make list of widgets that need to be bound to their handlers in ActivateWidgetsInPanel() and deleted on exit
 			self.WidgetsToActivate = [self.MainHeaderLabel,
-				self.TextFilterLabel, self.TextFilterText, self.ActionLabel, self.ActionChoice, self.ActionGoButton]
+				self.TextFilterLabel, self.TextFilterText, self.ActionLabel, self.ActionChoice, self.ActionGoButton,
+				self.FinishedButton]
 
 		def SetupAssocTextListSizer(): pass
 
@@ -155,6 +166,11 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 	def OnActionGoButton(self, Event): # handle user click on action Go button
 		pass
 
+	def OnFinishedButton(self, Event): # handle user click on Finished button
+		print('AT165 in Finished button handler')
+		self.StoreAttribsInProject()
+		self.ExitViewportAndRevert()
+
 	def PrepareFullDisplay(self, XMLTree):
 		# display associated text list in our display device
 		# first, unpack data from datacore
@@ -173,6 +189,32 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 
 	def UnpackDataFromDatacore(self, XMLTree):
 		print('AT172 in UnpackDataFromDatacore')
+		self.AssocTexts = [] # start with empty list of AT items
+		# find the starting tag
+		StartTag = XMLTree.find(info.PHAModelRedrawDataTag)
+		# confirm it came from this Viewport class
+		assert StartTag.get(info.PHAModelTypeTag) == self.InternalName
+		# find subelement containing the kind of associated text
+		ATKindEl = StartTag.find(info.AssociatedTextKindTag)
+		# confirm it indicates we received action items
+		assert ATKindEl.text == 'ActionItems'
+		# fetch tag for each action item in the project
+		for ThisATTag in StartTag.findall(info.AssociatedTextTag):
+			# make an associated text instance, and store it in the list
+			ThisAT = AssocTextItemInDisplay()
+			self.AssocTexts.append(ThisAT)
+			# fetch associated item numbering
+			ThisAT.Numbering = ThisATTag.text
+			# fetch AT content, responsibility, deadline and status
+			ThisAT.Content = ThisAT.findtext(info.ContentTag)
+			ThisAT.Responsibility = ThisAT.findtext(info.CoResponsibilityntentTag)
+			ThisAT.Deadline = ThisAT.findtext(info.DeadlineTag)
+			ThisAT.Status = ThisAT.findtext(info.StatusTag)
+			# fetch ID and display name for each PHA element using this AT, if any
+			for ThisElUsingTag in ThisATTag.findall(info.PHAElementTag):
+				ThisElUsing = PHAElementItem(ElementHumanName=ThisElUsingTag.text,
+					ElementID=ThisElUsingTag.get(info.IDTag))
+				ThisAT.PHAElements.append(ThisElUsing)
 
 	def ApplyFilters(self):
 		print('AT175 in ApplyFilters')
@@ -288,3 +330,15 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 	def RenderInDC(self, DC, **Args):
 		# currently no graphics to render in a DC. For future, may provide a zoom tool
 		pass
+
+	def StoreAttribsInProject(self):
+		# send request to datacore to store AT Viewport settings in project
+#		ThisViewport = self.ParentFrame.TopLevelFrame.CurrentViewport
+#		# gets string containing information about export required
+#		ShowWhat, PageNumberWhere, ShowTexts = self.MakeAttribStrings()
+		vizop_misc.SendRequest(Socket=self.C2DSocketREQ,
+			Command='RQ_PR_UpdateAssocTextFullViewAttribs',
+			Proj=self.Proj.ID, Viewport=self.ID,
+			AssocTextKind=self.AssocTextKind, FilterText=self.FilterText,
+			ATsSelected=','.join([AT.ID for AT in self.AssocTexts if AT.Selected]))
+		# next TODO: make handler for this command in datacore
