@@ -5168,10 +5168,10 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 	def __init__(self, PHAObjID, **Args): # FT object initiation. Args must include Proj and can include DisplDevice and ParentWindow
 		# self.PHAObj, Zoom, PanX, PanY, OffsetX, OffsetY defined in base class
 		# attrib PHAObjID is set in superclass
+		# attribs PHAObj and DatacoreHandler are set in DoNewViewport()
 		display_utilities.ViewportBaseClass.__init__(self, PHAObjID=PHAObjID, **Args)
 #		assert isinstance(PHAObj, core_classes.PHAModelBaseClass)
 		self.Proj = Args['Proj']
-#		self.PHAObj = PHAObj # instance of FTObjectInCore shown in this Viewport (set in datacore.DoNewViewport())
 		self.ID = None # assigned in display_utilities.CreateViewport()
 		self.HumanName = '' # default name is assigned in Proj.AssignDefaultNameToViewport()
 		self.DisplDevice = Args.get('DisplDevice', None)

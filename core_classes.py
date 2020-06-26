@@ -1251,12 +1251,10 @@ class PHAModelBaseClass(object, metaclass=PHAModelMetaClass):
 
 	def __init__(self, Proj, **Args):
 		object.__init__(self)
-#		self.ID = str(utilities.NextID(PHAModelBaseClass.AllPHAModelObjects)) # generate unique ID; stored as str
 		self.ID = Proj.GetNewID() # find next available ID
 		PHAModelBaseClass.AllPHAModelObjects.append(self) # add instance to register; must do after assigning self.ID
 		self.Proj = Proj
-		self.Viewports = [] # list of Viewport instances for this PHA model; instances of subclasses of ViewportBaseClass
-#		self.CurrentViewport = {} # keys: display devices; values: PHAObj shadows. Now handled through displaydevice.LatestViewport
+		self.Viewports = [] # list of Viewport shadow instances for this PHA model instance
 		self.EditAllowed = True
 		# capture any attribs provided in Args (risky, no checks performed)
 		self.__dict__.update(Args)

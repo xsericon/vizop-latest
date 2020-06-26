@@ -77,6 +77,8 @@ class ProjectItem(object): # class of PHA project instances
 		self.AllViewportShadows = [] # list of all Viewport shadows (belonging to datacore)
 		# should be ViewportShadow instances, but might be Viewport instances, i.e. ViewportBaseClass subclass instances FIXME
 		self.ViewportsWithoutPHAObjs = [] # datacore: any Viewport instances that don't belong to PHA objects (e.g. action item view)
+		self.ArchivedViewportShadows = [] # datacore: Viewport shadows created and subsequently deleted; retained to
+		# allow retrieval of persistent attribs. Need not be stored in project file.
 		self.IPLKinds = []
 		self.CauseKinds = []
 		self.RiskReceptors = [core_classes.RiskReceptorItem(XMLName='People', HumanName=_('People'))] # instances of RiskReceptorItem defined for this project

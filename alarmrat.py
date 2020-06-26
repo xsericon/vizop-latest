@@ -831,7 +831,7 @@ class AlarmList(display_utilities.ViewportBaseClass): # object containing all da
 	def __init__(self, **Args): # Alarm list initiation. Args must include Proj and can include DisplDevice and ParentWindow
 		display_utilities.ViewportBaseClass.__init__(self, **Args)
 		self.Proj = Args['Proj']
-		self.PHAObj = None # instance of ARObjectInCore shown in this Viewport
+		self.PHAObj = None # instance of ARObjectInCore shown in this Viewport; set in DoNewViewport()
 		self.ID = None # assigned in display_utilities.CreateViewport()
 		self.DisplDevice = Args.get('DisplDevice', None)
 #		self.Header = AlarmListHeader(MyAlarmList=self)

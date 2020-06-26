@@ -2484,7 +2484,7 @@ class ControlFrame(wx.Frame):
 		for ThisSocketObj in IncomingViewportSocketObjs:
 			# pass request to PHA model associated with the Viewport (we do this via datacore, not directly,
 			# so that local and remote Viewports are treated the same)
-			if ThisSocketObj.Viewport.PHAObj: # proceed only if Viewport has been assigned to a PHA object
+			if ThisSocketObj.Viewport.PHAObj: # proceed only if Viewport has been assigned to a PHA object%%%
 				# (will not have happened yet if Viewport is newly created)
 				ViewportMessageReceivedThisTime = vizop_misc.ListenToSocket(Proj=self.CurrentProj, Socket=ThisSocketObj.Socket,
 					Handler=ThisSocketObj.Viewport.PHAObj.HandleIncomingRequest)
@@ -2771,15 +2771,20 @@ class ControlFrame(wx.Frame):
 		# (also in redo?)
 		# In this instance, also need to delete the navigation history milestone that was added in DoNewViewportCommand()
 		assert isinstance(XMLRoot, ElementTree.Element)
-		# find the new PHA object from the ID returned from datacore
+		# find the new PHA object from the ID returned from datacore, or None if there's no associated PHA object
 		PHAObjIDTag = XMLRoot.find(info.IDTag)
-		PHAObj = utilities.ObjectWithID(core_classes.PHAModelBaseClass.AllPHAModelObjects,
+		print('CF2776 finding PHAObj by ID:', PHAObjIDTag, type(PHAObjIDTag))
+		PHAObj = None if PHAObjIDTag is None else utilities.ObjectWithID(core_classes.PHAModelBaseClass.AllPHAModelObjects,
 			utilities.TextAsString(PHAObjIDTag))
+		print('CF2779 finished finding PHAObj by ID')
 		# find the new Viewport from the ID returned from datacore (it's the text of the root tag) for checking
 		assert self.TrialViewport.ID == XMLRoot.text
-		# attach Viewport to PHA object, and label its sockets
+		# attach PHA object (if any) to Viewport
 		self.TrialViewport.PHAObj = PHAObj
-		self.TrialViewport.C2DSocketREQObj.PHAObj = self.TrialViewport.D2CSocketREPObj.PHAObj = PHAObj
+		# set Viewport's DatacoreHandler attrib, specifying where to find datacore handling routines.
+		# If Viewport doesn't have an associated PHAObj, Viewport will handle datacore requests directly.
+		self.TrialViewport.DatacoreHandler = PHAObj if PHAObj else self.TrialViewport
+		self.TrialViewport.C2DSocketREQObj.PHAObj = self.TrialViewport.D2CSocketREPObj.PHAObj = PHAObj # %%% TODO change to DatacoreHandler?
 		# set Viewport as the current Viewport and release any existing Viewport from display device
 		self.SwitchToViewport(TargetViewport=self.TrialViewport, XMLRoot=XMLRoot, debug=2550)
 		# send acknowledgment message back (ListenToSockets does the actual sending)
@@ -2807,8 +2812,11 @@ class ControlFrame(wx.Frame):
 		Proj = utilities.ObjectWithID(self.Projects, XMLRoot.find(info.ProjIDTag).text)
 		# set trial Viewport (created in PostProcessNewPHAModel_Redo) as the current Viewport
 		self.SwitchToViewport(TargetViewport=self.TrialViewport, XMLRoot=XMLRoot, debug=2575)
-		# attach Viewport to PHA object, and label its sockets
+		# attach PHA object (if any) to Viewport
 		self.CurrentViewport.PHAObj = PHAObj
+		# set Viewport's DatacoreHandler attrib, specifying where to find datacore handling routines.
+		# If Viewport doesn't have an associated PHAObj, Viewport will handle datacore requests directly.
+		self.CurrentViewport.DatacoreHandler = PHAObj if PHAObj else self.CurrentViewport
 		self.CurrentViewport.C2DSocketREQObj.PHAObj = self.CurrentViewport.D2CSocketREPObj.PHAObj = PHAObj
 		# set up the display in the PHA panel; now done in SwitchToViewport(), above
 #		self.ShowViewport(MessageAsXMLTree=XMLRoot)
@@ -3007,6 +3015,8 @@ class ControlFrame(wx.Frame):
 				 C2DSocketNumber=int(XMLRoot.find(info.C2DSocketNoTag).text), PHAObj=ExistingPHAObj)
 			# attach existing PHA object to the Viewport
 			NewViewport.PHAObj = ExistingPHAObj
+			# set DatacoreHandler, telling NewViewport where to find datacore request handlers. FIXME this might point to ViewportShadow!
+			NewViewport.DatacoreHandler = ExistingPHAObj if ExistingPHAObj else NewViewport
 			NewViewport.IsOnDisplay = True # set flag that ensures NewViewport will get redrawn
 			if ExistingPHAObj is None:
 				Proj.ViewportsWithoutPHAObjs.append(NewViewport) # add Viewport to list in the PHA object
@@ -3027,15 +3037,25 @@ class ControlFrame(wx.Frame):
 		return Reply
 
 	def DatacoreDestroyViewport(self, XMLRoot=None):
-		# find the Viewport to destroy
+		# find the Viewport shadow to destroy
 		DoomedViewportID = XMLRoot.find(info.DoomedViewportIDTag).text
 		ThisProj = utilities.ObjectWithID(self.Projects, XMLRoot.find(info.ProjIDTag).text)
-		HostPHAObj = utilities.ObjectWithID(ThisProj.PHAObjs, XMLRoot.find(info.PHAModelIDTag).text)
-		DoomedViewport = utilities.ObjectWithID(HostPHAObj.Viewports, DoomedViewportID)
+		# find out which PHA object contains the doomed Viewport (or it might be in ThisProj.ViewportsWithoutPHAObjs)
+		ViewportListsToCheck = [p.Viewports for p in ThisProj.PHAObjs] + [ThisProj.ViewportsWithoutPHAObjs]
+		print('CF3043 ViewportListsToCheck:', ViewportListsToCheck)
+		# find which Viewport list contains the Viewport with ID = DoomedViewportID
+		HostViewportList = ViewportListsToCheck[[DoomedViewportID in [v.ID for v in ThisList] for ThisList in ViewportListsToCheck].index(True)]
+#		HostPHAObj = utilities.ObjectWithID(ThisProj.PHAObjs, XMLRoot.find(info.PHAModelIDTag).text)
+		print('CF3044 removing viewport from HostViewportList: ', HostViewportList)
+		DoomedViewport = utilities.ObjectWithID(HostViewportList, DoomedViewportID)
+		print('CF3045 viewport to remove: ', DoomedViewport)
 		# remove the Viewport from its PHA object
-		HostPHAObj.Viewports.remove(DoomedViewport)
-		# remove the Viewport from the project's master list
+		HostViewportList.remove(DoomedViewport)
+		# remove the Viewport from the project's master list, and store it in the Archived list in case it is re-created
 		ThisProj.AllViewportShadows.remove(DoomedViewport)
+		EjectedViewportShadow, ArchiveIndex = display_utilities.ArchiveDestroyedViewport(Proj=ThisProj,
+			ViewportShadow=DoomedViewport)
+			# TODO use args returned from ArchiveDestroyedViewport in undo record
 		Reply = vizop_misc.MakeXMLMessage(RootName='RP_DestroyViewport', RootText=DoomedViewportID, Elements={})
 		return Reply
 

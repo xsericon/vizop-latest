@@ -206,10 +206,10 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 			# fetch associated item numbering
 			ThisAT.Numbering = ThisATTag.text
 			# fetch AT content, responsibility, deadline and status
-			ThisAT.Content = ThisAT.findtext(info.ContentTag)
-			ThisAT.Responsibility = ThisAT.findtext(info.CoResponsibilityntentTag)
-			ThisAT.Deadline = ThisAT.findtext(info.DeadlineTag)
-			ThisAT.Status = ThisAT.findtext(info.StatusTag)
+			ThisAT.Content = ThisATTag.findtext(info.ContentTag)
+			ThisAT.Responsibility = ThisATTag.findtext(info.CoResponsibilityntentTag)
+			ThisAT.Deadline = ThisATTag.findtext(info.DeadlineTag)
+			ThisAT.Status = ThisATTag.findtext(info.StatusTag)
 			# fetch ID and display name for each PHA element using this AT, if any
 			for ThisElUsingTag in ThisATTag.findall(info.PHAElementTag):
 				ThisElUsing = PHAElementItem(ElementHumanName=ThisElUsingTag.text,
@@ -332,13 +332,71 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 		pass
 
 	def StoreAttribsInProject(self):
-		# send request to datacore to store AT Viewport settings in project
-#		ThisViewport = self.ParentFrame.TopLevelFrame.CurrentViewport
-#		# gets string containing information about export required
-#		ShowWhat, PageNumberWhere, ShowTexts = self.MakeAttribStrings()
+		# send request to datacore to store AT Viewport settings in project's Viewport shadow, for persistence
+		AttribsToSend = {info.ProjIDTag: self.Proj.ID, info.ViewportTag: self.ID,
+			info.AssociatedTextKindTag: self.AssocTextKind,
+			info.FilterTextTag: self.FilterText,
+			info.ItemsSelectedTag: ','.join([AT.ID for AT in self.AssocTexts if AT.Selected])}
 		vizop_misc.SendRequest(Socket=self.C2DSocketREQ,
-			Command='RQ_PR_UpdateAssocTextFullViewAttribs',
-			Proj=self.Proj.ID, Viewport=self.ID,
-			AssocTextKind=self.AssocTextKind, FilterText=self.FilterText,
-			ATsSelected=','.join([AT.ID for AT in self.AssocTexts if AT.Selected]))
-		# next TODO: make handler for this command in datacore
+			Command='RQ_PR_UpdateAssocTextFullViewAttribs', **AttribsToSend)
+
+	def ExitViewportAndRevert(self):
+		# exit from Viewport; destroy the Viewport; and request the hosting display device to revert
+		# to the previous Viewport
+		# first, remove all widgets from the sizer and active text widget list
+		self.Deactivate(Widgets=self.WidgetsToActivate)
+		self.HeaderSizer.Clear()
+		# destroy the widgets
+		for ThisWidget in self.WidgetsToActivate:
+			ThisWidget.Widget.Destroy()
+		# destroy this Viewport and switch to the previous Viewport (for now, just go to the first PHA model in the project)
+		# TODO build mechanism to identify the last touched PHA model and Viewport.
+		self.DisplDevice.TopLevelFrame.SwitchToPHAObj(Proj=self.Proj, TargetPHAObjID=self.Proj.PHAObjShadows[0].ID,
+			TargetViewport=(self.Proj.ActiveViewports + [None])[0], ViewportToDestroy=self)
+
+	def Deactivate(self, Widgets=[], **Args): # deactivate widgets for this Viewport
+		self.DisplDevice.TopLevelFrame.DeactivateWidgetsInPanel(Widgets=Widgets, **Args)
+		# remove widgets from text widgets list, so that they're no longer checked in OnIdle
+		self.DisplDevice.TextWidgActive = []
+
+	@classmethod
+	def HandleIncomingRequest(cls, MessageReceived=None, MessageAsXMLTree=None, **Args):
+		# handle request received by this Viewport in datacore
+		# Incoming message can be supplied as either an XML string or XML tree root element
+		# MessageReceived (str or None): XML message containing request info
+		# MessageAsXMLTree (XML element or None): root of XML tree
+		# return Reply (Root object of XML tree)
+		print('AT352 in HandleIncoming Request')
+		assert isinstance(MessageReceived, bytes) or (MessageReceived is None)
+		assert isinstance(Args, dict)
+		# First, convert MessageReceived to an XML tree for parsing
+		if MessageReceived is None:
+			assert isinstance(MessageAsXMLTree, ElementTree.Element)
+			XMLRoot = MessageAsXMLTree
+		else: XMLRoot = ElementTree.fromstring(MessageReceived)
+		Proj = Args['Proj'] # get ProjectItem object to which the current FT belongs
+		# get the command - it's the tag of the root element
+		Command = XMLRoot.tag
+		# extract display-related parms to store in undo records
+		Zoom = XMLRoot.findtext(info.ZoomTag)
+		# prepare default reply if command unknown
+		Reply = vizop_misc.MakeXMLMessage(RootName='Fail', RootText='CommandNotRecognised')
+		if Command == 'RQ_PR_UpdateAssocTextFullViewAttribs': # store parms for associated text display
+			Reply = cls.UpdateAssocTextFullViewAttribs(Proj=Proj, XMLRoot=XMLRoot)
+		if Reply.tag == 'Fail': print('AT367 command not recognised: ', Command)
+		return Reply
+
+	@classmethod
+	def UpdateAssocTextFullViewAttribs(cls, Proj, XMLRoot):
+		# a datacore function. Store attribs about this Viewport in datacore for persistence.
+		# The attribs are stored in the Viewport shadow. They don't need to be saved in the project file, but need to
+		# be used to restore the same settings when this Viewport is destroyed and re-created.
+		print('AT375 storing attribs in datacore')
+		# First, find the Viewport shadow
+		ViewportShadow = utilities.ObjectWithID(Proj.AllViewportShadows, TargetID=XMLRoot.findtext(info.ViewportTag))
+		ViewportShadow.AssocTextKind = XMLRoot.findtext(info.AssociatedTextKindTag)
+		ViewportShadow.FilterText = XMLRoot.findtext(info.FilterTextTag)
+		ViewportShadow.ItemsSelectedCommaList = XMLRoot.findtext(info.ItemsSelectedTag) # string of AT ID's separated by commas
+		return vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
+
+# for display of assoc text list, consider class SIFListGridTable

@@ -94,6 +94,23 @@ def ViewportClassWithName(TargetName):
 		return ViewportMetaClass.ViewportClasses[InternalNameList.index(TargetName)]
 	else: return None
 
+def ArchiveDestroyedViewport(Proj, ViewportShadow):
+	# store a deleted Viewport shadow in Proj's list, to enable retrieval of persistent attributes if the Viewport is
+	# re-created
+	# If another Viewport of the same class is already in the archive list, replace the old one in the list with the new one
+	# return: EjectedViewportShadow (the old version removed from the list, or None), TargetIndex (int: index where
+	# ViewportShadow is placed in the list); for undo
+	ExistingViewportClasses = [v.MyClass for v in Proj.ArchivedViewportShadows]
+	if ViewportShadow.MyClass in ExistingViewportClasses: # replace existing archived Viewport shadow
+		TargetIndex = ExistingViewportClasses.index(ViewportShadow.MyClass)
+		EjectedViewportShadow = Proj.ArchivedViewportShadows[TargetIndex] # keep the old one for undo
+		Proj.ArchivedViewportShadows[TargetIndex] = ViewportShadow # overwrite old one with new one
+	else:
+		Proj.ArchivedViewportShadows.append(ViewportShadow)
+		EjectedViewportShadow = None
+		TargetIndex = len(Proj.ArchivedViewportShadows) - 1 # index of archived ViewportShadow in list
+	return EjectedViewportShadow, TargetIndex
+
 class GUIWidget(object): # superclass of all widgets that can be shown in iWindow modes
 	# when instances are created, the widgets are created, but not assigned to sizer, and no event binding is done
 	# this might be a 'parallel system' with class UIWidget in module controlframe. Consider merging.

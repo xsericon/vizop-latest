@@ -253,6 +253,8 @@ CategoriesTag = 'Categories'
 CategoryTag = 'Category'
 ConstValueTag = 'ConstValue'
 KindTag = 'Kind'
+FilterTextTag = 'FilterText'
+ItemsSelectedTag = 'ItemsSelected'
 
 FTImagePrefix = 'FT_' # filenames containing all images used in FT must begin with this
 ProjInfoImagePrefix = 'ProjInfo_'
