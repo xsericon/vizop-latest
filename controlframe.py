@@ -2273,7 +2273,6 @@ class ControlFrame(wx.Frame):
 		self.FTFullReportmitem.HostMenu = FileMenu
 		self.FTFullReportmitem.InternalName = 'FTFullExport'
 
-		print('CF2263 adding action items to File menu')
 		self.ActionItemsmitem = FileMenu.Append(-1, _('Action items'), '')
 		self.Bind(wx.EVT_MENU, self.OnShowActionItemsRequest, self.ActionItemsmitem)
 		self.ActionItemsmitem.HostMenu = FileMenu
@@ -2879,7 +2878,6 @@ class ControlFrame(wx.Frame):
 		ThisComponent = None
 		if XMLRoot is not None:
 			# find the expected XML tag of the Viewport, e.g. "FTTreeView"; now changed to info.FTTag
-			print('CF2868 SwitchToViewport: XMLRoot: ', ElementTree.tostring(XMLRoot))
 			# find the redraw data start tag in XMLRoot
 			ViewportTag = XMLRoot.find(info.PHAModelRedrawDataTag)
 			# find DisplayAttribs tag inside ViewportTag
@@ -3033,7 +3031,6 @@ class ControlFrame(wx.Frame):
 			Reply = vizop_misc.MakeXMLMessage(RootName='RP_NewViewport', RootText="Null",
 				Elements={'CantComply': 'EditingBlocked'})
 		# send the info back to control frame as a reply message (via ListenToSocket)
-		print('CF3019 ending DatacoreDoNewViewport')
 		return Reply
 
 	def DatacoreDestroyViewport(self, XMLRoot=None):
@@ -3239,8 +3236,6 @@ class ControlFrame(wx.Frame):
 
 	def OnShowActionItemsRequest(self, Event): # handle menu request to show all action items in the project
 		# make a AssocTextList Viewport. DoNewViewportCommand() provides the new Viewport as self.TrialViewport
-		print('CF3191 requesting action items viewport')
-		print('CF3200 registered viewports: ', [v.HumanName for v in display_utilities.ViewportMetaClass.ViewportClasses])
 		self.DoNewViewportCommand(Proj=self.CurrentProj, ViewportClass=assoc_text_view.AssocTextListViewport,
 			Chain=True, PHAModel=None, ViewportArgs={'ViewportToRevertTo': self.CurrentViewport,
 			'OriginatingViewport': self.CurrentViewport, 'AssocTextKind': 'ActionItems'})

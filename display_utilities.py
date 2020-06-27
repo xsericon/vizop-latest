@@ -683,7 +683,7 @@ def StringFromNum(InputNumber, RR):
 	else: # return 'cannot get value' indicator
 		return info.CantDisplayValueOnScreen
 
-class SIFListGridTable(wx.grid.PyGridTableBase): # object containing data table for SIF list display
+class BaseGridTable(wx.grid.PyGridTableBase): # object containing underlying data table for a grid display of data
 
 	def __init__(self, Log, ColumnInternalNames=[]):
 		# ColumnInternalNames: list of str, internal names (not display names) of grid table columns
@@ -710,8 +710,8 @@ class SIFListGridTable(wx.grid.PyGridTableBase): # object containing data table 
 	def GetValue(self, Row, Col): # required method for this class
 		assert isinstance(Row, int)
 		assert isinstance(Col, int)
-		if not (0 <= Row < self.GetNumberRows()): print("MG388 row: ", Row, type(Row)) # debugging
-		assert 0 <= Row < self.GetNumberRows() + 1 # +1 needed in case user drags a SIF to the bottom of the table
+		if not (0 <= Row < self.GetNumberRows()): print("DU388 row: ", Row, type(Row)) # debugging
+		assert 0 <= Row < self.GetNumberRows() + 1 # +1 needed in case user drags a row to the bottom of the table
 		assert 0 <= Col < self.GetNumberCols()
 		return self.data[Row][self.identifiers[Col]]
 
@@ -764,7 +764,7 @@ class DraggableGrid(wx.grid.Grid): # wx.grid object whose rows can be reordered 
 		assert isinstance(Viewport, ViewportBaseClass)
 		wx.grid.Grid.__init__(self, Parent, -1)
 		self.Viewport = Viewport
-		self.DataTable = SIFListGridTable(Log, ColumnInternalNames=ColumnInternalNames) # create a data table object
+		self.DataTable = BaseGridTable(Log, ColumnInternalNames=ColumnInternalNames) # create a data table object
 		self.SetTable(self.DataTable, True, selmode=wx.grid.Grid.SelectRows) # can select rows, but not individual cells
 		# enable columns to be dragged to reorder (not currently used)
 		# wx.lib.gridmovers.GridColMover(self)
@@ -772,16 +772,15 @@ class DraggableGrid(wx.grid.Grid): # wx.grid object whose rows can be reordered 
 		# enable rows to be dragged to reorder
 		wx.lib.gridmovers.GridRowMover(self)
 		self.Bind(wx.lib.gridmovers.EVT_GRID_ROW_MOVE, self.OnRowMove, self)
-		self.DisableCellEditControl() # disallow editing of cells
+		self.DisableCellEditControl() # disallow direct editing of cells
 		# send events to parent window (e.g. data panel) for processing, if parent has a handler
-		# (the hasattr() check is in case we use a grid in any other window in future, and don't implement handler)
 		print("DU624 looking for grid click handlers")
 		if hasattr(self.Viewport, 'OnGridMouseDoubleLClick'):
 			self.Bind(wx.grid.EVT_GRID_CELL_LEFT_DCLICK, self.Viewport.OnGridMouseDoubleLClick)
 		if hasattr(self.Viewport, 'OnGridRangeSelect'):
 			self.Bind(wx.grid.EVT_GRID_RANGE_SELECT, self.Viewport.OnGridRangeSelect)
 
-	def OnColMove(self, Event): # handle dragging of table column
+	def OnColMove(self, Event): # handle dragging of table column (not currently used?)
 		self.GetTable().MoveColumn(Event.GetMoveColumn(), Event.GetBeforeColumn())
 
 	def OnRowMove(self, Event): # handle dragging of table row

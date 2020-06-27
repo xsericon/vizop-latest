@@ -51,6 +51,10 @@ class AssocTextItemInDisplay(object):
 		self.Selected = False # bool; whether this item is currently selected by the user
 		self.PHAElements = [] # list of PHAElementItem instances; all elements in which this AT appears
 
+	def GetWhereUsedHumanText(self):
+		# get human-readable text showing PHA elements where this AT is used
+		return '\n'.join([_('%s %s in %s' % (p.ElementHumanName, p.ElementNumber, p.HostHumanName)) ])
+
 class AssocTextListViewport(display_utilities.ViewportBaseClass):
 	# defines a viewport that lists associated texts for the whole project
 	IsBaseClass = False
@@ -91,6 +95,9 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 		self.FilterApplied = False # whether filter is currently applied to AT display
 		self.FilterText = '' # filter text currently applied to AT display; might not be the same as contents of TextCtrl
 		self.InitializeActionChoices()
+		# make list of internal names of columns to show in AT grid list. Eventually, this should be persistent
+		self.ATListColInternalNames = ['Selected', 'Number', 'Content', 'Responsibility', 'Deadline', 'Status',
+			'WhereUsed']
 
 	def InitializeActionChoices(self):
 		self.PromptOption = core_classes.ChoiceItem(XMLName='Prompt', HumanName=_('Select an action...'), Applicable=True)
@@ -146,7 +153,12 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 				self.TextFilterLabel, self.TextFilterText, self.ActionLabel, self.ActionChoice, self.ActionGoButton,
 				self.FinishedButton]
 
-		def SetupAssocTextListSizer(): pass
+		def SetupAssocTextListSizer(HostPanel):
+			# set up associated text list grid widget
+			self.ATListGrid = UIWidgetItem(display_utilities.DraggableGrid(HostPanel), NewRow=True, ColLoc=0, ColSpan=6,
+				LeftMargin=10,
+				GapY=20, Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_LEFT)
+			self.WidgetsToActivate = [self.ATListGrid]
 
 		# start of SetupViewport()
 		self.MainSizer = wx.BoxSizer(orient=wx.VERTICAL)
@@ -155,7 +167,7 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 		self.MainSizer.Add(self.HeaderSizer)
 		self.MainSizer.Add(self.AssocTextListSizer)
 		SetupHeaderSizer(HostPanel=HostPanel)
-		SetupAssocTextListSizer()
+		SetupAssocTextListSizer(HostPanel=HostPanel)
 
 	def OnFilterText(self, Event): # handle Enter key press in text filter TextCtrl
 		pass
@@ -188,7 +200,6 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 		self.DisplDevice.SetSizer(self.MainSizer)
 
 	def UnpackDataFromDatacore(self, XMLTree):
-		print('AT172 in UnpackDataFromDatacore')
 		self.AssocTexts = [] # start with empty list of AT items
 		# find the starting tag
 		StartTag = XMLTree.find(info.PHAModelRedrawDataTag)
@@ -207,7 +218,7 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 			ThisAT.Numbering = ThisATTag.text
 			# fetch AT content, responsibility, deadline and status
 			ThisAT.Content = ThisATTag.findtext(info.ContentTag)
-			ThisAT.Responsibility = ThisATTag.findtext(info.CoResponsibilityntentTag)
+			ThisAT.Responsibility = ThisATTag.findtext(info.ResponsibilityTag)
 			ThisAT.Deadline = ThisATTag.findtext(info.DeadlineTag)
 			ThisAT.Status = ThisATTag.findtext(info.StatusTag)
 			# fetch ID and display name for each PHA element using this AT, if any
@@ -229,6 +240,8 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 		self.UpdateActionChoices()
 		# enable action Go button if any actions are available, apart from the prompt
 		self.ActionGoButton.Widget.Enable(len(self.ActionChoices) > 1)
+		# populate action items list
+		self.PopulateATList()
 
 	def SetWidgetVisibility(self, **Args):
 		# set IsVisible attribs for all widgets
@@ -260,6 +273,87 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 		# set the current option as the prompt
 		self.ActionChoice.Widget.SetSelection(self.ActionChoices.index(self.PromptOption))
 
+	def PopulateATList(self, CurrentAT=None):
+		# populate AT list grid with AT items to be displayed, and select appropriate items
+		# CurrentAT (AssocTextItem instance or None): the AT the user is currently working with. AT list will be
+		#	scrolled to ensure it's visible
+		GridWidget = self.ATListGrid.Widget # get the wx grid widget
+		# first, empty the data table and remove existing data from the grid
+		GridWidget.ClearSelection() # this must come before ClearGrid()
+		OldNumberOfRows = GridWidget.DataTable.GetNumberRows()
+		GridWidget.DataTable.data = []
+		GridWidget.DataTable.rowLabels = []
+		GridWidget.DataTable.colLabels = []
+		GridWidget.ClearGrid()
+		# populate column labels. First, make hash table of column internal names to human names
+		ColLabelHumanNameHash = {'Selected': _('Select'), 'Number': _('Action item number'), 'Content': _('Content'),
+			'Responsibility': _('Responsibility'), 'Deadline': _('Deadline'), 'Status': _('Status'),
+			'WhereUsed': _('Where used')}
+		ColHorizAlignments = {'Selected': wx.ALIGN_CENTRE, 'Number': wx.ALIGN_RIGHT, 'Content': wx.ALIGN_LEFT,
+			'Responsibility': wx.ALIGN_LEFT, 'Deadline': wx.ALIGN_LEFT, 'Status': wx.ALIGN_CENTRE,
+			'WhereUsed': wx.ALIGN_LEFT}
+		GridWidget.DataTable.colLabels = [ColLabelHumanNameHash[ThisColName]
+			for ThisColName in self.ATListColInternalNames]
+		# set cell alignments per column
+		for ThisColIndex, ThisColLabel in enumerate(GridWidget.DataTable.identifiers):
+			AttrObj = wx.grid.GridCellAttr()
+			AttrObj.SetAlignment(hAlign=ColHorizAlignments[ThisColLabel], vAlign=wx.ALIGN_TOP)
+			GridWidget.SetColAttr(ThisColIndex, AttrObj)
+			# populate rows%%%
+			RowIndex = -1
+			CurrentATRowIndex = None
+			for ATIndex, ThisAT in enumerate(self.AssocTexts):
+				if ThisAT.FilteredIn: # show this AT only if it meets filter criteria
+					RowIndex += 1 # keep counter of rows populated in grid
+					if ThisAT == CurrentAT: CurrentATRowIndex = RowIndex # store row of current AT, so we can scroll to it
+					GridWidget.DataTable.rowLabels.append(ATIndex + 1) # populate row serial number, irrespective of filter
+					# populate fields
+					ThisRow = {'Selected': ThisAT.Selected, 'Number': ThisAT.Numbering, 'Content': ThisAT.Content,
+						'Responsibility': ThisAT.Responsibility, 'Deadline': ThisAT.Deadline, 'Status': ThisAT.Status,
+						'WhereUsed': ThisAT.GetWhereUsedHumanText()}
+					# put data into table
+					GridWidget.DataTable.data.append(ThisRow)
+					# select row if appropriate
+					if ThisAT.Selected: GridWidget.SelectRow(RowIndex, addToSelected=True)
+		# update the grid object: tell it to add or delete rows according to whether there are more or less than last time
+		NewNumberOfRows = RowIndex + 1
+		GridWidget.BeginBatch()
+		if NewNumberOfRows > OldNumberOfRows:
+			GridWidget.ProcessTableMessage(wx.grid.GridTableMessage(GridWidget.DataTable,
+				wx.grid.GRIDTABLE_NOTIFY_ROWS_APPENDED, NewNumberOfRows - OldNumberOfRows))
+		elif NewNumberOfRows < OldNumberOfRows:
+			GridWidget.ProcessTableMessage(wx.grid.GridTableMessage(GridWidget.DataTable,
+				wx.grid.GRIDTABLE_NOTIFY_ROWS_DELETED, OldNumberOfRows - NewNumberOfRows,
+				OldNumberOfRows - NewNumberOfRows))
+		GridWidget.EndBatch()
+
+		# set grid size
+		PanelSizeX, PanelSizeY = self.DisplDevice.GetSize()
+		VertScrollbarXAllowanceInPx = 10  # x-size to allow for scrollbar
+		# define amount of width to allocate to each column. Row label column gets 1.0 by definition
+		ColRelativeWidths = {'Selected': 1.0, 'Number': 3.0, 'Content': 10.0,
+						'Responsibility': 5.0, 'Deadline': 4.0, 'Status': 2.0,
+						'WhereUsed': 5.0}
+		# allow X space for margins and panel's scrollbar
+		TargetGridSizeX = PanelSizeX - (GridWidgObj.LeftMargin * 2) - VertScrollbarXAllowanceInPx
+		TotalRelativeWidth = 1.0 + sum(ColRelativeWidths.values())
+		GridWidget.SetColMinimalAcceptableWidth(20) # minimum width to which user can resize columns
+		for ThisColName in ColRelativeWidths.keys():
+			GridWidget.SetColSize(GridWidget.DataTable.identifiers.index(ThisColName),
+				TargetGridSizeX * ColRelativeWidths[ThisColName] / TotalRelativeWidth)
+		GridWidget.SetRowLabelSize(TargetGridSizeX / TotalRelativeWidth) # row label column
+
+		# check if we need scrollbars for the grid, and set them up
+		# TODO it would be nice if we could use the VISIBLE (not total) size for the panel
+		GridSize = GridWidget.GetEffectiveMinSize()
+		GridWidthInPx, GridHeightInPx = GridSize.width, GridSize.height
+		if GridHeightInPx > PanelSizeY - 50: # -50 is to allow for widgets above the grid
+			# we need vertical scrollbar: set it up
+			GridWidget.SetScrollbars(20, 20, int(GridWidthInPx / 20), int(GridHeightInPx / 20), 0, 0)
+			# scroll grid to ensure current AT is visible, if filtered-in
+			if CurrentATRowIndex is not None:
+				GridWidget.GoToCell(row=CurrentATRowIndex, col=0)
+
 	@classmethod
 	def GetFullRedrawData(cls, Viewport=None, ViewportClass=None, **Args):
 		# a datacore method. Provide data for redraw of this Viewport
@@ -275,7 +369,6 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 			return ATTable
 
 		# start of GetFullRedrawData()
-		print('AT213 in GetFullRedrawData')
 		Proj = Args['Proj']
 		# get a lookup table of all action items in the project
 		ATTable = MakeAssocTextLookupTable(Proj=Proj)
@@ -350,9 +443,9 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 		for ThisWidget in self.WidgetsToActivate:
 			ThisWidget.Widget.Destroy()
 		# destroy this Viewport and switch to the previous Viewport (for now, just go to the first PHA model in the project)
-		# TODO build mechanism to identify the last touched PHA model and Viewport.
+		# TODO build mechanism to identify the last touched PHA model
 		self.DisplDevice.TopLevelFrame.SwitchToPHAObj(Proj=self.Proj, TargetPHAObjID=self.Proj.PHAObjShadows[0].ID,
-			TargetViewport=(self.Proj.ActiveViewports + [None])[0], ViewportToDestroy=self)
+			TargetViewport=None, ViewportToDestroy=self)
 
 	def Deactivate(self, Widgets=[], **Args): # deactivate widgets for this Viewport
 		self.DisplDevice.TopLevelFrame.DeactivateWidgetsInPanel(Widgets=Widgets, **Args)
@@ -366,7 +459,6 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 		# MessageReceived (str or None): XML message containing request info
 		# MessageAsXMLTree (XML element or None): root of XML tree
 		# return Reply (Root object of XML tree)
-		print('AT352 in HandleIncoming Request')
 		assert isinstance(MessageReceived, bytes) or (MessageReceived is None)
 		assert isinstance(Args, dict)
 		# First, convert MessageReceived to an XML tree for parsing
@@ -398,5 +490,9 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 		ViewportShadow.FilterText = XMLRoot.findtext(info.FilterTextTag)
 		ViewportShadow.ItemsSelectedCommaList = XMLRoot.findtext(info.ItemsSelectedTag) # string of AT ID's separated by commas
 		return vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
+
+	def ReleaseDisplayDevice(self, DisplDevice, **Args):
+		# wrap-up actions needed when display device is no longer showing associated texts list
+		self.DisplDevice = None
 
 # for display of assoc text list, consider class SIFListGridTable
