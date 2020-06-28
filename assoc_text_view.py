@@ -53,7 +53,8 @@ class AssocTextItemInDisplay(object):
 
 	def GetWhereUsedHumanText(self):
 		# get human-readable text showing PHA elements where this AT is used
-		return '\n'.join([_('%s %s in %s' % (p.ElementHumanName, p.ElementNumber, p.HostHumanName)) ])
+		return '\n'.join([_('%s %s in %s' % (p.ElementHumanName, p.ElementNumber, p.HostHumanName))
+			for p in self.PHAElements ])
 
 class AssocTextListViewport(display_utilities.ViewportBaseClass):
 	# defines a viewport that lists associated texts for the whole project
@@ -86,6 +87,8 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 		# get connection to originating Viewport
 		self.OriginatingViewport = Args['OriginatingViewport']
 		# do initial setup of display
+		self.ATListColInternalNames = ['Selected', 'Number', 'Content', 'Responsibility', 'Deadline', 'Status',
+			'WhereUsed']
 		self.SetupViewport(HostPanel=DisplDevice, Fonts=Fonts,
 			SystemFontNames=SystemFontNames, DateChoices=Args['DateChoices'])
 		# initialize attributes
@@ -96,8 +99,6 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 		self.FilterText = '' # filter text currently applied to AT display; might not be the same as contents of TextCtrl
 		self.InitializeActionChoices()
 		# make list of internal names of columns to show in AT grid list. Eventually, this should be persistent
-		self.ATListColInternalNames = ['Selected', 'Number', 'Content', 'Responsibility', 'Deadline', 'Status',
-			'WhereUsed']
 
 	def InitializeActionChoices(self):
 		self.PromptOption = core_classes.ChoiceItem(XMLName='Prompt', HumanName=_('Select an action...'), Applicable=True)
@@ -122,52 +123,65 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 		def SetupHeaderSizer(HostPanel):
 			# set up widgets for header. MainHeaderLabel is set in self.Prefill()
 			# HostPanel: a wx.Panel instance. Widgets will be set to have HostPanel as parent.
-			self.MainHeaderLabel = UIWidgetItem(wx.StaticText(HostPanel, -1, ''),
-				Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_LEFT | wx.EXPAND, GapX=20, GapY=10,
+			# Attrib 'Sizer' in each widget indicates which sizer it should be added to
+			# return WidgetsToActivate for this sizer
+			self.MainHeaderLabel = UIWidgetItem(wx.StaticText(HostPanel, -1, ''), Sizer=self.HeaderSizer,
+				Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_LEFT | wx.EXPAND, GapX=self.OverallLeftMargin, GapY=10,
 				ColLoc=1, ColSpan=10, Font=Fonts['BigHeadingFont'], NewRow=True)
 			self.TextFilterLabel = UIWidgetItem(wx.StaticText(HostPanel, -1, _('Filter on text:')),
-				Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_LEFT | wx.EXPAND,
-#				ColLoc=1, ColSpan=1, NewRow=True)
+				Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_LEFT | wx.EXPAND, Sizer=self.HeaderSizer,
 				ColLoc=1, ColSpan=1)
 			self.TextFilterText = UIWidgetItem(wx.TextCtrl(HostPanel, -1, style=wx.TE_PROCESS_ENTER),
-				MinSizeY=25, Events=[wx.EVT_TEXT_ENTER], Handler=self.OnFilterText, GapX=10,
+				MinSizeY=25, Events=[wx.EVT_TEXT_ENTER], Handler=self.OnFilterText, GapX=10, Sizer=self.HeaderSizer,
 				Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_LEFT | wx.EXPAND,
 				MinSizeX=200, ColLoc=3, ColSpan=1, DisplayMethod='StaticFromText')
-			self.ActionLabel = UIWidgetItem(wx.StaticText(HostPanel, -1, _('Select action:')),
+			self.ActionLabel = UIWidgetItem(wx.StaticText(HostPanel, -1, _('Select action:')), Sizer=self.HeaderSizer,
 				Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_LEFT | wx.EXPAND, GapX=20,
 				ColLoc=5, ColSpan=1)
 			self.ActionChoice = UIWidgetItem(wx.Choice(HostPanel, -1, size=(180, 25),
-				choices=[]), GapX=10,
+				choices=[]), GapX=10, Sizer=self.HeaderSizer,
 				Handler=self.OnActionChoice, Events=[wx.EVT_CHOICE], ColLoc=7, ColSpan=1)
-			self.ActionGoButton = UIWidgetItem(wx.Button(HostPanel, -1, _('Go')),
+			self.ActionGoButton = UIWidgetItem(wx.Button(HostPanel, -1, _('Go')), Sizer=self.HeaderSizer,
 				Handler=self.OnActionGoButton, Events=[wx.EVT_BUTTON],
 				ColLoc=8, ColSpan=1, Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_LEFT | wx.EXPAND)
-			self.FinishedButton = UIWidgetItem(wx.Button(HostPanel, -1, _('Finished')), GapX=20,
-				Handler=self.OnFinishedButton, Events=[wx.EVT_BUTTON],
+			self.FinishedButton = UIWidgetItem(wx.Button(HostPanel, -1, _('Finished')), GapX=20, Sizer=self.HeaderSizer,
+				Handler=self.OnFinishedButton, Events=[wx.EVT_BUTTON], GapY=40,
 				ColLoc=10, ColSpan=1, Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_LEFT | wx.EXPAND)
-			self.FixedWidgets = [self.MainHeaderLabel,
+			self.ATListGrid = UIWidgetItem(display_utilities.DraggableGrid(Parent=HostPanel, Viewport=self,
+				ColumnInternalNames=self.ATListColInternalNames),
+				NewRow=True, ColLoc=1, ColSpan=11,
+				Sizer=self.HeaderSizer,
+				Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_LEFT)
+			self.HeaderFixedWidgets = [self.MainHeaderLabel,
 				self.TextFilterLabel, self.TextFilterText, self.ActionLabel, self.ActionChoice, self.ActionGoButton,
-				self.FinishedButton]
-			# make list of widgets that need to be bound to their handlers in ActivateWidgetsInPanel() and deleted on exit
-			self.WidgetsToActivate = [self.MainHeaderLabel,
+				self.FinishedButton, self.ATListGrid]
+			# return list of widgets that need to be bound to their handlers in ActivateWidgetsInPanel() and deleted on exit
+			return [self.MainHeaderLabel,
 				self.TextFilterLabel, self.TextFilterText, self.ActionLabel, self.ActionChoice, self.ActionGoButton,
-				self.FinishedButton]
+				self.FinishedButton, self.ATListGrid]
 
 		def SetupAssocTextListSizer(HostPanel):
 			# set up associated text list grid widget
-			self.ATListGrid = UIWidgetItem(display_utilities.DraggableGrid(HostPanel), NewRow=True, ColLoc=0, ColSpan=6,
-				LeftMargin=10,
-				GapY=20, Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_LEFT)
-			self.WidgetsToActivate = [self.ATListGrid]
+			# return WidgetsToActivate for this sizer
+			self.TestLabel = UIWidgetItem(wx.StaticText(HostPanel, -1, 'Test'), Sizer=self.HeaderSizer,
+				Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_LEFT | wx.EXPAND, GapX=20, GapY=10,
+				ColLoc=1, ColSpan=10, Font=Fonts['BigHeadingFont'], NewRow=True)
+#			self.ATListFixedWidgets = [self.ATListGrid]
+#			self.ATListFixedWidgets = [self.ATListGrid, self.TestLabel]
+			self.ATListFixedWidgets = []
+			self.HeaderFixedWidgets.extend([self.TestLabel])
+			# return list to include in self.WidgetsToActivate
+#			return [self.ATListGrid]
+			return [self.TestLabel]
 
 		# start of SetupViewport()
 		self.MainSizer = wx.BoxSizer(orient=wx.VERTICAL)
 		self.HeaderSizer = wx.GridBagSizer(vgap=0, hgap=0) # for header widgets
+		self.OverallLeftMargin = 20 # gap on left edge inside panel
 		self.AssocTextListSizer = wx.GridBagSizer(vgap=0, hgap=0) # for associated text list
 		self.MainSizer.Add(self.HeaderSizer)
 		self.MainSizer.Add(self.AssocTextListSizer)
-		SetupHeaderSizer(HostPanel=HostPanel)
-		SetupAssocTextListSizer(HostPanel=HostPanel)
+		self.WidgetsToActivate = SetupHeaderSizer(HostPanel=HostPanel) + SetupAssocTextListSizer(HostPanel=HostPanel)
 
 	def OnFilterText(self, Event): # handle Enter key press in text filter TextCtrl
 		pass
@@ -192,12 +206,21 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 		self.Prefill(SystemFontNames=self.SystemFontNames)
 		self.SetWidgetVisibility()
 		# place header widgets in sizer, bind event handlers and register keyboard shortcuts
-		display_utilities.ActivateWidgetsInPanel(Widgets=self.WidgetsToActivate, Sizer=self.HeaderSizer,
-			ActiveWidgetList=[w for w in self.FixedWidgets if w.IsVisible],
+		print('AT200 self.AssocTextListSizer: ', self.AssocTextListSizer)
+		print('AT200 self.WidgetsToActivate: ', [w.Sizer for w in self.WidgetsToActivate])
+		display_utilities.ActivateWidgetsInPanel(
+			Widgets=[w for w in self.WidgetsToActivate if w.Sizer is self.HeaderSizer], Sizer=self.HeaderSizer,
+			ActiveWidgetList=[w for w in self.HeaderFixedWidgets if w.IsVisible],
+			DefaultFont=self.DisplDevice.TopLevelFrame.Fonts['NormalWidgetFont'],
+			HighlightBkgColour=self.DisplDevice.TopLevelFrame.ColScheme.BackHighlight)
+		display_utilities.ActivateWidgetsInPanel(
+			Widgets=[w for w in self.WidgetsToActivate if w.Sizer is self.AssocTextListSizer], Sizer=self.AssocTextListSizer,
+			ActiveWidgetList=[w for w in self.ATListFixedWidgets if w.IsVisible],
 			DefaultFont=self.DisplDevice.TopLevelFrame.Fonts['NormalWidgetFont'],
 			HighlightBkgColour=self.DisplDevice.TopLevelFrame.ColScheme.BackHighlight)
 		# display main sizer (containing all the visible widgets) in the display device
 		self.DisplDevice.SetSizer(self.MainSizer)
+		self.MainSizer.Layout()
 
 	def UnpackDataFromDatacore(self, XMLTree):
 		self.AssocTexts = [] # start with empty list of AT items
@@ -245,7 +268,7 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 
 	def SetWidgetVisibility(self, **Args):
 		# set IsVisible attribs for all widgets
-		for ThisWidget in self.FixedWidgets: ThisWidget.IsVisible = True
+		for ThisWidget in self.HeaderFixedWidgets + self.ATListFixedWidgets: ThisWidget.IsVisible = True
 
 	def AssocTextName(self, Plural=True):
 		# return (str) name of associated text kind; plural if Plural (bool)
@@ -335,7 +358,7 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 						'Responsibility': 5.0, 'Deadline': 4.0, 'Status': 2.0,
 						'WhereUsed': 5.0}
 		# allow X space for margins and panel's scrollbar
-		TargetGridSizeX = PanelSizeX - (GridWidgObj.LeftMargin * 2) - VertScrollbarXAllowanceInPx
+		TargetGridSizeX = PanelSizeX - (self.OverallLeftMargin * 2) - VertScrollbarXAllowanceInPx
 		TotalRelativeWidth = 1.0 + sum(ColRelativeWidths.values())
 		GridWidget.SetColMinimalAcceptableWidth(20) # minimum width to which user can resize columns
 		for ThisColName in ColRelativeWidths.keys():
