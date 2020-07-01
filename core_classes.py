@@ -1597,6 +1597,7 @@ class AssociatedTextItem(TextItem):  # 'smart text' used for comments, action it
 
 	def __init__(self, Proj, PHAObjClass, Host):
 		TextItem.__init__(self, Proj, PHAObjClass, Host)
+		self.ID = ''
 		self.Tack = None  # reference to a position object on a PIDItem, or another PHA object, referred to by this text
 		self.Numbering = NumberingItem()
 		self.Responsibility = '' # who is responsible for closing out the item

@@ -6,7 +6,7 @@
 import os, os.path, wx, platform # wx provides basic GUI functions
 import xml.etree.ElementTree as ElementTree # XML handling
 
-import core_classes, project_display, vizop_misc, info, utilities, faulttree, display_utilities
+import core_classes, project_display, vizop_misc, info, utilities, faulttree, display_utilities, undo
 from project_display import EditPanelAspectItem
 from display_utilities import UIWidgetItem
 
@@ -50,6 +50,7 @@ class AssocTextItemInDisplay(object):
 		self.FilteredIn = True # bool; whether this item shows up in the current filters. Defined only if filters are applied.
 		self.Selected = False # bool; whether this item is currently selected by the user
 		self.PHAElements = [] # list of PHAElementItem instances; all elements in which this AT appears
+		self.GridRow = None # row number in grid at which this item is currently displayed, or None if not displayed
 
 	def GetWhereUsedHumanText(self):
 		# get human-readable text showing PHA elements where this AT is used
@@ -87,8 +88,11 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 		# get connection to originating Viewport
 		self.OriginatingViewport = Args['OriginatingViewport']
 		# do initial setup of display
-		self.ATListColInternalNames = ['Selected', 'Number', 'Content', 'Responsibility', 'Deadline', 'Status',
-			'WhereUsed']
+		# make list of internal names of columns to show in AT grid list, in display order. Eventually, this should be persistent
+		# This list is what defines the actual display order of columns
+		self.ATListColInternalNames = ['Number', 'Content', 'Responsibility', 'Deadline', 'Status', 'WhereUsed']
+		# can add 'Selected' to provide a checkbox column, partially constructed in the rest of the code. See notes in
+		# spec file 391
 		self.SetupViewport(HostPanel=DisplDevice, Fonts=Fonts,
 			SystemFontNames=SystemFontNames, DateChoices=Args['DateChoices'])
 		# initialize attributes
@@ -98,7 +102,6 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 		self.FilterApplied = False # whether filter is currently applied to AT display
 		self.FilterText = '' # filter text currently applied to AT display; might not be the same as contents of TextCtrl
 		self.InitializeActionChoices()
-		# make list of internal names of columns to show in AT grid list. Eventually, this should be persistent
 
 	def InitializeActionChoices(self):
 		self.PromptOption = core_classes.ChoiceItem(XMLName='Prompt', HumanName=_('Select an action...'), Applicable=True)
@@ -160,28 +163,30 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 				self.TextFilterLabel, self.TextFilterText, self.ActionLabel, self.ActionChoice, self.ActionGoButton,
 				self.FinishedButton, self.ATListGrid]
 
-		def SetupAssocTextListSizer(HostPanel):
-			# set up associated text list grid widget
-			# return WidgetsToActivate for this sizer
-			self.TestLabel = UIWidgetItem(wx.StaticText(HostPanel, -1, 'Test'), Sizer=self.HeaderSizer,
-				Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_LEFT | wx.EXPAND, GapX=20, GapY=10,
-				ColLoc=1, ColSpan=10, Font=Fonts['BigHeadingFont'], NewRow=True)
+#		def SetupAssocTextListSizer(HostPanel):
+#			# set up associated text list grid widget
+#			# return WidgetsToActivate for this sizer. No longer used - had trouble with both sizers drawn on top of
+#			# each other, so now using HeaderSizer only
+#			self.TestLabel = UIWidgetItem(wx.StaticText(HostPanel, -1, 'Test'), Sizer=self.HeaderSizer,
+#				Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_LEFT | wx.EXPAND, GapX=20, GapY=10,
+#				ColLoc=1, ColSpan=10, Font=Fonts['BigHeadingFont'], NewRow=True)
 #			self.ATListFixedWidgets = [self.ATListGrid]
 #			self.ATListFixedWidgets = [self.ATListGrid, self.TestLabel]
-			self.ATListFixedWidgets = []
-			self.HeaderFixedWidgets.extend([self.TestLabel])
-			# return list to include in self.WidgetsToActivate
+#			self.ATListFixedWidgets = []
+#			self.HeaderFixedWidgets.extend([self.TestLabel])
+#			# return list to include in self.WidgetsToActivate
 #			return [self.ATListGrid]
-			return [self.TestLabel]
+#			return [self.TestLabel]
 
 		# start of SetupViewport()
 		self.MainSizer = wx.BoxSizer(orient=wx.VERTICAL)
 		self.HeaderSizer = wx.GridBagSizer(vgap=0, hgap=0) # for header widgets
 		self.OverallLeftMargin = 20 # gap on left edge inside panel
-		self.AssocTextListSizer = wx.GridBagSizer(vgap=0, hgap=0) # for associated text list
+#		self.AssocTextListSizer = wx.GridBagSizer(vgap=0, hgap=0) # for associated text list
 		self.MainSizer.Add(self.HeaderSizer)
-		self.MainSizer.Add(self.AssocTextListSizer)
-		self.WidgetsToActivate = SetupHeaderSizer(HostPanel=HostPanel) + SetupAssocTextListSizer(HostPanel=HostPanel)
+#		self.MainSizer.Add(self.AssocTextListSizer)
+		self.WidgetsToActivate = SetupHeaderSizer(HostPanel=HostPanel)
+#		self.WidgetsToActivate = SetupHeaderSizer(HostPanel=HostPanel) + SetupAssocTextListSizer(HostPanel=HostPanel)
 
 	def OnFilterText(self, Event): # handle Enter key press in text filter TextCtrl
 		pass
@@ -206,18 +211,16 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 		self.Prefill(SystemFontNames=self.SystemFontNames)
 		self.SetWidgetVisibility()
 		# place header widgets in sizer, bind event handlers and register keyboard shortcuts
-		print('AT200 self.AssocTextListSizer: ', self.AssocTextListSizer)
-		print('AT200 self.WidgetsToActivate: ', [w.Sizer for w in self.WidgetsToActivate])
 		display_utilities.ActivateWidgetsInPanel(
 			Widgets=[w for w in self.WidgetsToActivate if w.Sizer is self.HeaderSizer], Sizer=self.HeaderSizer,
 			ActiveWidgetList=[w for w in self.HeaderFixedWidgets if w.IsVisible],
 			DefaultFont=self.DisplDevice.TopLevelFrame.Fonts['NormalWidgetFont'],
 			HighlightBkgColour=self.DisplDevice.TopLevelFrame.ColScheme.BackHighlight)
-		display_utilities.ActivateWidgetsInPanel(
-			Widgets=[w for w in self.WidgetsToActivate if w.Sizer is self.AssocTextListSizer], Sizer=self.AssocTextListSizer,
-			ActiveWidgetList=[w for w in self.ATListFixedWidgets if w.IsVisible],
-			DefaultFont=self.DisplDevice.TopLevelFrame.Fonts['NormalWidgetFont'],
-			HighlightBkgColour=self.DisplDevice.TopLevelFrame.ColScheme.BackHighlight)
+#		display_utilities.ActivateWidgetsInPanel(
+#			Widgets=[w for w in self.WidgetsToActivate if w.Sizer is self.AssocTextListSizer], Sizer=self.AssocTextListSizer,
+#			ActiveWidgetList=[w for w in self.ATListFixedWidgets if w.IsVisible],
+#			DefaultFont=self.DisplDevice.TopLevelFrame.Fonts['NormalWidgetFont'],
+#			HighlightBkgColour=self.DisplDevice.TopLevelFrame.ColScheme.BackHighlight)
 		# display main sizer (containing all the visible widgets) in the display device
 		self.DisplDevice.SetSizer(self.MainSizer)
 		self.MainSizer.Layout()
@@ -268,7 +271,8 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 
 	def SetWidgetVisibility(self, **Args):
 		# set IsVisible attribs for all widgets
-		for ThisWidget in self.HeaderFixedWidgets + self.ATListFixedWidgets: ThisWidget.IsVisible = True
+		for ThisWidget in self.HeaderFixedWidgets: ThisWidget.IsVisible = True
+#		for ThisWidget in self.HeaderFixedWidgets + self.ATListFixedWidgets: ThisWidget.IsVisible = True
 
 	def AssocTextName(self, Plural=True):
 		# return (str) name of associated text kind; plural if Plural (bool)
@@ -309,35 +313,64 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 		GridWidget.DataTable.colLabels = []
 		GridWidget.ClearGrid()
 		# populate column labels. First, make hash table of column internal names to human names
-		ColLabelHumanNameHash = {'Selected': _('Select'), 'Number': _('Action item number'), 'Content': _('Content'),
+		ColLabelHumanNameHash = {'Selected': _('Select'), 'Number': _('Action item\nnumber'), 'Content': _('Content'),
 			'Responsibility': _('Responsibility'), 'Deadline': _('Deadline'), 'Status': _('Status'),
 			'WhereUsed': _('Where used')}
 		ColHorizAlignments = {'Selected': wx.ALIGN_CENTRE, 'Number': wx.ALIGN_RIGHT, 'Content': wx.ALIGN_LEFT,
 			'Responsibility': wx.ALIGN_LEFT, 'Deadline': wx.ALIGN_LEFT, 'Status': wx.ALIGN_CENTRE,
 			'WhereUsed': wx.ALIGN_LEFT}
+		ColCellRenderers = {'Selected': wx.grid.GridCellBoolRenderer, 'Number': wx.grid.GridCellStringRenderer,
+			'Content': wx.grid.GridCellAutoWrapStringRenderer,
+			'Responsibility': wx.grid.GridCellStringRenderer, 'Deadline': wx.grid.GridCellStringRenderer,
+			'Status': wx.grid.GridCellStringRenderer,
+			'WhereUsed': wx.grid.GridCellStringRenderer}
+		self.ColCellEditors = {'Selected': wx.grid.GridCellBoolEditor, 'Number': wx.grid.GridCellTextEditor,
+			'Content': wx.grid.GridCellTextEditor,
+			'Responsibility': wx.grid.GridCellTextEditor, 'Deadline': wx.grid.GridCellTextEditor,
+			'Status': wx.grid.GridCellTextEditor,
+			'WhereUsed': wx.grid.GridCellTextEditor}
+		ColReadOnly = {'Selected': False, 'Number': True,
+			'Content': False,
+			'Responsibility': False, 'Deadline': False,
+			'Status': False,
+			'WhereUsed': True}
 		GridWidget.DataTable.colLabels = [ColLabelHumanNameHash[ThisColName]
 			for ThisColName in self.ATListColInternalNames]
-		# set cell alignments per column
+		# set cell attributes per column, including alignment and read-only status
 		for ThisColIndex, ThisColLabel in enumerate(GridWidget.DataTable.identifiers):
 			AttrObj = wx.grid.GridCellAttr()
 			AttrObj.SetAlignment(hAlign=ColHorizAlignments[ThisColLabel], vAlign=wx.ALIGN_TOP)
+			AttrObj.SetReadOnly(isReadOnly=ColReadOnly[ThisColLabel])
 			GridWidget.SetColAttr(ThisColIndex, AttrObj)
-			# populate rows%%%
-			RowIndex = -1
-			CurrentATRowIndex = None
-			for ATIndex, ThisAT in enumerate(self.AssocTexts):
-				if ThisAT.FilteredIn: # show this AT only if it meets filter criteria
-					RowIndex += 1 # keep counter of rows populated in grid
-					if ThisAT == CurrentAT: CurrentATRowIndex = RowIndex # store row of current AT, so we can scroll to it
-					GridWidget.DataTable.rowLabels.append(ATIndex + 1) # populate row serial number, irrespective of filter
-					# populate fields
-					ThisRow = {'Selected': ThisAT.Selected, 'Number': ThisAT.Numbering, 'Content': ThisAT.Content,
-						'Responsibility': ThisAT.Responsibility, 'Deadline': ThisAT.Deadline, 'Status': ThisAT.Status,
-						'WhereUsed': ThisAT.GetWhereUsedHumanText()}
-					# put data into table
-					GridWidget.DataTable.data.append(ThisRow)
-					# select row if appropriate
-					if ThisAT.Selected: GridWidget.SelectRow(RowIndex, addToSelected=True)
+		# populate rows
+		RowIndex = -1
+		CurrentATRowIndex = None
+		for ATIndex, ThisAT in enumerate(self.AssocTexts):
+			if ThisAT.FilteredIn: # show this AT only if it meets filter criteria
+				RowIndex += 1 # keep counter of rows populated in grid
+				ThisAT.GridRow = RowIndex
+				if ThisAT == CurrentAT: CurrentATRowIndex = RowIndex # store row of current AT, so we can scroll to it
+				# set renderer and editor to show/edit each cell in required format (string, checkbox etc)
+				# TODO optimization: use SetColAttr() to define attribs for entire columns instead of row by row
+				for ThisColIndex, ThisColLabel in enumerate(GridWidget.DataTable.identifiers):
+					GridWidget.SetCellEditor(col=ThisColIndex, row=RowIndex, editor=self.ColCellEditors[ThisColLabel]())
+					GridWidget.SetCellRenderer(col=ThisColIndex, row=RowIndex, renderer=ColCellRenderers[ThisColLabel]())
+				GridWidget.DataTable.rowLabels.append(str(ATIndex + 1)) # populate row serial number, irrespective of filter
+#				# try to set column 0 as boolean
+#				A = wx.grid.GridCellAttr()
+#				A.SetEditor(wx.grid.GridCellBoolEditor())
+#				A.SetRenderer(wx.grid.GridCellBoolRenderer())
+#				GridWidget.DataTable.SetColAttr(col=0, attr=A)
+				# populate fields
+				ThisRow = {'Selected': ThisAT.Selected, 'Number': ThisAT.Numbering, 'Content': ThisAT.Content,
+					'Responsibility': ThisAT.Responsibility, 'Deadline': ThisAT.Deadline, 'Status': ThisAT.Status,
+					'WhereUsed': ThisAT.GetWhereUsedHumanText()}
+				# put data into table
+				GridWidget.DataTable.data.append(ThisRow)
+				# select row if appropriate
+				if ThisAT.Selected: GridWidget.SelectRow(RowIndex, addToSelected=True)
+			else: # this AT is filtered out; mark it as not shown in the grid
+				ThisAT.GridRow = None
 		# update the grid object: tell it to add or delete rows according to whether there are more or less than last time
 		NewNumberOfRows = RowIndex + 1
 		GridWidget.BeginBatch()
@@ -354,14 +387,16 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 		PanelSizeX, PanelSizeY = self.DisplDevice.GetSize()
 		VertScrollbarXAllowanceInPx = 10  # x-size to allow for scrollbar
 		# define amount of width to allocate to each column. Row label column gets 1.0 by definition
-		ColRelativeWidths = {'Selected': 1.0, 'Number': 3.0, 'Content': 10.0,
-						'Responsibility': 5.0, 'Deadline': 4.0, 'Status': 2.0,
-						'WhereUsed': 5.0}
+		ColRelativeWidths = {'Selected': 1.0, 'Number': 2.0, 'Content': 10.0,
+						'Responsibility': 5.0, 'Deadline': 3.0, 'Status': 2.0,
+						'WhereUsed': 6.0}
 		# allow X space for margins and panel's scrollbar
 		TargetGridSizeX = PanelSizeX - (self.OverallLeftMargin * 2) - VertScrollbarXAllowanceInPx
 		TotalRelativeWidth = 1.0 + sum(ColRelativeWidths.values())
 		GridWidget.SetColMinimalAcceptableWidth(20) # minimum width to which user can resize columns
-		for ThisColName in ColRelativeWidths.keys():
+		# set column initial widths
+#		for ThisColName in ColRelativeWidths.keys():
+		for ThisColName in self.ATListColInternalNames:
 			GridWidget.SetColSize(GridWidget.DataTable.identifiers.index(ThisColName),
 				TargetGridSizeX * ColRelativeWidths[ThisColName] / TotalRelativeWidth)
 		GridWidget.SetRowLabelSize(TargetGridSizeX / TotalRelativeWidth) # row label column
@@ -376,6 +411,52 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 			# scroll grid to ensure current AT is visible, if filtered-in
 			if CurrentATRowIndex is not None:
 				GridWidget.GoToCell(row=CurrentATRowIndex, col=0)
+
+		# set up event handlers
+#		GridWidget.Bind(wx.grid.EVT_GRID_EDITOR_CREATED, self.OnEditorCreated)
+		# may need EditorCreated handler for future implementation of checkbox column
+		GridWidget.Bind(wx.grid.EVT_GRID_CELL_CHANGED, self.OnCellEdited)
+
+	def OnCellEdited(self, Event):
+		# handle user editing of a grid cell
+		print('AT417 in OnCellEdited')
+		print('AT418 new cell content detected: ', self.ATListGrid.Widget.GetCellValue(row=Event.Row, col=Event.Col))
+		# below, AttribChanged contains hash of {column internal names, AT attrib names} in case either of them changes
+		self.ChangeAssociatedText(AssociatedTextObj=[AT for AT in self.AssocTexts if AT.GridRow == Event.Row][0],
+			ATRow=Event.Row,
+			AttribChanged={'Content': 'Content', 'Responsibility': 'Responsibility', 'Deadline': 'Deadline',
+				'Status': 'Status'}[self.ATListColInternalNames[Event.Col]],
+			NewAttribContent=self.ATListGrid.Widget.GetCellValue(row=Event.Row, col=Event.Col).strip())
+
+#	def OnEditorCreated(self, Event):
+#		print('AT406 in OnEditorCreated')
+#		# check if the user is editing a boolean cell
+#		if self.ColCellEditors[self.ATListColInternalNames[Event.Col]] is wx.grid.GridCellBoolEditor:
+#			# turn off the flag requiring character input
+#			self.ThisCheckBox = Event.Control
+#			self.ThisCheckBox.WindowStyle |= wx.WANTS_CHARS
+#			self.ThisCheckBox.Bind(wx.EVT_KEY_DOWN, self.OnCheckBoxKeyDown)
+#			self.ThisCheckBox.Bind(wx.EVT_CHECKBOX, self.OnCheckBoxToggle)
+#		Event.Skip()
+
+	def ChangeAssociatedText(self, AssociatedTextObj, ATRow, AttribChanged, NewAttribContent):
+		# handle request to change a text attrib of associated text AssociatedTextObj (AssocTextItemInDisplay instance)
+		# ATRow (int): row number of affected AT in grid, or None if not visible; stored to assist undo to show the
+		# correct row. None will be sent in XML as 'None'
+		# AttribChanged: (str) one of 'Content', 'Responsibility', 'Deadline', 'Status'
+		# NewAttribContent: (str) new value of the attrib
+		print('AT447 in ChangeAssociatedText')
+		assert isinstance(AssociatedTextObj, AssocTextItemInDisplay)
+		assert isinstance(ATRow, int)
+		assert 0 <= ATRow < len(self.AssocTexts) # however doesn't consider filtering
+		assert AttribChanged in ['Content', 'Responsibility', 'Deadline', 'Status']
+		assert isinstance(NewAttribContent, str)
+		# We use the ArgsToSend dict so that we can get arg names from info module
+		ArgsToSend = {info.AssociatedTextIDTag: AssociatedTextObj.ID, info.AttribNameTag: AttribChanged,
+			info.NewAttribValueTag: NewAttribContent, info.ATRowTag: 'None' if ATRow is None else str(ATRow),
+			info.ZoomTag: str(self.Zoom)}
+		vizop_misc.SendRequest(Socket=self.C2DSocketREQ, Command='RQ_AT_ChangeAssociatedText',
+			Proj=self.Proj.ID, Viewport=self.ID, **ArgsToSend)
 
 	@classmethod
 	def GetFullRedrawData(cls, Viewport=None, ViewportClass=None, **Args):
@@ -482,6 +563,7 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 		# MessageReceived (str or None): XML message containing request info
 		# MessageAsXMLTree (XML element or None): root of XML tree
 		# return Reply (Root object of XML tree)
+		print('AT565 in HandleIncoming Request')
 		assert isinstance(MessageReceived, bytes) or (MessageReceived is None)
 		assert isinstance(Args, dict)
 		# First, convert MessageReceived to an XML tree for parsing
@@ -498,8 +580,56 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 		Reply = vizop_misc.MakeXMLMessage(RootName='Fail', RootText='CommandNotRecognised')
 		if Command == 'RQ_PR_UpdateAssocTextFullViewAttribs': # store parms for associated text display
 			Reply = cls.UpdateAssocTextFullViewAttribs(Proj=Proj, XMLRoot=XMLRoot)
+		elif Command == 'RQ_AT_ChangeAssociatedText':
+			Reply = cls.HandleChangeAssociatedTextRequest(Proj, XMLRoot, ViewportID=XMLRoot.findtext(info.ViewportTag),
+				Zoom=Zoom)
 		if Reply.tag == 'Fail': print('AT367 command not recognised: ', Command)
 		return Reply
+
+	@classmethod
+	def HandleChangeAssociatedTextRequest(cls, Proj, XMLRoot, ViewportID, Zoom):
+		# handle request from Viewport with ID=ViewportID to change text content of existing AssociatedText
+		assert isinstance(XMLRoot, ElementTree.Element)
+		assert isinstance(ViewportID, str)
+		print('AT593 zoom: ', Zoom, type(Zoom))
+		assert isinstance(Zoom, str)
+		print('AT587 in HandleChangeAssociatedTextRequest')
+		# update the AssociatedText in the required AssociatedText list
+		cls.DoChangeAssociatedText(Proj, ATID=XMLRoot.findtext(info.AssociatedTextIDTag),
+			ChangedAttribName=XMLRoot.findtext(info.AttribNameTag),
+			NewAttribValue=XMLRoot.findtext(info.NewAttribValueTag),
+			ATRowInGrid=XMLRoot.findtext(info.ATRowTag),
+			ViewportID=ViewportID, Redoing=False, Zoom=Zoom)
+		return vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
+
+	@classmethod
+	def DoChangeAssociatedText(cls, Proj, ATID='', ChangedAttribName='', NewAttribValue='', ATRowInGrid='',
+			ViewportID='', AssociatedTextKind='ActionItems',
+			Redoing=False, Zoom=1.0):
+		# datacore function
+		# Change value of ChangedAttribName (str) of AssociatedText with ID ATID (str) to NewAttribValue (str)
+		# ATRowInGrid (int as str): row of grid at which this AT is displayed, or '' if not currently visible in grid
+		# ViewportID: ID of Viewport from where the change AssociatedText request was made
+		# first find the associated text; could be action item or parking lot item
+		ATToChange = utilities.ObjectWithID(Objects=Proj.ActionItems + Proj.ParkingLotItems, TargetID=ATID)
+		OldAttribValue = getattr(ATToChange, ChangedAttribName)
+		# change the attrib value
+		setattr(ATToChange, ChangedAttribName, NewAttribValue)
+		UndoEnglishText = 'change %s' % core_classes.AssociatedTextEnglishNamesSingular[AssociatedTextKind]
+		undo.AddToUndoList(Proj=Proj, Redoing=Redoing,
+			UndoObj=undo.UndoItem(UndoHandler=cls.ChangeAssociatedText_Undo,
+			RedoHandler=cls.ChangeAssociatedText_Redo,
+			ATID=ATID,
+			ChangedAttribName=ChangedAttribName,
+			OldAttribValue=OldAttribValue,
+			ATRowInGrid=ATRowInGrid,
+			HumanText=_(UndoEnglishText),
+			ViewportID=ViewportID, Zoom=Zoom))
+
+	@classmethod
+	def ChangeAssociatedText_Undo(**Args): pass
+	@classmethod
+	def ChangeAssociatedText_Redo(**Args): pass
 
 	@classmethod
 	def UpdateAssocTextFullViewAttribs(cls, Proj, XMLRoot):
@@ -508,7 +638,10 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 		# be used to restore the same settings when this Viewport is destroyed and re-created.
 		print('AT375 storing attribs in datacore')
 		# First, find the Viewport shadow
-		ViewportShadow = utilities.ObjectWithID(Proj.AllViewportShadows, TargetID=XMLRoot.findtext(info.ViewportTag))
+		print('AT630 Viewport shadows: ', [v.ID for v in Proj.AllViewportShadows])
+		print('AT630 Archieved Viewport shadows: ', [v.ID for v in Proj.ArchivedViewportShadows])
+		ViewportShadow = utilities.ObjectWithID(Proj.AllViewportShadows + Proj.ArchivedViewportShadows,
+			TargetID=XMLRoot.findtext(info.ViewportTag))
 		ViewportShadow.AssocTextKind = XMLRoot.findtext(info.AssociatedTextKindTag)
 		ViewportShadow.FilterText = XMLRoot.findtext(info.FilterTextTag)
 		ViewportShadow.ItemsSelectedCommaList = XMLRoot.findtext(info.ItemsSelectedTag) # string of AT ID's separated by commas

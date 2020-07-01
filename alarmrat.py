@@ -190,10 +190,10 @@ DeadbandUnitAttrib = AlarmAttrib(AttribName='DeadbandUnit', HumanName=_('Deadban
 
 MultiLevelSetpointAttribs = [SetpointHHAttrib, SetpointHAttrib, SetpointLAttrib, SetpointLLAttrib]
 
-class AlarmListGridTable(wx.grid.PyGridTableBase): # object containing data table for alarm list display
+class AlarmListGridTable(wx.grid.GridTableBase): # object containing data table for alarm list display
 
 	def __init__(self, Log):
-		wx.grid.PyGridTableBase.__init__(self)
+		wx.grid.GridTableBase.__init__(self)
 		self.Log = Log
 		self.identifiers = [InstrTagAttrib.AttribName, AlarmTagAttrib.AttribName] # internal names of columns
 		self.rowLabels = []

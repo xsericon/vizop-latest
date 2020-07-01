@@ -2483,10 +2483,13 @@ class ControlFrame(wx.Frame):
 		for ThisSocketObj in IncomingViewportSocketObjs:
 			# pass request to PHA model associated with the Viewport (we do this via datacore, not directly,
 			# so that local and remote Viewports are treated the same)
-			if ThisSocketObj.Viewport.PHAObj: # proceed only if Viewport has been assigned to a PHA object%%%
-				# (will not have happened yet if Viewport is newly created)
-				ViewportMessageReceivedThisTime = vizop_misc.ListenToSocket(Proj=self.CurrentProj, Socket=ThisSocketObj.Socket,
-					Handler=ThisSocketObj.Viewport.PHAObj.HandleIncomingRequest)
+#			if ThisSocketObj.Viewport.PHAObj: # proceed only if Viewport has been assigned to a PHA object%%%
+			if True:
+				# pass any message to message handler for Viewport's PHA object, if any, else to the Viewport class itself
+				ViewportMessageReceivedThisTime = vizop_misc.ListenToSocket(Proj=self.CurrentProj,
+					Socket=ThisSocketObj.Socket,
+					Handler=ThisSocketObj.Viewport.PHAObj.HandleIncomingRequest if ThisSocketObj.Viewport.PHAObj \
+						else ThisSocketObj.Viewport.MyClass.HandleIncomingRequest)
 #				if ViewportMessageReceivedThisTime: print('CF1459 incoming viewport message received')
 				ViewportMessageReceived |= bool(ViewportMessageReceivedThisTime)
 				MessageReceived |= bool(vizop_misc.ListenToSocket(Socket=[s.Socket for s in vizop_misc.RegisterSocket.Register
@@ -2957,11 +2960,18 @@ class ControlFrame(wx.Frame):
 	def DatacoreDoNewViewport_Redo(self, Proj, RedoRecord, **Args): # redo creation of new Viewport
 		# fetch the previously created Viewport shadow from the Redo record
 		RecoveredViewport = RedoRecord.ViewportShadow
-		# find the PHA object owning the Viewport
+		# find the PHA object owning the Viewport, if any
 		ThisPHAObj = RecoveredViewport.PHAObj
-		ThisPHAObj.Viewports.append(RecoveredViewport) # add Viewport to list in the PHA object
-		# fetch full redraw data of Viewport
-		RedrawXMLData = ThisPHAObj.GetFullRedrawData(Viewport=RecoveredViewport, ViewportClass=RecoveredViewport.MyClass)
+		print('CF2967 do we need to add Viewport back into project list, and remove from archive list?')
+		if ThisPHAObj:
+			ThisPHAObj.Viewports.append(RecoveredViewport) # add Viewport to list in the PHA object
+			# fetch full redraw data of Viewport
+			RedrawXMLData = ThisPHAObj.GetFullRedrawData(Viewport=RecoveredViewport, ViewportClass=RecoveredViewport.MyClass)
+		else: # handling Viewport with no associated PHA object
+			Proj.ViewportsWithoutPHAObjs.append(RecoveredViewport) # add Viewport to list in the PHA object
+			# fetch full redraw data of Viewport
+			RedrawXMLData = RecoveredViewport.MyClass.GetFullRedrawData(Viewport=RecoveredViewport,
+				ViewportClass=RecoveredViewport.MyClass)
 		# send ID of PHA model, followed by full redraw data, as reply to ControlFrame
 		Notification = vizop_misc.MakeXMLMessage(RootName='NO_NewViewport_Redo', RootText=RecoveredViewport.ID,
 			Elements={info.ProjIDTag: ThisPHAObj.ID, info.ViewportTypeTag: RecoveredViewport.MyClass.InternalName,
@@ -3573,8 +3583,13 @@ class ControlFrame(wx.Frame):
 			# check if ThisViewportShadow is displayed in any display device, local or remote
 			if ThisViewportShadow.IsOnDisplay:
 				# get refresh data from corresponding PHA object (now done below: entire FTDisplayAttribTag is appended)
-				RedrawXMLData = ThisViewportShadow.PHAObj.GetFullRedrawData(Viewport=ThisViewportShadow,
-					ViewportClass=ThisViewportShadow.MyClass)
+				if ThisViewportShadow.PHAObj:
+					RedrawXMLData = ThisViewportShadow.PHAObj.GetFullRedrawData(Viewport=ThisViewportShadow,
+						ViewportClass=ThisViewportShadow.MyClass)
+				else: # handling a Viewport shadow with no associated PHA object; get redraw data from Viewport class
+					RedrawXMLData = ThisViewportShadow.MyClass.GetFullRedrawData(Proj=self.CurrentProj,
+						Viewport=ThisViewportShadow,
+						ViewportClass=ThisViewportShadow.MyClass)
 				# make XML message with ID of PHA object, followed by full redraw data
 				FullXMLData = vizop_misc.MakeXMLMessage(RootName='RQ_RedrawViewport', RootText=ThisViewportShadow.ID,
 					Elements={info.IDTag: ThisViewportShadow.PHAObjID})

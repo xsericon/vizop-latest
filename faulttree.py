@@ -2441,6 +2441,10 @@ class FTEventInCore(FTElementInCore): # FT event object used in DataCore by FTOb
 		self.ValueComments.append(VC)
 		AI = core_classes.AssociatedTextItem(Proj=self.Proj, PHAObjClass=type(self), Host=self)
 		AI.Content = 'Test action item'
+		AI.Responsibility = 'Peter'
+		AI.Deadline = 'This week'
+		AI.Status = 'Open'
+		AI.ID = self.Proj.GetNewID()
 		self.ActionItems.append(AI)
 		self.Proj.ActionItems.append(AI)
 		AI.Numbering = core_classes.NumberingItem()
@@ -3128,6 +3132,11 @@ class FTConnectorItemInCore(FTElementInCore): # in- and out-connectors (CX's) to
 		self.ValueComments.append(VC)
 		AI = core_classes.AssociatedTextItem(Proj=self.Proj, PHAObjClass=type(self), Host=self)
 		AI.Content = 'Test action item for connector'
+		AI.Responsibility = 'Jim Smith'
+		AI.Deadline = 'Last week'
+		AI.Status = 'Closed'
+		AI.ID = self.Proj.GetNewID()
+		self.ActionItems.append(AI)
 		self.ActionItems.append(AI)
 		AI.Numbering = core_classes.NumberingItem()
 		self.Proj.ActionItems.append(AI)
@@ -4806,7 +4815,9 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		AssociatedTextListInProj = getattr(self.Proj, AssociatedTextListAttrib)
 		# make a new AssociatedText object, with numbering object the same as the preceding object in the project's list (if any)
 		NewAssociatedText = core_classes.AssociatedTextItem(Proj=self.Proj, PHAObjClass=type(self), Host=self)
+		NewAssociatedText.ID = self.Proj.GetNewID()
 		NewAssociatedText.Content = XMLRoot.findtext(info.AssociatedTextTag)
+		print('FT4820 add code here to store responsibility etcn')
 		if AssociatedTextListInProj:
 			NewAssociatedText.Numbering = copy.copy(AssociatedTextListInProj[-1].Numbering)
 		else:

@@ -683,11 +683,11 @@ def StringFromNum(InputNumber, RR):
 	else: # return 'cannot get value' indicator
 		return info.CantDisplayValueOnScreen
 
-class BaseGridTable(wx.grid.PyGridTableBase): # object containing underlying data table for a grid display of data
+class BaseGridTable(wx.grid.GridTableBase): # object containing underlying data table for a grid display of data
 
 	def __init__(self, Log, ColumnInternalNames=[]):
 		# ColumnInternalNames: list of str, internal names (not display names) of grid table columns
-		wx.grid.PyGridTableBase.__init__(self)
+		wx.grid.GridTableBase.__init__(self)
 		self.Log = Log
 		self.identifiers = ColumnInternalNames # internal names of columns
 		self.rowLabels = []
@@ -769,9 +769,9 @@ class DraggableGrid(wx.grid.Grid): # wx.grid object whose rows can be reordered 
 		# enable columns to be dragged to reorder (not currently used)
 		# wx.lib.gridmovers.GridColMover(self)
 		# self.Bind(wx.lib.gridmovers.EVT_GRID_COL_MOVE, self.OnColMove, self)
-		# enable rows to be dragged to reorder
-		wx.lib.gridmovers.GridRowMover(self)
-		self.Bind(wx.lib.gridmovers.EVT_GRID_ROW_MOVE, self.OnRowMove, self)
+		# enable rows to be dragged to reorder (TODO add this function later)
+#		wx.lib.gridmovers.GridRowMover(self) # keep these 2 lines for later
+#		self.Bind(wx.lib.gridmovers.EVT_GRID_ROW_MOVE, self.OnRowMove, self)
 		self.DisableCellEditControl() # disallow direct editing of cells
 		# send events to parent window (e.g. data panel) for processing, if parent has a handler
 		print("DU624 looking for grid click handlers")
