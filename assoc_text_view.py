@@ -6,7 +6,7 @@
 import os, os.path, wx, platform # wx provides basic GUI functions
 import xml.etree.ElementTree as ElementTree # XML handling
 
-import core_classes, project_display, vizop_misc, info, utilities, faulttree, display_utilities, undo
+import core_classes, project_display, vizop_misc, info, utilities, faulttree, display_utilities, undo, projects
 from project_display import EditPanelAspectItem
 from display_utilities import UIWidgetItem
 
@@ -97,7 +97,6 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 			SystemFontNames=SystemFontNames, DateChoices=Args['DateChoices'])
 		# initialize attributes
 		self.AssocTexts = [] # list of AssocTextItemInDisplay instances
-		self.TextFilterValue = '' # currently applied text filter
 		self.ActionChoices = []  # list of ChoiceItem instances; choices currently offered in Action choice box
 		self.FilterApplied = False # whether filter is currently applied to AT display
 		self.FilterText = '' # filter text currently applied to AT display; might not be the same as contents of TextCtrl
@@ -119,7 +118,8 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 		# setup sizers and widgets
 
 		# TODO we will need a method to "re-setup viewport" when the Viewport is moved to a different display device.
-		# This is because all the wx widgets belong to the panel. So they will have to be destroyed and remade.
+		# This is because all the wx widgets belong to the panel. So they will have to be destroyed and remade, or
+		# alternatively try Widget.Reparent().
 		# This is probably a better approach than destroying and remaking the entire Viewport, so that references to
 		# the Viewport object remain valid.
 
@@ -210,17 +210,12 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 		self.ApplyFilters() # mark each associated text as whether currently visible, based on current filters
 		self.Prefill(SystemFontNames=self.SystemFontNames)
 		self.SetWidgetVisibility()
-		# place header widgets in sizer, bind event handlers and register keyboard shortcuts
+		# place header widgets in header sizer, bind event handlers and register keyboard shortcuts
 		display_utilities.ActivateWidgetsInPanel(
 			Widgets=[w for w in self.WidgetsToActivate if w.Sizer is self.HeaderSizer], Sizer=self.HeaderSizer,
 			ActiveWidgetList=[w for w in self.HeaderFixedWidgets if w.IsVisible],
 			DefaultFont=self.DisplDevice.TopLevelFrame.Fonts['NormalWidgetFont'],
 			HighlightBkgColour=self.DisplDevice.TopLevelFrame.ColScheme.BackHighlight)
-#		display_utilities.ActivateWidgetsInPanel(
-#			Widgets=[w for w in self.WidgetsToActivate if w.Sizer is self.AssocTextListSizer], Sizer=self.AssocTextListSizer,
-#			ActiveWidgetList=[w for w in self.ATListFixedWidgets if w.IsVisible],
-#			DefaultFont=self.DisplDevice.TopLevelFrame.Fonts['NormalWidgetFont'],
-#			HighlightBkgColour=self.DisplDevice.TopLevelFrame.ColScheme.BackHighlight)
 		# display main sizer (containing all the visible widgets) in the display device
 		self.DisplDevice.SetSizer(self.MainSizer)
 		self.MainSizer.Layout()
@@ -240,7 +235,8 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 			# make an associated text instance, and store it in the list
 			ThisAT = AssocTextItemInDisplay()
 			self.AssocTexts.append(ThisAT)
-			# fetch associated item numbering
+			# fetch associated item ID and numbering
+			ThisAT.ID = ThisATTag.findtext(info.AssociatedTextIDTag)
 			ThisAT.Numbering = ThisATTag.text
 			# fetch AT content, responsibility, deadline and status
 			ThisAT.Content = ThisATTag.findtext(info.ContentTag)
@@ -253,21 +249,23 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 					ElementID=ThisElUsingTag.get(info.IDTag))
 				ThisAT.PHAElements.append(ThisElUsing)
 
-	def ApplyFilters(self):
+	def ApplyFilters(self, FilterText='', FilterApplied=False):
 		print('AT175 in ApplyFilters')
 
-	def Prefill(self, SystemFontNames): # prefill widgets for associated text display
+	def Prefill(self, SystemFontNames=None, CurrentAT=None): # prefill widgets for associated text display
 		# set header to e.g. "Showing 5 of 10 action items in the project"
+		# CurrentAT (AssocTextItemInDisplay instance or None): the AT the user is currently working with
+		assert isinstance(CurrentAT, AssocTextItemInDisplay) or (CurrentAT is None)
 		self.MainHeaderLabel.Widget.SetLabel(_('Showing %d of %d %s in the project') % \
 			([i.FilteredIn for i in self.AssocTexts].count(True), len(self.AssocTexts),
 			self.AssocTextName(Plural=bool(len(self.AssocTexts) - 1))))
-		self.TextFilterText.Widget.ChangeValue(self.TextFilterValue)
+		self.TextFilterText.Widget.ChangeValue(self.FilterText)
 		# set available choices in "action" choice box
 		self.UpdateActionChoices()
 		# enable action Go button if any actions are available, apart from the prompt
 		self.ActionGoButton.Widget.Enable(len(self.ActionChoices) > 1)
 		# populate action items list
-		self.PopulateATList()
+		self.PopulateATList(CurrentAT=CurrentAT)
 
 	def SetWidgetVisibility(self, **Args):
 		# set IsVisible attribs for all widgets
@@ -302,7 +300,7 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 
 	def PopulateATList(self, CurrentAT=None):
 		# populate AT list grid with AT items to be displayed, and select appropriate items
-		# CurrentAT (AssocTextItem instance or None): the AT the user is currently working with. AT list will be
+		# CurrentAT (AssocTextItemInDisplay instance or None): the AT the user is currently working with. AT list will be
 		#	scrolled to ensure it's visible
 		GridWidget = self.ATListGrid.Widget # get the wx grid widget
 		# first, empty the data table and remove existing data from the grid
@@ -445,7 +443,7 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 		# correct row. None will be sent in XML as 'None'
 		# AttribChanged: (str) one of 'Content', 'Responsibility', 'Deadline', 'Status'
 		# NewAttribContent: (str) new value of the attrib
-		print('AT447 in ChangeAssociatedText')
+		print('AT447 in ChangeAssociatedText with AT ID: ', AssociatedTextObj.ID)
 		assert isinstance(AssociatedTextObj, AssocTextItemInDisplay)
 		assert isinstance(ATRow, int)
 		assert 0 <= ATRow < len(self.AssocTexts) # however doesn't consider filtering
@@ -454,13 +452,15 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 		# We use the ArgsToSend dict so that we can get arg names from info module
 		ArgsToSend = {info.AssociatedTextIDTag: AssociatedTextObj.ID, info.AttribNameTag: AttribChanged,
 			info.NewAttribValueTag: NewAttribContent, info.ATRowTag: 'None' if ATRow is None else str(ATRow),
-			info.ZoomTag: str(self.Zoom)}
+			info.ZoomTag: str(self.Zoom), info.FilterTextTag: self.FilterText,
+			info.FilterAppliedTag: utilities.Bool2Str(self.FilterApplied)}
 		vizop_misc.SendRequest(Socket=self.C2DSocketREQ, Command='RQ_AT_ChangeAssociatedText',
 			Proj=self.Proj.ID, Viewport=self.ID, **ArgsToSend)
 
 	@classmethod
 	def GetFullRedrawData(cls, Viewport=None, ViewportClass=None, **Args):
-		# a datacore method. Provide data for redraw of this Viewport
+		# a datacore method. Provide data for redraw of this Viewport.
+		# Args needs 'Proj' as a minimum
 		# return the data as XML string
 
 		def MakeAssocTextLookupTable(Proj):
@@ -488,7 +488,9 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 			ATEl = ElementTree.SubElement(RootElement, info.AssociatedTextTag)
 			# set element text = associated item numbering
 			ATEl.text = ThisAssocTextItem.Numbering.HumanValue(PHAItem=ThisAssocTextItem, Host=AssocTextMasterList)[0]
-			# make subelements for AT content, responsibility, deadline and status
+			# make subelements for AT ID, content, responsibility, deadline and status
+			IDEl = ElementTree.SubElement(ATEl, info.AssociatedTextIDTag)
+			IDEl.text = ThisAssocTextItem.ID
 			ContentEl = ElementTree.SubElement(ATEl, info.ContentTag)
 			ContentEl.text = ThisAssocTextItem.Content
 			ResponsibilityEl = ElementTree.SubElement(ATEl, info.ResponsibilityTag)
@@ -516,7 +518,7 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 		if 'ExtraXMLTagsAsTags' in Args:
 			assert isinstance(Args['ExtraXMLTagsAsTags'], ElementTree.Element)
 			RootElement.append(Args['ExtraXMLTagsAsTags'])
-		# TODO add info.FTDisplayAttribTag with zoom and pan data
+		# TODO add info.DisplayAttribTag with zoom and pan data
 		print('AT270 ending GetFullRedrawData with RootElement: ', ElementTree.tostring(RootElement))
 		return RootElement
 
@@ -591,12 +593,12 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 		# handle request from Viewport with ID=ViewportID to change text content of existing AssociatedText
 		assert isinstance(XMLRoot, ElementTree.Element)
 		assert isinstance(ViewportID, str)
-		print('AT593 zoom: ', Zoom, type(Zoom))
 		assert isinstance(Zoom, str)
-		print('AT587 in HandleChangeAssociatedTextRequest')
+		print('AT587 in HandleChangeAssociatedTextRequest: changing attrib, ID: ', XMLRoot.findtext(info.AttribNameTag), XMLRoot.findtext(info.AssociatedTextIDTag))
 		# update the AssociatedText in the required AssociatedText list
 		cls.DoChangeAssociatedText(Proj, ATID=XMLRoot.findtext(info.AssociatedTextIDTag),
-			ChangedAttribName=XMLRoot.findtext(info.AttribNameTag),
+			ChangedAttribName=XMLRoot.findtext(info.AttribNameTag), FilterText=XMLRoot.findtext(info.FilterTextTag),
+			FilterApplied=utilities.Bool2Str(XMLRoot.findtext(info.FilterAppliedTag)),
 			NewAttribValue=XMLRoot.findtext(info.NewAttribValueTag),
 			ATRowInGrid=XMLRoot.findtext(info.ATRowTag),
 			ViewportID=ViewportID, Redoing=False, Zoom=Zoom)
@@ -604,32 +606,85 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 
 	@classmethod
 	def DoChangeAssociatedText(cls, Proj, ATID='', ChangedAttribName='', NewAttribValue='', ATRowInGrid='',
-			ViewportID='', AssociatedTextKind='ActionItems',
+			ViewportID='', AssociatedTextKind='ActionItems', FilterText='', FilterApplied=False,
 			Redoing=False, Zoom=1.0):
-		# datacore function
+		# datacore method
 		# Change value of ChangedAttribName (str) of AssociatedText with ID ATID (str) to NewAttribValue (str)
 		# ATRowInGrid (int as str): row of grid at which this AT is displayed, or '' if not currently visible in grid
 		# ViewportID: ID of Viewport from where the change AssociatedText request was made
+		# FilterText (str) and FilterApplied (bool) indicate the current status of filtering, for storage in undo record
 		# first find the associated text; could be action item or parking lot item
 		ATToChange = utilities.ObjectWithID(Objects=Proj.ActionItems + Proj.ParkingLotItems, TargetID=ATID)
 		OldAttribValue = getattr(ATToChange, ChangedAttribName)
 		# change the attrib value
 		setattr(ATToChange, ChangedAttribName, NewAttribValue)
-		UndoEnglishText = 'change %s' % core_classes.AssociatedTextEnglishNamesSingular[AssociatedTextKind]
 		undo.AddToUndoList(Proj=Proj, Redoing=Redoing,
 			UndoObj=undo.UndoItem(UndoHandler=cls.ChangeAssociatedText_Undo,
-			RedoHandler=cls.ChangeAssociatedText_Redo,
+			RedoHandler=cls.ChangeAssociatedText_Redo, FilterText=FilterText, FilterApplied=FilterApplied,
 			ATID=ATID,
 			ChangedAttribName=ChangedAttribName,
 			OldAttribValue=OldAttribValue,
 			ATRowInGrid=ATRowInGrid,
-			HumanText=_(UndoEnglishText),
+			HumanText=_('change %s' % core_classes.AssociatedTextEnglishNamesSingular[AssociatedTextKind]),
 			ViewportID=ViewportID, Zoom=Zoom))
 
 	@classmethod
-	def ChangeAssociatedText_Undo(**Args): pass
+	def ChangeAssociatedText_Undo(cls, Proj, UndoRecord, **Args):
+		# revert associated text attrib to previous value. Datacore method
+		# find out which datacore socket to send messages on
+		SocketFromDatacore = vizop_misc.SocketWithName(TargetName=Args['SocketFromDatacoreName'])
+		ATToChange = utilities.ObjectWithID(Objects=Proj.ActionItems + Proj.ParkingLotItems, TargetID=UndoRecord.ATID)
+		setattr(ATToChange, UndoRecord.ChangedAttribName, UndoRecord.OldAttribValue)
+		# request Control Frame to switch to the Viewport that was visible when the original edit was made
+		cls.RedrawAfterUndoOrRedo(Proj, UndoRecord, SocketFromDatacore)
+		projects.SaveOnFly(Proj, UpdateData=vizop_misc.MakeXMLMessage(RootName=info.AssociatedTextTag,
+			Elements={info.IDTag: UndoRecord.ATID}))
+#		# if this Viewport is currently visible, refresh the display
+#		if any(v.IsOnDisplay for v in Proj.AllViewportShadows if v.ID == UndoRecord.ViewportID):
+#			# restore previous filter settings, to ensure change is visible
+#			self.ApplyFilters(FilterText=UndoRecord.FilterText, FilterApplied=UndoRecord.FilterApplied)
+#			# repopulate full display
+#			self.Prefill(self, SystemFontNames=self.SystemFontNames, CurrentAT=None)
+#		else: # switch to AT list Viewport and redisplay
+#			print('AT641 TODO: switch to AT list Viewport on undo')
+
 	@classmethod
-	def ChangeAssociatedText_Redo(**Args): pass
+	def ChangeAssociatedText_Redo(cls, Proj, RedoRecord, **Args): pass # TODO
+
+	@classmethod
+	def RedrawAfterUndoOrRedo(cls, Proj, UndoRecord, SocketFromDatacore, SkipRefresh=False):
+		# check if we should redraw. If this is an undo, and UndoRecord is avalanche-chained, don't refresh.
+		# If this is a redo, don't refresh if UndoRecord.SkipRefresh is True.
+		# If we should redraw,
+		# instruct Control Frame to switch the requesting control frame to the Viewport that was visible when the original
+		# text change was made, with the original zoom  restored, and scrolled so that the first changed row is on screen
+		# and the changed attrib highlighted (so that the undo is visible to the user) (TODO)
+		# SocketFromDatacore (socket object): socket to send redraw message from datacore to Control Frame
+		# first, check whether to redraw
+		if not SkipRefresh:
+			# prepare data about zoom, highlight etc.
+			DisplayAttribTag = cls.FetchDisplayAttribsFromUndoRecord(UndoRecord)
+			RedrawDataXML = cls.GetFullRedrawData(Proj=Proj)
+			MsgToControlFrame = ElementTree.Element(info.NO_RedrawAfterUndo)
+			# add a ViewportID tag to the message, so that Control Frame knows which Viewport to redraw
+			ViewportTag = ElementTree.Element(info.ViewportTag)
+			ViewportTag.text = UndoRecord.ViewportID
+			ViewportTag.append(DisplayAttribTag)
+			MsgToControlFrame.append(ViewportTag)
+			MsgToControlFrame.append(RedrawDataXML)
+			vizop_misc.SendRequest(Socket=SocketFromDatacore.Socket, Command=info.NO_RedrawAfterUndo, XMLRoot=MsgToControlFrame)
+
+	@classmethod
+	def FetchDisplayAttribsFromUndoRecord(cls, UndoRecord):
+		# extract data about zoom, pan, highlight etc. from UndoRecord, build it into an XML tag DisplayAttribTag
+		# and return the tag
+		DisplaySpecificData = ElementTree.Element(info.DisplayAttribTag)
+		for (UndoRecordAttribName, TagName) in [ ('ChangedAttribName', info.AttribNameTag),
+				('Zoom', info.ZoomTag), ('PanX', info.PanXTag), ('PanY', info.PanYTag)]:
+			if hasattr(UndoRecord, UndoRecordAttribName):
+				ThisAttribTag = ElementTree.SubElement(DisplaySpecificData, TagName)
+				ThisAttribTag.text = str(getattr(UndoRecord, UndoRecordAttribName))
+		return DisplaySpecificData
 
 	@classmethod
 	def UpdateAssocTextFullViewAttribs(cls, Proj, XMLRoot):

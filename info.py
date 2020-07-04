@@ -131,6 +131,7 @@ HumanNameTag = 'HumanName'
 CanEditValueTag = 'CanEditValue'
 AttribNameTag = 'AttribName'
 NewAttribValueTag = 'NewAttribValue'
+DisplayAttribTag = 'DisplayAttribs'
 
 # for alarm list
 AlarmCountTag = 'AlarmCount'
@@ -141,7 +142,6 @@ AlarmTagTag = 'AlarmTag'
 # for Fault Tree
 FTTag = 'FT'
 ComponentHostIDTag = 'ComponentHostID'
-FTDisplayAttribTag = 'DisplayAttribs'
 FTElementContainingComponentToHighlight = 'ElContainingCptToHighlight'
 FTComponentToHighlight = 'CptToHighlight'
 TolFreqTag = 'TolFreq'
@@ -258,6 +258,7 @@ CategoryTag = 'Category'
 ConstValueTag = 'ConstValue'
 KindTag = 'Kind'
 FilterTextTag = 'FilterText'
+FilterAppliedTag = 'FilterApplied'
 ItemsSelectedTag = 'ItemsSelected'
 
 FTImagePrefix = 'FT_' # filenames containing all images used in FT must begin with this

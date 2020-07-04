@@ -3137,7 +3137,6 @@ class FTConnectorItemInCore(FTElementInCore): # in- and out-connectors (CX's) to
 		AI.Status = 'Closed'
 		AI.ID = self.Proj.GetNewID()
 		self.ActionItems.append(AI)
-		self.ActionItems.append(AI)
 		AI.Numbering = core_classes.NumberingItem()
 		self.Proj.ActionItems.append(AI)
 		# put a serial number into the numbering object
@@ -4194,9 +4193,9 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		return TargetValueIsValid
 
 	def FetchDisplayAttribsFromUndoRecord(self, UndoRecord):
-		# extract data about zoom, pan, highlight etc. from UndoRecord, build it into an XML tag FTDisplayAttribTag
+		# extract data about zoom, pan, highlight etc. from UndoRecord, build it into an XML tag DisplayAttribTag
 		# and return the tag
-		DisplaySpecificData = ElementTree.Element(info.FTDisplayAttribTag)
+		DisplaySpecificData = ElementTree.Element(info.DisplayAttribTag)
 		for (UndoRecordAttribName, TagName) in [ ('ElementID', info.FTElementContainingComponentToHighlight),
 				('ComponentName', info.FTComponentToHighlight), ('HostElementID', info.PHAElementTag),
 				('ComponentName', info.ComponentTag),
@@ -4817,7 +4816,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		NewAssociatedText = core_classes.AssociatedTextItem(Proj=self.Proj, PHAObjClass=type(self), Host=self)
 		NewAssociatedText.ID = self.Proj.GetNewID()
 		NewAssociatedText.Content = XMLRoot.findtext(info.AssociatedTextTag)
-		print('FT4820 add code here to store responsibility etcn')
+		print('FT4820 add code here to store responsibility etc')
 		if AssociatedTextListInProj:
 			NewAssociatedText.Numbering = copy.copy(AssociatedTextListInProj[-1].Numbering)
 		else:
@@ -5616,7 +5615,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		FTData = [t for t in XMLData.iter(info.PHAModelRedrawDataTag)][0]
 		# populate display-related attributes specific to this Viewport, such as zoom, pan, selection, collapse groups,
 		# and highlights
-		DisplayAttribData = FTData.find(info.FTDisplayAttribTag)
+		DisplayAttribData = FTData.find(info.DisplayAttribTag)
 		PopulateDisplayAttribs(self, DisplayAttribData)
 		# extract data about the overall FT
 		PopulateOverallData(FTData, HeaderEl=self.Header)

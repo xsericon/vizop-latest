@@ -1862,6 +1862,7 @@ class ControlFrame(wx.Frame):
 			for ThisWidget in Aspect.VariableWidgetList: ThisWidget.Widget.Destroy()
 			Aspect.VariableWidgetList = []
 			AssociatedTextList = getattr(TargetElement, AssociatedTextListAttrib)
+			print('CF1865 populating AT widgets with ATs: ', AssociatedTextList)
 			AssociatedTextNumberingList = getattr(TargetElement, AssociatedTextNumberingListAttrib)
 			# make a serial widget, textctrl and 'delete' button for each associated text
 			# RowOffset and ColOffset are offsets from the position of the placeholder in FixedWidgetList
@@ -2884,7 +2885,7 @@ class ControlFrame(wx.Frame):
 			# find the redraw data start tag in XMLRoot
 			ViewportTag = XMLRoot.find(info.PHAModelRedrawDataTag)
 			# find DisplayAttribs tag inside ViewportTag
-			DisplayAttribsTag = ViewportTag.find(info.FTDisplayAttribTag)
+			DisplayAttribsTag = ViewportTag.find(info.DisplayAttribTag)
 			# if tag found, extract zoom, PanX and PanY from it
 			if DisplayAttribsTag is not None:
 				ThisZoomTag = DisplayAttribsTag.find(info.ZoomTag)
@@ -3582,7 +3583,7 @@ class ControlFrame(wx.Frame):
 		for ThisViewportShadow in self.CurrentProj.AllViewportShadows:
 			# check if ThisViewportShadow is displayed in any display device, local or remote
 			if ThisViewportShadow.IsOnDisplay:
-				# get refresh data from corresponding PHA object (now done below: entire FTDisplayAttribTag is appended)
+				# get refresh data from corresponding PHA object (now done below: entire DisplayAttribTag is appended)
 				if ThisViewportShadow.PHAObj:
 					RedrawXMLData = ThisViewportShadow.PHAObj.GetFullRedrawData(Viewport=ThisViewportShadow,
 						ViewportClass=ThisViewportShadow.MyClass)
@@ -3597,7 +3598,7 @@ class ControlFrame(wx.Frame):
 				# append display parameter update data, if provided
 				if ViewportIDToUpdate == ThisViewportShadow.ID:
 					if ViewportToUpdateTag is not None:
-						FullXMLData.append(ViewportToUpdateTag.find(info.FTDisplayAttribTag))
+						FullXMLData.append(ViewportToUpdateTag.find(info.DisplayAttribTag))
 				# send all XML data to Viewport
 				vizop_misc.SendRequest(Socket=ThisViewportShadow.D2CSocketREQObj.Socket, Command='RQ_RedrawViewport',
 					XMLRoot=FullXMLData)
