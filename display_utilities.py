@@ -94,18 +94,23 @@ def ViewportClassWithName(TargetName):
 		return ViewportMetaClass.ViewportClasses[InternalNameList.index(TargetName)]
 	else: return None
 
-def ArchiveDestroyedViewport(Proj, ViewportShadow):
+def ArchiveDestroyedViewport(Proj, ViewportShadow, PersistentAttribs={}):
 	# store a deleted Viewport shadow in Proj's list, to enable retrieval of persistent attributes if the Viewport is
 	# re-created
 	# If another Viewport of the same class is already in the archive list, replace the old one in the list with the new one
+	# PersistentAttribs (dict): attribs to store in the Viewport shadow, to be restored if the Viewport is resurrected
 	# return: EjectedViewportShadow (the old version removed from the list, or None), TargetIndex (int: index where
 	# ViewportShadow is placed in the list); for undo
+	# first, store persistent attribs in the ViewportShadow in case the Viewport is resurrected later
+	print('DU105 archiving destroyed viewport')
+	ViewportShadow.PersistentAttribs = PersistentAttribs
+	# check if there's another Viewport of the same class already in the archive
 	ExistingViewportClasses = [v.MyClass for v in Proj.ArchivedViewportShadows]
 	if ViewportShadow.MyClass in ExistingViewportClasses: # replace existing archived Viewport shadow
 		TargetIndex = ExistingViewportClasses.index(ViewportShadow.MyClass)
 		EjectedViewportShadow = Proj.ArchivedViewportShadows[TargetIndex] # keep the old one for undo
 		Proj.ArchivedViewportShadows[TargetIndex] = ViewportShadow # overwrite old one with new one
-	else:
+	else: # no existing Viewport of this class; add it
 		Proj.ArchivedViewportShadows.append(ViewportShadow)
 		EjectedViewportShadow = None
 		TargetIndex = len(Proj.ArchivedViewportShadows) - 1 # index of archived ViewportShadow in list

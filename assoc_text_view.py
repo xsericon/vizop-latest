@@ -102,6 +102,12 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 		self.FilterText = '' # filter text currently applied to AT display; might not be the same as contents of TextCtrl
 		self.InitializeActionChoices()
 
+	def GetMyPersistentAttribs(self):
+		# return dict with keys: attrib names for persistent attribs, values: str
+		return {'AssocTextKind': self.AssocTextKind}
+
+	PersistentAttribs = property(fget=GetMyPersistentAttribs)
+
 	def InitializeActionChoices(self):
 		self.PromptOption = core_classes.ChoiceItem(XMLName='Prompt', HumanName=_('Select an action...'), Applicable=True)
 		self.DeleteUnusedATsOption = core_classes.ChoiceItem(XMLName='DeleteUnused', HumanName=_('Delete unused items'))
@@ -660,17 +666,21 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 		# text change was made, with the original zoom  restored, and scrolled so that the first changed row is on screen
 		# and the changed attrib highlighted (so that the undo is visible to the user) (TODO)
 		# SocketFromDatacore (socket object): socket to send redraw message from datacore to Control Frame
+		print('AT663 in redraw after undo')
 		# first, check whether to redraw
 		if not SkipRefresh:
 			# prepare data about zoom, highlight etc.
 			DisplayAttribTag = cls.FetchDisplayAttribsFromUndoRecord(UndoRecord)
 			RedrawDataXML = cls.GetFullRedrawData(Proj=Proj)
 			MsgToControlFrame = ElementTree.Element(info.NO_RedrawAfterUndo)
+			ProjTag = ElementTree.Element(info.ProjIDTag)
+			ProjTag.text = Proj.ID
 			# add a ViewportID tag to the message, so that Control Frame knows which Viewport to redraw
 			ViewportTag = ElementTree.Element(info.ViewportTag)
 			ViewportTag.text = UndoRecord.ViewportID
 			ViewportTag.append(DisplayAttribTag)
 			MsgToControlFrame.append(ViewportTag)
+			MsgToControlFrame.append(ProjTag)
 			MsgToControlFrame.append(RedrawDataXML)
 			vizop_misc.SendRequest(Socket=SocketFromDatacore.Socket, Command=info.NO_RedrawAfterUndo, XMLRoot=MsgToControlFrame)
 

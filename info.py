@@ -132,6 +132,7 @@ CanEditValueTag = 'CanEditValue'
 AttribNameTag = 'AttribName'
 NewAttribValueTag = 'NewAttribValue'
 DisplayAttribTag = 'DisplayAttribs'
+PersistentAttribsTag = 'PersistentAttribs'
 
 # for alarm list
 AlarmCountTag = 'AlarmCount'

@@ -1782,7 +1782,7 @@ class ControlFrame(wx.Frame):
 				Handler=lambda Event: self.AssociatedTextAspect_OnFullAssociatedTextListButton(Event, Aspect=NewAspect),
 				Events=[wx.EVT_BUTTON], ColLoc=13, ColSpan=1, GapX=20,
 				Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_LEFT | wx.EXPAND)
-			# make list of all fixed widgets in this aspect%%%
+			# make list of all fixed widgets in this aspect
 			NewAspect.FixedWidgetList = [NewAspect.NavigateBackButton,
 				NewAspect.NavigateForwardButton,
 				NewAspect.HeaderLabel,
@@ -1870,7 +1870,7 @@ class ControlFrame(wx.Frame):
 			for (ThisAssociatedTextIndex, ThisAssociatedText) in enumerate(AssociatedTextList):
 				Aspect.VariableWidgetList.append(UIWidgetItem(wx.StaticText(NotebookPage, -1,
 					AssociatedTextNumberingList[ThisAssociatedTextIndex]), RowOffset=ThisAssociatedTextIndex,
-					ColOffset=1, ColSpan=1, GapX=20))# %%%
+					ColOffset=1, ColSpan=1, GapX=20))
 				Aspect.VariableWidgetList.append(UIWidgetItem(wx.TextCtrl(NotebookPage, -1, ThisAssociatedText,
 					style=wx.TE_PROCESS_ENTER), RowOffset=ThisAssociatedTextIndex, ColOffset=2, ColSpan=1,
 					Handler=lambda Event: self.AssociatedTextAspect_OnEditAssociatedText(Event=Event, Aspect=Aspect),
@@ -2484,7 +2484,7 @@ class ControlFrame(wx.Frame):
 		for ThisSocketObj in IncomingViewportSocketObjs:
 			# pass request to PHA model associated with the Viewport (we do this via datacore, not directly,
 			# so that local and remote Viewports are treated the same)
-#			if ThisSocketObj.Viewport.PHAObj: # proceed only if Viewport has been assigned to a PHA object%%%
+#			if ThisSocketObj.Viewport.PHAObj: # proceed only if Viewport has been assigned to a PHA object
 			if True:
 				# pass any message to message handler for Viewport's PHA object, if any, else to the Viewport class itself
 				ViewportMessageReceivedThisTime = vizop_misc.ListenToSocket(Proj=self.CurrentProj,
@@ -2562,6 +2562,7 @@ class ControlFrame(wx.Frame):
 		# find the project with the ID provided
 		Proj = self.Projects[ [p.ID for p in self.Projects].index(ProjIDTagInXML.text) ]
 		# handlers for all possible requests from Control Frame. Handlers must return an XML reply message
+		# TODO RQ_DestroyViewport not currently used; remove
 		Handler = {'RQ_NewViewport': self.DatacoreDoNewViewport,
 			'RQ_SwitchToViewport': self.DatacoreSwitchToViewport,
 			'RQ_NewFTEventNotIPL': self.DatacoreDoNewFTEventNotIPL,
@@ -2586,6 +2587,7 @@ class ControlFrame(wx.Frame):
 		#	PHAModel (instance) to attach the Viewport to,
 		#	Chain (bool): whether this new Viewport creation call is chained from another event (e.g. new PHA model)
 		#	ViewportInRedoRecord (Viewport instance) if Redoing
+		# return: New Viewport ID
 		assert isinstance(Redoing, bool)
 		assert isinstance(ViewportArgs, dict)
 		assert all(isinstance(k, str) for k in ViewportArgs.keys()) # confirm all keys of ViewportArgs are str
@@ -2630,7 +2632,8 @@ class ControlFrame(wx.Frame):
 			for ThisTip in VizopTalksTips:
 				ThisTip.update( {'Priority': Tip_Context_GeneralPriority} )
 				self.MyVTPanel.SubmitVizopTalksMessage(**ThisTip)
-		return vizop_misc.MakeXMLMessage('Null', 'Null')
+		return NewViewport.ID
+#		return vizop_misc.MakeXMLMessage('Null', 'Null')
 
 	def DoNewPHAModelCommand(self, Proj, PHAModelClass, **Args):
 		# handle request for new PHA model in project Proj
@@ -2703,7 +2706,7 @@ class ControlFrame(wx.Frame):
 		return vizop_misc.MakeXMLMessage('Null', 'Null')
 
 	def DoSwitchToViewportCommand(self, Proj, PHAObj, Viewport, Redoing=False, Chain=False, ViewportToDestroy=None, **Args):
-		# handle request to switch to existing Viewport in project Proj
+		# handle request to switch to existing Viewport in project Proj. Client side function
 		# Redoing (bool): whether we are redoing an undone "switch to Viewport" operation (currently not used, can be removed)
 		# Chain (bool): whether this new Viewport creation call is chained from another event (e.g. switch PHA model)
 		# ViewportToDestroy (Viewport instance or None): if specified, destroy this Viewport
@@ -2728,9 +2731,35 @@ class ControlFrame(wx.Frame):
 		TargetViewportAttribs = {'ControlFrame': self.ID, info.SkipRefreshTag: utilities.Bool2Str(Chain),
 			info.ProjIDTag: Proj.ID, info.ViewportTag: Viewport.ID,
 			info.PHAModelIDTag: PHAObj.ID}
-		if KeepingOldViewport: 	TargetViewportAttribs.update({info.MilestoneIDTag: NewMilestone.ID})
-		else: TargetViewportAttribs.update({info.DoomedViewportIDTag: ViewportToDestroy.ID})
-		vizop_misc.SendRequest(self.zmqOutwardSocket, Command=RequestToDatacore, **TargetViewportAttribs)
+		if KeepingOldViewport:
+			TargetViewportAttribs.update({info.MilestoneIDTag: NewMilestone.ID})
+			vizop_misc.SendRequest(self.zmqOutwardSocket, Command=RequestToDatacore, **TargetViewportAttribs)
+		# if destroying old Viewport, get its persistent attribs for storage in datacore's Viewport archive
+		else:
+			TargetViewportAttribs.update({info.DoomedViewportIDTag: ViewportToDestroy.ID})
+			PersistentAttribs = getattr(ViewportToDestroy, 'PersistentAttribs', [])
+			if PersistentAttribs:
+				# make an XML message to send via SendRequest (following code derived from vizop_misc.SendRequest())
+				RootElement = ElementTree.Element(RequestToDatacore)
+#				MyXMLTree = ElementTree.ElementTree(element=RootElement)
+				# for any Args, make sub-elements and insert into the XML tree
+				for Cmd, Values in TargetViewportAttribs.items():
+					# force Values to be a list; if only a single str was supplied, put it in a list
+					if type(Values) is not list:
+						Values = [Values]
+					# make multiple sub-elements, one for each item in Values; set element text to corresponding value in Values
+					for ThisValue in Values:
+						NewElement = ElementTree.SubElement(RootElement, Cmd)
+						NewElement.text = ThisValue
+				# add PersistentAttribs subelement
+				PersistentAttribsEl = ElementTree.SubElement(RootElement, info.PersistentAttribsTag)
+				# add persistent attribs inside this subelement
+				for AttribXMLTag, AttribValue in PersistentAttribs.items():
+					ThisEl = ElementTree.SubElement(PersistentAttribsEl, AttribXMLTag)
+					ThisEl.text = AttribValue
+				vizop_misc.SendRequest(Socket=self.zmqOutwardSocket, XMLRoot=RootElement)
+			else: # send request without persistent attribs
+				vizop_misc.SendRequest(self.zmqOutwardSocket, Command=RequestToDatacore, **TargetViewportAttribs)
 		# show VizopTalks confirmation message
 		if not Redoing:
 			VTMessage = PHAObj.HumanName + '\n\n' + _('Use back button to go back') if KeepingOldViewport \
@@ -2851,7 +2880,7 @@ class ControlFrame(wx.Frame):
 			self.CurrentViewport = None
 
 	def SwitchToViewport(self, TargetViewport=None, XMLRoot=None, debug=0):
-		# Client side method
+		# Client side method%%%
 		# switch edit panel display (in local ControlFrame) to show TargetViewport
 		# TargetViewport (actual Viewport instance, not Viewport shadow)
 		assert isinstance(TargetViewport, display_utilities.ViewportBaseClass)
@@ -3026,6 +3055,7 @@ class ControlFrame(wx.Frame):
 			NewViewport.PHAObj = ExistingPHAObj
 			# set DatacoreHandler, telling NewViewport where to find datacore request handlers. FIXME this might point to ViewportShadow!
 			NewViewport.DatacoreHandler = ExistingPHAObj if ExistingPHAObj else NewViewport
+			print('CF3058 setting new Viewport as visible')
 			NewViewport.IsOnDisplay = True # set flag that ensures NewViewport will get redrawn
 			if ExistingPHAObj is None:
 				Proj.ViewportsWithoutPHAObjs.append(NewViewport) # add Viewport to list in the PHA object
@@ -3057,12 +3087,20 @@ class ControlFrame(wx.Frame):
 		print('CF3044 removing viewport from HostViewportList: ', HostViewportList)
 		DoomedViewport = utilities.ObjectWithID(HostViewportList, DoomedViewportID)
 		print('CF3045 viewport to remove: ', DoomedViewport)
+		DoomedViewport.IsOnDisplay = False # mark it as no longer visible
 		# remove the Viewport from its PHA object
 		HostViewportList.remove(DoomedViewport)
 		# remove the Viewport from the project's master list, and store it in the Archived list in case it is re-created
 		ThisProj.AllViewportShadows.remove(DoomedViewport)
+		# find any persistent attribs supplied in XMLRoot
+		PersistentAttribsTag = XMLRoot.find(info.PersistentAttribsTag)
+		if PersistentAttribsTag is None:
+			PersistentAttribs = {}
+		else:
+			PersistentAttribs = dict([(ThisPATag.tag, ThisPATag.text) for ThisPATag in PersistentAttribsTag])
+		print('CF3099 recovered persistent attribs: ', PersistentAttribs)
 		EjectedViewportShadow, ArchiveIndex = display_utilities.ArchiveDestroyedViewport(Proj=ThisProj,
-			ViewportShadow=DoomedViewport)
+			ViewportShadow=DoomedViewport, PersistentAttribs=PersistentAttribs)
 			# TODO use args returned from ArchiveDestroyedViewport in undo record
 		Reply = vizop_misc.MakeXMLMessage(RootName='RP_DestroyViewport', RootText=DoomedViewportID, Elements={})
 		return Reply
@@ -3107,10 +3145,30 @@ class ControlFrame(wx.Frame):
 			ThisProj = utilities.ObjectWithID(self.Projects, XMLRoot.find(info.ProjIDTag).text)
 			ClassList = display_utilities.ViewportMetaClass.ViewportClasses # list of all user-requestable Viewport classes
 			TargetViewportID = XMLRoot.find(info.ViewportTag).text
+			ExistingPHAObjIDRequested = XMLRoot.find(info.PHAModelIDTag)
+			ExistingPHAObj = None if ExistingPHAObjIDRequested is None \
+				else utilities.ObjectWithID(ThisProj.PHAObjs, TargetID=ExistingPHAObjIDRequested.text)
+		# Check if target Viewport is in the current lineup of Viewport shadows
+		print('CF3116 checking if target Viewport exists')
+		if TargetViewportID in [v.ID for v in ThisProj.AllViewportShadows]:
 			TargetViewport = utilities.ObjectWithID(ThisProj.AllViewportShadows, TargetID=TargetViewportID)
-			ExistingPHAObj = utilities.ObjectWithID(ThisProj.PHAObjs, TargetID=XMLRoot.find(info.PHAModelIDTag).text)
+			TargetViewport.IsOnDisplay = True
+		else: # it isn't in the current lineup; so it must be in the archived Viewports list, rebuild from there
+			ViewportArgs = {'ViewportToRevertTo': self.CurrentViewport,
+							'OriginatingViewport': self.CurrentViewport}
+			ArchivedViewportShadow = utilities.ObjectWithID(ThisProj.ArchivedViewportShadows, TargetID=TargetViewportID)
+			# fetch persistent attribs from ArchivedViewportShadow (stored in ArchiveDestroyedViewport())
+			#  and feed them to the new Viewport
+			print('CF3157 restoring persistent attribs: ', getattr(ArchivedViewportShadow, 'PersistentAttribs', None))
+			ViewportArgs.update(getattr(ArchivedViewportShadow, 'PersistentAttribs', {}))
+			self.DoNewViewportCommand(Proj=ThisProj, ViewportClass=ArchivedViewportShadow.MyClass,
+				Chain=True, PHAModel=ExistingPHAObj, ViewportArgs=ViewportArgs)
+			# no need to set Viewport.IsOnDisplay here, as it is set in DatacoreDoNewViewport()
+			# Next line is an ugly workaround. We need(?) to pass a Viewport shadow to MakeXMLMessageForDrawViewport(),
+			# and this is the only one we have at this point, as the newly re-created Viewport shadow may not exist yet.
+			# FIXME: see if we can remove the Viewport arg from the call to MakeXMLMessageForDrawViewport() - may not be used
+			TargetViewport = ArchivedViewportShadow
 		# make reply message to send to control frame
-		TargetViewport.IsOnDisplay = True
 		Reply = self.MakeXMLMessageForDrawViewport(MessageHead='RP_SwitchToViewport', PHAObj=ExistingPHAObj,
 			Viewport=TargetViewport, ViewportID=TargetViewportID)
 		# check whether we should destroy an old Viewport, and destroy it if required
@@ -3579,10 +3637,22 @@ class ControlFrame(wx.Frame):
 			ViewportToUpdateTag = XMLRoot.find(info.ViewportTag)
 			if ViewportToUpdateTag is not None:
 				ViewportIDToUpdate = ViewportToUpdateTag.text
+		# if a Viewport was specified, and it's not on display, we need to display it (e.g. to show an undo).%%%
+		print('CF3583 checking if we need to bring back a Viewport with ID: ', ViewportIDToUpdate)
+		ViewportToSkip = None
+		if ViewportIDToUpdate is not None:
+			ViewportShadowToUpdate = utilities.ObjectWithID(
+				self.CurrentProj.AllViewportShadows + self.CurrentProj.ArchivedViewportShadows, ViewportIDToUpdate)
+			print('CF3588 found Viewport: ', ViewportShadowToUpdate, ViewportShadowToUpdate.IsOnDisplay)
+			if not ViewportShadowToUpdate.IsOnDisplay:
+				print('CF3589 bringing back Viewport with ID: ', ViewportShadowToUpdate.ID, ViewportShadowToUpdate.HumanName)
+				self.DatacoreSwitchToViewport(XMLRoot=XMLRoot, Chain='NoChain')
+				# mark this Viewport as "skip", i.e. no need to redraw it again here
+				ViewportToSkip = ViewportShadowToUpdate
 		# Check with all Viewports that datacore knows about
 		for ThisViewportShadow in self.CurrentProj.AllViewportShadows:
 			# check if ThisViewportShadow is displayed in any display device, local or remote
-			if ThisViewportShadow.IsOnDisplay:
+			if ThisViewportShadow.IsOnDisplay and (ThisViewportShadow != ViewportToSkip):
 				# get refresh data from corresponding PHA object (now done below: entire DisplayAttribTag is appended)
 				if ThisViewportShadow.PHAObj:
 					RedrawXMLData = ThisViewportShadow.PHAObj.GetFullRedrawData(Viewport=ThisViewportShadow,
