@@ -44,8 +44,10 @@ class AssocTextItemInDisplay(object):
 	def __init__(self):
 		object.__init__(self)
 		self.ID = ''
-		print('AT47 reminder, need to fetch ID of action items')
 		self.Content = ''
+		self.Responsibility = ''
+		self.Deadline = ''
+		self.Status = ''
 		self.Numbering = ''
 		self.FilteredIn = True # bool; whether this item shows up in the current filters. Defined only if filters are applied.
 		self.Selected = False # bool; whether this item is currently selected by the user
@@ -141,7 +143,7 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 				Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_LEFT | wx.EXPAND, Sizer=self.HeaderSizer,
 				ColLoc=1, ColSpan=1)
 			self.TextFilterText = UIWidgetItem(wx.TextCtrl(HostPanel, -1, style=wx.TE_PROCESS_ENTER),
-				MinSizeY=25, Events=[wx.EVT_TEXT_ENTER], Handler=self.OnFilterText, GapX=10, Sizer=self.HeaderSizer,
+				MinSizeY=25, Events=[wx.EVT_TEXT], Handler=self.OnFilterText, GapX=10, Sizer=self.HeaderSizer,
 				Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_LEFT | wx.EXPAND,
 				MinSizeX=200, ColLoc=3, ColSpan=1, DisplayMethod='StaticFromText')
 			self.ActionLabel = UIWidgetItem(wx.StaticText(HostPanel, -1, _('Select action:')), Sizer=self.HeaderSizer,
@@ -195,7 +197,10 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 #		self.WidgetsToActivate = SetupHeaderSizer(HostPanel=HostPanel) + SetupAssocTextListSizer(HostPanel=HostPanel)
 
 	def OnFilterText(self, Event): # handle Enter key press in text filter TextCtrl
-		pass
+		# mark each associated text as whether currently visible, based on current filters
+		self.ApplyFilters(FilterText=self.TextFilterText.Widget.GetValue(), FilterApplied=True)
+		# repopulate action items list according to new filter setting
+		self.PopulateATList(CurrentAT=None)
 
 	def OnActionChoice(self, Event): # handle user selection in Action choice control
 		pass
@@ -213,6 +218,7 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 		# first, unpack data from datacore
 		self.UnpackDataFromDatacore(XMLTree)
 		# build the display: prefill widgets and activate it
+		print('AT219 TODO: reapply previous filter')
 		self.ApplyFilters() # mark each associated text as whether currently visible, based on current filters
 		self.Prefill(SystemFontNames=self.SystemFontNames)
 		self.SetWidgetVisibility()
@@ -256,7 +262,19 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 				ThisAT.PHAElements.append(ThisElUsing)
 
 	def ApplyFilters(self, FilterText='', FilterApplied=False):
-		print('AT175 in ApplyFilters')
+		# set each AT's FilteredIn flag according to FilterText (str)
+		# If FilterApplied is False, all ATs' FilteredIn flags are set to True
+		assert isinstance(FilterText, str)
+		assert isinstance(FilterApplied, bool)
+		FilterTextLower = FilterText.lower() # for case-insensitive searching
+		# set all ATs to filtered in if FilterApplied is False or FilterText is empty
+		ApplyFilter = (FilterText != '') and FilterApplied
+		for ThisAT in self.AssocTexts:
+			if ApplyFilter:
+				# set AT as FilteredIn if any of its searchable fields contain FilterText (case insensitive)
+				ThisAT.FilteredIn = any(FilterTextLower in ThisField.lower() for ThisField in \
+					[ThisAT.Content, ThisAT.Responsibility, ThisAT.Deadline, ThisAT.Status])
+			else: ThisAT.FilteredIn = True
 
 	def Prefill(self, SystemFontNames=None, CurrentAT=None): # prefill widgets for associated text display
 		# set header to e.g. "Showing 5 of 10 action items in the project"
@@ -507,10 +525,17 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 			StatusEl.text = ThisAssocTextItem.Status
 			# make subelement for each PHA element using this AT, if any. Set its text to the displayable name of the
 			# element. Add an attribute containing the PHA element's ID.
+			# TODO put this code for getting displayable name in a more general place. It'll be needed elsewhere
 			for ThisPHAElement in ATTable.get(ThisAssocTextItem, []):
 				PHAElUsingEl = ElementTree.SubElement(ATEl, info.PHAElementTag)
-				PHAElUsingEl.text = ThisPHAElement.HostPHAObj.HumanName + ' ' + \
-					ThisPHAElement.Numbering.HumanValue(PHAItem=ThisPHAElement, Host=ThisPHAElement.Siblings)[0]
+				DisplayableElementName = ': ' + ThisPHAElement.HumanName if ThisPHAElement.HumanName else ''
+				DisplayableElementNumbering = ThisPHAElement.Numbering.HumanValue(PHAItem=ThisPHAElement, Host=ThisPHAElement.Siblings)[0]
+				if DisplayableElementNumbering: DisplayableElementNumbering = ' ' + DisplayableElementNumbering
+				DisplayableHostName = ThisPHAElement.HostPHAObj.HumanName if ThisPHAElement.HostPHAObj.HumanName else \
+					type(ThisPHAElement.HostPHAObj).HumanName
+				PHAElUsingEl.text = ThisPHAElement.ClassHumanName + \
+					DisplayableElementNumbering +\
+					DisplayableElementName + ' ' + _('in') + ' ' + DisplayableHostName
 				PHAElUsingEl.set(info.IDTag, ThisPHAElement.ID)
 
 		# populate any extra tags requested (currently used by undo for specifying display-specific tags)
@@ -525,7 +550,6 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 			assert isinstance(Args['ExtraXMLTagsAsTags'], ElementTree.Element)
 			RootElement.append(Args['ExtraXMLTagsAsTags'])
 		# TODO add info.DisplayAttribTag with zoom and pan data
-		print('AT270 ending GetFullRedrawData with RootElement: ', ElementTree.tostring(RootElement))
 		return RootElement
 
 	def AllClickableObjects(self, **Args):

@@ -2109,6 +2109,7 @@ class ControlFrame(wx.Frame):
 
 		def ReleaseViewportFromDisplDevice(self):
 			# execute actions needed when display device is changing from one Viewport to another
+			print('CF2112 in ReleaseViewportFromDisplDevice')
 			# first, do wrap-up actions in the Viewport
 			self.ViewportOwner.CurrentViewport.ReleaseDisplayDevice(DisplDevice=self)
 			self.TopLevelFrame.CurrentViewport = None # this probably isn't used, redundant
@@ -2805,10 +2806,16 @@ class ControlFrame(wx.Frame):
 		assert isinstance(XMLRoot, ElementTree.Element)
 		# find the new PHA object from the ID returned from datacore, or None if there's no associated PHA object
 		PHAObjIDTag = XMLRoot.find(info.IDTag)
-		print('CF2776 finding PHAObj by ID:', PHAObjIDTag, type(PHAObjIDTag))
-		PHAObj = None if PHAObjIDTag is None else utilities.ObjectWithID(core_classes.PHAModelBaseClass.AllPHAModelObjects,
-			utilities.TextAsString(PHAObjIDTag))
-		print('CF2779 finished finding PHAObj by ID')
+		if PHAObjIDTag is None:
+			PHAObj = None
+		else: # try to find target ID in PHA objects. FIXME this is a workaround - the ID supplied could be a Viewport
+			# rather than a PHA object. This is a bug-in-waiting
+			TargetID = utilities.TextAsString(PHAObjIDTag)
+			if TargetID in [p.ID for p in core_classes.PHAModelBaseClass.AllPHAModelObjects]:
+				PHAObj = utilities.ObjectWithID(core_classes.PHAModelBaseClass.AllPHAModelObjects, TargetID)
+			else:
+				PHAObj = None
+				print('CF2818 PostProcessNewViewport: received target ID that''s not a PHA object')
 		# find the new Viewport from the ID returned from datacore (it's the text of the root tag) for checking
 		assert self.TrialViewport.ID == XMLRoot.text
 		# attach PHA object (if any) to Viewport
@@ -3055,7 +3062,6 @@ class ControlFrame(wx.Frame):
 			NewViewport.PHAObj = ExistingPHAObj
 			# set DatacoreHandler, telling NewViewport where to find datacore request handlers. FIXME this might point to ViewportShadow!
 			NewViewport.DatacoreHandler = ExistingPHAObj if ExistingPHAObj else NewViewport
-			print('CF3058 setting new Viewport as visible')
 			NewViewport.IsOnDisplay = True # set flag that ensures NewViewport will get redrawn
 			if ExistingPHAObj is None:
 				Proj.ViewportsWithoutPHAObjs.append(NewViewport) # add Viewport to list in the PHA object
@@ -3637,15 +3643,12 @@ class ControlFrame(wx.Frame):
 			ViewportToUpdateTag = XMLRoot.find(info.ViewportTag)
 			if ViewportToUpdateTag is not None:
 				ViewportIDToUpdate = ViewportToUpdateTag.text
-		# if a Viewport was specified, and it's not on display, we need to display it (e.g. to show an undo).%%%
-		print('CF3583 checking if we need to bring back a Viewport with ID: ', ViewportIDToUpdate)
+		# if a Viewport was specified, and it's not on display, we need to display it (e.g. to show an undo)
 		ViewportToSkip = None
 		if ViewportIDToUpdate is not None:
 			ViewportShadowToUpdate = utilities.ObjectWithID(
 				self.CurrentProj.AllViewportShadows + self.CurrentProj.ArchivedViewportShadows, ViewportIDToUpdate)
-			print('CF3588 found Viewport: ', ViewportShadowToUpdate, ViewportShadowToUpdate.IsOnDisplay)
 			if not ViewportShadowToUpdate.IsOnDisplay:
-				print('CF3589 bringing back Viewport with ID: ', ViewportShadowToUpdate.ID, ViewportShadowToUpdate.HumanName)
 				self.DatacoreSwitchToViewport(XMLRoot=XMLRoot, Chain='NoChain')
 				# mark this Viewport as "skip", i.e. no need to redraw it again here
 				ViewportToSkip = ViewportShadowToUpdate

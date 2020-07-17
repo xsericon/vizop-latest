@@ -2767,6 +2767,18 @@ class FTEventInCore(FTElementInCore): # FT event object used in DataCore by FTOb
 		DestinationEl.Value.SetMyUnit(DestinationEl.LastSelectedUnitPerQtyKind[self.Value.GetMyUnit().QtyKind])
 		return vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
 
+	def GetMyHumanName(self): # return displayable human name of this FT element
+		return self.EventDescription
+
+	HumanName = property(fget=GetMyHumanName)
+
+	def GetMyClassHumanName(self): # return human name of this type of FT element
+		# We can't do this as a @classmethod because it depends on the ElementType attrib of the instance, and also
+		# there's no way to call property() on a class attribute%%%
+		return FTEventTypeNameHash[self.EventType]
+
+	ClassHumanName = property(fget=GetMyClassHumanName)
+
 class FTGateItemInCore(object): # logic gate in a Fault Tree, used in DataCore
 #	AllFTGatesInCore = [] # register of all FTGates created; used to generate IDs
 	InternalName = 'FTGateInCore'
@@ -3019,6 +3031,18 @@ class FTGateItemInCore(object): # logic gate in a Fault Tree, used in DataCore
 		elif NewUnit.QtyKind == 'Frequency': self.LastSelectedUnitPerQtyKind['Frequency'] = NewUnit
 		else: print("CC2203 warning, unexpected QtyKind for gate value: ", NewUnit.QtyKind)
 
+	def GetMyHumanName(self): # return displayable human name of this FT gate
+		return self.GateDescription
+
+	HumanName = property(fget=GetMyHumanName)
+
+	def GetMyClassHumanName(self): # return human name of this type of FT element
+		# We can't do this as a @classmethod because, for other classes, it depends on attrib values of the instance, and also
+		# there's no way to call property() on a class attribute
+		return _('Gate')
+
+	ClassHumanName = property(fget=GetMyClassHumanName)
+
 def NextCombination(Length, PassMark):
 	# generator function returning the next combination (list) in a sequence of combinations.
 	# Each combination is a Length-long (int) list of True's and False's, of which exactly PassMark (int) items are True
@@ -3222,6 +3246,13 @@ class FTConnectorItemInCore(FTElementInCore): # in- and out-connectors (CX's) to
 			return AlreadyConnectorsIn
 		else: # it's a connector-in; return empty list
 			return []
+
+	def GetMyClassHumanName(self): # return human name of this type of FT element
+		# We can't do this as a @classmethod because, for other classes, it depends on attrib values of the instance, and also
+		# there's no way to call property() on a class attribute
+		return _('Connector')
+
+	ClassHumanName = property(fget=GetMyClassHumanName)
 
 class FTCollapseGroupInCore(object): # collapse group containing one or more FT elements that can be shown collapsed
 	# into a single object for more compact display
