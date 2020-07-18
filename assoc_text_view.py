@@ -198,7 +198,10 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 
 	def OnFilterText(self, Event): # handle Enter key press in text filter TextCtrl
 		# mark each associated text as whether currently visible, based on current filters
-		self.ApplyFilters(FilterText=self.TextFilterText.Widget.GetValue(), FilterApplied=True)
+		ShowingCount = self.ApplyFilters(FilterText=self.TextFilterText.Widget.GetValue(), FilterApplied=True)
+		self.SetMainHeaderLabel(ShowingCount=ShowingCount)
+		# update available choices in "action" choice box
+		self.UpdateActionChoices()
 		# repopulate action items list according to new filter setting
 		self.PopulateATList(CurrentAT=None)
 
@@ -264,25 +267,35 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 	def ApplyFilters(self, FilterText='', FilterApplied=False):
 		# set each AT's FilteredIn flag according to FilterText (str)
 		# If FilterApplied is False, all ATs' FilteredIn flags are set to True
+		# return ShowingCount (int; number of AT's whose FilteredIn flag is True after filtering
 		assert isinstance(FilterText, str)
 		assert isinstance(FilterApplied, bool)
 		FilterTextLower = FilterText.lower() # for case-insensitive searching
 		# set all ATs to filtered in if FilterApplied is False or FilterText is empty
 		ApplyFilter = (FilterText != '') and FilterApplied
+		# initialise ShowingCount to 0 if we are filtering; otherwise set it to = number of ATs
+		ShowingCount = 0 if ApplyFilter else len(self.AssocTexts)
 		for ThisAT in self.AssocTexts:
 			if ApplyFilter:
 				# set AT as FilteredIn if any of its searchable fields contain FilterText (case insensitive)
 				ThisAT.FilteredIn = any(FilterTextLower in ThisField.lower() for ThisField in \
 					[ThisAT.Content, ThisAT.Responsibility, ThisAT.Deadline, ThisAT.Status])
+				ShowingCount += int(ThisAT.FilteredIn)
 			else: ThisAT.FilteredIn = True
+		return ShowingCount
+
+	def SetMainHeaderLabel(self, ShowingCount=0):
+		# update content of main header label to show number of associated texts on display
+		assert isinstance(ShowingCount, int)
+		self.MainHeaderLabel.Widget.SetLabel(_('Showing %d of %d %s in the project') % \
+			(ShowingCount, len(self.AssocTexts),
+			self.AssocTextName(Plural=bool(len(self.AssocTexts) - 1))))
 
 	def Prefill(self, SystemFontNames=None, CurrentAT=None): # prefill widgets for associated text display
-		# set header to e.g. "Showing 5 of 10 action items in the project"
 		# CurrentAT (AssocTextItemInDisplay instance or None): the AT the user is currently working with
 		assert isinstance(CurrentAT, AssocTextItemInDisplay) or (CurrentAT is None)
-		self.MainHeaderLabel.Widget.SetLabel(_('Showing %d of %d %s in the project') % \
-			([i.FilteredIn for i in self.AssocTexts].count(True), len(self.AssocTexts),
-			self.AssocTextName(Plural=bool(len(self.AssocTexts) - 1))))
+		# set header to e.g. "Showing 5 of 10 action items in the project"
+		self.SetMainHeaderLabel(ShowingCount=[i.FilteredIn for i in self.AssocTexts].count(True))
 		self.TextFilterText.Widget.ChangeValue(self.FilterText)
 		# set available choices in "action" choice box
 		self.UpdateActionChoices()
@@ -294,7 +307,6 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 	def SetWidgetVisibility(self, **Args):
 		# set IsVisible attribs for all widgets
 		for ThisWidget in self.HeaderFixedWidgets: ThisWidget.IsVisible = True
-#		for ThisWidget in self.HeaderFixedWidgets + self.ATListFixedWidgets: ThisWidget.IsVisible = True
 
 	def AssocTextName(self, Plural=True):
 		# return (str) name of associated text kind; plural if Plural (bool)
@@ -395,6 +407,7 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 				ThisAT.GridRow = None
 		# update the grid object: tell it to add or delete rows according to whether there are more or less than last time
 		NewNumberOfRows = RowIndex + 1
+		print('AT410 grid old rows, new rows: ', OldNumberOfRows, NewNumberOfRows)
 		GridWidget.BeginBatch()
 		if NewNumberOfRows > OldNumberOfRows:
 			GridWidget.ProcessTableMessage(wx.grid.GridTableMessage(GridWidget.DataTable,
@@ -406,6 +419,7 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 		GridWidget.EndBatch()
 
 		# set grid size
+		GridWidget.SetSize(GridWidget.GetBestSize()) # reset grid size in case number of rows has changed
 		PanelSizeX, PanelSizeY = self.DisplDevice.GetSize()
 		VertScrollbarXAllowanceInPx = 10  # x-size to allow for scrollbar
 		# define amount of width to allocate to each column. Row label column gets 1.0 by definition
