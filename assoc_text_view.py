@@ -92,7 +92,8 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 		# do initial setup of display
 		# make list of internal names of columns to show in AT grid list, in display order. Eventually, this should be persistent
 		# This list is what defines the actual display order of columns
-		self.ATListColInternalNames = ['Number', 'Content', 'Responsibility', 'Deadline', 'Status', 'WhereUsed']
+		# ID column isn't shown - it's used as a hash to the matching AT object
+		self.ATListColInternalNames = ['ID', 'Number', 'Content', 'Responsibility', 'Deadline', 'Status', 'WhereUsed']
 		# can add 'Selected' to provide a checkbox column, partially constructed in the rest of the code. See notes in
 		# spec file 391
 		self.SetupViewport(HostPanel=DisplDevice, Fonts=Fonts,
@@ -116,11 +117,16 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 		self.ExportAllOption = core_classes.ChoiceItem(XMLName='ExportAll', HumanName=_('Export all items'))
 		self.ExportFilteredOption = core_classes.ChoiceItem(XMLName='ExportFiltered', HumanName=_('Export filtered items'))
 		self.ExportSelectedOption = core_classes.ChoiceItem(XMLName='ExportSelected', HumanName=_('Export selected items'))
+		self.SelectAllOption = core_classes.ChoiceItem(XMLName='SelectAll', HumanName=_('Select all items'))
+		self.SelectNoneOption = core_classes.ChoiceItem(XMLName='SelectNone', HumanName=_('Deselect all items'))
+		self.InvertSelectionOption = core_classes.ChoiceItem(XMLName='InvertSelection', HumanName=_('Invert selection'))
+		self.SelectFilteredOption = core_classes.ChoiceItem(XMLName='SelectFiltered', HumanName=_('Select all filtered items'))
 		self.AddToCurrentElementOption = core_classes.ChoiceItem(XMLName='AddToCurrent',
 			HumanName=_('Add selected items to current element'))
 		# make list of all possible options. Options will be displayed in the listed order
 		self.AllActionChoices = [self.PromptOption, self.DeleteUnusedATsOption, self.ExportAllOption,
-			self.ExportFilteredOption, self.ExportSelectedOption, self.AddToCurrentElementOption]
+			self.ExportFilteredOption, self.ExportSelectedOption, self.SelectAllOption, self.SelectNoneOption,
+			self.InvertSelectionOption, self.SelectFilteredOption, self.AddToCurrentElementOption]
 
 	def SetupViewport(self, HostPanel, Fonts, SystemFontNames, DateChoices):
 		# setup sizers and widgets
@@ -316,14 +322,29 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 
 	def UpdateActionChoices(self): # update choices available in "Action" choice box
 		# set "Applicable" flag for each possible choice
+		AnyATsSelected = any(i.Selected for i in self.AssocTexts)
+		AnyATsFilteredIn = any(i.FilteredIn for i in self.AssocTexts)
 		# enable "Delete unused ATs" option if not all ATs have associated PHA elements
 		self.DeleteUnusedATsOption.Applicable = not all(i.PHAElements for i in self.AssocTexts)
 		# enable "Export all" option if there are any ATs
 		self.ExportAllOption.Applicable = bool(self.AssocTexts)
 		# enable "Export filtered" option if filtering is applied and any ATs showed up in the filter
-		self.ExportFilteredOption.Applicable = self.FilterApplied and any(i.FilteredIn for i in self.AssocTexts)
+		self.ExportFilteredOption.Applicable = self.FilterApplied and AnyATsFilteredIn
 		# enable "Export selected" option and "Add to current element" option if any ATs are selected
-		self.ExportSelectedOption.Applicable = self.AddToCurrentElementOption.Applicable = any(i.Selected for i in self.AssocTexts)
+		self.ExportSelectedOption.Applicable = self.AddToCurrentElementOption.Applicable = AnyATsSelected
+		# enable "Select all" option if there are any ATs, not all ATs are selected, and no filter is active
+		# (user isn't allowed to select filtered-out ATs)
+		self.SelectAllOption.Applicable = bool(self.AssocTexts) and (not self.FilterApplied) and \
+			not all(i.Selected for i in self.AssocTexts)
+		# enable "Select none" option if there are any ATs, and at least some of them are selected
+		self.SelectNoneOption.Applicable = ((AnyATsFilteredIn and self.FilterApplied) or not self.FilterApplied) and \
+			AnyATsSelected
+		# enable "Invert selection" option if there are any ATs visible
+		self.InvertSelectionOption.Applicable = (AnyATsFilteredIn and self.FilterApplied) or \
+			(bool(self.AssocTexts) and not self.FilterApplied)
+		# enable "Select filtered" option if filtering is applied and any ATs showed up in the filter
+		print('AT346 setting SelectFilteredOption: self.FilterApplied , AnyATsFilteredIn: ', self.FilterApplied , AnyATsFilteredIn)
+		self.SelectFilteredOption.Applicable = self.FilterApplied and AnyATsFilteredIn
 		# make list of currently available options
 		self.ActionChoices = [a for a in self.AllActionChoices if a.Applicable]
 		# set the text of the prompt option, depending on whether other options are available
@@ -331,7 +352,7 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 			else _('(No actions available)')
 		# set available options in choice box
 		self.ActionChoice.Widget.Set([a.HumanName for a in self.ActionChoices])
-		# set the current option as the prompt
+		# set the prompt as the current option
 		self.ActionChoice.Widget.SetSelection(self.ActionChoices.index(self.PromptOption))
 
 	def PopulateATList(self, CurrentAT=None):
@@ -349,25 +370,25 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 		# populate column labels. First, make hash table of column internal names to human names
 		ColLabelHumanNameHash = {'Selected': _('Select'), 'Number': _('Action item\nnumber'), 'Content': _('Content'),
 			'Responsibility': _('Responsibility'), 'Deadline': _('Deadline'), 'Status': _('Status'),
-			'WhereUsed': _('Where used')}
+			'WhereUsed': _('Where used'), 'ID': 'ID'}
 		ColHorizAlignments = {'Selected': wx.ALIGN_CENTRE, 'Number': wx.ALIGN_RIGHT, 'Content': wx.ALIGN_LEFT,
 			'Responsibility': wx.ALIGN_LEFT, 'Deadline': wx.ALIGN_LEFT, 'Status': wx.ALIGN_CENTRE,
-			'WhereUsed': wx.ALIGN_LEFT}
+			'WhereUsed': wx.ALIGN_LEFT, 'ID': wx.ALIGN_LEFT}
 		ColCellRenderers = {'Selected': wx.grid.GridCellBoolRenderer, 'Number': wx.grid.GridCellStringRenderer,
 			'Content': wx.grid.GridCellAutoWrapStringRenderer,
 			'Responsibility': wx.grid.GridCellStringRenderer, 'Deadline': wx.grid.GridCellStringRenderer,
 			'Status': wx.grid.GridCellStringRenderer,
-			'WhereUsed': wx.grid.GridCellStringRenderer}
+			'WhereUsed': wx.grid.GridCellStringRenderer, 'ID': wx.grid.GridCellStringRenderer}
 		self.ColCellEditors = {'Selected': wx.grid.GridCellBoolEditor, 'Number': wx.grid.GridCellTextEditor,
 			'Content': wx.grid.GridCellTextEditor,
 			'Responsibility': wx.grid.GridCellTextEditor, 'Deadline': wx.grid.GridCellTextEditor,
 			'Status': wx.grid.GridCellTextEditor,
-			'WhereUsed': wx.grid.GridCellTextEditor}
+			'WhereUsed': wx.grid.GridCellTextEditor, 'ID': wx.grid.GridCellTextEditor}
 		ColReadOnly = {'Selected': False, 'Number': True,
 			'Content': False,
 			'Responsibility': False, 'Deadline': False,
 			'Status': False,
-			'WhereUsed': True}
+			'WhereUsed': True, 'ID': True}
 		GridWidget.DataTable.colLabels = [ColLabelHumanNameHash[ThisColName]
 			for ThisColName in self.ATListColInternalNames]
 		# set cell attributes per column, including alignment and read-only status
@@ -376,6 +397,8 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 			AttrObj.SetAlignment(hAlign=ColHorizAlignments[ThisColLabel], vAlign=wx.ALIGN_TOP)
 			AttrObj.SetReadOnly(isReadOnly=ColReadOnly[ThisColLabel])
 			GridWidget.SetColAttr(ThisColIndex, AttrObj)
+		# hide ID column (it's only for internal reference)
+		GridWidget.HideCol(self.ATListColInternalNames.index('ID'))
 		# populate rows
 		RowIndex = -1
 		CurrentATRowIndex = None
@@ -398,7 +421,7 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 				# populate fields
 				ThisRow = {'Selected': ThisAT.Selected, 'Number': ThisAT.Numbering, 'Content': ThisAT.Content,
 					'Responsibility': ThisAT.Responsibility, 'Deadline': ThisAT.Deadline, 'Status': ThisAT.Status,
-					'WhereUsed': ThisAT.GetWhereUsedHumanText()}
+					'WhereUsed': ThisAT.GetWhereUsedHumanText(), 'ID': ThisAT.ID}
 				# put data into table
 				GridWidget.DataTable.data.append(ThisRow)
 				# select row if appropriate
@@ -425,7 +448,7 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 		# define amount of width to allocate to each column. Row label column gets 1.0 by definition
 		ColRelativeWidths = {'Selected': 1.0, 'Number': 2.0, 'Content': 10.0,
 						'Responsibility': 5.0, 'Deadline': 3.0, 'Status': 2.0,
-						'WhereUsed': 6.0}
+						'WhereUsed': 6.0, 'ID': 0.0}
 		# allow X space for margins and panel's scrollbar
 		TargetGridSizeX = PanelSizeX - (self.OverallLeftMargin * 2) - VertScrollbarXAllowanceInPx
 		TotalRelativeWidth = 1.0 + sum(ColRelativeWidths.values())
@@ -452,6 +475,8 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 #		GridWidget.Bind(wx.grid.EVT_GRID_EDITOR_CREATED, self.OnEditorCreated)
 		# may need EditorCreated handler for future implementation of checkbox column
 		GridWidget.Bind(wx.grid.EVT_GRID_CELL_CHANGED, self.OnCellEdited)
+		GridWidget.Bind(wx.grid.EVT_GRID_SELECT_CELL, self.OnSelectionChanged)
+		GridWidget.Bind(wx.grid.EVT_GRID_CELL_LEFT_CLICK, self.OnSelectionChanged)
 
 	def OnCellEdited(self, Event):
 		# handle user editing of a grid cell
@@ -474,6 +499,27 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 #			self.ThisCheckBox.Bind(wx.EVT_KEY_DOWN, self.OnCheckBoxKeyDown)
 #			self.ThisCheckBox.Bind(wx.EVT_CHECKBOX, self.OnCheckBoxToggle)
 #		Event.Skip()
+
+	def OnSelectionChanged(self, Event): # handle change of which cell is selected
+		# request call to OnSelectionChanged_After when grid has processed the mouse click
+		wx.CallAfter(self.OnSelectionChanged_After, Event)
+		Event.Skip() # allow normal processing of event
+
+	def OnSelectionChanged_After(self, Event):
+		GridWidget = self.ATListGrid.Widget # get the wx grid widget%%%
+		# find which (hidden) column contains AT IDs
+		IDColIndex = self.ATListColInternalNames.index('ID')
+#		RowsSelected = [r for r in range(GridWidget.GetNumberRows()) if GridWidget.IsInSelection(row=r, col=0)]
+#		print('AT482 RowsSelected: ', RowsSelected)
+		# get list of IDs of ATs now selected
+		ATIDsSelected = [GridWidget.GetCellValue(row=r, col=IDColIndex) for r in range(GridWidget.GetNumberRows())
+			if GridWidget.IsInSelection(row=r, col=0)]
+#		print('AT496 AT IDs selected: ', ATIDsSelected)
+		# set Selected flag of AT objects
+		for ThisAT in self.AssocTexts:
+			ThisAT.Selected = ThisAT.ID in ATIDsSelected
+		# update action choice box
+		self.UpdateActionChoices()
 
 	def ChangeAssociatedText(self, AssociatedTextObj, ATRow, AttribChanged, NewAttribContent):
 		# handle request to change a text attrib of associated text AssociatedTextObj (AssocTextItemInDisplay instance)
