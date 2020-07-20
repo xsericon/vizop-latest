@@ -202,17 +202,61 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 		self.WidgetsToActivate = SetupHeaderSizer(HostPanel=HostPanel)
 #		self.WidgetsToActivate = SetupHeaderSizer(HostPanel=HostPanel) + SetupAssocTextListSizer(HostPanel=HostPanel)
 
-	def OnFilterText(self, Event): # handle Enter key press in text filter TextCtrl
+	def OnFilterText(self, Event): # handle change of text in text filter TextCtrl
 		# mark each associated text as whether currently visible, based on current filters
 		ShowingCount = self.ApplyFilters(FilterText=self.TextFilterText.Widget.GetValue(), FilterApplied=True)
 		self.SetMainHeaderLabel(ShowingCount=ShowingCount)
+		# set main FilterApplied flag if there's any text in the filter TextCtrl
+		self.FilterApplied = bool(self.TextFilterText.Widget.GetValue())
 		# update available choices in "action" choice box
 		self.UpdateActionChoices()
 		# repopulate action items list according to new filter setting
 		self.PopulateATList(CurrentAT=None)
 
 	def OnActionChoice(self, Event): # handle user selection in Action choice control
-		pass
+		print('AT217 in OnActionChoice')
+		GridWidget = self.ATListGrid.Widget # get the wx grid widget
+		# find out which action was requested%%%
+		ActionRequested = self.ActionChoices[self.ActionChoice.Widget.GetSelection()]
+		if ActionRequested is self.DeleteUnusedATsOption:
+			print('AT221 requested delete unused ATs, not coded yet')
+		elif ActionRequested is self.ExportAllOption:
+			print('AT221 requested export option, not coded yet')
+		elif ActionRequested is self.ExportFilteredOption:
+			print('AT221 requested export option, not coded yet')
+		elif ActionRequested is self.ExportSelectedOption:
+			print('AT221 requested export option, not coded yet')
+		elif ActionRequested is self.SelectAllOption:
+			# select all visible ATs. (This command should be available only when all ATs are visible, but to be on the
+			# safe side, we only select visible ATs)
+#			# first, find which data table column contains AT IDs
+#			IDColIndex = self.ATListColInternalNames.index('ID')
+			# set all visible grid rows as selected
+			GridWidget.SelectAll()
+			# set Selected flag of visible AT objects
+			if self.FilterApplied: # select filtered ATs
+				for ThisAT in self.AssocTexts: ThisAT.Selected = ThisAT.FilteredIn
+			else: # select all ATs
+				for ThisAT in self.AssocTexts: ThisAT.Selected = True
+		elif ActionRequested is self.SelectNoneOption:
+			# to quickly deselect all, we select the 0th row (only) then deselect it again
+			if bool(GridWidget.DataTable.GetNumberRows()): # make sure the grid contains at least 1 row
+				GridWidget.SelectRow(row=0, addToSelected=False)
+				GridWidget.DeselectRow(row=0)
+				for ThisAT in self.AssocTexts: ThisAT.Selected = False
+		elif ActionRequested is self.InvertSelectionOption:
+			print('AT221 requested InvertSelection option, not coded yet')
+		elif ActionRequested is self.SelectFilteredOption:
+			print('AT221 requested SelectFiltered option, not coded yet')
+		elif ActionRequested is self.AddToCurrentElementOption:
+			print('AT221 requested AddToCurrentElementOption, not coded yet')
+		# update available choices in "action" choice box
+		self.UpdateActionChoices()
+
+		self.AllActionChoices = [self.PromptOption, self.DeleteUnusedATsOption, self.ExportAllOption,
+			self.ExportFilteredOption, self.ExportSelectedOption, self.SelectAllOption, self.SelectNoneOption,
+			self.InvertSelectionOption, self.SelectFilteredOption, self.AddToCurrentElementOption]
+
 
 	def OnActionGoButton(self, Event): # handle user click on action Go button
 		pass
@@ -343,7 +387,6 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 		self.InvertSelectionOption.Applicable = (AnyATsFilteredIn and self.FilterApplied) or \
 			(bool(self.AssocTexts) and not self.FilterApplied)
 		# enable "Select filtered" option if filtering is applied and any ATs showed up in the filter
-		print('AT346 setting SelectFilteredOption: self.FilterApplied , AnyATsFilteredIn: ', self.FilterApplied , AnyATsFilteredIn)
 		self.SelectFilteredOption.Applicable = self.FilterApplied and AnyATsFilteredIn
 		# make list of currently available options
 		self.ActionChoices = [a for a in self.AllActionChoices if a.Applicable]
@@ -506,11 +549,9 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 		Event.Skip() # allow normal processing of event
 
 	def OnSelectionChanged_After(self, Event):
-		GridWidget = self.ATListGrid.Widget # get the wx grid widget%%%
+		GridWidget = self.ATListGrid.Widget # get the wx grid widget
 		# find which (hidden) column contains AT IDs
 		IDColIndex = self.ATListColInternalNames.index('ID')
-#		RowsSelected = [r for r in range(GridWidget.GetNumberRows()) if GridWidget.IsInSelection(row=r, col=0)]
-#		print('AT482 RowsSelected: ', RowsSelected)
 		# get list of IDs of ATs now selected
 		ATIDsSelected = [GridWidget.GetCellValue(row=r, col=IDColIndex) for r in range(GridWidget.GetNumberRows())
 			if GridWidget.IsInSelection(row=r, col=0)]
