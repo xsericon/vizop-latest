@@ -1260,18 +1260,22 @@ class PHAModelBaseClass(object, metaclass=PHAModelMetaClass):
 		self.__dict__.update(Args)
 
 class MilestoneItem(object): # item storing info required for navigation back/forwards
-	AllNavigationItems = [] # list of all instances created in this Vizop instance
+#	AllNavigationItems = [] # list of all instances created in this Vizop instance
 	def __init__(self, Proj, **Args):
 		AttribInfo = [ ('Displayable', bool), ('Zoom', int), ('PanX', int), ('PanY', int) ]
 		for AttribName, AttribType in AttribInfo:
 			if AttribName in Args: assert isinstance(Args[AttribName], AttribType)
 		object.__init__(self)
-		self.ID = str(utilities.NextID(MilestoneItem.AllNavigationItems)) # generate unique ID; stored as str
+#		self.ID = str(utilities.NextID(MilestoneItem.AllNavigationItems)) # generate unique ID; stored as str
+		self.ID = Proj.GetNewID() # find next available ID
 		self.Proj = Proj
 		self.Displayable = Args.get('Displayable', True) # whether the user is allowed to go to this item. If it's only for Undo purposes,
 			# Displayable may be False.
 		self.Viewport = Args.get('Viewport', None) # which Viewport to display on the display device
-		self.DisplDevice = Args.get('DisplDevice', None) # which display device to show the Viewport on
+		if hasattr(self.Viewport, 'GetMilestoneData'):
+			self.ViewportData = self.Viewport.GetMilestoneData()
+		else: self.ViewportData = {}
+		self.DisplDevice = Args.get('DisplDevice', None) # which display device was showing the Viewport
 		self.Zoom = Args.get('Zoom', 100) # Zoom value to apply on the Viewport
 		self.PanX = Args.get('PanX', 0) # Pan value to apply on the Viewport
 		self.PanY = Args.get('PanY', 0) # Pan value to apply on the Viewport

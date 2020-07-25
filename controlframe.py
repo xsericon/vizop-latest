@@ -2458,10 +2458,13 @@ class ControlFrame(wx.Frame):
 		# if there are no PHA models in the project, queue a VizopTalks prompt to create one
 		self.InviteUserToCreatePHAModel(Proj)
 
-	def StoreMilestone(self, Proj, Backward=True):
-		# store current state of display in a milestone.
-		# Backward (bool): if True, store the milestone in Proj's backward history list. If False, stor in forward history.
-		print("CF1391 Starting StoreMilestone, not coded yet")
+	def StoreMilestone(self, Proj, Viewport=None, Backward=True):
+		# store current state of Viewport in a milestone.
+		# Backward (bool): if True, store the milestone in Proj's backward history list, else store in forward history.
+		print("CF1391 Starting StoreMilestone")
+		NewMS = core_classes.MilestoneItem(Proj=Proj, Viewport=Viewport)
+		if Backward: Proj.BackwardHistory.append(NewMS)
+		else: Proj.ForwardHistory.append(NewMS)
 
 	def CheckForIncomingMessages(self):
 		# check datacore and control frame sockets for incoming messages, and send to appropriate processing routines
@@ -2877,6 +2880,8 @@ class ControlFrame(wx.Frame):
 	def ReleaseCurrentViewport(self, Proj):
 		# release any Viewport currently showing in edit panel
 		if self.CurrentViewport:
+			# store history for backward navigation
+			self.StoreMilestone(Proj, Viewport=self.CurrentViewport, Backward=True)
 			# remove old Viewport from local ActiveViewports list
 			Proj.ActiveViewports.remove(self.CurrentViewport)
 			# tell datacore the Viewport is no longer on display
@@ -2930,8 +2935,6 @@ class ControlFrame(wx.Frame):
 				TargetPanX = ThisXMLTag.text if ThisPanXTag else None
 				ThisPanYTag = DisplayAttribsTag.find(info.PanYTag)
 				TargetPanY = ThisPanYTag.text if ThisPanYTag else None
-		# store history for backward navigation
-		self.StoreMilestone(Proj, Backward=True)
 		# draw the Viewport
 		self.ShowViewport(MessageAsXMLTree=XMLRoot)
 		if DisplayAttribsTag is not None:

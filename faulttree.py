@@ -6603,6 +6603,13 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			self.UndoListDuringTextEditing.append(undo.UndoRecordDuringTextEditing(OldTextContentRich=OldTextContentRich,
 				NewTextContentRich=NewTextContentRich, EditAction=EditAction, CursorIndexLean=CursorIndexLean))
 
+	def GetMilestoneData(self):
+		# return (dict) data needing to be stored in milestone for navigation
+		ReturnArgs = {}
+		ReturnArgs['SelectedElements'] = self.CurrentElements[:]
+		print('FT6608 in FTForDisplay GetMilestoneData: SelectedElements: ', ReturnArgs['SelectedElements'])
+		return ReturnArgs
+
 FTObjectInCore.DefaultViewportType = FTForDisplay # set here (not in FTForDisplay class) due to the order of the
 	# class definitions
 

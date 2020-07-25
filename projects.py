@@ -204,6 +204,19 @@ class ProjectItem(object): # class of PHA project instances
 				yield ThisPHAElement
 		return
 
+	def GetMostRecentMilestoneWithSelectedElements(self):
+		# search through backward history to find most recent Milestone containing a Viewport with selected elements
+		# This will skip over Viewports with "selectable" elements if no elements were actually selected
+		# Returns the milestone found, or None if no suitable milestone found
+		ThisMilestoneIndex = len(self.BackwardHistory) - 1
+		MilestoneFound = None
+		while (ThisMilestoneIndex >= 0) and (MilestoneFound is None):
+			ThisMilestone = self.BackwardHistory[ThisMilestoneIndex]
+			if ThisMilestone.ViewportData.get('SelectedElements', []):
+				MilestoneFound = ThisMilestone
+			ThisMilestoneIndex -= 1
+		return MilestoneFound
+
 def TestProjectsOpenable(ProjectFilenames, ReadOnly=False):
 	"""
 	Args: ProjectFilenames: list of str containing path of vizop project files (can be empty list)

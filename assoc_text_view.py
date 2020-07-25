@@ -229,8 +229,6 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 		elif ActionRequested is self.SelectAllOption:
 			# select all visible ATs. (This command should be available only when all ATs are visible, but to be on the
 			# safe side, we only select visible ATs)
-#			# first, find which data table column contains AT IDs
-#			IDColIndex = self.ATListColInternalNames.index('ID')
 			# set all visible grid rows as selected
 			GridWidget.SelectAll()
 			# set Selected flag of visible AT objects
@@ -245,11 +243,35 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 				GridWidget.DeselectRow(row=0)
 				for ThisAT in self.AssocTexts: ThisAT.Selected = False
 		elif ActionRequested is self.InvertSelectionOption:
-			print('AT221 requested InvertSelection option, not coded yet')
+			if bool(GridWidget.DataTable.GetNumberRows()): # make sure the grid contains at least 1 row
+				# find which data table column contains AT IDs
+				IDColIndex = self.ATListColInternalNames.index('ID')
+				NotSelectedIDs = [] # set up a list of AT IDs that are not selected after the inversion
+				for ThisAT in self.AssocTexts:
+					# check if ThisAT is visible
+					if ThisAT.FilteredIn or not self.FilterApplied:
+						if ThisAT.Selected: NotSelectedIDs.append(ThisAT.ID) # add ThisAT to list if about to deselect
+						ThisAT.Selected = not ThisAT.Selected
+				# set selection status of each grid row. First, select all rows
+				GridWidget.SelectAll()
+				# deselect rows containing AT IDs that aren't selected
+				for ThisRow in range(GridWidget.DataTable.GetNumberRows()):
+					if GridWidget.GetCellValue(row=ThisRow, col=IDColIndex) in NotSelectedIDs:
+						GridWidget.DeselectRow(row=ThisRow)
 		elif ActionRequested is self.SelectFilteredOption:
-			print('AT221 requested SelectFiltered option, not coded yet')
+			if self.FilterApplied:
+				# set all filtered-in ATs as selected
+				for ThisAT in self.AssocTexts:
+					ThisAT.Selected = ThisAT.FilteredIn
+				# set all visible AT rows as selected
+				GridWidget.SelectAll()
 		elif ActionRequested is self.AddToCurrentElementOption:
-			print('AT221 requested AddToCurrentElementOption, not coded yet')
+			# get current elements in the last applicable Viewport
+			print('AT221 requested AddToCurrentElementOption')
+			TargetMilestone = self.Proj.GetMostRecentMilestoneWithSelectedElements()
+			if TargetMilestone:
+				TargetElements = TargetMilestone.ViewportData['SelectedElements']
+				print('AT273 found selected elements: ', TargetElements)
 		# update available choices in "action" choice box
 		self.UpdateActionChoices()
 
@@ -366,6 +388,8 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 
 	def UpdateActionChoices(self): # update choices available in "Action" choice box
 		# set "Applicable" flag for each possible choice
+		# FIXME "Delete unused ATs" and "Add to current element" options are a data edit and therefore allowed only if
+		# we have editing rights
 		AnyATsSelected = any(i.Selected for i in self.AssocTexts)
 		AnyATsFilteredIn = any(i.FilteredIn for i in self.AssocTexts)
 		# enable "Delete unused ATs" option if not all ATs have associated PHA elements
