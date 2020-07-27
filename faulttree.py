@@ -1114,6 +1114,13 @@ class FTEvent(FTBoxyObject): # FT event object in Viewport
 		# colour definitions such as BorderColour are in FTBoxyObject's __init__
 		self.MaxElementsConnectedToThis = FTEventInCore.MaxElementsConnectedToThis
 
+	def GetMyClassHumanName(self): # return human name of this type of FT element
+		# We can't do this as a @classmethod because, for other classes, it depends on attrib values of the instance, and also
+		# there's no way to call property() on a class attribute
+		return _('Fault tree event')
+
+	ClassHumanName = property(fget=GetMyClassHumanName)
+
 	def InitializeData(self):
 		# attribs transferred from datacore
 		self.ID = 0
@@ -1399,6 +1406,13 @@ class FTGate(FTBoxyObject): # object containing FT gates for display in Viewport
 		self.Visible = True # bool; whether it would be visible if currently panned onto the display device
 		self.Selected = False # bool; whether currently user-selected i.e. highlighted
 		self.MaxElementsConnectedToThis = FTGateItemInCore.MaxElementsConnectedToThis
+
+	def GetMyClassHumanName(self): # return human name of this type of FT element
+		# We can't do this as a @classmethod because, for other classes, it depends on attrib values of the instance, and also
+		# there's no way to call property() on a class attribute
+		return _('Gate')
+
+	ClassHumanName = property(fget=GetMyClassHumanName)
 
 	def CreateFixedTextElements(self):
 		# create elements for fixed text items and buttons in FTGate. Return (list of elements at top of FTGate,
@@ -1992,6 +2006,13 @@ class FTConnectorIn(FTConnector):
 	def __init__(self, FT, Column, **Args):
 		FTConnector.__init__(self, FT, Column, **Args)
 
+	def GetMyClassHumanName(self): # return human name of this type of FT element
+		# We can't do this as a @classmethod because, for other classes, it depends on attrib values of the instance, and also
+		# there's no way to call property() on a class attribute
+		return _('Inward connector')
+
+	ClassHumanName = property(fget=GetMyClassHumanName)
+
 class FTConnectorOut(FTConnector):
 	ControlPanelAspect = 'CPAspect_FTConnectorOut' # preferred Control Panel aspect to show when selecting an instance of this class
 	HumanName = _('Outward connector') # class name
@@ -2002,6 +2023,13 @@ class FTConnectorOut(FTConnector):
 			# connected. Expected attribs in the items: HumanName (str), ID (str)
 		self.ConnectorInsAvailable = [] # list of human-readable texts describing Connectors-In in the project that are
 			# available for connection to this Connector-Out
+
+	def GetMyClassHumanName(self): # return human name of this type of FT element
+		# We can't do this as a @classmethod because, for other classes, it depends on attrib values of the instance, and also
+		# there's no way to call property() on a class attribute
+		return _('Outward connector')
+
+	ClassHumanName = property(fget=GetMyClassHumanName)
 
 	def NewConnectorInsAvailable(self):
 		# returns list of human-readable texts describing Connectors-In in the project that are available for connection
@@ -2332,9 +2360,11 @@ class FTElementInCore(object): # superclass containing common methods and proper
 
 class FTEventInCore(FTElementInCore): # FT event object used in DataCore by FTObjectInCore
 	# Used for causes, SIF failure events (a single bottom level event used in high demand and continuous modes),
-	# IPLs, intermediate events, final events, connectors in/out but not gates
+	# IPLs, intermediate events, final events, but not gates
+	HumanName = _('FT event')
 	EventTypes = ['InitiatingEvent', 'SIFFailureEvent', 'IntermediateEvent', 'IPL', 'TopEvent',
-		'ConnectorIn', 'ConnectorOut', 'EnablingCondition', 'ConditionalModifier']
+		'EnablingCondition', 'ConditionalModifier']
+#		'ConnectorIn', 'ConnectorOut', 'EnablingCondition', 'ConditionalModifier']
 	# event types for which the user must supply a value
 	EventTypesWithUserValues = ['InitiatingEvent', 'IPL', 'EnablingCondition', 'ConditionalModifier']
 	# event types for which user can supply a value, or it can be derived from elsewhere
@@ -3081,7 +3111,7 @@ class FTConnectorItemInCore(FTElementInCore): # in- and out-connectors (CX's) to
 	ConnectorStyles = ['Default'] # future, will define various connector appearances (squares, arrows, circles etc)
 	MaxElementsConnectedToThis = 100 # arbitrary limit on connectivity of out-CX
 	InternalName = 'FTConnectorInCore'
-	HumanName = _('inward connector') # used in undo texts
+	HumanName = _('connector') # used in undo texts
 	FTConnAcceptableValueKinds = [core_classes.UserNumValueItem, core_classes.ConstNumValueItem,
 		core_classes.AutoNumValueItem,
 		core_classes.LookupNumValueItem, core_classes.ParentNumValueItem, core_classes.UseParentValueItem]
@@ -6606,8 +6636,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 	def GetMilestoneData(self):
 		# return (dict) data needing to be stored in milestone for navigation
 		ReturnArgs = {}
-		ReturnArgs['SelectedElements'] = self.CurrentElements[:]
-		print('FT6608 in FTForDisplay GetMilestoneData: SelectedElements: ', ReturnArgs['SelectedElements'])
+		ReturnArgs['SelectedElementIDs'] = [e.ID for e in self.CurrentElements]
 		return ReturnArgs
 
 FTObjectInCore.DefaultViewportType = FTForDisplay # set here (not in FTForDisplay class) due to the order of the

@@ -1916,7 +1916,7 @@ class ControlFrame(wx.Frame):
 			# set up ElementKindLabel, ElementNameLabel
 			# TODO limit length displayed. Smart ellipsization?
 			Aspect.ElementKindLabel.Widget.SetLabel(
-				type(self.TopLevelFrame.PHAElementInControlPanel).HumanName)
+				self.TopLevelFrame.PHAElementInControlPanel.ClassHumanName)
 			Aspect.ElementNameLabel.Widget.SetLabel(
 				self.TopLevelFrame.PHAElementInControlPanel.HumanName)
 			# set up lineup of variable widgets

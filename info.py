@@ -273,6 +273,10 @@ NullUnitInternalName = 'null'
 ConvertValueMarker = '_Convert' # indicates user has requested to convert value when changing unit
 ValueOutOfRangeMsg = 'ValueOutOfRange'
 
+# strings used to label objects
+ActionItemLabel = 'ActionItems'
+ParkingLotItemLabel = 'ParkingLot'
+
 # NO_ commands to control frame
 NO_ShowViewport = 'NO_ShowViewport'
 NO_RedrawAfterUndo = 'NO_RedrawAfterUndo'

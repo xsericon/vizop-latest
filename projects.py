@@ -7,8 +7,8 @@ import os.path
 import xml.etree.ElementTree as ElementTree
 
 # vizop modules needed:
-from vizop_misc import IsReadableFile, IsWritableLocation, select_file_from_all
-#import settings, core_classes, info, vizop_parser, faulttree
+from vizop_misc import IsReadableFile, IsWritableLocation, select_file_from_all, MakeXMLMessage
+#import vizop_parser
 import settings, core_classes, info, faulttree, utilities, display_utilities
 
 """
@@ -212,10 +212,42 @@ class ProjectItem(object): # class of PHA project instances
 		MilestoneFound = None
 		while (ThisMilestoneIndex >= 0) and (MilestoneFound is None):
 			ThisMilestone = self.BackwardHistory[ThisMilestoneIndex]
-			if ThisMilestone.ViewportData.get('SelectedElements', []):
+			if ThisMilestone.ViewportData.get('SelectedElementIDs', []):
 				MilestoneFound = ThisMilestone
 			ThisMilestoneIndex -= 1
 		return MilestoneFound
+
+	def AddExistingAssociatedTextsToElements(self, XMLRoot):
+		# add ATs to elements in the project.
+		# XMLRoot will contain tags:
+		#	PHAObjID: ID PHA object containing target elements
+		#	PHAElementIDs: Comma-separated list of target element IDs
+		#	AssociatedTextIDs: Comma-separated list of IDs of existing ATs (action items or parking lot items)
+		#	OriginatingViewportID: ID of Viewport that raised the request (for undo)
+		# returns reply message
+		print('PR228 in AddExistingAssociatedTextsToElements')
+		TargetPHAObj = utilities.ObjectWithID(self.PHAObjs, TargetID=XMLRoot.findtext(info.PHAObjTag))
+		print('PR230 TargetPHAObj: ', TargetPHAObj)
+		AllElementsInPHAObj = [e for e in TargetPHAObj.WalkOverAllElements()]
+		TargetElements = [utilities.ObjectWithID(AllElementsInPHAObj, TargetID=ThisID)
+			for ThisID in XMLRoot.findtext(info.PHAElementTag).split(',')]
+		print('AT232 TargetElements: ', TargetElements)
+		ATListName = 'ActionItems' if XMLRoot.findtext(info.AssociatedTextKindTag) == info.ActionItemLabel \
+			else 'ParkingLotItems'
+		print('AT233 ATListName: ', ATListName)
+		TargetATs = [utilities.ObjectWithID(getattr(self, ATListName), TargetID=ThisID)
+			for ThisID in XMLRoot.findtext(info.AssociatedTextIDTag).split(',')]
+		print('AT238 TargetATs: ', TargetATs)
+		# add the ATs to the elements
+		for ThisEl in TargetElements:
+			for ThisAT in TargetATs:
+				TargetATList = getattr(ThisEl, ATListName, None)
+				if TargetATList: # can this element support this kind of AT?
+					if not (ThisAT in TargetATList): # is the AT not already in the element?
+						TargetATList.append(ThisAT) # attach the AT to the element
+						print('PR243 attached an AT')
+		# TODO: Undo
+		return MakeXMLMessage(RootName='OK', RootText='OK')
 
 def TestProjectsOpenable(ProjectFilenames, ReadOnly=False):
 	"""

@@ -82,7 +82,7 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 		# Args must include: OriginatingViewport (Viewport instance), AssocTextKind (str)
 		# PHAObjID will be None, as this Viewport is at project level, not related to a specific PHA object
 		assert isinstance(Args['OriginatingViewport'], display_utilities.ViewportBaseClass)
-		assert Args['AssocTextKind'] in ['ActionItems', 'ParkingLot']
+		assert Args['AssocTextKind'] in [info.ActionItemLabel, info.ParkingLotItemLabel]
 		display_utilities.ViewportBaseClass.__init__(self, Proj=Proj, PHAObjID=PHAObjID, DisplDevice=DisplDevice,
 			ParentWindow=ParentWindow, **Args)
 		self.SystemFontNames = SystemFontNames
@@ -267,24 +267,37 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 				GridWidget.SelectAll()
 		elif ActionRequested is self.AddToCurrentElementOption:
 			# get current elements in the last applicable Viewport
-			print('AT221 requested AddToCurrentElementOption')
 			TargetMilestone = self.Proj.GetMostRecentMilestoneWithSelectedElements()
 			if TargetMilestone:
-				TargetElements = TargetMilestone.ViewportData['SelectedElements']
-				print('AT273 found selected elements: ', TargetElements)
+				# find which action items are selected
+				if self.FilterApplied:
+					SelectedATIDs = [ThisAT.ID for ThisAT in self.AssocTexts if ThisAT.FilteredIn and ThisAT.Selected]
+				else:
+					SelectedATIDs = [ThisAT.ID for ThisAT in self.AssocTexts if ThisAT.Selected]
+				print('AT221 Target PHA object: ', TargetMilestone.Viewport.PHAObj.ID)
+				print('AT278 Target PHA elements: ', TargetMilestone.ViewportData['SelectedElementIDs'])
+				self.AddActionItemsToElements(PHAObjID=TargetMilestone.Viewport.PHAObj.ID,
+					TargetElementIDs=TargetMilestone.ViewportData['SelectedElementIDs'],
+					ActionItemIDs=SelectedATIDs)
 		# update available choices in "action" choice box
 		self.UpdateActionChoices()
 
-		self.AllActionChoices = [self.PromptOption, self.DeleteUnusedATsOption, self.ExportAllOption,
-			self.ExportFilteredOption, self.ExportSelectedOption, self.SelectAllOption, self.SelectNoneOption,
-			self.InvertSelectionOption, self.SelectFilteredOption, self.AddToCurrentElementOption]
-
+	def AddActionItemsToElements(self, PHAObjID, TargetElementIDs, ActionItemIDs):
+		# request datacore to add action items with IDs in ActionItemIDs (list of str) to elements with IDs in
+		# TargetElementIDs (list of str) in PHA object with ID = PHAObjID (str)%%% working here, need to implement command in datacore
+		# Next line for future: get PHA object's Viewport to show AT aspect in Control Panel
+#		XX.PreferredControlPanelAspect = 'CPAspect_ActionItems'
+		# handle request to add new AssociatedText to PHAComponent in PHAElement
+		ArgsToSend = {info.PHAObjTag: PHAObjID, info.PHAElementTag: ','.join(TargetElementIDs),
+			info.AssociatedTextIDTag: ','.join(ActionItemIDs), info.ViewportTag: self.ID,
+			info.AssociatedTextKindTag: self.AssocTextKind}
+		vizop_misc.SendRequest(Socket=self.C2DSocketREQ, Command='RQ_AT_AddExistingAssociatedTextsToElements',
+			Proj=self.Proj.ID, **ArgsToSend)
 
 	def OnActionGoButton(self, Event): # handle user click on action Go button
 		pass
 
 	def OnFinishedButton(self, Event): # handle user click on Finished button
-		print('AT165 in Finished button handler')
 		self.StoreAttribsInProject()
 		self.ExitViewportAndRevert()
 
@@ -740,6 +753,8 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 		elif Command == 'RQ_AT_ChangeAssociatedText':
 			Reply = cls.HandleChangeAssociatedTextRequest(Proj, XMLRoot, ViewportID=XMLRoot.findtext(info.ViewportTag),
 				Zoom=Zoom)
+		elif Command == 'RQ_AT_AddExistingAssociatedTextsToElements':
+			Reply = Proj.AddExistingAssociatedTextsToElements(XMLRoot=XMLRoot)
 		if Reply.tag == 'Fail': print('AT367 command not recognised: ', Command)
 		return Reply
 
