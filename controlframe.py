@@ -2428,7 +2428,7 @@ class ControlFrame(wx.Frame):
 		else:
 			return self.MyArtProvider.GetBitmap(id=ImageName, size=(24, 24))
 
-	def NavigateToMilestone(self, Proj, MilestoneID=None, StoreForwardHistory=True):
+	def NavigateToMilestoneInBackwardHistory(self, Proj, MilestoneID=None, StoreForwardHistory=True):
 		# display the milestone in Proj's backward history
 		# MilestoneID (str containing integer): milestone to navigate to
 		# StoreForwardHistory (bool): whether to store the existing state of the display as a milestone in forward history
@@ -2679,7 +2679,7 @@ class ControlFrame(wx.Frame):
 		if not utilities.Bool2Str(XMLRoot.find(info.SkipRefreshTag).text):
 			pass
 			# any other back navigation to do here? Below is already done in PostProcessNewViewport_Undo
-#			self.NavigateToMilestone(Proj=Proj, MilestoneID=XMLRoot.find(info.MilestoneIDTag).text, StoreForwardHistory=False)
+#			self.NavigateToMilestoneInBackwardHistory(Proj=Proj, MilestoneID=XMLRoot.find(info.MilestoneIDTag).text, StoreForwardHistory=False)
 #		self.UpdateMenuStatus() # duplicate; will be done in OnUndoRequest()
 #		self.MyControlPanel.UpdateNavigationButtonStatus(Proj=self.CurrentProj)
 		# set UndoChainWaiting flag to trigger any further undo items
@@ -2787,6 +2787,7 @@ class ControlFrame(wx.Frame):
 			ViewportToDestroy=ViewportToDestroy)
 
 	def PostProcessSwitchToViewport(self, XMLRoot):
+		# this is a client-side method
 		# get info on an existing Viewport from datacore in XMLRoot, and display the Viewport
 		assert isinstance(XMLRoot, ElementTree.Element)
 		Proj = self.CurrentProj
@@ -2842,8 +2843,8 @@ class ControlFrame(wx.Frame):
 		# update display, regardless of SkipRefresh tag in XMLRoot (we have to refresh now, because we have the
 		# milestone to revert to)
 #		if not utilities.Bool2Str(XMLRoot.find(info.SkipRefreshTag).text):
-		self.NavigateToMilestone(Proj=Proj, MilestoneID=XMLRoot.find(info.MilestoneIDTag).text,
-			StoreForwardHistory=False)
+		self.NavigateToMilestoneInBackwardHistory(Proj=Proj, MilestoneID=XMLRoot.find(info.MilestoneIDTag).text,
+												  StoreForwardHistory=False)
 		# set UndoChainWaiting flag to trigger any further undo items
 		UndoChainWaiting = utilities.Bool2Str(XMLRoot.find(info.ChainWaitingTag).text)
 		return vizop_misc.MakeXMLMessage('Null', 'Null')
@@ -2869,7 +2870,7 @@ class ControlFrame(wx.Frame):
 				Priority=ConfirmationPriority)
 #		# is there another redo chained after this redo? If not, update display
 #		if not utilities.Bool2Str(XMLRoot.find(info.SkipRefreshTag).text):
-#			self.NavigateToMilestone(Proj=Proj, MilestoneID=XMLRoot.find(info.MilestoneIDTag).text,
+#			self.NavigateToMilestoneInBackwardHistory(Proj=Proj, MilestoneID=XMLRoot.find(info.MilestoneIDTag).text,
 #				StoreForwardHistory=False)
 		# set RedoChainWaiting flag to trigger any further redo items
 		RedoChainWaiting = utilities.Bool2Str(XMLRoot.find(info.ChainWaitingTag).text)
@@ -2892,7 +2893,7 @@ class ControlFrame(wx.Frame):
 			self.CurrentViewport = None
 
 	def SwitchToViewport(self, TargetViewport=None, XMLRoot=None, debug=0):
-		# Client side method%%%
+		# Client side method
 		# switch edit panel display (in local ControlFrame) to show TargetViewport
 		# TargetViewport (actual Viewport instance, not Viewport shadow)
 		assert isinstance(TargetViewport, display_utilities.ViewportBaseClass)
@@ -2927,7 +2928,7 @@ class ControlFrame(wx.Frame):
 			ViewportTag = XMLRoot.find(info.PHAModelRedrawDataTag)
 			# find DisplayAttribs tag inside ViewportTag
 			DisplayAttribsTag = ViewportTag.find(info.DisplayAttribTag)
-			# if tag found, extract zoom, PanX and PanY from it
+			# if tag found, extract zoom, PanX and PanY from it (although these are redundant here)
 			if DisplayAttribsTag is not None:
 				ThisZoomTag = DisplayAttribsTag.find(info.ZoomTag)
 				TargetZoom = ThisZoomTag.text if ThisZoomTag else None
@@ -3114,14 +3115,16 @@ class ControlFrame(wx.Frame):
 		Reply = vizop_misc.MakeXMLMessage(RootName='RP_DestroyViewport', RootText=DoomedViewportID, Elements={})
 		return Reply
 
-	def MakeXMLMessageForDrawViewport(self, MessageHead, PHAObj, Viewport, ViewportID):
+	def MakeXMLMessageForDrawViewport(self, MessageHead, PHAObj, Viewport, ViewportID, MilestoneID=None):
 		# make and return XML element containing message required for SwitchToViewport, with all required redraw data
 		# MessageHead: command string required as XML root, e.g. 'RP_NewViewport'
 		# PHAObj: PHAObj to which Viewport belongs, or None if Viewport doesn't have an associated PHAObj
+		# MilestoneID: ID of any milestone in Proj.MilestonesForUndo that should be applied when Viewport is drawn, or None
 		assert isinstance(MessageHead, str)
 		assert isinstance(PHAObj, core_classes.PHAModelBaseClass) or (PHAObj is None)
 		assert isinstance(Viewport, ViewportShadow)
 		assert isinstance(ViewportID, str)
+		assert isinstance(MilestoneID, str) or (MilestoneID is None)
 		# fetch full redraw data for Viewport from PHA object, or from the Viewport itself if it doesn't have a PHAObj
 		if PHAObj is None:
 			RedrawXMLData = Viewport.MyClass.GetFullRedrawData(Proj=self.CurrentProj)
@@ -3131,15 +3134,22 @@ class ControlFrame(wx.Frame):
 		Reply = vizop_misc.MakeXMLMessage(RootName=MessageHead, RootText=ViewportID,
 			Elements={info.IDTag: getattr(PHAObj, 'ID', '')})
 		Reply.append(RedrawXMLData)
+		# add milestone ID tag, if required
+		print('CF3138 adding milestoneID tag: ', MilestoneID)
+		if MilestoneID is not None:
+			MilestoneTag = ElementTree.Element(info.MilestoneIDTag)
+			MilestoneTag.text = MilestoneID
+			Reply.append(MilestoneTag)
 		return Reply
 
 	def DatacoreSwitchToViewport(self, XMLRoot=None, Proj=None, ViewportClass=None, ViewportID=None, HumanName='',
-			PHAObj=None, Chain='NoChain'):
+			PHAObj=None, Chain='NoChain', MilestoneID=None):
 		# datacore function to handle request to switch to an existing Viewport from any Control Frame (local or remote)
 		# It assumes a Viewport shadow, i.e. an object that allows the datacore to know that a Viewport exists in
 		# one of the Control Frames (local or remote), already exists for this Viewport.
 		# Input data is supplied in XMLRoot, an XML ElementTree root element, or as separate attribs
 		# including Chain (str: 'NoChain' or 'Stepwise'): whether this call is chained from another event, e.g. new PHA model
+		# MilestoneID (str or None): if the Viewport should apply display attribs from a milestone, this is its ID
 		# return reply data (XML tree) to send back to respective Control Frame
 		# This function might be better placed outside Control Frame class, but currently we can't because it needs
 		# access to ControlFrame's self.Projects
@@ -3162,9 +3172,8 @@ class ControlFrame(wx.Frame):
 		if TargetViewportID in [v.ID for v in ThisProj.AllViewportShadows]:
 			TargetViewport = utilities.ObjectWithID(ThisProj.AllViewportShadows, TargetID=TargetViewportID)
 			TargetViewport.IsOnDisplay = True
-		else: # it isn't in the current lineup; so it must be in the archived Viewports list, rebuild from there
-			ViewportArgs = {'ViewportToRevertTo': self.CurrentViewport,
-							'OriginatingViewport': self.CurrentViewport}
+		else: # it isn't in the current lineup; so it must be in the archived Viewports list, retrieve from there
+			ViewportArgs = {'ViewportToRevertTo': self.CurrentViewport, 'OriginatingViewport': self.CurrentViewport}
 			ArchivedViewportShadow = utilities.ObjectWithID(ThisProj.ArchivedViewportShadows, TargetID=TargetViewportID)
 			# fetch persistent attribs from ArchivedViewportShadow (stored in ArchiveDestroyedViewport())
 			#  and feed them to the new Viewport
@@ -3179,7 +3188,7 @@ class ControlFrame(wx.Frame):
 			TargetViewport = ArchivedViewportShadow
 		# make reply message to send to control frame
 		Reply = self.MakeXMLMessageForDrawViewport(MessageHead='RP_SwitchToViewport', PHAObj=ExistingPHAObj,
-			Viewport=TargetViewport, ViewportID=TargetViewportID)
+			Viewport=TargetViewport, ViewportID=TargetViewportID, MilestoneID=MilestoneID)
 		# check whether we should destroy an old Viewport, and destroy it if required
 		if XMLRoot.find(info.DoomedViewportIDTag) is not None:
 			self.DatacoreDestroyViewport(XMLRoot=XMLRoot)
@@ -3634,25 +3643,31 @@ class ControlFrame(wx.Frame):
 		self.DisplayDevices.append(NewDisplayDevice)
 
 	def UpdateAllViewports(self, MessageAsStr='', XMLRoot=None, **Args):
-		# this is a Datacore function.
-		# refresh Viewports after change to data in datacore. For now, we just redraw all Viewports currently shown
+		# this is a Datacore method
+		# Refresh Viewports after change to data in datacore. For now, we just redraw all Viewports currently shown
 		# in a display device.
 		# MessageAsStr (str): str containing XML message received requesting update to Viewports (currently not used)
 		# XMLRoot (ElementTree element or None): any instruction to update display parameters (zoom, pan) of a Viewport
-		#	(used during redraw after undo)
-		# retrieve any data about a specific Viewport that needs display parameters updated
-		ViewportIDToUpdate = None
+		#	(used during redraw after undo); also can contain MilestoneIDTag with display attribs to apply
+		# First, retrieve any data about a specific Viewport that needs display parameters updated
+		ViewportIDToUpdate = MilestoneID = None
 		if XMLRoot is not None:
 			ViewportToUpdateTag = XMLRoot.find(info.ViewportTag)
 			if ViewportToUpdateTag is not None:
 				ViewportIDToUpdate = ViewportToUpdateTag.text
-		# if a Viewport was specified, and it's not on display, we need to display it (e.g. to show an undo)
+			# fetch milestone ID, if milestone is to be applied when redrawing the Viewport
+			MilestoneTag = XMLRoot.find(info.MilestoneIDTag)
+			if MilestoneTag is not None:
+				MilestoneID = MilestoneTag.text
+		print('CF3662 UpdateAllViewports with milestoneID: ', MilestoneID)
+		# if a Viewport was specified, and it's not on display, we need to display it (e.g. to show after undo)
+		# TODO: handle applying a milestone after undo when the original Viewport is still on display
 		ViewportToSkip = None
 		if ViewportIDToUpdate is not None:
 			ViewportShadowToUpdate = utilities.ObjectWithID(
 				self.CurrentProj.AllViewportShadows + self.CurrentProj.ArchivedViewportShadows, ViewportIDToUpdate)
 			if not ViewportShadowToUpdate.IsOnDisplay:
-				self.DatacoreSwitchToViewport(XMLRoot=XMLRoot, Chain='NoChain')
+				self.DatacoreSwitchToViewport(XMLRoot=XMLRoot, MilestoneID=MilestoneID, Chain='NoChain')
 				# mark this Viewport as "skip", i.e. no need to redraw it again here
 				ViewportToSkip = ViewportShadowToUpdate
 		# Check with all Viewports that datacore knows about

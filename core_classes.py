@@ -1259,26 +1259,24 @@ class PHAModelBaseClass(object, metaclass=PHAModelMetaClass):
 		# capture any attribs provided in Args (risky, no checks performed)
 		self.__dict__.update(Args)
 
-class MilestoneItem(object): # item storing info required for navigation back/forwards
-#	AllNavigationItems = [] # list of all instances created in this Vizop instance
+class MilestoneItem(object): # item storing info required for navigation back/forwards, and for reverting display on undo
 	def __init__(self, Proj, **Args):
-		AttribInfo = [ ('Displayable', bool), ('Zoom', int), ('PanX', int), ('PanY', int) ]
+		AttribInfo = [ ('Displayable', bool), ('Zoom', (int, float)), ('PanX', (int, float)), ('PanY', (int, float)) ]
 		for AttribName, AttribType in AttribInfo:
 			if AttribName in Args: assert isinstance(Args[AttribName], AttribType)
 		object.__init__(self)
-#		self.ID = str(utilities.NextID(MilestoneItem.AllNavigationItems)) # generate unique ID; stored as str
 		self.ID = Proj.GetNewID() # find next available ID
 		self.Proj = Proj
-		self.Displayable = Args.get('Displayable', True) # whether the user is allowed to go to this item. If it's only for Undo purposes,
-			# Displayable may be False.
+		self.Displayable = Args.get('Displayable', True) # whether the user is allowed to navigate to this milestone.
+			# If it's only for Undo purposes, Displayable may be False.
 		self.Viewport = Args.get('Viewport', None) # which Viewport to display on the display device
 		if hasattr(self.Viewport, 'GetMilestoneData'):
 			self.ViewportData = self.Viewport.GetMilestoneData()
 		else: self.ViewportData = {}
 		self.DisplDevice = Args.get('DisplDevice', None) # which display device was showing the Viewport
-		self.Zoom = Args.get('Zoom', 100) # Zoom value to apply on the Viewport
-		self.PanX = Args.get('PanX', 0) # Pan value to apply on the Viewport
-		self.PanY = Args.get('PanY', 0) # Pan value to apply on the Viewport
+		self.Zoom = int(round(Args.get('Zoom', 100))) # Zoom value to apply on the Viewport
+		self.PanX = int(round(Args.get('PanX', 0))) # Pan value to apply on the Viewport
+		self.PanY = int(round(Args.get('PanY', 0))) # Pan value to apply on the Viewport
 		self.IsZoomChange = Args.get('IsZoomChange', False) # True if this object is a change of zoom in the same Viewport, all other attribs unchanged except Pan
 		self.IsPanChange = Args.get('IsPanChange', False) # True if this object is a change of pan in the same Viewport, all other attribs unchanged except Zoom
 

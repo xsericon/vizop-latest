@@ -12,6 +12,7 @@ from platform import system
 import text, utilities, core_classes, info, vizop_misc, projects, art, display_utilities, undo, project_display
 
 # constants applicable to fault tree
+ShowActionItemsByDefault = False
 TextElementTopBufferInCU = 2 # y-gap in canvas units between top of a text element and top of its contained text
 DefaultFontFamily = wx.FONTFAMILY_DEFAULT
 ConnectingLineColour = (0xf6, 0xff, 0x2a) # golden yellow, for lines connecting FT elements
@@ -28,7 +29,7 @@ EditingTextBkgColour = (0xff, 0xff, 0xff) # white for backgrounds of text compon
 EditingTextCursorColour = (0xff, 0x00, 0x00) # red for cursor in text components being edited
 EditingTextBorderColour = (0x20, 0x20, 0x30) # deep grey, border colour for border of edit-in-place text box
 DefaultTextFgColour = (0x20, 0x20, 0x20) # dark grey for foreground of text components not being edited
-LabelFgColour = (0xb0, 0xb0, 0xff) # light grey for foreground of label texts in elements
+LabelFgColour = (0x90, 0x90, 0xff) # light grey for foreground of label texts in elements
 GateLabelBkgColour = ButtonBorderColour
 GateLabelFgColour = ButtonGraphicColour
 GateTextBkgColour = (0xb0, 0xb0, 0xff) # light grey
@@ -543,7 +544,7 @@ class FTBoxyObject(object): # superclass of vaguely box-like FT components for u
 			self.__dict__.update(self.FT.PreservedAttribs[self.ID])
 
 	def DrawElements(self, DC, Components, Zoom): # render all the components of this object in DC
-		BackBoxRoundedness = 3 # for text elements, how rounded the background boxes' corners are
+		BackBoxRoundedness = 2 # for text elements, how rounded the background boxes' corners are
 		for El in Components:
 			if getattr(El, 'Visible', True):
 				El.Draw(DC, Zoom, BackBoxRoundedness=BackBoxRoundedness) # render element, including any background box, in DC
@@ -666,7 +667,6 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 		self.PromptTextObj.Italics = text.BIUSNoEffectValue + 1 # show prompt text in italics
 		self.InternalName = InternalName # name used to identify specific elements
 		self.DefaultFgColour = Args.get('DefaultFgColour', DefaultTextFgColour)
-#		self.BkgColour = (0x40, 0x40, 0x40)
 		self.Visible = True
 		self.Selected = False # whether highlighted as part of user selection
 		self.IsClickable = True
@@ -675,7 +675,7 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 		for (Attrib, Value) in Args.items(): setattr(self, Attrib, Value)
 
 	def MinTextXat(self, TextIdentifier=0, StartY=0, EndY=10):
-		# returns minimum X coord (canvas coords) available for text within element in the Y-range StartY to EndY%%%
+		# returns minimum X coord (canvas coords) available for text within element in the Y-range StartY to EndY
 		return self.PosXInCU
 
 	def MaxComponentXat(self, TextIdentifier=0, StartY=0, EndY=10):
@@ -729,7 +729,7 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 	def Draw(self, DC, Zoom, **Args): # render text element, including background box, in DC
 		# Optional arg BackBoxRoundedness: radius of background box corner curvature, in canvas coords
 		# Optional arg Highlight (bool): whether to highlight the background box
-		DefaultRound = 3 # default value of BackBoxRoundedness if not supplied
+		DefaultRound = 2 # default value of BackBoxRoundedness if not supplied
 		EditingText = (self.FT.CurrentEditComponent is self) # whether we are currently editing text in this component
 		# set background colour according to whether to highlight
 		BkgColour = EditingTextBkgColour if EditingText \
@@ -749,7 +749,6 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 
 	def HandleMouseLClickOnMe(self, **Args): # handle mouse left button single click on TextElement instance when not editing
 		# first, request control frame to show appropriate aspect in control panel
-		print('FT750 in mouse click handler for text component')
 		if getattr(self, 'ControlPanelAspect', None):
 			# if editing a component in the header, get the component name
 			if isinstance(self.HostObject, FTHeader):
@@ -966,7 +965,6 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 			return self.Text.Content[text.FindnthChar(RichStr=self.Text.Content, n=CharIndexLean)] == info.NewlineSymbol
 
 		# start of OnKeyDown()
-		print('FT969 starting OnKeyDown')
 		Propagate = True # whether to propagate the keypress event to other handlers
 		OldTextContentLean = text.StripOutEscapeSequences(self.Text.Content)
 		if Event.KeyCode == wx.WXK_BACK: # check for backspace key (we do this first, as it also generates ASCII code)
@@ -1161,7 +1159,8 @@ class FTEvent(FTBoxyObject): # FT event object in Viewport
 
 	def CreateFixedTextElements(self):
 		# create elements for fixed text items in FTEvent. Return (list of elements at top of FTEvent, list of elements relating to FTEvent's value)
-		HeaderLabelBkg = (0xdb, 0xf7, 0xf0) # pale green
+#		HeaderLabelBkg = (0xdb, 0xf7, 0xf0) # pale green
+		HeaderLabelBkg = ElementHeaderBkgColour
 		ColourLabelBkg = (0x80, 0x3E, 0x51) # plum
 		ColourLabelFg = (0xFF, 0xFF, 0xFF) # white
 		ColourContentBkg = (0x6A, 0xDA, 0xBD) # mint green
@@ -1422,6 +1421,7 @@ class FTGate(FTBoxyObject): # object containing FT gates for display in Viewport
 		# it should be assigned to the Row that it can force to grow
 		# Elements in variable row number (after Comments) have RowBase parm, which defines the row number if there
 		# are no comments visible
+		HeaderLabelBkg = ElementHeaderBkgColour
 		self.GateKind = TextElement(self.FT, Row=0, ColStart=0, ColSpan=4, EndX=299, HostObject=self,
 			InternalName='GateKind', EditBehaviour='Choice', ObjectChoices=[], DisplAttrib='HumanName',
 			DefaultFgColour=LabelFgColour)
@@ -1459,7 +1459,7 @@ class FTGate(FTBoxyObject): # object containing FT gates for display in Viewport
 		for El in TopEls + ValueEls:
 			if type(El) is TextElement:
 				El.Text.Colour = El.PromptTextObj.Colour = GateTextFgColour
-				El.BkgColour = GateTextBkgColour
+				El.BkgColour = HeaderLabelBkg if El.InternalName == 'GateKind' else GateTextBkgColour
 
 		return TopEls, ValueEls
 
@@ -1503,6 +1503,7 @@ class FTGate(FTBoxyObject): # object containing FT gates for display in Viewport
 				MatchingEl.Text.Content = self.__dict__[Attrib]
 		# put the gate kind into the respective element
 		self.GateKind.Text.Content = self.GateKindHash.get(self.Algorithm, _('<Undefined gate type>'))
+		print('FT1505 populated gate kind with: ', self.GateKind.Text.Content)
 
 	def RenderIntoBitmap(self, Zoom): # draw FTGate in self.Bitmap. Also calculates FTGate size attributes
 		# based on equivalent method in FTEvent class
@@ -1606,7 +1607,7 @@ class FTGate(FTBoxyObject): # object containing FT gates for display in Viewport
 			BubbleRadiusInPx = int(round(BubbleRadiusInCU * Zoom))
 			TextPointSizeNoZoom = 30
 			PenWidth = max(1, int(round(Zoom)))  # width of pen for drawing border
-			if self.Style == 'IEC 60617-12': # boxes with annotations inside; not tested yet
+			if self.Style == 'IEC 60617-12': # boxes with annotations inside; not tested yet TODO
 				BoxSizeXInCU = 60
 				self.SizeYInCU = 100
 				if self.Algorithm in AlgorithmsWithBubble: self.SizeXInCU = BoxSizeXInCU + 2 * BubbleRadiusInCU + 1
@@ -1684,7 +1685,7 @@ class FTGate(FTBoxyObject): # object containing FT gates for display in Viewport
 					DC.Destroy() # so that FillSymbol() has exclusive access to self.Bitmap
 					self.Bitmap = FillSymbol(self.Bitmap, self.SizeXInPx, self.SizeYInPx, HalfwayAlongSymbolInPx, HalfHeightInPx,
 						GateBaseColour, GateBorderColour[0])
-			elif self.Style == 'DIN 40700': # semicircles with annotation inside
+			elif self.Style == 'DIN 40700': # semicircles with annotation inside; not tested TODO
 				SymbolSizeXInCU = 100 # target size of symbol without bubble
 				self.SizeYInCU = 60
 				# extra X size on right for bubble; the +1 is a fudge to make it look better at lower zooms
@@ -2436,14 +2437,13 @@ class FTEventInCore(FTElementInCore): # FT event object used in DataCore by FTOb
 			# relevant opmodes (used to restore SIF failure event if we change back to those modes)
 		self.CanEditValue = True # False if the value should only be calculated and not overridden by user
 		self.ApplicableRiskReceptors = FT.MyTolRiskModel.RiskReceptors[:] # set which risk receptors apply to this event
-		self.ShowActionItems = False
 		self.BackgColour = '0,0,0'
 		self.EventDescriptionComments = [] # list of AssociatedTextItem instances
 		self.ValueComments = [] # list of AssociatedTextItem instances
 		self.ShowDescriptionComments = True # whether description comments are visible
 		self.ShowValueComments = True # whether value comments are visible
 		self.ActionItems = [] # list of AssociatedTextItem instances
-		self.ShowActionItems = True
+		self.ShowActionItems = ShowActionItemsByDefault # initial default when events are first created
 		self.MakeTestComments()
 		self.ConnectTo = [] # FT object instances in next column to the right, to which this element is connected
 		self.LinkedFrom = [] # list of LinkItem instances for linking individual attribs to a master element elsewhere in the project
@@ -4756,11 +4756,11 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 				TextComponentName=XMLRoot.findtext('TextComponent'),
 				NewValue=XMLRoot.findtext('NewValue'), Viewport=SourceViewport)
 		elif Command == 'RQ_FT_ChangeChoice':
-			Reply = self.ChangeChoice(Proj=Proj, ElementID=XMLRoot.findtext('Element'), Zoom=Zoom, PanX=PanX, PanY=PanY,
+			Reply = self.ChangeChoice(Proj=Proj, ElementID=XMLRoot.findtext('Element'),
 				TextComponentName=XMLRoot.findtext('TextComponent'), ViewportObj=SourceViewport,
 				**dict([(ThisTag.tag, ThisTag.text) for ThisTag in XMLRoot.iter()]))
 			# The ** arg sends a dict of all tags and their texts, allowing ChangeChoice to pick up case-specific tags
-			# Attribs NewValue and Viewport are already in the ** arg, so no need to include it explicitly
+			# Attribs Zoom, PanX/Y, NewValue and Viewport are already in the ** arg, so no need to include explicitly
 		elif Command == 'RQ_FT_DescriptionCommentsVisible': # make description comments in/visible in an FT element; not currently used
 			ThisElementID = XMLRoot.findtext('Element')
 			ThisFTElement = [e for e in WalkOverAllFTObjs(self) if e.ID == ThisElementID][0]
@@ -6345,27 +6345,16 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 				# get the text typed by the user, and remove newline symbols
 				TextEntered = RemoveNewlineSymbols(self.CurrentEditComponent.Text.Content)
 				# check if any changes made
-				print('FT6216 wrapping up after editing with AcceptEdits, AcceptEditsThisTime, TextEntered: ', AcceptEdits, AcceptEditsThisTime, TextEntered)
 				if AcceptEditsThisTime and (TextEntered != self.CurrentEditComponent.Text.OldContent):
 					if isinstance(self.CurrentEditComponent.HostObject, FTHeader): ElementID = 'Header'
 					else: ElementID = self.CurrentEditComponent.HostObject.ID
 					EditComponentInternalName = self.CurrentEditComponent.InternalName
-#					# destroy the TextCtrl (to avoid memory leak) (do this before SendRequest() so that the FT gets fully
-#					# refreshed by ControlFrame's OnPaint() afterwards)
-#					self.CurrentEditTextCtrl.Destroy()
-#					self.CurrentEditComponent = None
-#					self.PaintNeeded = True # turn off paint suppression while TextCtrl was in use; redundant?
 					# request PHA object in datacore to update text attribute
 					self.RequestChangeText(ElementID, EditComponentInternalName, NewValue=TextEntered)
 				else: # no change made, or change rejected
 					# revert the text to its original state
 					self.CurrentEditComponent.Text.Content = self.CurrentEditComponent.Text.OldContent
-					# redraw
-#					self.CurrentEditTextCtrl.Destroy()
-#					self.CurrentEditComponent = None
-#					self.PaintNeeded = True # turn off paint suppression while TextCtrl was in use; redundant?
 				# redraw the element containing the edited component
-#				self.CurrentEditComponent.RedrawDuringEditing(Zoom=self.Zoom)
 				self.CurrentEditComponent = None
 				self.PaintNeeded = True # turn off paint suppression while TextCtrl was in use; redundant?
 			elif CurrentEditBehaviour == 'Choice': # it was a choice editing operation
@@ -6386,14 +6375,13 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 					self.CurrentEditComponent = self.CurrentEditChoice = None
 					# request PHA object to update choice attribute by sending message through zmq
 					vizop_misc.SendRequest(Socket=self.C2DSocketREQ, Command='RQ_FT_ChangeChoice',
-						ProjID=self.Proj.ID, PHAObj=self.PHAObjID, Viewport=self.ID, Zoom=str(self.Zoom)(),
+						ProjID=self.Proj.ID, PHAObj=self.PHAObjID, Viewport=self.ID, Zoom=str(self.Zoom),
 						PanX=str(self.PanX), PanY=str(self.PanY),
 						Element=ElementID, TextComponent=EditComponentInternalName,
 						NewValue=ChosenXMLName)
 					# store current element's ID to set as "current" when display is refreshed
 					if ElementID != 'Header':
 						self.CurrentElementIDsToSelectOnRefresh = [ElementID]
-						print('FT5374 in EndEditingOperation; self.CurrentElementIDsToSelectOnRefresh:', self.CurrentElementIDsToSelectOnRefresh)
 				else: # no change made, or change rejected; destroy the choice widget
 					self.CurrentEditChoice.Destroy()
 					self.CurrentEditComponent = self.CurrentEditChoice = None
@@ -6415,7 +6403,6 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		vizop_misc.SendRequest(Socket=self.C2DSocketREQ, Command='RQ_FT_ChangeChoice', Attrib=AttribName,
 			PHAObj=self.PHAObjID, Viewport=self.ID,
 			Element=ElementID, TextComponent=EditComponentInternalName, NewValue=NewValue)
-
 
 	def RequestNewConnectionToConnectorIn(self, ElementID, TargetConnectorID):
 		# send request to Datacore to create a new connection from a connector-out with ID=ElementID to a connector-in

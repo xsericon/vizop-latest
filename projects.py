@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Module: projects. This file is part of Vizop. Copyright xSeriCon, 2019
+# Module: projects. This file is part of Vizop. Copyright xSeriCon, 2020
 
 # standard modules needed:
 import os, shutil, datetime
@@ -7,12 +7,13 @@ import os.path
 import xml.etree.ElementTree as ElementTree
 
 # vizop modules needed:
-from vizop_misc import IsReadableFile, IsWritableLocation, select_file_from_all, MakeXMLMessage
+# from vizop_misc import IsReadableFile, IsWritableLocation, select_file_from_all, MakeXMLMessage, SocketWithName
 #import vizop_parser
-import settings, core_classes, info, faulttree, utilities, display_utilities
+import settings, core_classes, info, faulttree, utilities, display_utilities, undo, vizop_misc
 
 """
 The projects module contains functions for handling entire Vizop projects, including project files.
+Code for project-wide features like action items is also here.
 """
 
 UsableProjDocTypes = ['VizopProject0.1'] # project doc types parsable by this version of Vizop
@@ -108,6 +109,9 @@ class ProjectItem(object): # class of PHA project instances
 		self.BackwardHistory = [] # list of MilestoneItem instances recently displayed; for navigation
 		self.UndoList = [] # list of undoable actions
 		self.RedoList = [] # list of redoable actions
+		self.MilestonesForUndo = [] # list of MilestoneItem instances for reverting display when undoing.
+			# This is a client-side list in the project shadow, because milestones act on Viewports
+			# (whereas undo objects are on datacore side)
 		self.SaveOnFly = False # bool; whether project is being saved on fly
 		self.SandboxStatus = 'SandboxInactive' # str; whether sandbox is active
 		self.OutputFilename = '' # str; full pathname of last file last used to save project in this Vizop instance.
@@ -223,7 +227,7 @@ class ProjectItem(object): # class of PHA project instances
 		#	PHAObjID: ID PHA object containing target elements
 		#	PHAElementIDs: Comma-separated list of target element IDs
 		#	AssociatedTextIDs: Comma-separated list of IDs of existing ATs (action items or parking lot items)
-		#	OriginatingViewportID: ID of Viewport that raised the request (for undo)
+		#	info.ViewportTag: ID of Viewport that raised the request (for undo)
 		# returns reply message
 		print('PR228 in AddExistingAssociatedTextsToElements')
 		TargetPHAObj = utilities.ObjectWithID(self.PHAObjs, TargetID=XMLRoot.findtext(info.PHAObjTag))
@@ -232,12 +236,20 @@ class ProjectItem(object): # class of PHA project instances
 		TargetElements = [utilities.ObjectWithID(AllElementsInPHAObj, TargetID=ThisID)
 			for ThisID in XMLRoot.findtext(info.PHAElementTag).split(',')]
 		print('AT232 TargetElements: ', TargetElements)
-		ATListName = 'ActionItems' if XMLRoot.findtext(info.AssociatedTextKindTag) == info.ActionItemLabel \
-			else 'ParkingLotItems'
+		ATKind = XMLRoot.findtext(info.AssociatedTextKindTag)
+		ATListName = 'ActionItems' if ATKind == info.ActionItemLabel else 'ParkingLotItems'
 		print('AT233 ATListName: ', ATListName)
 		TargetATs = [utilities.ObjectWithID(getattr(self, ATListName), TargetID=ThisID)
 			for ThisID in XMLRoot.findtext(info.AssociatedTextIDTag).split(',')]
 		print('AT238 TargetATs: ', TargetATs)
+		# add undo record
+		undo.AddToUndoList(Proj=self, Redoing=False,
+			UndoObj=undo.UndoItem(UndoHandler=self.AddExistingAssociatedTextsToElements_Undo,
+			RedoHandler=self.AddExistingAssociatedTextsToElements_Redo,
+			MilestoneID=XMLRoot.findtext(info.MilestoneIDTag),
+			PHAObj=TargetPHAObj, PHAElements=TargetElements, ATs=TargetATs, ATListName=ATListName,
+			HumanText=_('add %s to element(s)' % core_classes.AssociatedTextEnglishNamesPlural[ATKind]),
+			ViewportID=XMLRoot.findtext(info.ViewportTag)))
 		# add the ATs to the elements
 		for ThisEl in TargetElements:
 			for ThisAT in TargetATs:
@@ -246,8 +258,46 @@ class ProjectItem(object): # class of PHA project instances
 					if not (ThisAT in TargetATList): # is the AT not already in the element?
 						TargetATList.append(ThisAT) # attach the AT to the element
 						print('PR243 attached an AT')
-		# TODO: Undo
-		return MakeXMLMessage(RootName='OK', RootText='OK')
+		return vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
+		# TODO: add save on fly
+
+	def AddExistingAssociatedTextsToElements_Undo(self, Proj, UndoRecord, **Args):
+		print('PR263 in undo handler; not fully coded, not yet redrawing Viewports')
+		assert isinstance(Proj, ProjectItem)
+		assert isinstance(UndoRecord, undo.UndoItem)
+		# find out which datacore socket to send messages on
+		SocketFromDatacore = vizop_misc.SocketWithName(TargetName=Args['SocketFromDatacoreName'])
+		# remove the ATs added to the elements
+		for ThisPHAElement in [e for e in UndoRecord.PHAObj.WalkOverAllElements() if e in UndoRecord.PHAElements]:
+			for ThisAT in UndoRecord.ATs:
+				getattr(ThisPHAElement, UndoRecord.ATListName).remove(ThisAT)
+		# request Control Frame to switch to the milestone that was visible when the original edit was made, and refresh
+		# all other visible Viewports
+		# %%% working here
+#		RedrawDataXML = cls.GetFullRedrawData(Proj=Proj) # not sure if needed here
+		MsgToControlFrame = ElementTree.Element(info.NO_RedrawAfterUndo)
+		ProjTag = ElementTree.Element(info.ProjIDTag)
+		ProjTag.text = self.ID
+		# add a ViewportID tag to the message, so that Control Frame knows which Viewport to redraw
+		ViewportTag = ElementTree.Element(info.ViewportTag)
+		ViewportTag.text = UndoRecord.ViewportID
+		# add a milestoneID tag
+		MilestoneTag = ElementTree.Element(info.MilestoneIDTag)
+		MilestoneTag.text = UndoRecord.MilestoneID
+		MsgToControlFrame.append(ViewportTag)
+		MsgToControlFrame.append(MilestoneTag)
+		MsgToControlFrame.append(ProjTag)
+#		MsgToControlFrame.append(RedrawDataXML)
+		# Refresh this and all other visible Viewports, using controlframe.UpdateAllViewports()
+		vizop_misc.SendRequest(Socket=SocketFromDatacore.Socket, Command=info.NO_RedrawAfterUndo,
+							   XMLRoot=MsgToControlFrame)
+#		projects.SaveOnFly(Proj, UpdateData=vizop_misc.MakeXMLMessage(RootName=info.FTTag,
+#			Elements={info.IDTag: self.ID, info.ComponentHostIDTag: UndoRecord.ComponentHost.ID}))
+		# TODO add required data to the Save On Fly data
+		return {'Success': True}
+
+	def AddExistingAssociatedTextsToElements_Redo(self, Proj, RedoRecord, **Args):
+		print('PR266 in redo handler')
 
 def TestProjectsOpenable(ProjectFilenames, ReadOnly=False):
 	"""
@@ -261,7 +311,7 @@ def TestProjectsOpenable(ProjectFilenames, ReadOnly=False):
 	ProjOpenData = [ {'Openable': False, 'Comment': ''} ] * len(ProjectFilenames) # set up template for return data
 	# check project files in turn
 	for (FileIndex, ProjFile) in enumerate(ProjectFilenames):
-		ProjOpenData[FileIndex]['Openable'] = IsReadableFile(ProjFile)
+		ProjOpenData[FileIndex]['Openable'] = vizop_misc.IsReadableFile(ProjFile)
 	return ProjOpenData
 
 def GetProjectFilenamesToOpen(parent_frame):
@@ -280,7 +330,7 @@ def GetProjectFilenamesToOpen(parent_frame):
 
 	proj_file_ext = sm.get_config('ProjFileExt')
 
-	file_list = select_file_from_all(message=_('Select Vizop project file(s) to open'),
+	file_list = vizop_misc.select_file_from_all(message=_('Select Vizop project file(s) to open'),
 							  default_path=working_dir,
 							  wildcard='.'.join(['*', proj_file_ext]),
 							  read_only=False, allow_multi_files=True,
@@ -396,7 +446,7 @@ def SaveEntireProject(Proj: ProjectItem, OutputFilename, ProblemReport='', Close
 
 	Report = ProblemReport # final report to return to user
 	# First, try to create the project file
-	if IsWritableLocation(os.path.dirname(OutputFilename)):
+	if vizop_misc.IsWritableLocation(os.path.dirname(OutputFilename)):
 #		ProjFile = open(OutputFilename, 'w') # create the file
 		WriteOK, WriteReport = WriteEntireProjectToFile(Proj, OutputFilename) # write all the data into the file
 		Report = AddToReport(Report, WriteReport)
@@ -492,7 +542,7 @@ def SaveChangesToProj(Proj, UpdateData=None, Task='Update'):
 	assert Task == 'Update'
 	Success = True; ProblemReport = ''
 	# Step 1. Check that we can still access project's file for writing
-	Success = IsReadableFile(Proj.OutputFilename) and IsWritableLocation(os.path.dirname(Proj.OutputFilename))
+	Success = vizop_misc.IsReadableFile(Proj.OutputFilename) and vizop_misc.IsWritableLocation(os.path.dirname(Proj.OutputFilename))
 	if not Success: ProblemReport = "Can'tAccessProjectFileLocation"
 	if Success:
 		# Step 2. Copy the project file. First, make a file path with "_Restore" inserted before file extension

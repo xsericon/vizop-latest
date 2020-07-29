@@ -216,7 +216,7 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 	def OnActionChoice(self, Event): # handle user selection in Action choice control
 		print('AT217 in OnActionChoice')
 		GridWidget = self.ATListGrid.Widget # get the wx grid widget
-		# find out which action was requested%%%
+		# find out which action was requested
 		ActionRequested = self.ActionChoices[self.ActionChoice.Widget.GetSelection()]
 		if ActionRequested is self.DeleteUnusedATsOption:
 			print('AT221 requested delete unused ATs, not coded yet')
@@ -284,13 +284,17 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 
 	def AddActionItemsToElements(self, PHAObjID, TargetElementIDs, ActionItemIDs):
 		# request datacore to add action items with IDs in ActionItemIDs (list of str) to elements with IDs in
-		# TargetElementIDs (list of str) in PHA object with ID = PHAObjID (str)%%% working here, need to implement command in datacore
+		# TargetElementIDs (list of str) in PHA object with ID = PHAObjID (str)%%%
 		# Next line for future: get PHA object's Viewport to show AT aspect in Control Panel
 #		XX.PreferredControlPanelAspect = 'CPAspect_ActionItems'
-		# handle request to add new AssociatedText to PHAComponent in PHAElement
+		# First, make a client-side milestone for undo reversion
+		print('AT291 type of Zoom, PanX, PanY: ', type(self.Zoom), type(self.PanX), type(self.PanY))
+		UndoMilestone = core_classes.MilestoneItem(Proj=self.Proj, Displayable=False, Zoom=self.Zoom,
+			PanX=self.PanX, PanY=self.PanY, Viewport=self, DisplDevice=self.DisplDevice)
+		self.Proj.MilestonesForUndo.append(UndoMilestone)
 		ArgsToSend = {info.PHAObjTag: PHAObjID, info.PHAElementTag: ','.join(TargetElementIDs),
 			info.AssociatedTextIDTag: ','.join(ActionItemIDs), info.ViewportTag: self.ID,
-			info.AssociatedTextKindTag: self.AssocTextKind}
+			info.AssociatedTextKindTag: self.AssocTextKind, info.MilestoneIDTag: UndoMilestone.ID}
 		vizop_misc.SendRequest(Socket=self.C2DSocketREQ, Command='RQ_AT_AddExistingAssociatedTextsToElements',
 			Proj=self.Proj.ID, **ArgsToSend)
 
@@ -301,10 +305,13 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 		self.StoreAttribsInProject()
 		self.ExitViewportAndRevert()
 
-	def PrepareFullDisplay(self, XMLTree):
+	def PrepareFullDisplay(self, XMLData):
 		# display associated text list in our display device
 		# first, unpack data from datacore
-		self.UnpackDataFromDatacore(XMLTree)
+		self.UnpackDataFromDatacore(XMLData)
+		# check if a milestone should be applied
+		MilestoneID = XMLData.find(info.MilestoneIDTag)
+		print('AT314 Milestone ID to apply: ', MilestoneID)
 		# build the display: prefill widgets and activate it
 		print('AT219 TODO: reapply previous filter')
 		self.ApplyFilters() # mark each associated text as whether currently visible, based on current filters

@@ -1,14 +1,9 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
-# undo module: part of Vizop, (c) 2018 xSeriCon. Contains general code for managing undo/redo
-# undo/redo handlers for each specific operation are adjacent to the code for those operations
-# Grabbed from SILability, Chain attrib changed and updated for Python 3
+# undo module: part of Vizop, (c) 2020 xSeriCon. Contains general code for managing undo/redo
+# Undo/redo handlers for each specific operation are adjacent to the code for those operations
 
-# library modules
-from __future__ import division # makes a/b yield exact, not truncated, result. Must be 1st import
-
-# SILability modules
-import projects
+# SILability modules - currently no imports required
 
 def _(Dummy): pass # dummy definition
 
@@ -28,6 +23,7 @@ class UndoItem(object):
 		#   When user hits 'Cancel', all consecutive records with same UndoOnCancel value as the last one (if > 0) are undone.
 		#   No redo record is stored when Undoing-on-Cancel. (However, redo is required if these records are undone later.)
 #		# WritesDatabase/ReadsDatabase (projects.DatabaseItem instance or None): this action reads to or writes from a database
+		# TODO: database support is copied from SILability and redundant here
 		# First, check UndoHandler and RedoHandler are functions. Not using callable() as it's deprecated
 		assert hasattr(UndoHandler, '__call__'), "UndoHandler '%s' isn't a function" % str(UndoHandler)
 		assert hasattr(RedoHandler, '__call__'), "RedoHandler '%s' isn't a function" % str(RedoHandler)
@@ -91,7 +87,6 @@ def PerformUndoOnCancel(Proj, TargetUoCValue=0):
 	Should be called when "Cancel" selected in an editing dialogue
 	No need to store Redo record.
 	"""
-	assert isinstance(Proj, projects.ProjectItem)
 	assert isinstance(TargetUoCValue, int)
 	Undoing = True
 	while Undoing and Proj.UndoList: # check Undo list items starting from end of list, unless list is empty
@@ -106,7 +101,6 @@ def SetUp4UndoOnCancel(Proj):
 	This should be called at the start of any routine that requires Undoable tasks to be Undone when a Cancel command is issued.
 	Returns UndoOnCancel value (int) that should be stored with any Undo records. See Undo spec for details.
 	"""
-	assert isinstance(Proj, projects.ProjectItem)
 	if Proj.UndoList: UndoOnCancelIndex = Proj.UndoList[-1].UndoOnCancel + 1
 	else: UndoOnCancelIndex = 1 # if there's no Undo record, assign arbitrary value > 0
 	return UndoOnCancelIndex
