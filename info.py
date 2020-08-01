@@ -261,6 +261,7 @@ KindTag = 'Kind'
 FilterTextTag = 'FilterText'
 FilterAppliedTag = 'FilterApplied'
 ItemsSelectedTag = 'ItemsSelected'
+AssociatedTextsSelectedTag = 'ATsSelected'
 
 FTImagePrefix = 'FT_' # filenames containing all images used in FT must begin with this
 ProjInfoImagePrefix = 'ProjInfo_'

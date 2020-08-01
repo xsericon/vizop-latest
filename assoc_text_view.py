@@ -75,7 +75,8 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 	InitialEditPanelMode = 'Widgets'
 	MinZoom = 0.1 # min and max zoom factors allowed for this Viewport
 	MaxZoom = 9.99
-	MenuCommandsAvailable = ['ShowActionItems'] # InternalNames of menu commands to enable when this Viewport is visible
+	# Make list of InternalNames of menu commands to enable when this Viewport is visible
+	MenuCommandsAvailable = ['FTFullExport', 'ShowActionItems', 'ShowParkingLot']
 
 	def __init__(self, Proj, PHAObjID, DisplDevice, ParentWindow, Fonts, SystemFontNames, **Args):
 		# __init__ for class AssocTextListViewport
@@ -158,9 +159,9 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 			self.ActionChoice = UIWidgetItem(wx.Choice(HostPanel, -1, size=(180, 25),
 				choices=[]), GapX=10, Sizer=self.HeaderSizer,
 				Handler=self.OnActionChoice, Events=[wx.EVT_CHOICE], ColLoc=7, ColSpan=1)
-			self.ActionGoButton = UIWidgetItem(wx.Button(HostPanel, -1, _('Go')), Sizer=self.HeaderSizer,
-				Handler=self.OnActionGoButton, Events=[wx.EVT_BUTTON],
-				ColLoc=8, ColSpan=1, Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_LEFT | wx.EXPAND)
+#			self.ActionGoButton = UIWidgetItem(wx.Button(HostPanel, -1, _('Go')), Sizer=self.HeaderSizer,
+#				Handler=self.OnActionGoButton, Events=[wx.EVT_BUTTON],
+#				ColLoc=8, ColSpan=1, Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_LEFT | wx.EXPAND)
 			self.FinishedButton = UIWidgetItem(wx.Button(HostPanel, -1, _('Finished')), GapX=20, Sizer=self.HeaderSizer,
 				Handler=self.OnFinishedButton, Events=[wx.EVT_BUTTON], GapY=40,
 				ColLoc=10, ColSpan=1, Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_LEFT | wx.EXPAND)
@@ -170,11 +171,11 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 				Sizer=self.HeaderSizer,
 				Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_LEFT)
 			self.HeaderFixedWidgets = [self.MainHeaderLabel,
-				self.TextFilterLabel, self.TextFilterText, self.ActionLabel, self.ActionChoice, self.ActionGoButton,
+				self.TextFilterLabel, self.TextFilterText, self.ActionLabel, self.ActionChoice,
 				self.FinishedButton, self.ATListGrid]
 			# return list of widgets that need to be bound to their handlers in ActivateWidgetsInPanel() and deleted on exit
 			return [self.MainHeaderLabel,
-				self.TextFilterLabel, self.TextFilterText, self.ActionLabel, self.ActionChoice, self.ActionGoButton,
+				self.TextFilterLabel, self.TextFilterText, self.ActionLabel, self.ActionChoice,
 				self.FinishedButton, self.ATListGrid]
 
 #		def SetupAssocTextListSizer(HostPanel):
@@ -214,7 +215,6 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 		self.PopulateATList(CurrentAT=None)
 
 	def OnActionChoice(self, Event): # handle user selection in Action choice control
-		print('AT217 in OnActionChoice')
 		GridWidget = self.ATListGrid.Widget # get the wx grid widget
 		# find out which action was requested
 		ActionRequested = self.ActionChoices[self.ActionChoice.Widget.GetSelection()]
@@ -274,32 +274,26 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 					SelectedATIDs = [ThisAT.ID for ThisAT in self.AssocTexts if ThisAT.FilteredIn and ThisAT.Selected]
 				else:
 					SelectedATIDs = [ThisAT.ID for ThisAT in self.AssocTexts if ThisAT.Selected]
-				print('AT221 Target PHA object: ', TargetMilestone.Viewport.PHAObj.ID)
-				print('AT278 Target PHA elements: ', TargetMilestone.ViewportData['SelectedElementIDs'])
-				self.AddActionItemsToElements(PHAObjID=TargetMilestone.Viewport.PHAObj.ID,
+				self.AddATsToElements(PHAObjID=TargetMilestone.Viewport.PHAObj.ID,
 					TargetElementIDs=TargetMilestone.ViewportData['SelectedElementIDs'],
-					ActionItemIDs=SelectedATIDs)
+					ATIDs=SelectedATIDs)
 		# update available choices in "action" choice box
 		self.UpdateActionChoices()
 
-	def AddActionItemsToElements(self, PHAObjID, TargetElementIDs, ActionItemIDs):
-		# request datacore to add action items with IDs in ActionItemIDs (list of str) to elements with IDs in
-		# TargetElementIDs (list of str) in PHA object with ID = PHAObjID (str)%%%
+	def AddATsToElements(self, PHAObjID, TargetElementIDs, ATIDs):
+		# request datacore to add associated texts with IDs in ATIDs (list of str) to elements with IDs in
+		# TargetElementIDs (list of str) in PHA object with ID = PHAObjID (str)
 		# Next line for future: get PHA object's Viewport to show AT aspect in Control Panel
 #		XX.PreferredControlPanelAspect = 'CPAspect_ActionItems'
 		# First, make a client-side milestone for undo reversion
-		print('AT291 type of Zoom, PanX, PanY: ', type(self.Zoom), type(self.PanX), type(self.PanY))
 		UndoMilestone = core_classes.MilestoneItem(Proj=self.Proj, Displayable=False, Zoom=self.Zoom,
 			PanX=self.PanX, PanY=self.PanY, Viewport=self, DisplDevice=self.DisplDevice)
 		self.Proj.MilestonesForUndo.append(UndoMilestone)
 		ArgsToSend = {info.PHAObjTag: PHAObjID, info.PHAElementTag: ','.join(TargetElementIDs),
-			info.AssociatedTextIDTag: ','.join(ActionItemIDs), info.ViewportTag: self.ID,
+			info.AssociatedTextIDTag: ','.join(ATIDs), info.ViewportTag: self.ID,
 			info.AssociatedTextKindTag: self.AssocTextKind, info.MilestoneIDTag: UndoMilestone.ID}
 		vizop_misc.SendRequest(Socket=self.C2DSocketREQ, Command='RQ_AT_AddExistingAssociatedTextsToElements',
 			Proj=self.Proj.ID, **ArgsToSend)
-
-	def OnActionGoButton(self, Event): # handle user click on action Go button
-		pass
 
 	def OnFinishedButton(self, Event): # handle user click on Finished button
 		self.StoreAttribsInProject()
@@ -312,6 +306,7 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 		# check if a milestone should be applied
 		MilestoneID = XMLData.find(info.MilestoneIDTag)
 		print('AT314 Milestone ID to apply: ', MilestoneID)
+		# TODO recover selection from milestone (key: info.AssociatedTextsSelectedTag) and apply%%%
 		# build the display: prefill widgets and activate it
 		print('AT219 TODO: reapply previous filter')
 		self.ApplyFilters() # mark each associated text as whether currently visible, based on current filters
@@ -335,9 +330,10 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 		assert StartTag.get(info.PHAModelTypeTag) == self.InternalName
 		# find subelement containing the kind of associated text
 		ATKindEl = StartTag.find(info.AssociatedTextKindTag)
-		# confirm it indicates we received action items
-		assert ATKindEl.text == 'ActionItems'
-		# fetch tag for each action item in the project
+		# confirm it indicates we received action items or parking lot items
+		print('AT334 ATKindEl.text, self.AssocTextKind: ', ATKindEl.text, self.AssocTextKind)
+		assert ATKindEl.text == self.AssocTextKind
+		# fetch tag for each associated text in the project
 		for ThisATTag in StartTag.findall(info.AssociatedTextTag):
 			# make an associated text instance, and store it in the list
 			ThisAT = AssocTextItemInDisplay()
@@ -391,9 +387,9 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 		self.TextFilterText.Widget.ChangeValue(self.FilterText)
 		# set available choices in "action" choice box
 		self.UpdateActionChoices()
-		# enable action Go button if any actions are available, apart from the prompt
-		self.ActionGoButton.Widget.Enable(len(self.ActionChoices) > 1)
-		# populate action items list
+#		# enable action Go button if any actions are available, apart from the prompt (not using Go button currently)
+#		self.ActionGoButton.Widget.Enable(len(self.ActionChoices) > 1)
+		# populate associated texts list
 		self.PopulateATList(CurrentAT=CurrentAT)
 
 	def SetWidgetVisibility(self, **Args):
@@ -404,7 +400,7 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 		# return (str) name of associated text kind; plural if Plural (bool)
 		assert isinstance(Plural, bool)
 		return [(_('action item'), _('action items')), (_('parking lot item'), _('parking lot items'))][\
-			['ActionItems', 'ParkingLot'].index(self.AssocTextKind)][int(Plural)]
+			[info.ActionItemLabel, info.ParkingLotItemLabel].index(self.AssocTextKind)][int(Plural)]
 
 	def UpdateActionChoices(self): # update choices available in "Action" choice box
 		# set "Applicable" flag for each possible choice
@@ -455,7 +451,10 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 		GridWidget.DataTable.colLabels = []
 		GridWidget.ClearGrid()
 		# populate column labels. First, make hash table of column internal names to human names
-		ColLabelHumanNameHash = {'Selected': _('Select'), 'Number': _('Action item\nnumber'), 'Content': _('Content'),
+		ColLabelHumanNameHash = {'Selected': _('Select'),
+			'Number': [_('Action item\nnumber'), _('Parking lot\nnumber')][\
+				[info.ActionItemLabel, info.ParkingLotItemLabel].index(self.AssocTextKind)],
+			'Content': _('Content'),
 			'Responsibility': _('Responsibility'), 'Deadline': _('Deadline'), 'Status': _('Status'),
 			'WhereUsed': _('Where used'), 'ID': 'ID'}
 		ColHorizAlignments = {'Selected': wx.ALIGN_CENTRE, 'Number': wx.ALIGN_RIGHT, 'Content': wx.ALIGN_LEFT,
@@ -517,7 +516,6 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 				ThisAT.GridRow = None
 		# update the grid object: tell it to add or delete rows according to whether there are more or less than last time
 		NewNumberOfRows = RowIndex + 1
-		print('AT410 grid old rows, new rows: ', OldNumberOfRows, NewNumberOfRows)
 		GridWidget.BeginBatch()
 		if NewNumberOfRows > OldNumberOfRows:
 			GridWidget.ProcessTableMessage(wx.grid.GridTableMessage(GridWidget.DataTable,
@@ -599,7 +597,6 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 		# get list of IDs of ATs now selected
 		ATIDsSelected = [GridWidget.GetCellValue(row=r, col=IDColIndex) for r in range(GridWidget.GetNumberRows())
 			if GridWidget.IsInSelection(row=r, col=0)]
-#		print('AT496 AT IDs selected: ', ATIDsSelected)
 		# set Selected flag of AT objects
 		for ThisAT in self.AssocTexts:
 			ThisAT.Selected = ThisAT.ID in ATIDsSelected
@@ -629,28 +626,34 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 	@classmethod
 	def GetFullRedrawData(cls, Viewport=None, ViewportClass=None, **Args):
 		# a datacore method. Provide data for redraw of this Viewport.
-		# Args needs 'Proj' as a minimum
+		# Args needs 'Proj' as a minimum:
+		#	Proj (ProjectItem instance)
+		#	ATKind (str; info.ActionItemLabel or info.ParkingLotItemLabel)
 		# return the data as XML string
 
-		def MakeAssocTextLookupTable(Proj):
-			# make and return dictionary with keys = action items, values = list of PHA elements containing the action item
+		def MakeAssocTextLookupTable(Proj, ATKind):
+			# make and return dictionary with keys = ATs, values = list of PHA elements containing the AT
+			# We assume the element's attrib containing the AT is named the same as ATKind; if not,
+			# its ATs won't be found
+			assert ATKind in (info.ActionItemLabel, info.ParkingLotItemLabel)
 			ATTable = {}
 			for ThisPHAElement in Proj.WalkOverAllPHAElements():
-				for ThisAT in getattr(ThisPHAElement, 'ActionItems', []):
+				for ThisAT in getattr(ThisPHAElement, ATKind, []):
 					if ThisAT in ATTable: ATTable[ThisAT].append(ThisPHAElement)
 					else: ATTable[ThisAT] = [ThisPHAElement]
 			return ATTable
 
 		# start of GetFullRedrawData()
+		assert Args['ATKind'] in (info.ActionItemLabel,  info.ParkingLotItemLabel)
 		Proj = Args['Proj']
-		# get a lookup table of all action items in the project
-		ATTable = MakeAssocTextLookupTable(Proj=Proj)
+		# get a lookup table of all ATs of the appropriate kind in the project
+		ATTable = MakeAssocTextLookupTable(Proj=Proj, ATKind=Args['ATKind'])
 		# First, make the root element
 		RootElement = ElementTree.Element(info.PHAModelRedrawDataTag)
 		RootElement.set(info.PHAModelTypeTag, cls.InternalName)
 		# add a subelement containing the kind of associated text
 		ATKindEl = ElementTree.SubElement(RootElement, info.AssociatedTextKindTag)
-		ATKindEl.text = 'ActionItems'
+		ATKindEl.text = Args['ATKind']
 		AssocTextMasterList = Proj.ActionItems # identify master list containing all associated text items to show
 		# add a tag for each action item in the project
 		for ThisAssocTextItem in AssocTextMasterList:
@@ -740,7 +743,6 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 		# MessageReceived (str or None): XML message containing request info
 		# MessageAsXMLTree (XML element or None): root of XML tree
 		# return Reply (Root object of XML tree)
-		print('AT565 in HandleIncoming Request')
 		assert isinstance(MessageReceived, bytes) or (MessageReceived is None)
 		assert isinstance(Args, dict)
 		# First, convert MessageReceived to an XML tree for parsing
@@ -798,7 +800,7 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 		undo.AddToUndoList(Proj=Proj, Redoing=Redoing,
 			UndoObj=undo.UndoItem(UndoHandler=cls.ChangeAssociatedText_Undo,
 			RedoHandler=cls.ChangeAssociatedText_Redo, FilterText=FilterText, FilterApplied=FilterApplied,
-			ATID=ATID,
+			ATID=ATID, ATKind=AssociatedTextKind,
 			ChangedAttribName=ChangedAttribName,
 			OldAttribValue=OldAttribValue,
 			ATRowInGrid=ATRowInGrid,
@@ -842,7 +844,7 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 		if not SkipRefresh:
 			# prepare data about zoom, highlight etc.
 			DisplayAttribTag = cls.FetchDisplayAttribsFromUndoRecord(UndoRecord)
-			RedrawDataXML = cls.GetFullRedrawData(Proj=Proj)
+			RedrawDataXML = cls.GetFullRedrawData(Proj=Proj, ATKind=UndoRecord.ATKind)
 			MsgToControlFrame = ElementTree.Element(info.NO_RedrawAfterUndo)
 			ProjTag = ElementTree.Element(info.ProjIDTag)
 			ProjTag.text = Proj.ID
@@ -872,11 +874,8 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 		# a datacore function. Store attribs about this Viewport in datacore for persistence.
 		# The attribs are stored in the Viewport shadow. They don't need to be saved in the project file, but need to
 		# be used to restore the same settings when this Viewport is destroyed and re-created.
-		print('AT375 storing attribs in datacore')
 		# First, find the Viewport shadow
-		print('AT630 Viewport shadows: ', [v.ID for v in Proj.AllViewportShadows])
-		print('AT630 Archieved Viewport shadows: ', [v.ID for v in Proj.ArchivedViewportShadows])
-		ViewportShadow = utilities.ObjectWithID(Proj.AllViewportShadows + Proj.ArchivedViewportShadows,
+		ViewportShadow = utilities.ObjectWithID(Proj.AllViewportShadows,
 			TargetID=XMLRoot.findtext(info.ViewportTag))
 		ViewportShadow.AssocTextKind = XMLRoot.findtext(info.AssociatedTextKindTag)
 		ViewportShadow.FilterText = XMLRoot.findtext(info.FilterTextTag)
@@ -887,4 +886,24 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 		# wrap-up actions needed when display device is no longer showing associated texts list
 		self.DisplDevice = None
 
-# for display of assoc text list, consider class SIFListGridTable
+	def GetMilestoneData(self):
+		# return (dict) data needing to be stored in milestone for navigation
+		ReturnArgs = {}
+		ReturnArgs[info.AssociatedTextsSelectedTag] = [AT.ID for AT in self.AssocTexts if AT.Selected]
+		# TODO add other display-related attribs such as filter, and scroll position
+		return ReturnArgs
+
+	@classmethod
+	def GetClassAttribsOnInit(cls, XMLRoot):
+		# return dict of attrib names and values that need to be stored in this Viewport's ViewportShadow when created.
+		# Values must be str (as they will be supplied directly to an XML tree)
+		# This is an optional datacore side class method for Viewports
+		assert isinstance(XMLRoot, ElementTree.Element)
+		assert info.AssociatedTextKindTag in [t.tag for t in XMLRoot]
+		return {'ATKind': XMLRoot.findtext(info.AssociatedTextKindTag)}
+
+	@classmethod
+	def GetClassAttribsRequired(cls, **Args):
+		# optional client side method - similar to GetClassAttribsOnInit(), but using Args instead of XMLRoot
+		assert info.AssociatedTextKindTag in Args
+		return {info.AssociatedTextKindTag: Args[info.AssociatedTextKindTag]}

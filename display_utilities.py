@@ -52,6 +52,7 @@ class ViewportBaseClass(object, metaclass=ViewportMetaClass): # base class for a
 #		self.GotoMilestoneOnUndoCreate = None # a milestone instance to revert to, if creation of this Viewport is undone
 
 def CreateViewport(Proj, ViewportClass, DisplDevice=None, PHAObj=None, DatacoreIsLocal=True, Fonts=[], **Args):
+	# Client side method.
 	# create new Viewport instance of class ViewportClass in project Proj, and attach it to DisplDevice.
 	# PHAObj: PHA object shadow to which the Viewport belongs, if any (None if the Viewport is project-wide)
 	# DatacoreIsLocal (bool): whether datacore is in this instance of Vizop
@@ -66,7 +67,6 @@ def CreateViewport(Proj, ViewportClass, DisplDevice=None, PHAObj=None, DatacoreI
 	NewViewport = ViewportClass(Proj=Proj, PHAObjID=getattr(PHAObj, 'ID', None), ParentWindow=DisplDevice,
 		DisplDevice=DisplDevice, Fonts=Fonts, **ArgsToSupply)
 	# append the Viewport to the project's list
-#	NewViewport.ID = str(utilities.NextID(Proj.ActiveViewports)) # generate unique ID; stored as str
 	NewViewport.ID = str(Proj.GetNewID()) # generate unique ID; stored as str. FIXME this is getting ID from client side Proj!
 	# assign default name to Viewport
 	Proj.AssignDefaultNameToViewport(Viewport=NewViewport)
@@ -94,7 +94,8 @@ def ViewportClassWithName(TargetName):
 		return ViewportMetaClass.ViewportClasses[InternalNameList.index(TargetName)]
 	else: return None
 
-def ArchiveDestroyedViewport(Proj, ViewportShadow, PersistentAttribs={}):
+#def ArchiveDestroyedViewport(Proj, ViewportShadow, PersistentAttribs={}):
+	# redundant; now we keep the Viewport shadow in the project's main list
 	# store a deleted Viewport shadow in Proj's list, to enable retrieval of persistent attributes if the Viewport is
 	# re-created
 	# If another Viewport of the same class is already in the archive list, replace the old one in the list with the new one
@@ -102,19 +103,18 @@ def ArchiveDestroyedViewport(Proj, ViewportShadow, PersistentAttribs={}):
 	# return: EjectedViewportShadow (the old version removed from the list, or None), TargetIndex (int: index where
 	# ViewportShadow is placed in the list); for undo
 	# first, store persistent attribs in the ViewportShadow in case the Viewport is resurrected later
-	print('DU105 archiving destroyed viewport')
-	ViewportShadow.PersistentAttribs = PersistentAttribs
-	# check if there's another Viewport of the same class already in the archive
-	ExistingViewportClasses = [v.MyClass for v in Proj.ArchivedViewportShadows]
-	if ViewportShadow.MyClass in ExistingViewportClasses: # replace existing archived Viewport shadow
-		TargetIndex = ExistingViewportClasses.index(ViewportShadow.MyClass)
-		EjectedViewportShadow = Proj.ArchivedViewportShadows[TargetIndex] # keep the old one for undo
-		Proj.ArchivedViewportShadows[TargetIndex] = ViewportShadow # overwrite old one with new one
-	else: # no existing Viewport of this class; add it
-		Proj.ArchivedViewportShadows.append(ViewportShadow)
-		EjectedViewportShadow = None
-		TargetIndex = len(Proj.ArchivedViewportShadows) - 1 # index of archived ViewportShadow in list
-	return EjectedViewportShadow, TargetIndex
+#	ViewportShadow.PersistentAttribs = PersistentAttribs
+#	# check if there's another Viewport of the same class already in the archive
+#	ExistingViewportClasses = [v.MyClass for v in Proj.ArchivedViewportShadows]
+#	if ViewportShadow.MyClass in ExistingViewportClasses: # replace existing archived Viewport shadow
+#		TargetIndex = ExistingViewportClasses.index(ViewportShadow.MyClass)
+#		EjectedViewportShadow = Proj.ArchivedViewportShadows[TargetIndex] # keep the old one for undo
+#		Proj.ArchivedViewportShadows[TargetIndex] = ViewportShadow # overwrite old one with new one
+#	else: # no existing Viewport of this class; add it
+#		Proj.ArchivedViewportShadows.append(ViewportShadow)
+#		EjectedViewportShadow = None
+#		TargetIndex = len(Proj.ArchivedViewportShadows) - 1 # index of archived ViewportShadow in list
+#	return EjectedViewportShadow, TargetIndex
 
 class GUIWidget(object): # superclass of all widgets that can be shown in iWindow modes
 	# when instances are created, the widgets are created, but not assigned to sizer, and no event binding is done
@@ -779,7 +779,6 @@ class DraggableGrid(wx.grid.Grid): # wx.grid object whose rows can be reordered 
 #		self.Bind(wx.lib.gridmovers.EVT_GRID_ROW_MOVE, self.OnRowMove, self)
 		self.DisableCellEditControl() # disallow direct editing of cells
 		# send events to parent window (e.g. data panel) for processing, if parent has a handler
-		print("DU624 looking for grid click handlers")
 		if hasattr(self.Viewport, 'OnGridMouseDoubleLClick'):
 			self.Bind(wx.grid.EVT_GRID_CELL_LEFT_DCLICK, self.Viewport.OnGridMouseDoubleLClick)
 		if hasattr(self.Viewport, 'OnGridRangeSelect'):

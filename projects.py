@@ -73,13 +73,13 @@ class ProjectItem(object): # class of PHA project instances
 		self.PHAObjs = [] # list of PHA objects existing locally, in order created; empty if datacore is remote
 		self.PHAObjShadows = [] # list of info about PHA objects; used by control frame, as the project datacore may be
 			# remote, so it may not have access to self.PHAObjs; same order as self.PHAObjs
-		self.ActiveViewports = [] # list of all actual Viewports (not Viewport shadows) currently displayed in a display device.
-			# This attrib is used on the "display side" (client side) project instance, not in datacore
+		self.ClientViewports = [] # list of all actual Viewports (not Viewport shadows) in this Vizop instance,
+			# whether visible or not. Client side attrib.
 		self.AllViewportShadows = [] # list of all Viewport shadows (belonging to datacore)
 		# should be ViewportShadow instances, but might be Viewport instances, i.e. ViewportBaseClass subclass instances FIXME
 		self.ViewportsWithoutPHAObjs = [] # datacore: any Viewport instances that don't belong to PHA objects (e.g. action item view)
-		self.ArchivedViewportShadows = [] # datacore: Viewport shadows created and subsequently deleted; retained to
-		# allow retrieval of persistent attribs. Need not be stored in project file.
+#		self.ArchivedViewportShadows = [] # datacore: Viewport shadows created and subsequently deleted; retained to
+#		# allow retrieval of persistent attribs. Need not be stored in project file. This attrib is no longer used.
 		self.IPLKinds = []
 		self.CauseKinds = []
 		self.RiskReceptors = [core_classes.RiskReceptorItem(XMLName='People', HumanName=_('People'))] # instances of RiskReceptorItem defined for this project
@@ -188,7 +188,7 @@ class ProjectItem(object): # class of PHA project instances
 		PHAObj.HumanName = HumanNameStub + str(HighestSuffix + 1)
 
 	def AssignDefaultNameToViewport(self, Viewport): # assigns a default HumanName to Viewport
-		# FIXME this should be a datacore-side function; currently called on client side
+		# Client side method
 		# The default name is the parent PHA object e.g. "Fault Tree", then "View", then '-' and a serial number
 		assert isinstance(Viewport, display_utilities.ViewportBaseClass)
 		ParentPHAObjID = Viewport.PHAObjID
@@ -197,7 +197,7 @@ class ProjectItem(object): # class of PHA project instances
 		# check if any other Viewports in this PHA object have the same HumanNameStub (ignoring spaces).
 		# If so, find the highest among their serial suffixes
 		HighestSuffix = max([utilities.str2int(utilities.StripSpaces(v.HumanName)[SkipLength:])
-			for v in self.ActiveViewports if v.PHAObjID == ParentPHAObjID] + [0])
+			for v in self.ClientViewports if v.PHAObjID == ParentPHAObjID] + [0])
 		# assign HumanName to Viewport
 		Viewport.HumanName = HumanNameStub + str(HighestSuffix + 1)
 
@@ -257,12 +257,10 @@ class ProjectItem(object): # class of PHA project instances
 				if TargetATList: # can this element support this kind of AT?
 					if not (ThisAT in TargetATList): # is the AT not already in the element?
 						TargetATList.append(ThisAT) # attach the AT to the element
-						print('PR243 attached an AT')
 		return vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
 		# TODO: add save on fly
 
 	def AddExistingAssociatedTextsToElements_Undo(self, Proj, UndoRecord, **Args):
-		print('PR263 in undo handler; not fully coded, not yet redrawing Viewports')
 		assert isinstance(Proj, ProjectItem)
 		assert isinstance(UndoRecord, undo.UndoItem)
 		# find out which datacore socket to send messages on
@@ -273,7 +271,6 @@ class ProjectItem(object): # class of PHA project instances
 				getattr(ThisPHAElement, UndoRecord.ATListName).remove(ThisAT)
 		# request Control Frame to switch to the milestone that was visible when the original edit was made, and refresh
 		# all other visible Viewports
-		# %%% working here
 #		RedrawDataXML = cls.GetFullRedrawData(Proj=Proj) # not sure if needed here
 		MsgToControlFrame = ElementTree.Element(info.NO_RedrawAfterUndo)
 		ProjTag = ElementTree.Element(info.ProjIDTag)

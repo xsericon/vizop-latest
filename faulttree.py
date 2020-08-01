@@ -4739,7 +4739,6 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		# get the command - it's the tag of the root element
 		Command = XMLRoot.tag
 		# get the ViewportShadow corresponding to the Viewport from which the command was issued
-#		SourceViewport = utilities.ObjectWithID(Objects=Proj.ActiveViewports, TargetID=XMLRoot.findtext('Viewport'))
 		SourceViewport = utilities.ObjectWithID(Objects=Proj.AllViewportShadows, TargetID=XMLRoot.findtext('Viewport'))
 		# extract display-related parms to store in undo records
 		Zoom = XMLRoot.findtext(info.ZoomTag)
@@ -5220,7 +5219,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 	MaxZoom = 10.0
 	InitialEditPanelMode = 'Select'
 	# InternalNames of menu commands to enable when this Viewport is visible
-	MenuCommandsAvailable = ['FTFullExport', 'ShowActionItems']
+	MenuCommandsAvailable = ['FTFullExport', 'ShowActionItems', 'ShowParkingLot']
 
 	class SeverityCatInFT(object): # represents a severity category in FTForDisplay instance
 		# (so far, it's identical to ChoiceItem class)
