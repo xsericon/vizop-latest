@@ -619,6 +619,7 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 		ArgsToSend = {info.AssociatedTextIDTag: AssociatedTextObj.ID, info.AttribNameTag: AttribChanged,
 			info.NewAttribValueTag: NewAttribContent, info.ATRowTag: 'None' if ATRow is None else str(ATRow),
 			info.ZoomTag: str(self.Zoom), info.FilterTextTag: self.FilterText,
+			info.AssociatedTextKindTag: self.AssocTextKind,
 			info.FilterAppliedTag: utilities.Bool2Str(self.FilterApplied)}
 		vizop_misc.SendRequest(Socket=self.C2DSocketREQ, Command='RQ_AT_ChangeAssociatedText',
 			Proj=self.Proj.ID, Viewport=self.ID, **ArgsToSend)
@@ -628,7 +629,7 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 		# a datacore method. Provide data for redraw of this Viewport.
 		# Args needs 'Proj' as a minimum:
 		#	Proj (ProjectItem instance)
-		#	ATKind (str; info.ActionItemLabel or info.ParkingLotItemLabel)
+		#	ATKind (str; info.ActionItemLabel or info.ParkingLotItemLabel) (now changed: this is in Viewport.RedrawData)
 		# return the data as XML string
 
 		def MakeAssocTextLookupTable(Proj, ATKind):
@@ -644,17 +645,20 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 			return ATTable
 
 		# start of GetFullRedrawData()
-		assert Args['ATKind'] in (info.ActionItemLabel,  info.ParkingLotItemLabel)
+		assert Viewport.RedrawData[info.AssociatedTextKindTag] in (info.ActionItemLabel,  info.ParkingLotItemLabel)
 		Proj = Args['Proj']
+		# find out what kind of AT is required, from the Viewport shadow's redraw data
+		ATKind = Viewport.RedrawData[info.AssociatedTextKindTag]
 		# get a lookup table of all ATs of the appropriate kind in the project
-		ATTable = MakeAssocTextLookupTable(Proj=Proj, ATKind=Args['ATKind'])
+		ATTable = MakeAssocTextLookupTable(Proj=Proj, ATKind=ATKind)
 		# First, make the root element
 		RootElement = ElementTree.Element(info.PHAModelRedrawDataTag)
 		RootElement.set(info.PHAModelTypeTag, cls.InternalName)
 		# add a subelement containing the kind of associated text
 		ATKindEl = ElementTree.SubElement(RootElement, info.AssociatedTextKindTag)
-		ATKindEl.text = Args['ATKind']
-		AssocTextMasterList = Proj.ActionItems # identify master list containing all associated text items to show
+		ATKindEl.text = ATKind
+		# identify master list containing all associated text items to show
+		AssocTextMasterList = Proj.ActionItems if ATKind == info.ActionItemLabel else Proj.ParkingLotItems
 		# add a tag for each action item in the project
 		for ThisAssocTextItem in AssocTextMasterList:
 			ATEl = ElementTree.SubElement(RootElement, info.AssociatedTextTag)
@@ -774,12 +778,13 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 		assert isinstance(ViewportID, str)
 		assert isinstance(Zoom, str)
 		print('AT587 in HandleChangeAssociatedTextRequest: changing attrib, ID: ', XMLRoot.findtext(info.AttribNameTag), XMLRoot.findtext(info.AssociatedTextIDTag))
-		# update the AssociatedText in the required AssociatedText list
+		# update the AssociatedText in the required AssociatedText list%%%
 		cls.DoChangeAssociatedText(Proj, ATID=XMLRoot.findtext(info.AssociatedTextIDTag),
 			ChangedAttribName=XMLRoot.findtext(info.AttribNameTag), FilterText=XMLRoot.findtext(info.FilterTextTag),
 			FilterApplied=utilities.Bool2Str(XMLRoot.findtext(info.FilterAppliedTag)),
 			NewAttribValue=XMLRoot.findtext(info.NewAttribValueTag),
 			ATRowInGrid=XMLRoot.findtext(info.ATRowTag),
+			AssociatedTextKind=XMLRoot.findtext(info.AssociatedTextKindTag),
 			ViewportID=ViewportID, Redoing=False, Zoom=Zoom)
 		return vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
 
@@ -792,7 +797,9 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 		# ATRowInGrid (int as str): row of grid at which this AT is displayed, or '' if not currently visible in grid
 		# ViewportID: ID of Viewport from where the change AssociatedText request was made
 		# FilterText (str) and FilterApplied (bool) indicate the current status of filtering, for storage in undo record
+		assert AssociatedTextKind in (info.ActionItemLabel, info.ParkingLotItemLabel)
 		# first find the associated text; could be action item or parking lot item
+		# TODO: optimise next line to avoid searching unnecessary AT lists - use arg AssociatedTextKind
 		ATToChange = utilities.ObjectWithID(Objects=Proj.ActionItems + Proj.ParkingLotItems, TargetID=ATID)
 		OldAttribValue = getattr(ATToChange, ChangedAttribName)
 		# change the attrib value
@@ -900,7 +907,7 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 		# This is an optional datacore side class method for Viewports
 		assert isinstance(XMLRoot, ElementTree.Element)
 		assert info.AssociatedTextKindTag in [t.tag for t in XMLRoot]
-		return {'ATKind': XMLRoot.findtext(info.AssociatedTextKindTag)}
+		return {info.AssociatedTextKindTag: XMLRoot.findtext(info.AssociatedTextKindTag)}
 
 	@classmethod
 	def GetClassAttribsRequired(cls, **Args):

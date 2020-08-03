@@ -1503,7 +1503,6 @@ class FTGate(FTBoxyObject): # object containing FT gates for display in Viewport
 				MatchingEl.Text.Content = self.__dict__[Attrib]
 		# put the gate kind into the respective element
 		self.GateKind.Text.Content = self.GateKindHash.get(self.Algorithm, _('<Undefined gate type>'))
-		print('FT1505 populated gate kind with: ', self.GateKind.Text.Content)
 
 	def RenderIntoBitmap(self, Zoom): # draw FTGate in self.Bitmap. Also calculates FTGate size attributes
 		# based on equivalent method in FTEvent class
@@ -4872,6 +4871,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		AssociatedTextListAttrib = XMLRoot.findtext('AssociatedTextListAttrib') # name of attrib containing associated text list
 		AssociatedTextList = getattr(ThisPHAElement, AssociatedTextListAttrib)
 		AssociatedTextListInProj = getattr(self.Proj, AssociatedTextListAttrib)
+		ATKind = XMLRoot.findtext(info.AssociatedTextKindTag)
 		# make a new AssociatedText object, with numbering object the same as the preceding object in the project's list (if any)
 		NewAssociatedText = core_classes.AssociatedTextItem(Proj=self.Proj, PHAObjClass=type(self), Host=self)
 		NewAssociatedText.ID = self.Proj.GetNewID()
@@ -4883,7 +4883,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			NewAssociatedText.Numbering = copy.copy(self.Proj.DefaultAssociatedTextNumbering)
 		# update the AssociatedText in the required AssociatedText list
 		self.DoNewAssociatedText(NewAssociatedText=NewAssociatedText,
-			PHAElement=ThisPHAElement,
+			PHAElement=ThisPHAElement, AssociatedTextKind=ATKind,
 			AssociatedTextListAttrib=AssociatedTextListAttrib, ComponentName=XMLRoot.findtext(info.ComponentTag),
 			Viewport=Viewport, Redoing=False, Zoom=Zoom, PanX=PanX, PanY=PanY)
 		return vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
@@ -4899,7 +4899,8 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		self.DoChangeAssociatedText(NewAssociatedText=XMLRoot.findtext(info.AssociatedTextTag),
 			AssociatedTextIndex=int(XMLRoot.findtext(info.AssociatedTextIndexTag)), PHAElement=ThisPHAElement,
 			AssociatedTextListAttrib=AssociatedTextListAttrib, ComponentName=XMLRoot.findtext(info.ComponentTag),
-			Viewport=Viewport, Redoing=False, Zoom=Zoom, PanX=PanX, PanY=PanY)
+			AssociatedTextKind=XMLRoot.findtext(info.AssociatedTextKindTag), Viewport=Viewport, Redoing=False,
+			Zoom=Zoom, PanX=PanX, PanY=PanY)
 		return vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
 
 	def HandleDeleteAssociatedTextRequest(self, XMLRoot, Viewport, Zoom, PanX, PanY):
@@ -4912,6 +4913,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		self.DoDeleteAssociatedText(DoomedAssociatedTextIndex=int(XMLRoot.findtext(info.AssociatedTextIndexTag)),
 							 PHAElement=ThisPHAElement, AssociatedTextListAttrib=AssociatedTextListAttrib,
 							 ComponentName=XMLRoot.findtext(info.ComponentTag), Viewport=Viewport, Redoing=False,
+							 AssociatedTextKind=XMLRoot.findtext(info.AssociatedTextKindTag),
 							 Zoom=Zoom, PanX=PanX, PanY=PanY)
 		return vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
 
@@ -5021,19 +5023,20 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 
 	def DeleteComment_Redo(self): pass
 
-	def DoNewAssociatedText(self, NewAssociatedText=None, PHAElement=None, ComponentName=None,
+	def DoNewAssociatedText(self, NewAssociatedText=None, PHAElement=None, AssociatedTextKind='', ComponentName=None,
 			AssociatedTextListAttrib='', Viewport=None,
 			Redoing=False, Zoom=1.0, PanX=0, PanY=0):
 		# add NewAssociatedText (AssociatedTextItem instance) to PHAElement's list in attrib named AssociatedTextListAttrib (str)
 		# ComponentName is the InternalName of the Viewport PHAElement's component that selects the AssociatedText for editing;
 		# needed for undo implementation
 		# Viewport: ViewportShadow corresponding to the Viewport from where the add AssociatedText request was made
+		assert AssociatedTextKind in (info.ActionItemLabel, info.ParkingLotItemLabel)
 		AssociatedTextList = getattr(PHAElement, AssociatedTextListAttrib)
 		AssociatedTextList.append(NewAssociatedText)
 		# add the associated text to project's master list
 		AssociatedTextListInProj = getattr(self.Proj, AssociatedTextListAttrib)
 		AssociatedTextListInProj.append(NewAssociatedText)
-		UndoEnglishText = 'add new %s to' % core_classes.AssociatedTextEnglishNamesSingular[AssociatedTextListAttrib]
+		UndoEnglishText = 'add new %s to' % core_classes.AssociatedTextEnglishNamesSingular[AssociatedTextKind]
 		undo.AddToUndoList(Proj=self.Proj, Redoing=Redoing,
 						   UndoObj=undo.UndoItem(UndoHandler=self.NewAssociatedText_Undo,
 												 RedoHandler=self.NewAssociatedText_Redo,
@@ -5068,16 +5071,18 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		pass
 
 	def DoChangeAssociatedText(self, NewAssociatedText=None, AssociatedTextIndex=0, PHAElement=None, ComponentName=None,
-						AssociatedTextListAttrib='', Viewport=None, Redoing=False, Zoom=1.0, PanX=0, PanY=0):
+						AssociatedTextListAttrib='', AssociatedTextKind='', Viewport=None, Redoing=False,
+						Zoom=1.0, PanX=0, PanY=0):
 		# Change text of AssociatedText in PHAElement's list in attrib named AssociatedTextListAttrib (str) at
 		# AssociatedTextIndex to NewAssociatedText (str)
 		# ComponentName is the InternalName of the Viewport PHAElement's component that selects the AssociatedText for editing;
 		# needed for undo implementation
 		# Viewport: ViewportShadow corresponding to the Viewport from where the change AssociatedText request was made
+		assert AssociatedTextKind in (info.ActionItemLabel, info.ParkingLotItemLabel)
 		AssociatedTextList = getattr(PHAElement, AssociatedTextListAttrib)
 		OldAssociatedText = AssociatedTextList[AssociatedTextIndex].Content
 		AssociatedTextList[AssociatedTextIndex].Content = NewAssociatedText
-		UndoEnglishText = 'change %s in' % core_classes.AssociatedTextEnglishNamesSingular[AssociatedTextListAttrib]
+		UndoEnglishText = 'change %s in' % core_classes.AssociatedTextEnglishNamesSingular[AssociatedTextKind]
 		undo.AddToUndoList(Proj=self.Proj, Redoing=Redoing,
 			UndoObj=undo.UndoItem(UndoHandler=self.ChangeAssociatedText_Undo,
 			RedoHandler=self.ChangeAssociatedText_Redo, OldAssociatedText=OldAssociatedText,
@@ -5107,12 +5112,14 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 	def ChangeAssociatedText_Redo(self, Proj, RedoRecord, **Args): # handle redo for change associated text
 		pass
 
-	def DoDeleteAssociatedText(self, DoomedAssociatedTextIndex=None, PHAElement=None, ComponentName=None, AssociatedTextListAttrib='',
-						Viewport=None, Redoing=False, Zoom=1.0, PanX=0, PanY=0):
+	def DoDeleteAssociatedText(self, DoomedAssociatedTextIndex=None, PHAElement=None, ComponentName=None,
+			AssociatedTextListAttrib='', AssociatedTextKind='',
+			Viewport=None, Redoing=False, Zoom=1.0, PanX=0, PanY=0):
 		# delete AssociatedText at DoomedAssociatedTextIndex (int) from PHAElement's list in attrib named AssociatedTextListAttrib (str)
 		# ComponentName is the InternalName of the Viewport PHAElement's component that selects the AssociatedText for editing;
 		# needed for undo implementation
 		# Viewport: ViewportShadow corresponding to the Viewport from where the delete AssociatedText request was made
+		assert AssociatedTextKind in (info.ActionItemLabel, info.ParkingLotItemLabel)
 		AssociatedTextList = getattr(PHAElement, AssociatedTextListAttrib)
 		AssociatedTextListInProj = getattr(self.Proj, AssociatedTextListAttrib)
 		# remove the doomed AssociatedText from PHAElement's list
@@ -5120,7 +5127,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		# remove the AssociatedText from the project's list
 		DoomedAssociatedTextIndexInProject = AssociatedTextListInProj.index(DoomedAssociatedText)
 		AssociatedTextListInProj.pop(DoomedAssociatedTextIndexInProject)
-		UndoEnglishText = 'delete %s in' % core_classes.AssociatedTextEnglishNamesSingular[AssociatedTextListAttrib]
+		UndoEnglishText = 'delete %s in' % core_classes.AssociatedTextEnglishNamesSingular[AssociatedTextKind]
 		undo.AddToUndoList(Proj=self.Proj, Redoing=Redoing,
 			UndoObj=undo.UndoItem(UndoHandler=self.DeleteAssociatedText_Undo,
 			RedoHandler=self.DeleteAssociatedText_Redo, DeletedAssociatedText=DoomedAssociatedText,
@@ -5613,7 +5620,6 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 				setattr(NewGate, Attrib, XMLObj.findtext(Tag, default=''))
 			# recover preserved attribs from previous Viewport layout; do this after recovering ID
 			NewGate.RecoverPreservedAttribs()
-			print('FT5256 recovered gate is in detailed view: ', NewGate.DetailedView)
 			DataInfoAsBool = [ ('MadeBySystem', 'MadeBySystem'),
 				('ShowDescriptionComments', 'ShowComments'), ('FTGateLinked', 'Linked') ]
 			for Tag, Attrib in DataInfoAsBool:
@@ -5638,14 +5644,12 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 					HumanName=ThisUnitHumanName, Applicable=utilities.Bool2Str(ThisTag.get(info.ApplicableAttribName))))
 			# set status of value problem button, and get help text relating to any value problem
 			SetValueProblemButtonStatus(FTElement=NewGate, XMLObj=XMLObj)
-			# create variable elements and build combined element list comprising fixed and variable elements
+			# create variable components and build combined component list comprising fixed and variable components
+			# (we build these lists even if the gate is not in Detailed view, because the user may switch to detailed view)
 			(NewGate.DescriptionCommentEls, NewGate.ActionItemEls) = NewGate.CreateVariableTextElements()
-			if NewGate.DetailedView: # populate components if gate is shown in detailed view (not just a gate symbol)
-#			if True:
-				NewGate.AllComponents = BuildFullElementList(
-					NewGate.TopFixedEls, NewGate.ValueFixedEls, NewGate.DescriptionCommentEls, NewGate.ActionItemEls)
-				NewGate.PopulateTextElements(NewGate.AllComponents) # put required text values in the components
-			else: NewGate.AllComponents = []
+			NewGate.AllComponents = BuildFullElementList(
+				NewGate.TopFixedEls, NewGate.ValueFixedEls, NewGate.DescriptionCommentEls, NewGate.ActionItemEls)
+			NewGate.PopulateTextElements(NewGate.AllComponents) # put required text values in the components
 			return NewGate
 
 		def PopulateDisplayAttribs(FT, DisplayAttribData):
@@ -5879,10 +5883,11 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 				ThisElement.PosYInCU = LastPosY + GapYAboveInCU
 				ThisElement.PosXInPx, ThisElement.PosYInPx = utilities.ScreenCoords(ThisColOffsetXInCU + ThisElement.PosXInCU,
 					ThisElement.PosYInCU, self.Zoom, PanX=self.PanX, PanY=self.PanY)
-				# set PosX/Y of components within elements
-				if hasattr(ThisElement, 'AllComponents'):
+				# set PosX/Y of components within elements (not needed if element isn't in Detailed view, e.g. gate symbol)
+				if hasattr(ThisElement, 'AllComponents') and getattr(ThisElement, 'DetailedView', True):
 					for ThisComponent in ThisElement.AllComponents:
-#						if not hasattr(ThisComponent, 'PosXInCU'): print('FT5520 component: ', ThisComponent.InternalName)
+						# the following line is for debugging
+						if not hasattr(ThisComponent, 'PosXInCU'): print('FT5520 component: ', ThisComponent.InternalName)
 						ThisComponent.PosXInPx = int(round(ThisElement.PosXInPx + (ThisComponent.PosXInCU * self.Zoom)))
 						ThisComponent.PosYInPx = int(round(ThisElement.PosYInPx + (ThisComponent.PosYInCU * self.Zoom)))
 				# set overall column width
@@ -6558,15 +6563,16 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			Proj=self.Proj.ID, PHAObj=self.PHAObjID, PHAElement=PHAElement.ID, CommentKind=PHAComponent.CommentKind,
 			Component=PHAComponent.InternalName, Viewport=self.ID, **ArgsToSend)
 
-	def AddNewAssociatedText(self, PHAElement, PHAComponent, AssociatedTextContent):
+	def AddNewAssociatedText(self, PHAElement, PHAComponent, AssociatedTextKind, AssociatedTextContent):
 		# handle request from ControlFrame for new AssociatedText in component PHAComponent of element PHAElement
 		# This method is for a completely new AssociatedText that doesn't exist in the project
 		# PHAComponent: the ButtonElement instance clicked to raise the AssociatedTexts for editing
+		assert AssociatedTextKind in (info.ActionItemLabel, info.ParkingLotItemLabel)
 		# First, store info to enable Viewport to request the AssociatedText aspect in control panel after redraw
 		self.PreferredControlPanelAspect = PHAComponent.ControlPanelAspect # aspect identifier such as 'CPAspect_ActionItems'
 		self.ComponentEdited = PHAComponent
 		# handle request to add new AssociatedText to PHAComponent in PHAElement
-		ArgsToSend = {info.ZoomTag: str(self.Zoom),
+		ArgsToSend = {info.ZoomTag: str(self.Zoom), info.AssociatedTextKindTag: AssociatedTextKind,
 			info.PanXTag: str(self.PanX), info.PanYTag: str(self.PanY),
 			info.AssociatedTextTag: AssociatedTextContent}
 		vizop_misc.SendRequest(Socket=self.C2DSocketREQ, Command='RQ_FT_NewAssociatedText',
@@ -6575,33 +6581,36 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			Component=PHAComponent.InternalName, AssociatedTextContent=AssociatedTextContent, Viewport=self.ID,
 			**ArgsToSend)
 
-	def ChangeAssociatedText(self, PHAElement, PHAComponent, AssociatedTextIndex, AssociatedTextContent):
+	def ChangeAssociatedText(self, PHAElement, PHAComponent, AssociatedTextKind,
+			AssociatedTextIndex, AssociatedTextContent):
 		# handle request from ControlFrame to change text of AssociatedText at AssociatedTextIndex (int)
 		# in component PHAComponent of element PHAElement
 		# PHAComponent: the ButtonElement instance clicked to raise the AssociatedTexts for editing
+		assert AssociatedTextKind in (info.ActionItemLabel, info.ParkingLotItemLabel)
 		# First, store info to enable Viewport to request the AssociatedText aspect in control panel after redraw
 		assert isinstance(AssociatedTextIndex, int)
 		self.PreferredControlPanelAspect = PHAComponent.ControlPanelAspect # aspect identifier such as 'CPAspect_ActionItems'
 		self.ComponentEdited = PHAComponent
 		# We use the ArgsToSend dict so that we can get arg names from info module
 		ArgsToSend = {info.AssociatedTextIndexTag: str(AssociatedTextIndex), info.ZoomTag: str(self.Zoom),
-			info.PanXTag: str(self.PanX), info.PanYTag: str(self.PanY),
+			info.PanXTag: str(self.PanX), info.PanYTag: str(self.PanY), info.AssociatedTextKindTag: AssociatedTextKind,
 			info.AssociatedTextTag: AssociatedTextContent}
 		vizop_misc.SendRequest(Socket=self.C2DSocketREQ, Command='RQ_FT_ChangeAssociatedText',
 			Proj=self.Proj.ID, PHAObj=self.PHAObjID, PHAElement=PHAElement.ID,
 			AssociatedTextListAttrib=PHAComponent.AssociatedTextListAttrib,
 			Component=PHAComponent.InternalName, Viewport=self.ID, **ArgsToSend)
 
-	def DeleteAssociatedText(self, PHAElement, PHAComponent, DoomedAssociatedTextIndex):
+	def DeleteAssociatedText(self, PHAElement, PHAComponent, DoomedAssociatedTextIndex, AssociatedTextKind):
 		# handle request from ControlFrame to delete AssociatedText in component PHAComponent of element PHAElement
 		# PHAComponent: the ButtonElement instance clicked to raise the AssociatedTexts for editing
 		assert isinstance(DoomedAssociatedTextIndex, int)
+		assert AssociatedTextKind in (info.ActionItemLabel, info.ParkingLotItemLabel)
 		# First, store info to enable Viewport to request the AssociatedText aspect in control panel after redraw
 		self.PreferredControlPanelAspect = PHAComponent.ControlPanelAspect # aspect identifier such as 'CPAspect_ActionItems'
 		self.ComponentEdited = PHAComponent
 		# We use the ArgsToSend dict so that we can get arg names from info module
 		ArgsToSend = {info.AssociatedTextIndexTag: str(DoomedAssociatedTextIndex), info.ZoomTag: str(self.Zoom),
-			info.PanXTag: str(self.PanX), info.PanYTag: str(self.PanY)}
+			info.AssociatedTextKindTag: AssociatedTextKind, info.PanXTag: str(self.PanX), info.PanYTag: str(self.PanY)}
 		vizop_misc.SendRequest(Socket=self.C2DSocketREQ, Command='RQ_FT_DeleteAssociatedText',
 			Proj=self.Proj.ID, PHAObj=self.PHAObjID, PHAElement=PHAElement.ID,
 			AssociatedTextListAttrib=PHAComponent.AssociatedTextListAttrib,

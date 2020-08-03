@@ -229,19 +229,14 @@ class ProjectItem(object): # class of PHA project instances
 		#	AssociatedTextIDs: Comma-separated list of IDs of existing ATs (action items or parking lot items)
 		#	info.ViewportTag: ID of Viewport that raised the request (for undo)
 		# returns reply message
-		print('PR228 in AddExistingAssociatedTextsToElements')
 		TargetPHAObj = utilities.ObjectWithID(self.PHAObjs, TargetID=XMLRoot.findtext(info.PHAObjTag))
-		print('PR230 TargetPHAObj: ', TargetPHAObj)
 		AllElementsInPHAObj = [e for e in TargetPHAObj.WalkOverAllElements()]
 		TargetElements = [utilities.ObjectWithID(AllElementsInPHAObj, TargetID=ThisID)
 			for ThisID in XMLRoot.findtext(info.PHAElementTag).split(',')]
-		print('AT232 TargetElements: ', TargetElements)
 		ATKind = XMLRoot.findtext(info.AssociatedTextKindTag)
 		ATListName = 'ActionItems' if ATKind == info.ActionItemLabel else 'ParkingLotItems'
-		print('AT233 ATListName: ', ATListName)
 		TargetATs = [utilities.ObjectWithID(getattr(self, ATListName), TargetID=ThisID)
 			for ThisID in XMLRoot.findtext(info.AssociatedTextIDTag).split(',')]
-		print('AT238 TargetATs: ', TargetATs)
 		# add undo record
 		undo.AddToUndoList(Proj=self, Redoing=False,
 			UndoObj=undo.UndoItem(UndoHandler=self.AddExistingAssociatedTextsToElements_Undo,

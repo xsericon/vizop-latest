@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Module core_classes: part of Vizop, (c) 2019 xSeriCon
+# Module core_classes: part of Vizop, (c) 2020 xSeriCon
 # contains class definitions of basic objects used throughout Vizop
 
 # library modules
@@ -1607,8 +1607,8 @@ class AssociatedTextItem(TextItem):  # 'smart text' used for comments, action it
 		self.Status = '' # whether item is open, closed etc
 
 # English names for associated text kinds. Translated at point of use, because they could be subject or object
-AssociatedTextEnglishNamesSingular = {'ActionItems': 'action item', 'ParkingLotItems': 'parking lot item'}
-AssociatedTextEnglishNamesPlural = {'ActionItems': 'action items', 'ParkingLotItems': 'parking lot items'}
+AssociatedTextEnglishNamesSingular = {info.ActionItemLabel: 'action item', info.ParkingLotItemLabel: 'parking lot item'}
+AssociatedTextEnglishNamesPlural = {info.ActionItemLabel: 'action items', info.ParkingLotItemLabel: 'parking lot items'}
 
 DefaultTextStyleItem = TextStyleItem()
 

@@ -884,11 +884,11 @@ class ControlFrame(wx.Frame):
 			self.MakeFaultTreeAspect()
 			self.MakeFTConnectorOutAspect()
 			self.MakeCommentAspect()
-			self.ActionItemsAspect = self.MakeAssociatedTextAspect(Aspect='ActionItems')
+			self.ActionItemsAspect = self.MakeAssociatedTextAspect(Aspect=info.ActionItemLabel)
 			# define hint text shown in textctrl for new associated texts, in English
 			self.ActionItemsAspect.NewItemHintFirst = 'Type an action item'
 			self.ActionItemsAspect.NewItemHintNotFirst = 'Type another action item'
-			self.ParkingLotAspect = self.MakeAssociatedTextAspect(Aspect='ParkingLotItems')
+			self.ParkingLotAspect = self.MakeAssociatedTextAspect(Aspect=info.ParkingLotItemLabel)
 			self.ParkingLotAspect.NewItemHintFirst = 'Type a parking lot item'
 			self.ParkingLotAspect.NewItemHintNotFirst = 'Type another parking lot item'
 			# Make sizer for notebook (this is required even though there's only one item in it, the notebook itself)
@@ -1749,12 +1749,12 @@ class ControlFrame(wx.Frame):
 
 		def MakeAssociatedTextAspect(self, Aspect): # make 'action item/parking lot item' aspect for Control Panel
 			# make basic attribs needed for the aspect
-			# Aspect (str): 'ActionItems' or 'ParkingLotItems'
-			assert Aspect in ('ActionItems', 'ParkingLotItems')
+			# Aspect (str): 'ActionItems' or 'ParkingLot'
+			assert Aspect in (info.ActionItemLabel, info.ParkingLotItemLabel)
 			# select parms for the appropriate aspect
 			(TabText, InternalName, HeaderLabel) =\
-				{'ActionItems': (_('Action items'), info.ActionItemLabel, _('Action items:')),
-				'ParkingLotItems': (_('Parking lot'), info.ParkingLotItemLabel, _('Parking lot items:'))}[Aspect]
+				{info.ActionItemLabel: (_('Action items'), info.ActionItemLabel, _('Action items:')),
+				info.ParkingLotItemLabel: (_('Parking lot'), info.ParkingLotItemLabel, _('Parking lot items:'))}[Aspect]
 			MyNotebookPage = wx.Panel(parent=self.MyNotebook)
 			NewAspect = self.ControlPanelAspectItem(InternalName=InternalName, ParentFrame=self,
 				TopLevelFrame=self.TopLevelFrame,
@@ -1762,6 +1762,7 @@ class ControlFrame(wx.Frame):
 				SetWidgetVisibilityMethod=lambda **Args: self.SetWidgetVisibilityforAssociatedTextAspect(
 					Aspect=NewAspect, **Args),
 				NotebookPage=MyNotebookPage, TabText=TabText)
+			NewAspect.ATKind = Aspect # store which kind of associated text is handled by this aspect
 			# make fixed widgets (this aspect also has variable widgets depending on the associated texts defined)
 			self.MakeStandardWidgets(Scope=NewAspect, NotebookPage=MyNotebookPage)
 			NewAspect.HeaderLabel = UIWidgetItem(wx.StaticText(MyNotebookPage, -1, HeaderLabel),
@@ -1801,10 +1802,9 @@ class ControlFrame(wx.Frame):
 			CurrentViewport = self.TopLevelFrame.CurrentViewport
 			ThisPHAElement = self.TopLevelFrame.PHAElementInControlPanel
 			ThisComponent = self.TopLevelFrame.ComponentInControlPanel
-#			ThisCommentList = getattr(ThisPHAElement, ThisComponent.CommentKind)
 			# submit 'delete associated text' request to datacore
 			self.TopLevelFrame.DoDeleteAssociatedText(Proj=Proj, PHAObj=CurrentViewport.PHAObj, Viewport=CurrentViewport,
-				PHAElement=ThisPHAElement,
+				PHAElement=ThisPHAElement, AssociatedTextKind=Aspect.ATKind,
 				Component=ThisComponent, DoomedAssociatedTextIndex=DeleteWidgetClicked.AssociatedTextIndex)
 
 		def AssociatedTextAspect_OnEditAssociatedText(self, Event, Aspect): # handle editing of AssociatedText in control panel
@@ -1826,14 +1826,15 @@ class ControlFrame(wx.Frame):
 				if AssociatedTextAsTyped:
 					# submit to datacore as a new associated text
 					self.TopLevelFrame.DoNewAssociatedText(Proj=Proj, PHAObj=CurrentViewport.PHAObj, Viewport=CurrentViewport,
-						PHAElement=ThisPHAElement,
+						PHAElement=ThisPHAElement, AssociatedTextKind=Aspect.ATKind,
 						Component=ThisComponent, AssociatedTextContent=AssociatedTextAsTyped)
 			else: # user typed in an existing associated text
-				# check if edited associated text is different from old associated text
+				# check if edited associated text is different from old associated text%%% set kind of AT?
 				if AssociatedTextAsTyped == ThisAssociatedTextList[AssociatedTextWidgetEdited.AssociatedTextIndex]: pass
 				else:
-					self.TopLevelFrame.DoChangeAssociatedText(Proj=Proj, PHAObj=CurrentViewport.PHAObj, Viewport=CurrentViewport,
-						PHAElement=ThisPHAElement, Component=ThisComponent,
+					self.TopLevelFrame.DoChangeAssociatedText(Proj=Proj, PHAObj=CurrentViewport.PHAObj,
+						Viewport=CurrentViewport,
+						PHAElement=ThisPHAElement, Component=ThisComponent, AssociatedTextKind=Aspect.ATKind,
 						AssociatedTextIndex=AssociatedTextWidgetEdited.AssociatedTextIndex,
 						AssociatedTextContent=AssociatedTextAsTyped)
 
@@ -1855,7 +1856,6 @@ class ControlFrame(wx.Frame):
 			for ThisWidget in Aspect.VariableWidgetList: ThisWidget.Widget.Destroy()
 			Aspect.VariableWidgetList = []
 			AssociatedTextList = getattr(TargetElement, AssociatedTextListAttrib)
-			print('CF1865 populating AT widgets with ATs: ', AssociatedTextList)
 			AssociatedTextNumberingList = getattr(TargetElement, AssociatedTextNumberingListAttrib)
 			# make a serial widget, textctrl and 'delete' button for each associated text
 			# RowOffset and ColOffset are offsets from the position of the placeholder in FixedWidgetList
@@ -2927,6 +2927,7 @@ class ControlFrame(wx.Frame):
 			ViewportTag = XMLRoot.find(info.PHAModelRedrawDataTag)
 			# find DisplayAttribs tag inside ViewportTag
 			DisplayAttribsTag = ViewportTag.find(info.DisplayAttribTag)
+			print('CF2930 DisplayAttribsTag found: ', DisplayAttribsTag)
 			# if tag found, extract zoom, PanX and PanY from it (although these are redundant here)
 			if DisplayAttribsTag is not None:
 				ThisZoomTag = DisplayAttribsTag.find(info.ZoomTag)
@@ -2952,6 +2953,9 @@ class ControlFrame(wx.Frame):
 		self.RefreshGUIAfterDataChange(Proj=Proj)
 		# show appropriate aspect in Control Panel
 		if hasattr(self.CurrentViewport, 'PreferredControlPanelAspect'):
+			print('CF2955 going to control panel aspect: ', self.CurrentViewport.PreferredControlPanelAspect)
+			print('CF2956 Viewport class: ', type(self.CurrentViewport))
+			print('CF2957 PHAElement: ', PHAElement)
 			self.MyControlPanel.GotoControlPanelAspect(NewAspect=self.CurrentViewport.PreferredControlPanelAspect,
 				PHAObjInControlPanel=self.CurrentViewport, PHAElementInControlPanel=PHAElement,
 				ComponentInControlPanel=ThisComponent, debug=2673)
@@ -3122,9 +3126,10 @@ class ControlFrame(wx.Frame):
 		assert isinstance(Viewport, ViewportShadow)
 		assert isinstance(ViewportID, str)
 		assert isinstance(MilestoneID, str) or (MilestoneID is None)
-		# fetch full redraw data for Viewport from PHA object, or from the Viewport itself if it doesn't have a PHAObj%%%
+		# fetch full redraw data for Viewport from PHA object, or from the Viewport itself if it doesn't have a PHAObj
 		if PHAObj is None:
-			RedrawXMLData = Viewport.MyClass.GetFullRedrawData(Proj=self.CurrentProj, **Viewport.RedrawData)
+			RedrawXMLData = Viewport.MyClass.GetFullRedrawData(Proj=self.CurrentProj, Viewport=Viewport)
+#				**Viewport.RedrawData)
 		else:
 			RedrawXMLData = PHAObj.GetFullRedrawData(Viewport=Viewport, ViewportClass=Viewport.MyClass)
 		# put ID of PHA object, followed by full redraw data, into XML element
@@ -3386,38 +3391,43 @@ class ControlFrame(wx.Frame):
 		# request Viewport to update the PHAObj with the new comment
 		Viewport.DeleteComment(PHAElement=PHAElement, PHAComponent=Component, DoomedCommentIndex=DoomedCommentIndex)
 
-	def DoNewAssociatedText(self, Proj, PHAObj, Viewport, PHAElement, Component, AssociatedTextContent, Redoing=False):
+	def DoNewAssociatedText(self, Proj, PHAObj, Viewport, PHAElement, AssociatedTextKind, Component,
+			AssociatedTextContent, Redoing=False):
 		# handle new associated text (action item/parking lot item) creation in a Component of a PHAElement
 		assert isinstance(Proj, projects.ProjectItem)
 		assert isinstance(PHAObj, core_classes.PHAModelBaseClass)
+		assert AssociatedTextKind in (info.ActionItemLabel, info.ParkingLotItemLabel)
 		assert isinstance(AssociatedTextContent, str)
 		assert isinstance(Redoing, bool)
 		# request Viewport to update the PHAObj with the new associated text
 		Viewport.AddNewAssociatedText(PHAElement=PHAElement, PHAComponent=Component,
-			AssociatedTextContent=AssociatedTextContent)
+			AssociatedTextKind=AssociatedTextKind, AssociatedTextContent=AssociatedTextContent)
 
 	def DoChangeAssociatedText(self, Proj, PHAObj, Viewport, PHAElement, Component, AssociatedTextIndex,
-			AssociatedTextContent, Redoing=False):
+			AssociatedTextContent, AssociatedTextKind, Redoing=False):
 		# handle change of existing associated text (action item/parking lot item) in a Component of a PHAElement
 		assert isinstance(Proj, projects.ProjectItem)
 		assert isinstance(PHAObj, core_classes.PHAModelBaseClass)
 		assert isinstance(AssociatedTextIndex, int)
 		assert isinstance(AssociatedTextContent, str)
+		assert AssociatedTextKind in (info.ActionItemLabel, info.ParkingLotItemLabel)
 		assert isinstance(Redoing, bool)
 		# request Viewport to update the PHAObj with the changed AssociatedText
 		Viewport.ChangeAssociatedText(PHAElement=PHAElement, PHAComponent=Component,
+			AssociatedTextKind=AssociatedTextKind,
 			AssociatedTextIndex=AssociatedTextIndex, AssociatedTextContent=AssociatedTextContent)
 
 	def DoDeleteAssociatedText(self, Proj, PHAObj, Viewport, PHAElement, Component, DoomedAssociatedTextIndex,
-			Redoing=False):
+			AssociatedTextKind, Redoing=False):
 		# handle deletion of an associated text (action item/parking lot item) in a Component of a PHAElement
 		assert isinstance(Proj, projects.ProjectItem)
 		assert isinstance(PHAObj, core_classes.PHAModelBaseClass)
 		assert isinstance(DoomedAssociatedTextIndex, int)
+		assert AssociatedTextKind in (info.ActionItemLabel, info.ParkingLotItemLabel)
 		assert isinstance(Redoing, bool)
 		# request Viewport to update the PHAObj with the new AssociatedText
 		Viewport.DeleteAssociatedText(PHAElement=PHAElement, PHAComponent=Component,
-			DoomedAssociatedTextIndex=DoomedAssociatedTextIndex)
+			DoomedAssociatedTextIndex=DoomedAssociatedTextIndex, AssociatedTextKind=AssociatedTextKind)
 
 	# ControlFrame main body
 	def __init__(self, parent=None, ID=None, title='', Projects=[], FirstProject=None, Viewport=None,
