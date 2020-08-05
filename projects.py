@@ -142,7 +142,7 @@ class ProjectItem(object): # class of PHA project instances
 		self.DefaultAssociatedTextNumbering = core_classes.NumberingItem()
 		self.DefaultAssociatedTextNumbering.NumberStructure = [core_classes.SerialNumberChunkItem()]
 		self.ActionItems = [] # list of AssociatedText instances for entire project
-		self.ParkingLotItems = [] # list of AssociatedText instances
+		self.ParkingLot = [] # list of AssociatedText instances
 
 		# Attributes saved in actual project file
 		self.VizopVersion = CurrentProjDocType # str; Vizop Version
@@ -234,7 +234,7 @@ class ProjectItem(object): # class of PHA project instances
 		TargetElements = [utilities.ObjectWithID(AllElementsInPHAObj, TargetID=ThisID)
 			for ThisID in XMLRoot.findtext(info.PHAElementTag).split(',')]
 		ATKind = XMLRoot.findtext(info.AssociatedTextKindTag)
-		ATListName = 'ActionItems' if ATKind == info.ActionItemLabel else 'ParkingLotItems'
+		ATListName = 'ActionItems' if ATKind == info.ActionItemLabel else 'ParkingLot'
 		TargetATs = [utilities.ObjectWithID(getattr(self, ATListName), TargetID=ThisID)
 			for ThisID in XMLRoot.findtext(info.AssociatedTextIDTag).split(',')]
 		# add undo record

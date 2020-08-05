@@ -666,7 +666,7 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 		ThisAspect.ActionsCheck = UIWidgetItem(wx.CheckBox(MyEditPanel, -1, _('Action items')),
 			Handler=ThisAspect.OnActionsCheck, Events=[wx.EVT_CHECKBOX], ColLoc=2, ColSpan=1, XMLLabel='ActionItems')
 		ThisAspect.ParkingCheck = UIWidgetItem(wx.CheckBox(MyEditPanel, -1, _('Parking lot items')),
-			Handler=ThisAspect.OnParkingCheck, Events=[wx.EVT_CHECKBOX], ColLoc=3, ColSpan=1, XMLLabel='ParkingLotItems')
+			Handler=ThisAspect.OnParkingCheck, Events=[wx.EVT_CHECKBOX], ColLoc=3, ColSpan=1, XMLLabel='ParkingLot')
 		# add widgets to FileBoxSubSizer
 		ThisAspect.TextWidgets.extend(display_utilities.PopulateSizer(Sizer=ScopeBoxSubSizer, Widgets=[ThisAspect.ExportWhatLabel,
 			ThisAspect.ShowHeaderCheck, ThisAspect.ShowFTCheck, ThisAspect.ShowOnlySelectedCheck,

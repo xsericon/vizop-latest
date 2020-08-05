@@ -231,6 +231,8 @@ class ButtonElement(object): # object containing a button and attributes and met
 			self.HostObject.ShowDescriptionComments = not self.HostObject.ShowDescriptionComments
 		elif CommentKind == 'ValueComments':
 			self.HostObject.ShowValueComments = not self.HostObject.ShowValueComments
+		# store redraw info in milestone
+		self.HostObject.FT.StoreMilestoneForRedraw()
 		# redraw the whole FT
 		self.HostObject.FT.DisplDevice.Redraw(FullRefresh=True)
 		# previously we sent a command to datacore to toggle comments; no longer required here, but still need to set
@@ -241,8 +243,10 @@ class ButtonElement(object): # object containing a button and attributes and met
 		# toggle whether associated text items are visible
 		if self.AssociatedTextListAttrib == 'ActionItems':
 			self.HostObject.ShowActionItems = not self.HostObject.ShowActionItems
-		elif self.AssociatedTextListAttrib == 'ParkingLotItems':
+		elif self.AssociatedTextListAttrib == 'ParkingLot':
 			self.HostObject.ShowParkingLotItems = not self.HostObject.ShowParkingLotItems
+		# store redraw info in milestone
+		self.HostObject.FT.StoreMilestoneForRedraw()
 		# redraw the whole FT
 		self.HostObject.FT.DisplDevice.Redraw(FullRefresh=True)
 
@@ -291,6 +295,8 @@ class ButtonElement(object): # object containing a button and attributes and met
 		# TODO send message to datacore to update the initial gate style; also in click handler of FTGate
 		# change gate style flag
 		self.HostObject.DetailedView = False
+		# store redraw info in milestone
+		self.HostObject.FT.StoreMilestoneForRedraw()
 		self.FT.DisplDevice.Redraw(FullRefresh=True) # refresh the display to show the gate style
 
 	MinSizeInCU = property(fget=GetMinSizeInCU)
@@ -546,6 +552,8 @@ class FTBoxyObject(object): # superclass of vaguely box-like FT components for u
 	def DrawElements(self, DC, Components, Zoom): # render all the components of this object in DC
 		BackBoxRoundedness = 2 # for text elements, how rounded the background boxes' corners are
 		for El in Components:
+#			ElText = El.Text.Content if hasattr(El, 'Text') else 'not text'
+#			print('FT552 drawing component of FT element with Visible: ', ElText, getattr(El, 'Visible', 'no visible attrib'))
 			if getattr(El, 'Visible', True):
 				El.Draw(DC, Zoom, BackBoxRoundedness=BackBoxRoundedness) # render element, including any background box, in DC
 
@@ -1094,12 +1102,6 @@ class FTEvent(FTBoxyObject): # FT event object in Viewport
 		('ValueUnit', str, False), ('Status', int, False), ('CanEditValue', bool, False), ('ShowActionItems', bool, False), ('BackgColour', 'rgb', False),
 		('DescriptionComment', str, True), ('ValueComment', str, True), ('ValueUnitComment', str, True),
 		('ValueKindComment', str, True), ('ActionItems', str, True), ('ConnectTo', int, True)]
-	# Make lists of HumanNames of event types that expect a frequency or probability value (now using global FTEventTypesWith...)
-#	EventTypesWithFreqValue = [FTEventTypeNameHash[e] for e in FTEventTypesWithFreqValue]
-#	EventTypesWithProbValue = [FTEventTypeNameHash[e] for e in FTEventTypesWithProbValue]
-#	EventTypesWithFreqValue = ['InitiatingEvent', 'SIFFailureEvent', 'IntermediateEvent', 'TopEvent',
-#		'ConnectorIn', 'ConnectorOut']
-#	EventTypesWithProbValue = ['IPL', 'EnablingCondition', 'ConditionalModifier']
 
 	def __init__(self, Column, **Args):
 		# Args must include FT (the FTForDisplay instance containing this element)
@@ -1137,6 +1139,7 @@ class FTEvent(FTBoxyObject): # FT event object in Viewport
 		self.ShowValueComments = True # whether value comments are visible
 		self.ActionItems = [] # str values
 		self.ShowActionItems = True
+		self.ShowParkingLotItems = True
 		self.EventCommentWidgets = []
 		self.ValueCommentWidgets = []
 		# attribs determined locally, not transferred from datacore
@@ -1371,7 +1374,7 @@ class FTGate(FTBoxyObject): # object containing FT gates for display in Viewport
 	# human readable names per algorithm
 	GateKindHash = {'AND': _('AND gate'), 'OR': _('OR gate'), 'MutExcOR': _('Mutually exclusive'),
 		'NAND': _('NAND gate'), 'NOR': _('NOR gate'), '2ooN': _(u'≥2 out of N'), '3ooN': _(u'≥3 out of N')}
-	# attribs to be reinstated after a redraw
+	# attribs to be reinstated after a redraw - maybe not needed, as we are now using milestone
 	AttribsToPreserve = ['DetailedView']
 
 	def __init__(self, **Args): # attribs marked * below are named in quotes elsewhere: be careful if names changed
@@ -1392,7 +1395,9 @@ class FTGate(FTBoxyObject): # object containing FT gates for display in Viewport
 		self.MadeBySystem = False # needed to determine whether gate can be deleted
 		self.GateDescriptionComments = [] # str values
 		self.ActionItems = [] # str values
+		self.ParkingLot = []
 		self.ShowActionItems = True
+		self.ShowParkingLotItems = True
 		self.SizeXInCU = self.SizeXInPx = self.SizeYInCU = self.SizeYInPx = 10 # size in canvas units and screen pixels
 		self.PosZ = 0 # z-coordinate
 		self.Buffer = wx.Bitmap(width=self.SizeXInPx, height=self.SizeYInPx, depth=wx.BITMAP_SCREEN_DEPTH)
@@ -1766,11 +1771,12 @@ class FTGate(FTBoxyObject): # object containing FT gates for display in Viewport
 	def HandleMouseLClickOnMe(self, **Args): # handle mouse click on gate when in symbol (not detailed) style
 		# change gate style flag
 		self.DetailedView = True
+		# store redraw info in milestone
+		self.FT.StoreMilestoneForRedraw()
 		self.FT.DisplDevice.Redraw(FullRefresh=True) # refresh the display to show detailed gate style
 
 class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for display in Viewport. These belong to FTColumn's.
 	# Is the superclass of FTConnectorIn and FTConnectorOut
-#	HumanName = {True: _('Inward connector'), False: _('Outward connector')} # class name; now set in subclasses
 	ConnectorStyles = ['Default'] # future, will define various connector appearances (squares, arrows, circles etc)
 	NeedsConnectButton = True # whether to provide connect buttons
 	# Attribs are used by ParseFTData() to populate object's attributes from data transferred from datacore (may be redundant)
@@ -1802,7 +1808,7 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 		self.ActionItems = [] # str values
 		self.ActionItemNumbering = [] # str; numbers of action items
 		self.ShowActionItems = True
-		self.ParkingLotItems = [] # str values
+		self.ParkingLot = [] # str values
 		self.ParkingLotItemNumbering = [] # str; numbers of parking lot items
 		self.ShowParkingLotItems = True
 		self.EventCommentWidgets = []
@@ -1865,7 +1871,7 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 			AssociatedTextNumberingListAttrib='ActionItemNumbering', ControlPanelAspect='CPAspect_ActionItems')
 		self.ConnParkingLotItemButton = ButtonElement(self.FT, Row=3, ColStart=6, ColSpan=1, StartX=250, EndX=274,
 			HostObject=self, InternalName='ConnParkingLotItemButton', Stati=('OutNotExist', 'OutExist'),
-			LSingleClickHandler='HandleMouseLClickOnActionItemButton', AssociatedTextListAttrib='ParkingLotItems',
+			LSingleClickHandler='HandleMouseLClickOnActionItemButton', AssociatedTextListAttrib='ParkingLot',
 			AssociatedTextNumberingListAttrib='ParkingLotItemNumbering', ControlPanelAspect='CPAspect_ParkingLot')
 		# make lists of elements: TopEls at top of connector, ValueEls relating to connector value
 		TopEls = [ConnKind, ConnName, ConnDescription, self.ConnDescriptionCommentButton]
@@ -1896,7 +1902,7 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 			[(DescrComments, self.ConnectorDescriptionComments, self.ShowDescriptionComments, _('Comments on\ndescription')),
 			 (ValueComments, self.ValueComments, self.ShowValueComments, _('Comments on\nvalue')),
 			 (ActionItems, self.ActionItems, self.ShowActionItems, _('Action items')),
-			 (ParkingLotItems, self.ParkingLotItems, self.ShowParkingLotItems, _('Parking lot items'))]:
+			 (ParkingLotItems, self.ParkingLot, self.ShowParkingLotItems, _('Parking lot items'))]:
 			if True: # populate all lists irrespective of whether associated texts are visible (formerly "if ShowFlag:")
 				for (CommentIndex, Comment) in enumerate(CommentList):
 					CommentElementList.append(TextElement(self.FT, RowBase=CommentIndex, ColStart=1, ColSpan=6,
@@ -1943,7 +1949,7 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 #					('ConnGroupedButton', bool(self.CollapseGroups)),
 					('ConnDescriptionCommentButton', bool(self.ConnectorDescriptionComments)),
 					('ConnActionItemButton', bool(self.ActionItems)),
-					('ConnParkingLotItemButton', bool(self.ParkingLotItems)),
+					('ConnParkingLotItemButton', bool(self.ParkingLot)),
 					('ConnValueCommentButton', bool(self.ValueComments))]:
 				FoundButtonComponent = ElementNamed(Components, ButtonName)
 				if FoundButtonComponent:
@@ -2803,7 +2809,7 @@ class FTEventInCore(FTElementInCore): # FT event object used in DataCore by FTOb
 
 	def GetMyClassHumanName(self): # return human name of this type of FT element
 		# We can't do this as a @classmethod because it depends on the ElementType attrib of the instance, and also
-		# there's no way to call property() on a class attribute%%%
+		# there's no way to call property() on a class attribute
 		return FTEventTypeNameHash[self.EventType]
 
 	ClassHumanName = property(fget=GetMyClassHumanName)
@@ -3143,9 +3149,9 @@ class FTConnectorItemInCore(FTElementInCore): # in- and out-connectors (CX's) to
 		self.ShowDescriptionComments = True # whether description comments are visible
 		self.ValueComments = [] # list of AssociatedTextItem instances
 		self.ShowValueComments = True # whether value comments are visible
-		self.ActionItems = [] # list of AssociatedTextItem instances
+		self.ActionItems = [] # list of AssociatedTextItem instances; needs to have same name as info.ActionItemLabel
 		self.ShowActionItems = True
-		self.ParkingLotItems = [] # list of AssociatedTextItem instances
+		self.ParkingLot = [] # list of AssociatedTextItem instances; needs to have same name as info.ParkingLotItemLabel
 		self.ShowParkingLotItems = True
 		self.MakeTestComments() # make test comments, action item and parking lot item
 		self.RelatedCX = None # an FTConnectorItemInCore instance:
@@ -3197,8 +3203,8 @@ class FTConnectorItemInCore(FTElementInCore): # in- and out-connectors (CX's) to
 		AI.Numbering.NumberStructure = [SerialObj]
 		PLI = core_classes.AssociatedTextItem(Proj=self.Proj, PHAObjClass=type(self), Host=self)
 		PLI.Content = 'Test parking lot item for connector'
-		self.ParkingLotItems.append(PLI)
-		self.Proj.ParkingLotItems.append(PLI)
+		self.ParkingLot.append(PLI)
+		self.Proj.ParkingLot.append(PLI)
 		PLI.Numbering = core_classes.NumberingItem()
 		# put a serial number into the numbering object
 		SerialObj = core_classes.SerialNumberChunkItem()
@@ -3836,14 +3842,14 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 					(FTConn.CanEditValue, bool), (FTConn.ShowActionItems, bool), (FTConn.ShowParkingLotItems, bool),
 					(FTConn.BackgColour, str), (FTConn.ConnectorDescriptionComments, list),
 					(FTConn.ValueComments, list), (FTConn.ShowDescriptionComments, bool),
-					(FTConn.ShowValueComments, bool), (FTConn.ActionItems, list), (FTConn.ParkingLotItems, list),
+					(FTConn.ShowValueComments, bool), (FTConn.ActionItems, list), (FTConn.ParkingLot, list),
 					(FTConn.ConnectTo, list), (FTConn.CollapseGroups, list)]
 				IterableChecks = [(FTConn.LinkedFrom, core_classes.LinkItem),
-					(FTConn.CollapseGroups, FTCollapseGroup),
-					(FTConn.ConnectorDescriptionComments, core_classes.AssociatedTextItem),
-					(FTConn.ValueComments, core_classes.AssociatedTextItem),
-					(FTConn.ActionItems, core_classes.AssociatedTextItem),
-					(FTConn.ParkingLotItems, core_classes.AssociatedTextItem)]
+								  (FTConn.CollapseGroups, FTCollapseGroup),
+								  (FTConn.ConnectorDescriptionComments, core_classes.AssociatedTextItem),
+								  (FTConn.ValueComments, core_classes.AssociatedTextItem),
+								  (FTConn.ActionItems, core_classes.AssociatedTextItem),
+								  (FTConn.ParkingLot, core_classes.AssociatedTextItem)]
 #				TypeChecks = [(El, ElementTree.Element), (FTConn, FTConnectorItemInCore),
 #							  (FTConn.ID, str), (FTConn.FT, FTObjectInCore), (FTConn.Out, bool),
 #							  (FTConn.ConnectorDescription, str), (FTConn.BackgColour, str),
@@ -3874,9 +3880,9 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			# elements for lists of AssociatedTextItems
 			# DataInfo tuples contain: XML tag for an instance, list attrib in the connector, list attrib in the project)
 			DataInfo = [(info.ConnectorDescriptionCommentsTag, FTConn.ConnectorDescriptionComments, None),
-				(info.ValueCommentsTag, FTConn.ValueComments, None),
-				(info.ActionItemsTag, FTConn.ActionItems, self.Proj.ActionItems),
-				(info.ParkingLotItemsTag, FTConn.ParkingLotItems, self.Proj.ParkingLotItems)]
+						(info.ValueCommentsTag, FTConn.ValueComments, None),
+						(info.ActionItemsTag, FTConn.ActionItems, self.Proj.ActionItems),
+						(info.ParkingLotItemsTag, FTConn.ParkingLot, self.Proj.ParkingLot)]
 			for Tag, ListInConnector, ListInProj in DataInfo:
 				for Item in ListInConnector:
 					El = ElementTree.SubElement(ConnEl, Tag)
@@ -5247,7 +5253,6 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		# attrib PHAObjID is set in superclass
 		# attribs PHAObj and DatacoreHandler are set in DoNewViewport()
 		display_utilities.ViewportBaseClass.__init__(self, PHAObjID=PHAObjID, **Args)
-#		assert isinstance(PHAObj, core_classes.PHAModelBaseClass)
 		self.Proj = Args['Proj']
 		self.ID = None # assigned in display_utilities.CreateViewport()
 		self.HumanName = '' # default name is assigned in Proj.AssignDefaultNameToViewport()
@@ -5298,12 +5303,16 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			# that should be preserved when the FT is redrawn with updated data
 			# TODO eventually, these attribs need to be sent to the ViewportShadow and stored in the project file,
 			# so that they can be reinstated when the project file is opened
+			# TODO 2: changing to a milestone-based system for persistent attribs
 		self.PreferredControlPanelAspect = 'CPAspect_FaultTree' # initial control panel aspect to show when FT is displayed
 		self.ComponentEdited = '' # last FT element component edited (e.g. a comment button clicked);
 			# to enable control panel aspect to show required comments
 		self.UndoListDuringTextEditing = [] # list of undo.UndoRecordDuringTextEditing instances
-		self.PersistentFTAttribs = {} # keys are attrib names of self; values are values to reinstate when object is
-			# refreshed from datacore. Not needed, as attribs are not wiped?
+#		self.PersistentFTAttribs = {} # keys are attrib names of self; values are values to reinstate when object is
+#			# refreshed from datacore. Not needed, as attribs are not wiped?
+		print('FT5313 making new empty milestone')
+		self.MilestoneForRedraw = None # instance of MilestoneItem, containing attribs needed to enable us to redraw
+			# the FT with same appearance as last time
 
 	def Wipe(self): # preserve any attribs that need to be preserved. Then wipe all data in the FT and re-initialize
 		# first, preserve display-related attribs. Check all elements in the "old" (previously displayed) FT
@@ -5478,7 +5487,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			DataInfoAsStr = [ (info.IDTag, 'ID'), ('Numbering', 'Numbering'),
 				('EventDescription', 'EventDescription'), ('Value', 'Value'), ('ValueProblemObjectID', 'ValueProblemObjectID'),
 				('Unit', 'ValueUnit'), ('ValueProblemID', 'ValueProblemID'), ('BackgColour', 'BackgColour') ]
-			for Tag, Attrib in DataInfoAsStr:
+			for Tag, Attrib in DataInfoAsStr: # %%%
 				setattr(NewEvent, Attrib, XMLObj.findtext(Tag, default=''))
 			DataInfoAsBool = [ ('CanEditValue', 'CanEditValue'), (info.ShowActionItemTag, 'ShowActionItems'),
 				('IsIPL', 'IsIPL'),  ('FTEventLinked', 'Linked'),
@@ -5553,7 +5562,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			DataInfoAsList = [ (info.ConnectorDescriptionCommentsTag, 'ConnectorDescriptionComments', ''),
 				(info.ValueCommentsTag, 'ValueComments', ''),
 				(info.ActionItemsTag, 'ActionItems', 'ActionItemNumbering'),
-				(info.ParkingLotItemsTag, 'ParkingLotItems', 'ParkingLotItemNumbering'),
+				(info.ParkingLotItemsTag, 'ParkingLot', 'ParkingLotItemNumbering'),
 				('ConnectTo', 'ConnectToIDs', ''),
 				('CollapseGroups', 'CollapseGroups', '') ]
 			for Tag, Attrib, NumberingListName in DataInfoAsList:
@@ -5764,6 +5773,9 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		assert isinstance(DrawZoomTool, bool)
 		assert isinstance(BitmapMinSize, wx.Size) or (BitmapMinSize is None)
 		if FullRefresh:
+			# fetch display attribs from redraw milestone, if any
+			self.UpdateAttribsFromMilestone()
+			for ThisFTObject in self.Columns[0].FTElements:
 			# get each element in the FT to calculate and draw itself in own bitmap: header, columns and strips
 			self.Header.CalculateSize(self.Zoom, self.PanX, self.PanY)
 			for ThisColumn in self.Columns:
@@ -6631,8 +6643,45 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 	def GetMilestoneData(self):
 		# return (dict) data needing to be stored in milestone for navigation
 		ReturnArgs = {}
+		# get data relating to FT as a whole
+		ReturnArgs['SelectedElements'] = self.CurrentElements[:]
 		ReturnArgs['SelectedElementIDs'] = [e.ID for e in self.CurrentElements]
+		# get data for each element%%%
+		ReturnArgs['Elements'] = []
+		# list of potential attribs in each element that should be stored if they exist
+		TargetAttribNames = ['ShowComments', 'DetailedView', 'ShowDescriptionComments', 'ShowValueComments',
+			'ShowActionItems', 'ShowParkingLotItems']
+		for ThisEl in WalkOverAllFTObjs(FT=self):
+			ThisElData = {'ElementID': ThisEl.ID}
+			for ThisAttribName in TargetAttribNames:
+				if hasattr(ThisEl, ThisAttribName): ThisElData[ThisAttribName] = getattr(ThisEl, ThisAttribName)
+			ReturnArgs['Elements'].append(ThisElData) # store data for this element
 		return ReturnArgs
+
+	def StoreMilestoneForRedraw(self):
+		# create and store a MilestoneItem instance in self.MilestoneForRedraw, to enable FT to be redrawn with the
+		# same appearance next time
+		# the following call to class MilestoneItem() automatically calls self.GetMilestoneData()
+		self.MilestoneForRedraw = core_classes.MilestoneItem(Proj=self.Proj, Displayable=False, Viewport=self,
+			Zoom=self.Zoom, PanX=self.PanX,
+			PanY=self.PanY, DisplDevice=self.DisplDevice)
+
+	def UpdateAttribsFromMilestone(self):
+		# get redraw attribs back from self.MilestoneForRedraw and apply them to the FT
+		if self.MilestoneForRedraw is not None:
+			# don't restore zoom and pan here - it would overwrite the required values with the old ones
+			# restore selection
+			self.CurrentElements = self.MilestoneForRedraw.ViewportData['SelectedElements'][:]
+			# make a hash of element IDs in milestone
+			ElHash = dict( [(El['ElementID'], ThisElIndex) for (ThisElIndex, El) in \
+				enumerate(self.MilestoneForRedraw.ViewportData['Elements'])] )
+			# restore individual element attribs, referencing to elements in the milestone by their IDs
+			for ThisEl in WalkOverAllFTObjs(FT=self):
+				# find any matching element in the milestone
+				if ThisEl.ID in ElHash.keys():
+					ThisElInMilestone = self.MilestoneForRedraw.ViewportData['Elements'][ElHash[ThisEl.ID]]
+					for ThisAttribName, ThisAttribValue in ThisElInMilestone.items():
+						if ThisAttribName != 'ElementID': setattr(ThisEl, ThisAttribName, ThisAttribValue)
 
 FTObjectInCore.DefaultViewportType = FTForDisplay # set here (not in FTForDisplay class) due to the order of the
 	# class definitions

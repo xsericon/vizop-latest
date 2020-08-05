@@ -658,7 +658,7 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 		ATKindEl = ElementTree.SubElement(RootElement, info.AssociatedTextKindTag)
 		ATKindEl.text = ATKind
 		# identify master list containing all associated text items to show
-		AssocTextMasterList = Proj.ActionItems if ATKind == info.ActionItemLabel else Proj.ParkingLotItems
+		AssocTextMasterList = Proj.ActionItems if ATKind == info.ActionItemLabel else Proj.ParkingLot
 		# add a tag for each action item in the project
 		for ThisAssocTextItem in AssocTextMasterList:
 			ATEl = ElementTree.SubElement(RootElement, info.AssociatedTextTag)
@@ -800,7 +800,7 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 		assert AssociatedTextKind in (info.ActionItemLabel, info.ParkingLotItemLabel)
 		# first find the associated text; could be action item or parking lot item
 		# TODO: optimise next line to avoid searching unnecessary AT lists - use arg AssociatedTextKind
-		ATToChange = utilities.ObjectWithID(Objects=Proj.ActionItems + Proj.ParkingLotItems, TargetID=ATID)
+		ATToChange = utilities.ObjectWithID(Objects=Proj.ActionItems + Proj.ParkingLot, TargetID=ATID)
 		OldAttribValue = getattr(ATToChange, ChangedAttribName)
 		# change the attrib value
 		setattr(ATToChange, ChangedAttribName, NewAttribValue)
@@ -819,7 +819,7 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 		# revert associated text attrib to previous value. Datacore method
 		# find out which datacore socket to send messages on
 		SocketFromDatacore = vizop_misc.SocketWithName(TargetName=Args['SocketFromDatacoreName'])
-		ATToChange = utilities.ObjectWithID(Objects=Proj.ActionItems + Proj.ParkingLotItems, TargetID=UndoRecord.ATID)
+		ATToChange = utilities.ObjectWithID(Objects=Proj.ActionItems + Proj.ParkingLot, TargetID=UndoRecord.ATID)
 		setattr(ATToChange, UndoRecord.ChangedAttribName, UndoRecord.OldAttribValue)
 		# request Control Frame to switch to the Viewport that was visible when the original edit was made
 		cls.RedrawAfterUndoOrRedo(Proj, UndoRecord, SocketFromDatacore)
