@@ -34,6 +34,7 @@ CacheFolderTail = 'vizop'
 # file-related constants
 RestoreFileSuffix = '_Restore' # suffix for project restore filename
 DefaultImageFileType = 'pdf' # must be Extension attrib of an instance of core_classes.ImageFileType
+ExcelExtension = 'xlsx' # extension expected for reading/writing Excel files
 DefaultUserDirectory = '~'
 
 # display-related constants

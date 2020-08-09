@@ -40,11 +40,11 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 		def OnFilenameTextWidget(self, Event=None, WidgetObj=None):
 			# get filename stub provided by user
 			UserFilenameStub = self.FilenameText.Widget.GetValue().strip()
-			# get all actual filenames to use, based on this stub
-			ActualFilenames = GetFilenamesForMultipageExport(BasePath=UserFilenameStub,
-				FileType=core_classes.ImageFileTypesSupported[self.FileTypeChoice.Widget.GetSelection()],
-				PagesAcross=self.PageCountInfo['PagesAcrossCount'], PagesDown=self.PageCountInfo['PagesDownCount'])
-			print('FR37 filenames to use: ', ActualFilenames)
+#			# get all actual filenames to use, based on this stub
+#			ActualFilenames = GetFilenamesForMultipageExport(BasePath=UserFilenameStub,
+#				FileType=core_classes.ImageFileTypesSupported[self.FileTypeChoice.Widget.GetSelection()],
+#				PagesAcross=self.PageCountInfo['PagesAcrossCount'], PagesDown=self.PageCountInfo['PagesDownCount'])
+#			print('FR37 filenames to use: ', ActualFilenames)
 			# update filename status text, Go button status etc
 			FilenameStatus = self.UpdateWidgetStatus()
 			# write name back into widget, if filename is usable
@@ -590,7 +590,7 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 			self.Overwrite = False # whether to overwrite any existing file when exporting
 
 	def MakeFTFullExportAspect(self, MyEditPanel, Fonts, SystemFontNames, DateChoices):
-		# make Control Panel aspect for PHAModel control
+		# make edit panel aspect for defining FT full export
 		# fonts (dict): internal font objects such as SmallHeadingFont
 		# SystemFontNames (list of str): names of "real" fonts available on the platform
 		# DateChoices (list of ChoiceItem): options for date to show in FT

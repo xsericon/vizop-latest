@@ -136,6 +136,7 @@ class ProjectItem(object): # class of PHA project instances
 		self.LastExportFontName = '' # str; system name of font used for last export, e.g. 'Arial'
 		self.LastExportPreferredDateToShow = None # ChoiceItem or None; one of the items in core_classes.DateChoices;
 			# represents date choice used for last export, e.g. today or last edited date
+		self.ATExportFilename = '' # str; last used full pathname for exporting associated texts, including extension
 		# make a default numbering object for comment numbering, containing only a serial number; likewise for associated texts
 		self.DefaultCommentNumbering = core_classes.NumberingItem()
 		self.DefaultCommentNumbering.NumberStructure = [core_classes.SerialNumberChunkItem()]

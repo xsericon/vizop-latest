@@ -2256,8 +2256,6 @@ class ControlFrame(wx.Frame):
 
 		# Set up the "File" menu
 		FileMenu = wx.Menu()
-		Openmitem = FileMenu.Append(-1, _('&Open Vizop project...'), '')
-#		self.Bind(wx.EVT_MENU, self.OnProjectOpenRequest, Openmitem)
 		Savemitem = FileMenu.Append(-1, _('&Save Vizop project'), '')
 		self.Bind(wx.EVT_MENU, projects.SaveEntireProjectRequest, Savemitem)
 		FileMenu.AppendSeparator() # add a separating line in the menu
@@ -2298,6 +2296,16 @@ class ControlFrame(wx.Frame):
 		self.ParkingLotmitem.InternalName = 'ShowParkingLot'
 		self.ProjectMenuSeparatorAfterATCommands = ProjectMenu.AppendSeparator()
 		self.ProjectMenuSeparatorAfterATCommands.InsertBeforeMe = [self.ActionItemsmitem, self.ParkingLotmitem]
+		self.ActionItemsReportmitem = ProjectMenu.Append(-1, _('Make action items &report...'), '')
+		self.Bind(wx.EVT_MENU, lambda Event: self.OnMakeAssociatedTextsReportRequest(Event, ATKind=info.ActionItemLabel),
+				  self.ActionItemsReportmitem)
+		self.ActionItemsReportmitem.HostMenu = ProjectMenu
+		self.ActionItemsReportmitem.InternalName = 'MakeActionItemsReport'
+		self.ParkingLotReportmitem = ProjectMenu.Append(-1, _('Make parking &lot report...'), '')
+		self.Bind(wx.EVT_MENU, lambda Event: self.OnMakeAssociatedTextsReportRequest(Event, ATKind=info.ParkingLotItemLabel),
+				  self.ParkingLotReportmitem)
+		self.ParkingLotReportmitem.HostMenu = ProjectMenu
+		self.ParkingLotReportmitem.InternalName = 'MakeParkingLotReport'
 
 		# Create the menubar
 		self.MenuBar = wx.MenuBar()
@@ -3328,6 +3336,14 @@ class ControlFrame(wx.Frame):
 		# make a AssocTextList Viewport. DoNewViewportCommand() provides the new Viewport as self.TrialViewport
 		NamedArgs = {info.AssociatedTextKindTag: ATKind}
 		self.DoNewViewportCommand(Proj=self.CurrentProj, ViewportClass=assoc_text_view.AssocTextListViewport,
+			Chain=True, PHAModel=None, ViewportArgs={'ViewportToRevertTo': self.CurrentViewport,
+			'OriginatingViewport': self.CurrentViewport, 'AssocTextKind': ATKind}, **NamedArgs)
+
+	def OnMakeAssociatedTextsReportRequest(self, Event, ATKind):
+		# handle request to export a report of all action items or parking lot items in the project
+		assert ATKind in (info.ActionItemLabel, info.ParkingLotItemLabel)
+		NamedArgs = {info.AssociatedTextKindTag: ATKind}
+		self.DoNewViewportCommand(Proj=self.CurrentProj, ViewportClass=assoc_text_report.AssocTextReportViewport,
 			Chain=True, PHAModel=None, ViewportArgs={'ViewportToRevertTo': self.CurrentViewport,
 			'OriginatingViewport': self.CurrentViewport, 'AssocTextKind': ATKind}, **NamedArgs)
 

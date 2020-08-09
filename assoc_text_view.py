@@ -914,3 +914,8 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 		# optional client side method - similar to GetClassAttribsOnInit(), but using Args instead of XMLRoot
 		assert info.AssociatedTextKindTag in Args
 		return {info.AssociatedTextKindTag: Args[info.AssociatedTextKindTag]}
+
+	def GetSelectedATs(self, **Args):
+		# return list of AT objects that are currently selected, irrespective of whether they are visible according to
+		# the current filter
+		return [ThisAT.Selected for ThisAT in self.AssocTexts]
