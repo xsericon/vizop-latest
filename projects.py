@@ -138,6 +138,8 @@ class ProjectItem(object): # class of PHA project instances
 			# represents date choice used for last export, e.g. today or last edited date
 		self.ATExportFilename = '' # str; last used full pathname for exporting associated texts, including extension
 		# make a default numbering object for comment numbering, containing only a serial number; likewise for associated texts
+		self.ATExportShowWhat = 'Header,EditNumber,ATs'
+		self.ATExportPaperOrientation = info.PortraitLabel
 		self.DefaultCommentNumbering = core_classes.NumberingItem()
 		self.DefaultCommentNumbering.NumberStructure = [core_classes.SerialNumberChunkItem()]
 		self.DefaultAssociatedTextNumbering = core_classes.NumberingItem()
@@ -291,6 +293,27 @@ class ProjectItem(object): # class of PHA project instances
 
 	def AddExistingAssociatedTextsToElements_Redo(self, Proj, RedoRecord, **Args):
 		print('PR266 in redo handler')
+
+	def FindViewportOfClass_Client(self, TargetClass=None, MatchAttribs={}):
+		# client side method
+		# check whether client-side project contains a Viewport of class TargetClass, with its UniqueAttribs matching
+		# values provided in MatchAttribs. (Any extra attribs in MatchAttribs are ignored)
+		# return matching Viewport instance, or None if none found
+		assert issubclass(TargetClass, display_utilities.ViewportBaseClass)
+		assert isinstance(MatchAttribs, dict)
+		assert all([isinstance(k, str) for k in MatchAttribs.keys()])
+		MatchingViewport = None
+		for ThisViewport in self.ClientViewports:
+			if isinstance(ThisViewport, TargetClass):
+				# check match for any attribs in UniqueAttribs
+#					Matched = all([getattr(ThisViewport, k, None) == v for k, v in MatchAttribs.items()])
+				# check every attrib in ThisViewport's UniqueAttribs matches value supplied in MatchAttribs,
+				# ignoring any attribs missing from MatchAttribs
+				if all([(getattr(ThisViewport, k) == MatchAttribs.get(k, None)) or \
+				   (k not in MatchAttribs.keys()) for k in getattr(ThisViewport, 'UniqueAttribs', [])]):
+					MatchingViewport = ThisViewport
+					break
+		return MatchingViewport
 
 def TestProjectsOpenable(ProjectFilenames, ReadOnly=False):
 	"""

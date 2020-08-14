@@ -134,11 +134,9 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 			self.UpdatePageCount()
 
 		def OnPortraitRadio(self, Event): # handle click on "portrait" radio button
-#			vizop_misc.StoreValueInUserConfig(ConfigName='ExportPaperOrientation', Value='Portrait')
 			self.UpdatePageCount()
 
 		def OnLandscapeRadio(self, Event): # handle click on "landscape" radio button
-#			vizop_misc.StoreValueInUserConfig(ConfigName='ExportPaperOrientation', Value='Landscape')
 			self.UpdatePageCount()
 
 		def OnMarginTextCtrl(self, Event=None, WidgetObj=None):

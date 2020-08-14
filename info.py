@@ -263,6 +263,7 @@ FilterTextTag = 'FilterText'
 FilterAppliedTag = 'FilterApplied'
 ItemsSelectedTag = 'ItemsSelected'
 AssociatedTextsSelectedTag = 'ATsSelected'
+ItemsToIncludeTag = 'ItemsToInclude'
 
 FTImagePrefix = 'FT_' # filenames containing all images used in FT must begin with this
 ProjInfoImagePrefix = 'ProjInfo_'
@@ -278,6 +279,17 @@ ValueOutOfRangeMsg = 'ValueOutOfRange'
 # strings used to label objects
 ActionItemLabel = 'ActionItems'
 ParkingLotItemLabel = 'ParkingLot'
+ATsLabel = 'ATs' # for 'associated texts' in general
+ResponsibilityLabel = 'Responsibility'
+DeadlineLabel = 'Deadline'
+StatusLabel = 'Status'
+WhereUsedLabel = 'WhereUsed'
+EditNumberLabel = 'EditNumber'
+HeaderLabel = 'Header'
+PortraitLabel = 'Portrait'
+LandscapeLabel = 'Landscape'
+AllItemsLabel = 'AllItems'
+FilteredItemsLabel = 'Filtered'
 
 # NO_ commands to control frame
 NO_ShowViewport = 'NO_ShowViewport'

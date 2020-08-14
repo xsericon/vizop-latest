@@ -4,7 +4,7 @@
 # Code tidying done on 1 Dec 2018
 
 """
-The controlframe module contains code for the main Vizop control and navigation screen.
+The controlframe module contains code for the main Vizop control and navigation frame.
 """
 
 # standard modules needed:
@@ -20,8 +20,6 @@ import faulttree, ft_full_report, assoc_text_view
 from display_utilities import UIWidgetItem, UIWidgetPlaceholderItem
 
 # ColourSwatchButtonSize = (60,20) # size for 'change colour' buttons. Not applied in all cases, yet
-# HeadingTextPointSize = 13 # default point size of heading font in iWindow
-# LabelTextPointSize = 11 # default point size of widget label font in iWindow
 KeyPressHash = [] # list of tuples: (keystroke code, handling routines when those keystrokes are detected,
 # dict of args to supply to handler)
 AllControlFrameShadows = [] # all shadow objects comprising datacore's representation of currently active control
@@ -1788,7 +1786,6 @@ class ControlFrame(wx.Frame):
 			return NewAspect
 
 		def AssociatedTextAspect_OnFullAssociatedTextListButton(self, Event, Aspect):
-			print('CF1792 in full list button handler')
 			self.TopLevelFrame.OnShowAssociatedTextsRequest(Event=Event, ATKind=Aspect.InternalName)
 
 		def AssociatedTextAspect_OnDeleteItemButton(self, Event, Aspect):
@@ -2600,7 +2597,7 @@ class ControlFrame(wx.Frame):
 		#	PHAModel (instance) to attach the Viewport to
 		#	Chain (bool): whether this new Viewport creation call is chained from another event (e.g. new PHA model)
 		#	ViewportInRedoRecord (Viewport instance) if Redoing
-		# return: New Viewport ID
+		# return: New Viewport instance
 		assert isinstance(Redoing, bool)
 		assert isinstance(ViewportArgs, dict)
 		assert all(isinstance(k, str) for k in ViewportArgs.keys()) # confirm all keys of ViewportArgs are str
@@ -2650,7 +2647,7 @@ class ControlFrame(wx.Frame):
 			for ThisTip in VizopTalksTips:
 				ThisTip.update( {'Priority': Tip_Context_GeneralPriority} )
 				self.MyVTPanel.SubmitVizopTalksMessage(**ThisTip)
-		return NewViewport.ID
+		return NewViewport
 
 	def DoNewPHAModelCommand(self, Proj, PHAModelClass, **Args):
 		# handle request for new PHA model in project Proj
@@ -3300,6 +3297,32 @@ class ControlFrame(wx.Frame):
 			# set up initial mouse pointer and mouse bindings
 		self.Refresh() # trigger OnPaint() so that the panel rendering is refreshed
 		return vizop_misc.MakeXMLMessage(RootName='RP_ShowViewport', RootText='Null')
+
+	def CloseViewportAndGotoViewport(self, Proj=None,
+		GotoViewportClass=None, ViewportToRevertTo=None,
+		OriginatingViewport=None, **Args):
+		# close OriginatingViewport on its display device, and open another Viewport of class GotoViewportClass.
+		# Args are passed to the incoming Viewport, for communication between old and new Viewports.
+		# Currently assumes incoming Viewport doesn't belong to any PHAModel (hence: PHAModel=None)
+		assert isinstance(Proj, projects.ProjectItem)
+		assert issubclass(GotoViewportClass, display_utilities.ViewportBaseClass)
+		assert isinstance(ViewportToRevertTo, display_utilities.ViewportBaseClass)
+		assert isinstance(OriginatingViewport, display_utilities.ViewportBaseClass)
+#		# First, release old Viewport from its display device%%%
+#		self.ReleaseCurrentViewport(Proj=Proj)
+#		OriginatingViewport.DisplDevice.ReleaseViewportFromDisplDevice()
+		# First, check if there's already a suitable Viewport instance to switch to
+		CandidateViewport = Proj.FindViewportOfClass_Client(TargetClass=GotoViewportClass, MatchAttribs=Args)
+		# if there's none, create a new Viewport
+		if CandidateViewport:
+			self.SwitchToViewport(TargetViewport=CandidateViewport, XMLRoot=None) # TODO probably need to put redraw data in XMLRoot
+		else:
+			ViewportArgs = Args
+			ViewportArgs.update({'ViewportToRevertTo': ViewportToRevertTo, 'OriginatingViewport': OriginatingViewport})
+			TargetViewport = self.DoNewViewportCommand(Proj=Proj, Redoing=False, ViewportArgs=ViewportArgs,
+				ViewportClass=GotoViewportClass, PHAModel=None, Chain=False, **Args)
+			print('CF3323 TargetViewport: ', TargetViewport, type(TargetViewport))
+			# no need to call SwitchToViewport() in this branch, as it is called by PostProcessNewViewport()
 
 	def SetupFonts(self):
 		Fonts = {}

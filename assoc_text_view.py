@@ -6,7 +6,8 @@
 import os, os.path, wx, platform # wx provides basic GUI functions
 import xml.etree.ElementTree as ElementTree # XML handling
 
-import core_classes, project_display, vizop_misc, info, utilities, faulttree, display_utilities, undo, projects
+import core_classes, project_display, vizop_misc, info, utilities, faulttree, display_utilities, undo, projects,\
+	assoc_text_report
 from project_display import EditPanelAspectItem
 from display_utilities import UIWidgetItem
 
@@ -221,9 +222,9 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 		if ActionRequested is self.DeleteUnusedATsOption:
 			print('AT221 requested delete unused ATs, not coded yet')
 		elif ActionRequested is self.ExportAllOption:
-			print('AT221 requested export option, not coded yet')
+			self.RequestATExport(Scope=info.AllItemsLabel)
 		elif ActionRequested is self.ExportFilteredOption:
-			print('AT221 requested export option, not coded yet')
+			self.RequestATExport(Scope=info.FilteredItemsLabel)
 		elif ActionRequested is self.ExportSelectedOption:
 			print('AT221 requested export option, not coded yet')
 		elif ActionRequested is self.SelectAllOption:
@@ -721,7 +722,7 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 		vizop_misc.SendRequest(Socket=self.C2DSocketREQ,
 			Command='RQ_PR_UpdateAssocTextFullViewAttribs', **AttribsToSend)
 
-	def ExitViewportAndRevert(self):
+	def ExitViewportAndRevert(self, GotoPreviousViewport=True):
 		# exit from Viewport; destroy the Viewport; and request the hosting display device to revert
 		# to the previous Viewport
 		# first, remove all widgets from the sizer and active text widget list
@@ -730,10 +731,11 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 		# destroy the widgets
 		for ThisWidget in self.WidgetsToActivate:
 			ThisWidget.Widget.Destroy()
-		# destroy this Viewport and switch to the previous Viewport (for now, just go to the first PHA model in the project)
-		# TODO build mechanism to identify the last touched PHA model
-		self.DisplDevice.TopLevelFrame.SwitchToPHAObj(Proj=self.Proj, TargetPHAObjID=self.Proj.PHAObjShadows[0].ID,
-			TargetViewport=None, ViewportToDestroy=self)
+		if GotoPreviousViewport:
+			# destroy this Viewport and switch to the previous Viewport (for now, just go to the first PHA model in the project)
+			# TODO build mechanism to identify the last touched PHA model
+			self.DisplDevice.TopLevelFrame.SwitchToPHAObj(Proj=self.Proj, TargetPHAObjID=self.Proj.PHAObjShadows[0].ID,
+				TargetViewport=None, ViewportToDestroy=self)
 
 	def Deactivate(self, Widgets=[], **Args): # deactivate widgets for this Viewport
 		self.DisplDevice.TopLevelFrame.DeactivateWidgetsInPanel(Widgets=Widgets, **Args)
@@ -919,3 +921,14 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 		# return list of AT objects that are currently selected, irrespective of whether they are visible according to
 		# the current filter
 		return [ThisAT.Selected for ThisAT in self.AssocTexts]
+
+	def RequestATExport(self, Scope):
+		# handle request to export some or all ATs
+		assert Scope in [info.AllItemsLabel, info.FilteredItemsLabel]
+		self.StoreAttribsInProject()
+#		self.ExitViewportAndRevert(GotoPreviousViewport=False)
+		# following lines are pasted to use as basis for calling export viewport%%% working here
+		NamedArgs = {info.AssociatedTextKindTag: self.AssocTextKind, info.ItemsToIncludeTag: Scope}
+		self.DisplDevice.TopLevelFrame.CloseViewportAndGotoViewport(Proj=self.Proj,
+			GotoViewportClass=assoc_text_report.AssocTextReportViewport, ViewportToRevertTo=self,
+			OriginatingViewport=self, **NamedArgs)

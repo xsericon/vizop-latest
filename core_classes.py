@@ -1598,13 +1598,14 @@ class TextItem(object):  # text forming part of a PHA object, such as a descript
 class AssociatedTextItem(TextItem):  # 'smart text' used for comments, action items and parking lot items
 
 	def __init__(self, Proj, PHAObjClass, Host):
+		# names of attribs marked + are assumed to match corresponding labels in module info, e.g. info.ResponsibilityLabel
 		TextItem.__init__(self, Proj, PHAObjClass, Host)
 		self.ID = ''
-		self.Tack = None  # reference to a position object on a PIDItem, or another PHA object, referred to by this text
+		self.Tack = None # reference to a position object on a PIDItem, or another PHA object, referred to by this text
 		self.Numbering = NumberingItem()
-		self.Responsibility = '' # who is responsible for closing out the item
-		self.Deadline = '' # deadline for closeout
-		self.Status = '' # whether item is open, closed etc
+		self.Responsibility = '' # who is responsible for closing out the item +
+		self.Deadline = '' # deadline for closeout +
+		self.Status = '' # whether item is open, closed etc +
 
 # English names for associated text kinds. Translated at point of use, because they could be subject or object
 AssociatedTextEnglishNamesSingular = {info.ActionItemLabel: 'action item', info.ParkingLotItemLabel: 'parking lot item'}

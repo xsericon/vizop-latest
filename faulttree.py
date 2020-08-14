@@ -5775,7 +5775,6 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		if FullRefresh:
 			# fetch display attribs from redraw milestone, if any
 			self.UpdateAttribsFromMilestone()
-			for ThisFTObject in self.Columns[0].FTElements:
 			# get each element in the FT to calculate and draw itself in own bitmap: header, columns and strips
 			self.Header.CalculateSize(self.Zoom, self.PanX, self.PanY)
 			for ThisColumn in self.Columns:
