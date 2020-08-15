@@ -832,8 +832,10 @@ def PopulateSizer(Sizer=None, Widgets=[], ActiveWidgetList=[], DefaultFont=None,
 						GapYAdded = False # reset flag
 					ThisRowSpan = 1 # reset for new row
 				# put widgets in sizer. wx.LEFT flag assigns the margin space to the left side only
-				Sizer.Add(ThisWidget.Widget, pos=(RowBase + ThisWidget.RowOffset, ThisWidget.ColLoc + ThisWidget.ColOffset),
-					span=(ThisWidget.RowSpan, ThisWidget.ColSpan), flag=ThisWidget.Flags | wx.LEFT, border=ThisWidget.LeftMargin)
+				try:
+					Sizer.Add(ThisWidget.Widget, pos=(RowBase + ThisWidget.RowOffset, ThisWidget.ColLoc + ThisWidget.ColOffset),
+						span=(ThisWidget.RowSpan, ThisWidget.ColSpan), flag=ThisWidget.Flags | wx.LEFT, border=ThisWidget.LeftMargin)
+				except: print('DU838 failed widget: ', ThisWidget, ThisWidget.ColLoc, ThisWidget.ColSpan)
 				ThisRowSpan = max(ThisRowSpan, ThisWidget.RowSpan)
 				# set widget minimum size in sizer, if required
 				if (ThisWidget.MinSizeX is not None) and (ThisWidget.MinSizeY is not None):

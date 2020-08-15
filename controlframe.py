@@ -2503,14 +2503,20 @@ class ControlFrame(wx.Frame):
 					Handler=ThisSocketObj.Viewport.PHAObj.HandleIncomingRequest if ThisSocketObj.Viewport.PHAObj \
 						else ThisSocketObj.Viewport.MyClass.HandleIncomingRequest)
 #				if ViewportMessageReceivedThisTime: print('CF1459 incoming viewport message received')
-				ViewportMessageReceived |= bool(ViewportMessageReceivedThisTime)
+				# if any message was received from this Viewport, store it for sending to UpdateAllViewports
+				if ViewportMessageReceivedThisTime:
+					ViewportMessageReceived = True
+					MessageToApply = ViewportMessageReceivedThisTime.decode("utf-8") # convert bytes to str
+#				ViewportMessageReceived |= bool(ViewportMessageReceivedThisTime)
 				MessageReceived |= bool(vizop_misc.ListenToSocket(Socket=[s.Socket for s in vizop_misc.RegisterSocket.Register
 						if s.SocketLabel == info.ViewportOutSocketLabel + '_' + ThisSocketObj.SocketLabel.split('_')[1]][0],
 						Handler=None, SendReply2=False))
 		MessageReceived |= ViewportMessageReceived
 		# update applicable Viewports, if any messages were received
 		if ViewportMessageReceived:
-			self.UpdateAllViewports(MessageAsStr=ViewportMessageReceivedThisTime)
+			# check MessageToApply doesn't begin with a command that doesn't need to refresh Viewports [3gd]
+			if not any(MessageToApply.startswith(m, 1) for m in ['RQ_PR_UpdateAssocTextFullViewAttribs']):
+				self.UpdateAllViewports(MessageAsStr=MessageToApply)
 		# 3. check sockets for any messages coming into the control frame, and process
 		MessageReceived |= bool(vizop_misc.ListenToSocket(Socket=self.zmqInwardSocket, Handler=self.HandleIncomingMessageToControlFrame))
 		MessageReceived |= bool(vizop_misc.ListenToSocket(Socket=self.zmqOutwardSocket, Handler=self.HandleIncomingReplyToControlFrame,
@@ -2942,6 +2948,7 @@ class ControlFrame(wx.Frame):
 				ThisPanYTag = DisplayAttribsTag.find(info.PanYTag)
 				TargetPanY = ThisPanYTag.text if ThisPanYTag else None
 		# draw the Viewport
+		print('CF2945 calling ShowViewport with debug = ', debug)
 		self.ShowViewport(MessageAsXMLTree=XMLRoot)
 		if DisplayAttribsTag is not None:
 			# get the newly refreshed current element (PHAElement) and current component (ThisComponent); must do after
@@ -3269,6 +3276,7 @@ class ControlFrame(wx.Frame):
 			return vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
 		else:
 			# draw complete Viewport (this branch handles message RQ_RedrawViewport)
+			print('CF3273 calling ShowViewport')
 			ReplyXML = self.ShowViewport(MessageReceived=MessageReceived, MessageAsXMLTree=XMLTreeToSend, **Args)
 			self.RefreshGUIAfterDataChange(Proj=self.CurrentProj)
 			return ReplyXML
@@ -3315,7 +3323,7 @@ class ControlFrame(wx.Frame):
 		CandidateViewport = Proj.FindViewportOfClass_Client(TargetClass=GotoViewportClass, MatchAttribs=Args)
 		# if there's none, create a new Viewport
 		if CandidateViewport:
-			self.SwitchToViewport(TargetViewport=CandidateViewport, XMLRoot=None) # TODO probably need to put redraw data in XMLRoot
+			self.SwitchToViewport(TargetViewport=CandidateViewport, XMLRoot=None, debug=3320) # TODO probably need to put redraw data in XMLRoot
 		else:
 			ViewportArgs = Args
 			ViewportArgs.update({'ViewportToRevertTo': ViewportToRevertTo, 'OriginatingViewport': OriginatingViewport})
@@ -3697,7 +3705,11 @@ class ControlFrame(wx.Frame):
 		# MessageAsStr (str): str containing XML message received requesting update to Viewports (currently not used)
 		# XMLRoot (ElementTree element or None): any instruction to update display parameters (zoom, pan) of a Viewport
 		#	(used during redraw after undo); also can contain MilestoneIDTag with display attribs to apply
+		# Note: When datacore auto-updates Viewports after receiving a command, it can end up causing a double redraw.
+		# If this causes problems, the auto-call to UpdateAllViewports can be suppressed by adding the command to the
+		# list found by searching for [3gd].
 		# First, retrieve any data about a specific Viewport that needs display parameters updated
+		print('CF3703 in UpdateAllViewports with MessageAsStr: ', MessageAsStr)
 		ViewportIDToUpdate = MilestoneID = None
 		if XMLRoot is not None:
 			ViewportToUpdateTag = XMLRoot.find(info.ViewportTag)
@@ -3717,6 +3729,7 @@ class ControlFrame(wx.Frame):
 				# mark this Viewport as "skip", i.e. no need to redraw it again here
 				ViewportToSkip = ViewportShadowToUpdate
 		# Check with all Viewports that datacore knows about
+		print('cf3722 in UpdateAllViewports with ViewportToSkip: ', ViewportToSkip)
 		for ThisViewportShadow in self.CurrentProj.AllViewportShadows:
 			# check if ThisViewportShadow is displayed in any display device, local or remote
 			if ThisViewportShadow.IsOnDisplay and (ThisViewportShadow != ViewportToSkip):

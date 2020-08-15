@@ -45,6 +45,7 @@ class AssocTextReportViewport(display_utilities.ViewportBaseClass):
 		# build the dialogue: prefill widgets in new aspect and activate it
 		self.DialogueAspect.Prefill(self.Proj, SystemFontNames=self.SystemFontNames)
 		self.DialogueAspect.SetWidgetVisibility()
+		print('AR48 DialogueAspect: ', self.DialogueAspect)
 		self.DialogueAspect.Activate(WidgetsToActivate=self.DialogueAspect.WidgetsToActivate[:],
 			TextWidgets=self.DialogueAspect.TextWidgets)
 		# display aspect's sizer (containing all the visible widgets) in the edit panel
@@ -61,8 +62,7 @@ class AssocTextReportViewport(display_utilities.ViewportBaseClass):
 		# SystemFontNames (list of str): names of "real" fonts available on the platform
 		# DateChoices (list of ChoiceItem): options for date to show in report (not currently used)
 		# return the aspect
-		print('AR70 starting MakeATReportDialogueAspect')
-		# make basic attribs needed for the aspect
+		# First, make basic attribs needed for the aspect
 		MyEditPanel.ATReportDialogueAspect = AssocTextReportViewport.ATReportDialogueAspect(InternalName='ATReport',
 			ParentFrame=MyEditPanel, TopLevelFrame=MyEditPanel.TopLevelFrame)
 		ThisAspect = MyEditPanel.ATReportDialogueAspect
@@ -189,6 +189,24 @@ class AssocTextReportViewport(display_utilities.ViewportBaseClass):
 			Handler=ThisAspect.OnGoButton, Events=[wx.EVT_BUTTON], ColLoc=1, ColSpan=1,
 			Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_LEFT | wx.EXPAND)
 		display_utilities.PopulateSizer(Sizer=ActionBoxSubSizer, Widgets=[ThisAspect.CancelButton, ThisAspect.GoButton])
+
+		# make required lists
+		ThisAspect.WidgetList = [ThisAspect.HeaderLabel,
+			ThisAspect.FileBox, ThisAspect.PageLayoutBox, ThisAspect.ScopeBox, ThisAspect.StyleBox,
+			ThisAspect.ActionBox]
+		ThisAspect.WidgetsToActivate = [ThisAspect.HeaderLabel,
+			ThisAspect.FilenameLabel, ThisAspect.FilenameText, ThisAspect.SelectButton,
+			ThisAspect.OverwriteCheck, ThisAspect.FilenameStatusMessage,
+			ThisAspect.ExportWhatLabel,
+			ThisAspect.ShowHeaderCheck, ThisAspect.AllItemsRadio,
+			ThisAspect.FilteredItemsRadio,
+			ThisAspect.PageSizeLabel,
+			ThisAspect.PageSizeChoice, ThisAspect.PortraitRadio,
+			ThisAspect.LandscapeRadio,
+			ThisAspect.FontLabel, ThisAspect.FontChoice, ThisAspect.ShowResponsibilityCheck,
+			ThisAspect.ShowDeadlineCheck, ThisAspect.ShowStatusCheck,
+			ThisAspect.ShowPlacesUsedCheck,
+			ThisAspect.CancelButton, ThisAspect.GoButton]
 		return ThisAspect
 
 	class ATReportDialogueAspect(project_display.EditPanelAspectItem):

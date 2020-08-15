@@ -3,3 +3,7 @@ venv
 .pylintrc
 .vscode
 /icon library/FT_ActionButton_OutExist LtoR.png
+/test.jpg
+/test.png
+/test.tiff
+/icon library/
