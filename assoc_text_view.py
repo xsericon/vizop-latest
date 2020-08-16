@@ -219,14 +219,17 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 		GridWidget = self.ATListGrid.Widget # get the wx grid widget
 		# find out which action was requested
 		ActionRequested = self.ActionChoices[self.ActionChoice.Widget.GetSelection()]
+		ExitingViewport = False # whether the requested action will result in leaving this Viewport
 		if ActionRequested is self.DeleteUnusedATsOption:
 			print('AT221 requested delete unused ATs, not coded yet')
 		elif ActionRequested is self.ExportAllOption:
 			self.RequestATExport(Scope=info.AllItemsLabel)
+			ExitingViewport = True
 		elif ActionRequested is self.ExportFilteredOption:
 			self.RequestATExport(Scope=info.FilteredItemsLabel)
+			ExitingViewport = True
 		elif ActionRequested is self.ExportSelectedOption:
-			print('AT221 requested export option, not coded yet')
+			print('AT221 requested export selected option, not coded yet')
 		elif ActionRequested is self.SelectAllOption:
 			# select all visible ATs. (This command should be available only when all ATs are visible, but to be on the
 			# safe side, we only select visible ATs)
@@ -279,7 +282,7 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 					TargetElementIDs=TargetMilestone.ViewportData['SelectedElementIDs'],
 					ATIDs=SelectedATIDs)
 		# update available choices in "action" choice box
-		self.UpdateActionChoices()
+		if not ExitingViewport: self.UpdateActionChoices()
 
 	def AddATsToElements(self, PHAObjID, TargetElementIDs, ATIDs):
 		# request datacore to add associated texts with IDs in ATIDs (list of str) to elements with IDs in
@@ -725,6 +728,8 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 	def ExitViewportAndRevert(self, GotoPreviousViewport=True):
 		# exit from Viewport; destroy the Viewport; and request the hosting display device to revert
 		# to the previous Viewport
+		# If GotoPreviousViewport is False, we only clean up the widgets and sizers
+		assert isinstance(GotoPreviousViewport, bool)
 		# first, remove all widgets from the sizer and active text widget list
 		self.Deactivate(Widgets=self.WidgetsToActivate)
 		self.HeaderSizer.Clear()
@@ -926,7 +931,7 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 		# handle request to export some or all ATs
 		assert Scope in [info.AllItemsLabel, info.FilteredItemsLabel]
 		self.StoreAttribsInProject()
-#		self.ExitViewportAndRevert(GotoPreviousViewport=False)
+		self.ExitViewportAndRevert(GotoPreviousViewport=False)
 		# following lines are pasted to use as basis for calling export viewport%%% working here
 		NamedArgs = {info.AssociatedTextKindTag: self.AssocTextKind, info.ItemsToIncludeTag: Scope}
 		self.DisplDevice.TopLevelFrame.CloseViewportAndGotoViewport(Proj=self.Proj,

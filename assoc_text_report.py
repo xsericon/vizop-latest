@@ -29,9 +29,9 @@ class AssocTextReportViewport(display_utilities.ViewportBaseClass):
 			ParentWindow=ParentWindow, **Args)
 		self.SystemFontNames = SystemFontNames
 		# make aspect object for dialogue
-		print('AR32 calling MakeATReportDialogueAspect')
+		print('AR32 calling MakeATReportDialogueAspect. Args available: ', Args)
 		self.DialogueAspect = self.MakeATReportDialogueAspect(MyEditPanel=DisplDevice, Fonts=Fonts,
-			SystemFontNames=SystemFontNames, DateChoices=Args['DateChoices'])
+			SystemFontNames=SystemFontNames, DateChoices=Args['DateChoices'], ATKind=Args[info.AssociatedTextKindTag])
 		# get connection to originating Viewport
 		assert isinstance(Args['OriginatingViewport'], display_utilities.ViewportBaseClass)
 		self.OriginatingViewport = Args['OriginatingViewport']
@@ -45,7 +45,6 @@ class AssocTextReportViewport(display_utilities.ViewportBaseClass):
 		# build the dialogue: prefill widgets in new aspect and activate it
 		self.DialogueAspect.Prefill(self.Proj, SystemFontNames=self.SystemFontNames)
 		self.DialogueAspect.SetWidgetVisibility()
-		print('AR48 DialogueAspect: ', self.DialogueAspect)
 		self.DialogueAspect.Activate(WidgetsToActivate=self.DialogueAspect.WidgetsToActivate[:],
 			TextWidgets=self.DialogueAspect.TextWidgets)
 		# display aspect's sizer (containing all the visible widgets) in the edit panel
@@ -56,17 +55,19 @@ class AssocTextReportViewport(display_utilities.ViewportBaseClass):
 
 #	class ATReportDialogueAspect(project_display.EditPanelAspectItem): # class definition is lower down
 
-	def MakeATReportDialogueAspect(self, MyEditPanel, Fonts, SystemFontNames, DateChoices):
+	def MakeATReportDialogueAspect(self, MyEditPanel, Fonts, SystemFontNames, DateChoices, ATKind):
 		# make edit panel aspect for defining associated text report
 		# fonts (dict): internal font objects such as SmallHeadingFont
 		# SystemFontNames (list of str): names of "real" fonts available on the platform
 		# DateChoices (list of ChoiceItem): options for date to show in report (not currently used)
 		# return the aspect
+		assert ATKind in [info.ActionItemLabel, info.ParkingLotItemLabel]
 		# First, make basic attribs needed for the aspect
 		MyEditPanel.ATReportDialogueAspect = AssocTextReportViewport.ATReportDialogueAspect(InternalName='ATReport',
 			ParentFrame=MyEditPanel, TopLevelFrame=MyEditPanel.TopLevelFrame)
 		ThisAspect = MyEditPanel.ATReportDialogueAspect
 		ThisAspect.TextWidgets = []
+		ThisAspect.ATKind = ATKind
 		# make box sizers to contain groups of widgets
 		FileBoxSizer = wx.StaticBoxSizer(orient=wx.VERTICAL, parent=MyEditPanel, label=_('About the file to produce'))
 		FileBoxSubSizer = wx.GridBagSizer(hgap=5, vgap=5)
@@ -85,13 +86,14 @@ class AssocTextReportViewport(display_utilities.ViewportBaseClass):
 		ActionBoxSizer.Add(ActionBoxSubSizer)
 		# make widgets for File box
 		ThisAspect.HeaderLabel = UIWidgetItem(wx.StaticText(MyEditPanel, -1,
-			_('Export action items report')),
+			{info.ActionItemLabel: _('Export action items report'),
+			info.ParkingLotItemLabel: _('Export parking lot report')}[ATKind]),
 			Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_LEFT | wx.EXPAND, GapY=10,
 			ColLoc=0, ColSpan=10, Font=Fonts['BigHeadingFont'], NewRow=True)
 		ThisAspect.FileBox = UIWidgetItem(FileBoxSizer, HideMethod=lambda : FileBoxSizer.ShowItems(False),
 			ShowMethod=lambda : FileBoxSizer.ShowItems(True), ColLoc=0, ColSpan=5, NewRow=True,
 			SetFontMethod=lambda f: FileBoxSizer.GetStaticBox().SetFont, Font=Fonts['SmallHeadingFont'])
-		ThisAspect.FilenameLabel = UIWidgetItem(wx.StaticText(MyEditPanel, -1, _('Filename stub:'),
+		ThisAspect.FilenameLabel = UIWidgetItem(wx.StaticText(MyEditPanel, -1, _('Filename:'),
 			style=wx.ALIGN_RIGHT | wx.ALIGN_CENTER_VERTICAL),
 			ColLoc=0, ColSpan=1, Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_RIGHT)
 		ThisAspect.FilenameText = UIWidgetItem(wx.TextCtrl(MyEditPanel, -1, style=wx.TE_PROCESS_ENTER),
@@ -118,7 +120,9 @@ class AssocTextReportViewport(display_utilities.ViewportBaseClass):
 			ColLoc=0, ColSpan=1, Flags=wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_RIGHT)
 		ThisAspect.ShowHeaderCheck = UIWidgetItem(wx.CheckBox(MyEditPanel, -1, _('Header block')),
 			Handler=ThisAspect.OnShowHeaderCheck, Events=[wx.EVT_CHECKBOX], ColLoc=1, ColSpan=1, XMLLabel=info.HeaderLabel)
-		ThisAspect.AllItemsRadio = UIWidgetItem(wx.RadioButton(MyEditPanel, -1, _('All action items/parking lot items'),
+		ThisAspect.AllItemsRadio = UIWidgetItem(wx.RadioButton(MyEditPanel, -1,
+			{info.ActionItemLabel: _('All action items'),
+			info.ParkingLotItemLabel: _('All parking lot items')}[ATKind],
 			style=wx.RB_GROUP), XMLLabel=info.AllItemsLabel,
 			Handler=ThisAspect.OnAllItemsRadio, Events=[wx.EVT_RADIOBUTTON], ColLoc=4)
 		ThisAspect.FilteredItemsRadio = UIWidgetItem(wx.RadioButton(MyEditPanel, -1, _('Only filtered items')),
@@ -310,7 +314,9 @@ class AssocTextReportViewport(display_utilities.ViewportBaseClass):
 				DefaultDirectory = os.path.dirname(self.Proj.OutputFilename)
 			else: DefaultDirectory = info.DefaultUserDirectory
 			(GetFilenameSuccess, SaveFilename) = vizop_misc.GetFilenameForSave(self.TopLevelFrame,
-				DialogueTitle=_('Select filename  for action item/parking lot export'), DefaultDir=DefaultDirectory,
+				DialogueTitle={info.ActionItemLabel: _('Select filename  for action item report'),
+				info.ParkingLotItemLabel: _('Select filename for parking lot report')}[self.ATKind],
+				DefaultDir=DefaultDirectory,
 				DefaultFile=DefaultBasename, Wildcard=Wildcard, DefaultExtension=DefaultExtension)
 			if GetFilenameSuccess:
 				# write pathname into filename textctrl
@@ -391,12 +397,9 @@ class AssocTextReportViewport(display_utilities.ViewportBaseClass):
 		def MakeAttribStrings(self):
 			# return ShowWhat (1 x str) containing information about export required
 			# make string containing labels of parts of table to be exported, e.g. 'Header,EditNumber,ATs'
-			ShowWhat = ','.join([w.XMLLabel for w in [self.ShowHeaderCheck, self.ShowEditNumberCheck,
-				self.AllItemsRadio, self.FilteredItemsRadio] if w.Widget.IsChecked()])
-#			PartsList = [info.HeaderLabel] if self.ShowHeaderCheck.Widget.IsChecked() else []
-#			if self.ShowEditNumberCheck.Widget.IsChecked(): PartsList.append(info.EditNumberLabel)
-#			PartsList.append(info.ATsLabel) # we always export the AT list
-#			ShowWhat = ','.join(PartList)
+			ShowWhat = ','.join([w.XMLLabel for w in [self.ShowHeaderCheck, self.ShowEditNumberCheck]
+				if w.Widget.IsChecked()] + \
+				[w.XMLLabel for w in [self.AllItemsRadio, self.FilteredItemsRadio] if w.Widget.GetValue()])
 			return ShowWhat
 
 		def ExitViewportAndRevert(self):
@@ -506,6 +509,7 @@ class AssocTextReportViewport(display_utilities.ViewportBaseClass):
 		Proj = Args['Proj']
 		# find out what kind of AT is required, from the Viewport shadow's redraw data
 		ATKind = Viewport.RedrawData[info.AssociatedTextKindTag]
+		print('AR505 AT kind requested: ', ATKind)
 		# get a lookup table of all ATs of the appropriate kind in the project
 		ATTable = MakeAssocTextLookupTable(Proj=Proj, ATKind=ATKind)
 		# First, make the root element

@@ -2101,6 +2101,7 @@ class ControlFrame(wx.Frame):
 			# execute actions needed when display device is changing from one Viewport to another
 			# first, do wrap-up actions in the Viewport
 			self.ViewportOwner.CurrentViewport.ReleaseDisplayDevice(DisplDevice=self)
+			self.ViewportOwner.CurrentViewport.ReleaseDisplayDevice(DisplDevice=self)
 			self.TopLevelFrame.CurrentViewport = None # this probably isn't used, redundant
 			# clear graphics
 			self.ShowEmptyPanel()
@@ -2938,7 +2939,6 @@ class ControlFrame(wx.Frame):
 			ViewportTag = XMLRoot.find(info.PHAModelRedrawDataTag)
 			# find DisplayAttribs tag inside ViewportTag
 			DisplayAttribsTag = ViewportTag.find(info.DisplayAttribTag)
-			print('CF2930 DisplayAttribsTag found: ', DisplayAttribsTag)
 			# if tag found, extract zoom, PanX and PanY from it (although these are redundant here)
 			if DisplayAttribsTag is not None:
 				ThisZoomTag = DisplayAttribsTag.find(info.ZoomTag)
@@ -2948,7 +2948,6 @@ class ControlFrame(wx.Frame):
 				ThisPanYTag = DisplayAttribsTag.find(info.PanYTag)
 				TargetPanY = ThisPanYTag.text if ThisPanYTag else None
 		# draw the Viewport
-		print('CF2945 calling ShowViewport with debug = ', debug)
 		self.ShowViewport(MessageAsXMLTree=XMLRoot)
 		if DisplayAttribsTag is not None:
 			# get the newly refreshed current element (PHAElement) and current component (ThisComponent); must do after
@@ -3054,7 +3053,6 @@ class ControlFrame(wx.Frame):
 		# return reply data (XML tree) to send back to respective Control Frame
 		# This function might be better placed outside Control Frame class, but currently we can't because it needs
 		# access to ControlFrame's self.Projects
-		print('CF3042 received XMLRoot tags: ', [t.tag for t in XMLRoot])
 		# First, get the attribs needed to make the Viewport in the datacore
 		if XMLRoot is None: # this branch is not currently used
 			ThisProj = Proj
@@ -3299,7 +3297,6 @@ class ControlFrame(wx.Frame):
 			assert isinstance(MessageReceived, bytes)
 			XMLTree = ElementTree.fromstring(MessageReceived)
 		# First, tell Viewport to prepare for display, with data from PHA model
-		print('CF3291 displaying viewport: ', type(self.CurrentViewport))
 		self.CurrentViewport.PrepareFullDisplay(XMLTree)
 		self.MyEditPanel.EditPanelMode(self.CurrentViewport, NewMode=self.CurrentViewport.InitialEditPanelMode)
 			# set up initial mouse pointer and mouse bindings

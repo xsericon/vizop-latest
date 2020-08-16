@@ -5308,9 +5308,6 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		self.ComponentEdited = '' # last FT element component edited (e.g. a comment button clicked);
 			# to enable control panel aspect to show required comments
 		self.UndoListDuringTextEditing = [] # list of undo.UndoRecordDuringTextEditing instances
-#		self.PersistentFTAttribs = {} # keys are attrib names of self; values are values to reinstate when object is
-#			# refreshed from datacore. Not needed, as attribs are not wiped?
-		print('FT5313 making new empty milestone')
 		self.MilestoneForRedraw = None # instance of MilestoneItem, containing attribs needed to enable us to redraw
 			# the FT with same appearance as last time
 
