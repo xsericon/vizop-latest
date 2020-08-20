@@ -1525,6 +1525,7 @@ class LowerCaseLetterNumberSystem(SequenceNumberSystem): # number system using a
 	MinValue = 1
 
 class UpperCaseLetterNumberSystem(SequenceNumberSystem): # number system using A/B/C...
+	# this is used to generate column names for Excel spreadsheets
 	HumanName = _('Upper case (A, B...)')
 	Digits = [chr(x) for x in range(ord('A'), ord('Z') + 1)]
 	LogDigits = math.log(len(Digits))

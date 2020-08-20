@@ -2580,7 +2580,6 @@ class ControlFrame(wx.Frame):
 		# find the project with the ID provided
 		Proj = self.Projects[ [p.ID for p in self.Projects].index(ProjIDTagInXML.text) ]
 		# handlers for all possible requests from Control Frame. Handlers must return an XML reply message
-		# RQ_DestroyViewport not currently used; formerly called self.DatacoreSetViewportAsNotInUse
 		Handler = {'RQ_NewViewport': self.DatacoreDoNewViewport,
 			'RQ_SwitchToViewport': self.DatacoreSwitchToViewport,
 			'RQ_NewFTEventNotIPL': self.DatacoreDoNewFTEventNotIPL,
@@ -2645,7 +2644,6 @@ class ControlFrame(wx.Frame):
 		# FIXME this will break during redo, as we have no arg ViewportClass
 		if hasattr(Args['ViewportClass'], 'GetClassAttribsRequired'):
 			NewViewportAttribs.update(Args['ViewportClass'].GetClassAttribsRequired(**Args))
-			print('CF2637 getting new Viewport attribs: ', Args['ViewportClass'].GetClassAttribsRequired(**Args))
 		vizop_misc.SendRequest(self.zmqOutwardSocket, Command=RequestToDatacore, **NewViewportAttribs)
 		# show VizopTalks confirmation message, and set VizopTalks tips
 		if not Redoing:
@@ -2964,27 +2962,10 @@ class ControlFrame(wx.Frame):
 		self.RefreshGUIAfterDataChange(Proj=Proj)
 		# show appropriate aspect in Control Panel
 		if hasattr(self.CurrentViewport, 'PreferredControlPanelAspect'):
-			print('CF2955 going to control panel aspect: ', self.CurrentViewport.PreferredControlPanelAspect)
-			print('CF2956 Viewport class: ', type(self.CurrentViewport))
-			print('CF2957 PHAElement: ', PHAElement)
 			self.MyControlPanel.GotoControlPanelAspect(NewAspect=self.CurrentViewport.PreferredControlPanelAspect,
 				PHAObjInControlPanel=self.CurrentViewport, PHAElementInControlPanel=PHAElement,
 				ComponentInControlPanel=ThisComponent, debug=2673)
 		return vizop_misc.MakeXMLMessage('Null', 'Null')
-
-#	def DestroyViewport(self, Proj, DoomedViewport, **Args):
-#		# don't use this function; destroy a Viewport by calling DoSwitchToViewportCommand() instead
-#		# destroy DoomedViewport, remove it from Proj
-#		# might also work for future Redo; Args may need to include Chain
-#		# TODO check if Viewport is in any Milestone in the navigation history, and remove it? Or will that cause
-#		# complications with undo/redo of Destroy Viewport?
-#		self.Viewports.remove(DoomedViewport) # remove it from register
-#		if self.TrialViewport == DoomedViewport: self.TrialViewport = None # for safety
-#		RequestToDatacore = 'RQ_DestroyViewport'
-#		# request datacore to destroy Viewport shadow
-#		ViewportAttribs = {'ControlFrame': self.ID, info.SkipRefreshTag: utilities.Bool2Str(Args.get('Chain', False)),
-#			info.ProjIDTag: Proj.ID, 'Viewport': DoomedViewport.ID}
-#		vizop_misc.SendRequest(self.zmqOutwardSocket, Command=RequestToDatacore, **ViewportAttribs)
 
 	def DatacoreDoNewViewport_Undo(self, Proj, UndoRecord, **Args): # undo creation of new Viewport
 		global UndoChainWaiting
@@ -3274,7 +3255,6 @@ class ControlFrame(wx.Frame):
 			return vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
 		else:
 			# draw complete Viewport (this branch handles message RQ_RedrawViewport)
-			print('CF3273 calling ShowViewport')
 			ReplyXML = self.ShowViewport(MessageReceived=MessageReceived, MessageAsXMLTree=XMLTreeToSend, **Args)
 			self.RefreshGUIAfterDataChange(Proj=self.CurrentProj)
 			return ReplyXML
@@ -3706,7 +3686,6 @@ class ControlFrame(wx.Frame):
 		# If this causes problems, the auto-call to UpdateAllViewports can be suppressed by adding the command to the
 		# list found by searching for [3gd].
 		# First, retrieve any data about a specific Viewport that needs display parameters updated
-		print('CF3703 in UpdateAllViewports with MessageAsStr: ', MessageAsStr)
 		ViewportIDToUpdate = MilestoneID = None
 		if XMLRoot is not None:
 			ViewportToUpdateTag = XMLRoot.find(info.ViewportTag)
@@ -3726,7 +3705,6 @@ class ControlFrame(wx.Frame):
 				# mark this Viewport as "skip", i.e. no need to redraw it again here
 				ViewportToSkip = ViewportShadowToUpdate
 		# Check with all Viewports that datacore knows about
-		print('cf3722 in UpdateAllViewports with ViewportToSkip: ', ViewportToSkip)
 		for ThisViewportShadow in self.CurrentProj.AllViewportShadows:
 			# check if ThisViewportShadow is displayed in any display device, local or remote
 			if ThisViewportShadow.IsOnDisplay and (ThisViewportShadow != ViewportToSkip):

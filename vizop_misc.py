@@ -184,7 +184,8 @@ def SendRequest(Socket=None, Command='RQ_Null', FetchReply=False, XMLRoot=None, 
 	# Command (str): the basic command string, usually beginning with RQ_. Ignored if XMLRoot is supplied
 	# FetchReply (bool): If True, SendRequest will wait for reply to command and return reply received
 	# XMLRoot (XML tree): if supplied, this is sent as the body of the command. If None, take from Args
-	# Args (dict): keywords are data names (str), values are data values (str, or list of str). Ignored if XMLRoot supplied
+	# Args (dict): keywords are data attrib names (str), values are data values (str, or list of str).
+	# 	No compulsory Args. Ignored if XMLRoot supplied
 	if __debug__ == 1: # skip the following checking code if running in Optimized mode
 		assert Socket is not None
 		assert type(Command) is str, "VM1142 SendRequest: oops: requested Command is not a string"
@@ -196,7 +197,8 @@ def SendRequest(Socket=None, Command='RQ_Null', FetchReply=False, XMLRoot=None, 
 				Values = [Values]
 			for ThisValue in Values:
 				if not isinstance(ThisValue, str):
-					print("VM1153 Oops: non-string data value '%s' sent to SendRequest for command: '%s'" % (str(ThisValue), Cmd))
+					print("VM1153 Oops: non-string data value '%s' sent to SendRequest for arg '%s', command: '%s'" % \
+						(str(ThisValue), Cmd, Command))
 	if XMLRoot is None:
 		# create new XML structure from keys and values in Args, and set root element = Command
 		RootElement = ElementTree.Element(Command)

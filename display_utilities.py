@@ -1021,3 +1021,123 @@ def EnsurePaperMarginsReasonable(Margins, PaperSize, Orientation, LastMarginChan
 				Margins[SmallerMarginKey] = PaperSizeThisAxis - info.MinUsablePaperLength \
 					- Margins[LargerMarginKey]
 	return Margins, MarginsChanged
+
+class ExcelTable_Border(object):
+	# defines border along one edge of a cell at the extremity of a table
+
+	def __init__(self, Visible=True, Colour=None, Thickness=None, Dashed=None):
+		assert isinstance(Visible, bool)
+		assert isinstance(Colour, tuple)
+		assert isinstance(Thickness, int)
+		assert Thickness >= 0
+		assert isinstance(Dashed, str)
+		self.Visible = Visible
+		self.Colour = Colour
+		self.Thickness = Thickness
+		self.Dashed = Dashed
+
+class ExcelTable_Table(object):
+	# defines a block of cells in an Excel export
+
+	def __init__(self, PositionRelativeTo=None, RelPosDirection='Right', GapToRight=0,
+		SkipGapToRightIfAtRightOfSheet=True, GapBelow=0, SkipGapBelowIfAtBottomOfSheet=True, TopBorder=None,
+		BottomBorder=None, LeftBorder=None, RightBorder=None):
+		# PositionRelativeTo: another Table or None - the table this one should be oriented relative to
+		# RelPosDirection (str): which direction this table should be oriented relative to the one named above
+		# GapToRight (int): if nonzero, one blank cell with this width (mm) is left blank to the right of this table
+		# SkipGapToRightIfAtRightOfSheet (bool): don't leave gap if there's no table to the right
+		# GapBelow (int): if nonzero, one blank cell with height = this number of lines is left blank below this table
+		# SkipGapBelowIfAtBottomOfSheet (bool): don't leave gap if there's no table below
+		# Borders: border object or None
+		assert isinstance(PositionRelativeTo, ExcelTable_Table) or (PositionRelativeTo is None)
+		assert RelPosDirection in [info.RightLabel, info.BelowLabel]
+		assert isinstance(GapToRight, int)
+		assert GapToRight >= 0
+		assert isinstance(SkipGapToRightIfAtRightOfSheet, bool)
+		assert isinstance(GapBelow, int)
+		assert GapBelow >= 0
+		assert isinstance(SkipGapBelowIfAtBottomOfSheet, bool)
+		assert isinstance(TopBorder, ExcelTable_Border) or (TopBorder is None)
+		assert isinstance(BottomBorder, ExcelTable_Border) or (BottomBorder is None)
+		assert isinstance(LeftBorder, ExcelTable_Border) or (LeftBorder is None)
+		assert isinstance(RightBorder, ExcelTable_Border) or (RightBorder is None)
+		self.PositionRelativeTo = PositionRelativeTo
+		self.RelPosDirection = RelPosDirection
+		self.GapToRight = GapToRight
+		self.SkipGapToRightIfAtRightOfSheet = SkipGapToRightIfAtRightOfSheet
+		self.GapBelow = GapBelow
+		self.SkipGapBelowIfAtBottomOfSheet = SkipGapBelowIfAtBottomOfSheet
+		self.TopBorder = TopBorder
+		self.BottomBorder = BottomBorder
+		self.LeftBorder = LeftBorder
+		self.RightBorder = RightBorder
+		self.Components = [] # list of ExcelTable_Component instances
+
+class ExcelTable_Component(object):
+	# defines a single cell in a table comprising part of an Excel export
+
+	def __init__(self, PositionRelativeTo=None, RelPosDirection='Right', TopBorder=None,
+		BottomBorder=None, LeftBorder=None, RightBorder=None, Content='', VertAlignment=info.TopLabel,
+		HorizAlignment=info.LeftLabel, LeftIndentInmm=0, LeftIndentInRelWidth=0, FontStyle=None,
+		BackgColour=(255,255,255), RelWidth=1.0, MergeToRight=False, MergeDown=False):
+		# PositionRelativeTo: another Component or None - the component this one should be oriented relative to
+		# RelPosDirection (str): which direction this component should be oriented relative to the one named above
+		# Borders: border object or None
+		# Content: text to put in the cell
+		# VertAlignment, HorizAlignment: text alignment in the cell
+		# LeftIndent: text indent to apply. LeftIndentInmm takes priority.
+		# RelWidth: relative width of cell relative to all other cells in the sheet
+		# Merge: whether to merge with any adjacent cell in specified direction
+		assert isinstance(PositionRelativeTo, ExcelTable_Component) or (PositionRelativeTo is None)
+		assert RelPosDirection in [info.RightLabel, info.BelowLabel]
+		assert isinstance(TopBorder, ExcelTable_Border) or (TopBorder is None)
+		assert isinstance(BottomBorder, ExcelTable_Border) or (BottomBorder is None)
+		assert isinstance(LeftBorder, ExcelTable_Border) or (LeftBorder is None)
+		assert isinstance(RightBorder, ExcelTable_Border) or (RightBorder is None)
+		assert isinstance(Content, str)
+		assert VertAlignment in [info.TopLabel, info.CentreLabel, info.BottomLabel]
+		assert HorizAlignment in [info.LeftLabel, info.CentreLabel, info.RightLabel]
+		assert isinstance(LeftIndentInmm, (int, float))
+		assert LeftIndentInmm >= 0
+		assert isinstance(LeftIndentInRelWidth, (int, float))
+		assert LeftIndentInRelWidth >= 0
+		assert isinstance(FontStyle, wx.Font) or (FontStyle is None)
+		assert isinstance(BackgColour, tuple)
+		assert isinstance(RelWidth, (int, float))
+		assert RelWidth > 0
+		assert isinstance(MergeToRight, bool)
+		assert isinstance(MergeDown, bool)
+		self.PositionRelativeTo = PositionRelativeTo
+		self.RelPosDirection = RelPosDirection
+		self.TopBorder = TopBorder
+		self.BottomBorder = BottomBorder
+		self.LeftBorder = LeftBorder
+		self.RightBorder = RightBorder
+		self.Content = Content
+		self.VertAlignment = VertAlignment
+		self.HorizAlignment = HorizAlignment
+		self.LeftIndentInmm = LeftIndentInmm
+		self.LeftIndentInRelWidth = LeftIndentInRelWidth
+		self.FontStyle = FontStyle
+		self.BackgColour = BackgColour
+		self.RelWidth = Width
+		self.MergeToRight = MergeToRight
+		self.MergeDown = MergeDown
+
+class ExcelTable_Sheet(object):
+	# defines a block of tables defining content of an exported spreadsheet
+
+	def __init__(self, TabName, TabColour, TargetWidth):
+		# TabName (str): Name to be shown on Excel worksheet tab. Can't be blank
+		# TabColour (rgb tuple, 3 x int): Colour to be applied to Excel worksheet tab
+		# TargetWidth (int): Total width of all cells in the Sheet, in mm
+		assert isinstance(TabName, str)
+		assert TabName.strip() # ensure it's not blank or whitespace only
+		assert isinstance(TabColour, tuple)
+		assert isinstance(TargetWidth, int)
+		assert TargetWidth > 0
+		object.__init__(self)
+		self.TabName = TabName
+		self.TabColour = TabColour
+		self.TargetWidth = TargetWidth
+		self.Tables = [] # ExcelTable_Table instances

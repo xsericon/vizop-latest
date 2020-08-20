@@ -3,7 +3,7 @@
 # Codes the dialogue and export of a report of action items and parking lot items
 import os, os.path, wx, platform # wx provides basic GUI functions
 
-import display_utilities, project_display, info, core_classes, vizop_misc
+import display_utilities, project_display, info, core_classes, vizop_misc, excel_export
 from display_utilities import UIWidgetItem
 import xml.etree.ElementTree as ElementTree # XML handling
 
@@ -25,19 +25,22 @@ class AssocTextReportViewport(display_utilities.ViewportBaseClass):
 
 	def __init__(self, Proj, PHAObjID, DisplDevice, ParentWindow, Fonts, SystemFontNames, **Args):
 		# __init__ for class AssocTextReportViewport
+		assert Args[info.AssociatedTextKindTag] in [info.ActionItemLabel, info.ParkingLotItemLabel]
 		display_utilities.ViewportBaseClass.__init__(self, Proj=Proj, PHAObjID=PHAObjID, DisplDevice=DisplDevice,
 			ParentWindow=ParentWindow, **Args)
 		self.SystemFontNames = SystemFontNames
+		self.ATKind = Args[info.AssociatedTextKindTag]
 		# make aspect object for dialogue
-		print('AR32 calling MakeATReportDialogueAspect. Args available: ', Args)
+		assert Args[info.ItemsToIncludeTag] in [info.AllItemsLabel, info.FilteredItemsLabel, info.NotSpecifiedLabel]
 		self.DialogueAspect = self.MakeATReportDialogueAspect(MyEditPanel=DisplDevice, Fonts=Fonts,
-			SystemFontNames=SystemFontNames, DateChoices=Args['DateChoices'], ATKind=Args[info.AssociatedTextKindTag])
+			SystemFontNames=SystemFontNames, DateChoices=Args['DateChoices'], ATKind=self.ATKind,
+			ItemsToInclude=Args[info.ItemsToIncludeTag])
 		# get connection to originating Viewport
 		assert isinstance(Args['OriginatingViewport'], display_utilities.ViewportBaseClass)
 		self.OriginatingViewport = Args['OriginatingViewport']
-		# get requested scope of export
-		assert Args[info.ItemsToIncludeTag] in [info.AllItemsLabel, info.FilteredItemsLabel]
-		print('AR36 making ATR viewport with scope: ', Args[info.ItemsToIncludeTag])
+#		# get requested scope of export
+#		self.ScopeRequestedOnInit = Args[info.ItemsToIncludeTag]
+#		print('AR36 making ATR viewport with scope: ', Args[info.ItemsToIncludeTag])
 
 
 	def PrepareFullDisplay(self, XMLTree):
@@ -55,19 +58,22 @@ class AssocTextReportViewport(display_utilities.ViewportBaseClass):
 
 #	class ATReportDialogueAspect(project_display.EditPanelAspectItem): # class definition is lower down
 
-	def MakeATReportDialogueAspect(self, MyEditPanel, Fonts, SystemFontNames, DateChoices, ATKind):
+	def MakeATReportDialogueAspect(self, MyEditPanel, Fonts, SystemFontNames, DateChoices, ATKind, ItemsToInclude):
 		# make edit panel aspect for defining associated text report
 		# fonts (dict): internal font objects such as SmallHeadingFont
 		# SystemFontNames (list of str): names of "real" fonts available on the platform
 		# DateChoices (list of ChoiceItem): options for date to show in report (not currently used)
+		# ItemsToInclude (str): one of 'AllItems' or 'FilteredItems' - which ATs were requested on entry to the Viewport
 		# return the aspect
 		assert ATKind in [info.ActionItemLabel, info.ParkingLotItemLabel]
+		assert ItemsToInclude in [info.AllItemsLabel, info.FilteredItemsLabel, info.NotSpecifiedLabel]
 		# First, make basic attribs needed for the aspect
 		MyEditPanel.ATReportDialogueAspect = AssocTextReportViewport.ATReportDialogueAspect(InternalName='ATReport',
 			ParentFrame=MyEditPanel, TopLevelFrame=MyEditPanel.TopLevelFrame)
 		ThisAspect = MyEditPanel.ATReportDialogueAspect
 		ThisAspect.TextWidgets = []
 		ThisAspect.ATKind = ATKind
+		ThisAspect.ItemsRequestedOnInit = ItemsToInclude
 		# make box sizers to contain groups of widgets
 		FileBoxSizer = wx.StaticBoxSizer(orient=wx.VERTICAL, parent=MyEditPanel, label=_('About the file to produce'))
 		FileBoxSubSizer = wx.GridBagSizer(hgap=5, vgap=5)
@@ -384,12 +390,13 @@ class AssocTextReportViewport(display_utilities.ViewportBaseClass):
 			ShowWhat = self.MakeAttribStrings()
 			vizop_misc.SendRequest(Socket=ThisViewport.C2DSocketREQ,
 				Command='RQ_ZZ_UpdateATExportAttribs',
-				Proj=self.Proj.ID, PHAObj=ThisViewport.PHAObjID, Viewport=ThisViewport.ID,
+				Proj=self.Proj.ID,
+				PHAObj='None' if ThisViewport.PHAObjID is None else ThisViewport.PHAObjID, Viewport=ThisViewport.ID,
 				Filename=self.FilenameText.Widget.GetValue().strip(),
 				FileType=info.ExcelExtension,
 				ExportWhat=ShowWhat,
 				PageSize=core_classes.PaperSizes[self.PageSizeChoice.Widget.GetSelection()].XMLName,
-				PaperOrientation='Portrait' if self.PortraitRadio.Widget.GetValue() else 'Landscape',
+				PaperOrientation=info.PortraitLabel if self.PortraitRadio.Widget.GetValue() else info.LandscapeLabel,
 				Font=self.ParentFrame.TopLevelFrame.SystemFontNames[self.FontChoice.Widget.GetSelection()])
 				# next line retained for future use, as we may add a "show what date" choice, like ft_full_report
 #				DateToShow=core_classes.DateChoices[self.DateChoice.Widget.GetSelection()].XMLName)
@@ -413,8 +420,8 @@ class AssocTextReportViewport(display_utilities.ViewportBaseClass):
 				ThisWidget.Widget.Destroy()
 			# destroy this Viewport and switch to the previous Viewport (for now, just go to the first PHA model in the project)
 			# TODO build mechanism to identify the last touched PHA model (also needed in other Viewports' Exit())
-			self.DisplDevice.TopLevelFrame.SwitchToPHAObj(Proj=self.Proj, TargetPHAObjID=self.Proj.PHAObjShadows[0].ID,
-				TargetViewport=None, ViewportToDestroy=self.ParentFrame.TopLevelFrame.CurrentViewport)
+			self.TopLevelFrame.SwitchToPHAObj(Proj=self.Proj, TargetPHAObjID=self.Proj.PHAObjShadows[0].ID,
+				TargetViewport=None, ViewportToDestroy=self.TopLevelFrame.CurrentViewport)
 
 		def Prefill(self, Proj, SystemFontNames):
 			# prefill widget values in the dialogue
@@ -425,11 +432,17 @@ class AssocTextReportViewport(display_utilities.ViewportBaseClass):
 			self.FilenameText.Widget.SelectAll()
 			# set overwrite checkbox
 			self.OverwriteCheck.Widget.SetValue(self.Overwrite)
-			# set scope checkboxes
+			# set scope checkboxes and radio buttons
 			self.ShowHeaderCheck.Widget.SetValue(info.HeaderLabel in Proj.ATExportShowWhat)
+			if self.ItemsRequestedOnInit == info.AllItemsLabel or not SomeATsAreSelected:
+				self.AllItemsRadio.Widget.SetValue(True)
+			elif self.ItemsRequestedOnInit == info.FilteredItemsLabel:
+				self.FilteredItemsRadio.Widget.SetValue(True)
+			elif self.ItemsRequestedOnInit == info.NotSpecifiedLabel: # using this route when starting from menu
+				self.FilteredItemsRadio.Widget.SetValue(SomeATsAreSelected and \
+					(info.FilteredItemsLabel in Proj.ATExportShowWhat))
+				self.AllItemsRadio.Widget.SetValue(not self.FilteredItemsRadio.Widget.GetValue())
 			self.ShowEditNumberCheck.Widget.SetValue(info.EditNumberLabel in Proj.ATExportShowWhat)
-			self.FilteredItemsRadio.Widget.SetValue(SomeATsAreSelected and \
-				(info.FilteredItemsLabel in Proj.ATExportShowWhat))
 			# set layout widget values
 			# get user's preferred paper size from config file
 			PaperSizeStr = vizop_misc.GetValueFromUserConfig('ExportPaperSize')
@@ -610,14 +623,41 @@ class AssocTextReportViewport(display_utilities.ViewportBaseClass):
 		Zoom = XMLRoot.findtext(info.ZoomTag)
 		# prepare default reply if command unknown
 		Reply = vizop_misc.MakeXMLMessage(RootName='Fail', RootText='CommandNotRecognised')
-		# insert command handling code here - currently, no commands are expected to this Viewport
+		# handle incoming commands
+		if Command == 'RQ_ZZ_UpdateATExportAttribs': self.UpdateATExportAttribs(Proj, XMLRoot)
 		if Reply.tag == 'Fail': print('AR591 command not recognised: ', Command)
 		return Reply
+
+	def ReleaseDisplayDevice(self, DisplDevice, **Args):
+		# wrap-up actions needed when display device is no longer showing associated texts report dialogue
+		self.DisplDevice = None
+
+	def UpdateATExportAttribs(self, Proj, XMLRoot):
+		# store attribs for AT report dialogue in project
+		assert isinstance(Proj, projects.ProjectItem)
+		Proj.ATExportFilename = XMLRoot.findtext('Filename')
+		Proj.ATExportShowWhat = XMLRoot.findtext('ExportWhat')
+		Proj.LastExportPageSize = utilities.InstanceWithAttribValue(ObjList=core_classes.PaperSizes,
+			AttribName='XMLName', TargetValue=XMLRoot.findtext('PageSize'),
+			NotFoundValue=core_classes.PaperSizes[0])
+		Proj.ATExportPaperOrientation = XMLRoot.findtext('PaperOrientation')
+		Proj.LastExportFontName = XMLRoot.findtext('Font')
+#		Proj.LastExportPreferredDateToShow = utilities.InstanceWithAttribValue(ObjList=core_classes.DateChoices,
+#			AttribName='XMLName', TargetValue=XMLRoot.findtext('DateToShow'),
+#			NotFoundValue=core_classes.DateChoices[0])
+		return vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
+
+	def DoExportToExcel(self):
+		# build export Excel workbook of associated texts
+
+		# main procedure for DoExportToExcel()
+		XLWorkbook = excel_export.SetupWorkbook()
+		XLWorksheet = excel_export.SetupWorksheet(WB=XLWorkbook,
+			TabName=_({info.ActionItemLabel: 'Action items', info.ParkingLotItemLabel: 'Parking lot'}[self.ATKind]),
+			TabColour=(200,200,255))
 
 # %%% working here - transferring methods from ft_full_report. May still need:
 # StoreAttribsInProject
 # ExitViewportAndRevert
 # Deactivate
-# UpdateAssocTextFullViewAttribs (equivalent for this Viewport, but might be obsolete)
-# ReleaseDisplayDevice
 # GetMilestoneData

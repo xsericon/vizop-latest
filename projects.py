@@ -306,7 +306,6 @@ class ProjectItem(object): # class of PHA project instances
 		for ThisViewport in self.ClientViewports:
 			if isinstance(ThisViewport, TargetClass):
 				# check match for any attribs in UniqueAttribs
-#					Matched = all([getattr(ThisViewport, k, None) == v for k, v in MatchAttribs.items()])
 				# check every attrib in ThisViewport's UniqueAttribs matches value supplied in MatchAttribs,
 				# ignoring any attribs missing from MatchAttribs
 				if all([(getattr(ThisViewport, k) == MatchAttribs.get(k, None)) or \
