@@ -33,8 +33,8 @@ class AssocTextReportViewport(display_utilities.ViewportBaseClass):
 		# make aspect object for dialogue
 		assert Args[info.ItemsToIncludeTag] in [info.AllItemsLabel, info.FilteredItemsLabel, info.NotSpecifiedLabel]
 		self.DialogueAspect = self.MakeATReportDialogueAspect(MyEditPanel=DisplDevice, Fonts=Fonts,
-															  SystemFontNames=SystemFontNames, DateChoices=Args['DateChoices'], ATKind=self.AssocTextKind,
-															  ItemsToInclude=Args[info.ItemsToIncludeTag])
+			SystemFontNames=SystemFontNames, DateChoices=Args['DateChoices'], ATKind=self.AssocTextKind,
+			ItemsToInclude=Args[info.ItemsToIncludeTag])
 		# get connection to originating Viewport
 		assert isinstance(Args['OriginatingViewport'], display_utilities.ViewportBaseClass)
 		self.OriginatingViewport = Args['OriginatingViewport']
@@ -684,14 +684,15 @@ class AssocTextReportViewport(display_utilities.ViewportBaseClass):
 				BackgColour=TitleBackgColour, RelWidth=1.0, MergeToRight=True)
 			ST.Components.append(HeaderRowFirstCell)
 			# fill up to end of table on right
-			HeaderRowCells = [HeaderRowFirstCell]
-			for i in range(Col1CellCount + Col2CellCount - 2):
-				HeaderRowCells.append(GetEmptyCell(MergeToRight=True))
-			HeaderRowCells.append(GetEmptyCell())
-			# connect each cell to the one on the left
-			for (ThisIndex, ThisCell) in enumerate(HeaderRowCells[1:]):
-				ThisCell.PositionRelativeTo = HeaderRowCells[ThisIndex]
-			ST.Components.extend(HeaderRowCells)
+			excel_export.MergeAndFillCells(Table=ST, StartComponent=HeaderRowFirstCell, EndCol=Col1CellCount + Col2CellCount)
+#			HeaderRowCells = [HeaderRowFirstCell]
+#			for i in range(Col1CellCount + Col2CellCount - 2):
+#				HeaderRowCells.append(GetEmptyCell(MergeToRight=True))
+#			HeaderRowCells.append(GetEmptyCell())
+#			# connect each cell to the one on the left
+#			for (ThisIndex, ThisCell) in enumerate(HeaderRowCells[1:]):
+#				ThisCell.PositionRelativeTo = HeaderRowCells[ThisIndex]
+#			ST.Components.extend(HeaderRowCells)
 
 			# report date and edit number row
 			DateLabelCell = excel_export.ExcelTable_Component(BottomBorder=NormalInnerBorder,
@@ -748,7 +749,7 @@ class AssocTextReportViewport(display_utilities.ViewportBaseClass):
 			ST.Components.extend(StatusHeaderRowCells)
 
 			# rows for each AT status
-			StatusCounts = self.GetATStatusCounts()
+			StatusCounts = self.GetATStatusCounts(Scope=self.GetScope())
 			RowStartReference = StatusNameLabelCell # position reference for the start of 1st row
 			for (ThisStatus, ThisStatusCount) in StatusCounts.items():
 				StatusNameCell = excel_export.ExcelTable_Component(BottomBorder=LightInnerBorder,
@@ -786,9 +787,118 @@ class AssocTextReportViewport(display_utilities.ViewportBaseClass):
 			assert isinstance(Borders, excel_export.ExcelTable_Border)
 			ATT = excel_export.ExcelTable_Table(GapBelow=1, TopBorder=Borders, BottomBorder=Borders,
 				LeftBorder=Borders, RightBorder=Borders)
-			Col1CellCount = 3 # number of horizontally merged cells in each table column
-			Col2CellCount = 3
-			print('AR791 to complete routine to set up table structure')
+			# find out which fields are to be shown
+			ShowPlacesUsed = self.DialogueAspect.ShowPlacesUsedCheck.Widget.GetValue()
+			ShowResponsibility = self.DialogueAspect.ShowResponsibilityCheck.Widget.GetValue()
+			ShowDeadline = self.DialogueAspect.ShowDeadlineCheck.Widget.GetValue()
+			ShowStatus = self.DialogueAspect.ShowStatusCheck.Widget.GetValue()
+			# Calculate number of columns allocated to "Description" field, depending on which fields are to be shown
+#			ItemNoCol = 1
+#			DescriptionCol = 2 # fixed starting column
+			DescriptionColEnd = 2 + [ShowPlacesUsed, ShowResponsibility, ShowDeadline, ShowStatus].count(False)
+#			# determine which column each field will be shown in (1-based. Item no and Description cols are always shown)
+#			PlacesUsedCol = 6 - [ShowResponsibility, ShowDeadline, ShowStatus].count(True)
+#			ResponsibilityCol = 6 - [ShowDeadline, ShowStatus].count(True)
+#			DeadlineCol = 6 - [ShowStatus].count(True)
+			# make header row
+			HeaderRowFirstCell = excel_export.ExcelTable_Component(BottomBorder=NormalInnerBorder,
+				Content=_('Item no'), RightBorder=NormalInnerBorder,
+				VertAlignment=info.CentreLabel, HorizAlignment=info.CentreLabel, FontStyle=Header1Font,
+				BackgColour=TitleBackgColour, RelWidth=1.0)
+			NextRowRefComponent = HeaderRowFirstCell
+			ATT.Components.append(HeaderRowFirstCell)
+			HeaderRowDescriptionCell = excel_export.ExcelTable_Component(BottomBorder=NormalInnerBorder,
+				Content=_('Description'), PositionRelativeTo=HeaderRowFirstCell, RelPosDirection=info.RightLabel,
+				VertAlignment=info.CentreLabel, HorizAlignment=info.CentreLabel, FontStyle=Header1Font,
+				BackgColour=TitleBackgColour, RelWidth=4.0)
+			ATT.Components.append(HeaderRowDescriptionCell)
+			# add further cells for Description header, if needed
+			NextRefComponent = excel_export.MergeAndFillCells(Table=ATT, StartComponent=HeaderRowDescriptionCell,
+				EndCol=DescriptionColEnd, FinalRightBorder=NormalInnerBorder)
+			# add remaining headers as needed
+			if ShowPlacesUsed:
+				NextRefComponent = excel_export.ExcelTable_Component(BottomBorder=NormalInnerBorder,
+				Content=_('Places used'), RightBorder=NormalInnerBorder, PositionRelativeTo=NextRefComponent,
+				VertAlignment=info.CentreLabel, HorizAlignment=info.CentreLabel, FontStyle=Header1Font,
+				BackgColour=TitleBackgColour, RelWidth=3.0, RelPosDirection=info.RightLabel)
+				ATT.Components.append(NextRefComponent)
+			if ShowResponsibility:
+				NextRefComponent = excel_export.ExcelTable_Component(BottomBorder=NormalInnerBorder,
+				Content=_('Responsibility'), RightBorder=NormalInnerBorder, PositionRelativeTo=NextRefComponent,
+				VertAlignment=info.CentreLabel, HorizAlignment=info.CentreLabel, FontStyle=Header1Font,
+				BackgColour=TitleBackgColour, RelWidth=2.0, RelPosDirection=info.RightLabel)
+				ATT.Components.append(NextRefComponent)
+			if ShowDeadline:
+				NextRefComponent = excel_export.ExcelTable_Component(BottomBorder=NormalInnerBorder,
+				Content=_('Deadline'), RightBorder=NormalInnerBorder, PositionRelativeTo=NextRefComponent,
+				VertAlignment=info.CentreLabel, HorizAlignment=info.CentreLabel, FontStyle=Header1Font,
+				BackgColour=TitleBackgColour, RelWidth=1.0, RelPosDirection=info.RightLabel)
+				ATT.Components.append(NextRefComponent)
+			if ShowStatus:
+				NextRefComponent = excel_export.ExcelTable_Component(BottomBorder=NormalInnerBorder,
+				Content=_('Status'), RightBorder=NormalInnerBorder, PositionRelativeTo=NextRefComponent,
+				VertAlignment=info.CentreLabel, HorizAlignment=info.CentreLabel, FontStyle=Header1Font,
+				BackgColour=TitleBackgColour, RelWidth=1.0, RelPosDirection=info.RightLabel)
+				ATT.Components.append(NextRefComponent)
+			# make rows for each AT to be shown
+			for ThisAT in self.AssocTexts:
+				if (self.GetScope() == info.AllItemsLabel) or ThisAT.FilteredIn:
+					# make item number component
+					ItemNumberComponent = excel_export.ExcelTable_Component(BottomBorder=LightInnerBorder,
+						Content=ThisAT.Numbering, RightBorder=LightInnerBorder, PositionRelativeTo=NextRowRefComponent,
+						VertAlignment=info.LeftLabel, HorizAlignment=info.TopLabel, FontStyle=NormalFont,
+						BackgColour=NormalBackgColour, RelPosDirection=info.BelowLabel)
+					NextRowRefComponent = ItemNumberComponent
+					ATT.Components.append(ItemNumberComponent)
+					# make description component
+					DescriptionComponent = excel_export.ExcelTable_Component(BottomBorder=LightInnerBorder,
+						Content=ThisAT.Content,
+						PositionRelativeTo=ItemNumberComponent,
+						VertAlignment=info.LeftLabel,
+						HorizAlignment=info.TopLabel, FontStyle=NormalFont,
+						BackgColour=NormalBackgColour,
+						RelPosDirection=info.RightLabel)
+					ATT.Components.append(DescriptionComponent)
+					# fill to right, if description takes more than one col
+					NextRefComponent = excel_export.MergeAndFillCells(Table=ATT, StartComponent=DescriptionComponent,
+						EndCol=DescriptionColEnd, FinalRightBorder=NormalInnerBorder)
+					# make Places Used component
+					if ShowPlacesUsed:
+						NextRefComponent = excel_export.ExcelTable_Component(BottomBorder=LightInnerBorder,
+							Content=ThisAT.PHAElements, RightBorder=LightInnerBorder,
+							PositionRelativeTo=NextRefComponent,
+							VertAlignment=info.LeftLabel,
+							HorizAlignment=info.TopLabel, FontStyle=NormalFont,
+							BackgColour=NormalBackgColour,
+							RelPosDirection=info.RightLabel)
+						ATT.Components.append(NextRefComponent)
+					if ShowResponsibility:
+						NextRefComponent = excel_export.ExcelTable_Component(BottomBorder=LightInnerBorder,
+							Content=ThisAT.Responsibility, RightBorder=LightInnerBorder,
+							PositionRelativeTo=NextRefComponent,
+							VertAlignment=info.LeftLabel,
+							HorizAlignment=info.TopLabel, FontStyle=NormalFont,
+							BackgColour=NormalBackgColour,
+							RelPosDirection=info.RightLabel)
+						ATT.Components.append(NextRefComponent)
+					if ShowDeadline:
+						NextRefComponent = excel_export.ExcelTable_Component(BottomBorder=LightInnerBorder,
+							Content=ThisAT.Deadline, RightBorder=LightInnerBorder,
+							PositionRelativeTo=NextRefComponent,
+							VertAlignment=info.LeftLabel,
+							HorizAlignment=info.TopLabel, FontStyle=NormalFont,
+							BackgColour=NormalBackgColour,
+							RelPosDirection=info.RightLabel)
+						ATT.Components.append(NextRefComponent)
+					if ShowStatus:
+						NextRefComponent = excel_export.ExcelTable_Component(BottomBorder=LightInnerBorder,
+							Content=ThisAT.Status,
+							PositionRelativeTo=NextRefComponent,
+							VertAlignment=info.LeftLabel,
+							HorizAlignment=info.TopLabel, FontStyle=NormalFont,
+							BackgColour=NormalBackgColour,
+							RelPosDirection=info.RightLabel)
+						ATT.Components.append(NextRefComponent)
 			return ATT
 
 		# main procedure for DoExportToExcel()%%%
@@ -821,7 +931,7 @@ class AssocTextReportViewport(display_utilities.ViewportBaseClass):
 			TargetWidth=AbsWSWidth)
 		# make the tables and put them in MySheet
 		MySheet.Tables.append(MakeSummaryTable(Borders=HeavyBorder))
-#		MySheet.Tables.append(MakeATTable(Borders=HeavyBorder))
+		MySheet.Tables.append(MakeATTable(Borders=HeavyBorder))
 		# generate the Excel spreadsheet
 		MySheet.PopulateSheet(WS=XLWorksheet, AbsSheetWidth=AbsWSWidth)
 		# write the Excel spreadsheet to file
@@ -874,6 +984,11 @@ class AssocTextReportViewport(display_utilities.ViewportBaseClass):
 				ThisElUsing = project_display.PHAElementItem(ElementHumanName=ThisElUsingTag.text,
 					ElementID=ThisElUsingTag.get(info.IDTag))
 				ThisAT.PHAElements.append(ThisElUsing)
+
+	def GetScope(self):
+		# return info.AllItemsLabel or info.FilteredItemsLabel, according to current user selection in radio buttons
+		return [w.XMLLabel for w in [self.DialogueAspect.AllItemsRadio, self.DialogueAspect.FilteredItemsRadio]
+			if w.Widget.GetValue()][0]
 
 class AssocTextItemInDisplay(object):
 	# data for associated text items for display. Reflects data held in the actual associated text items in datacore

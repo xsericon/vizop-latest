@@ -318,3 +318,36 @@ def WriteWBToFile(WB, FilePath):
 	# FilePath is assumed to be a writeable path
 	print('EE317 writing Excel file')
 	WB.save(filename=FilePath)
+
+def MergeAndFillCells(Table, StartComponent, EndCol, FinalRightBorder=None):
+	# in Table, append after StartComponent a series of Components, on the right of StartComponent and merged to it
+	# EndCol (int): 1-based index of column to merge up to and including
+	# FinalRightBorder: right border to apply to the last cell added
+	# return the final component added, if any. If no components added, return StartComponent. This may be needed as
+	# a positional reference for further components in the table
+	# Inserted cells have the same top and bottom border as StartComponent
+	assert isinstance(Table, ExcelTable_Table)
+	assert isinstance(StartComponent, ExcelTable_Component)
+	assert StartComponent in Table.Components
+	assert isinstance(EndCol, int)
+	assert EndCol >= 1
+	assert isinstance(FinalRightBorder, ExcelTable_Border) or (FinalRightBorder is None)
+	# first, find index of StartComponent in Table; we don't assume it's at the end of Table.Components
+	StartComponentIndex = Table.Components.index(StartComponent)
+	# insert empty cells up to the final cell - unless StartComponent is already at column EndCol
+	ComponentsAdded = False
+	for InsertIndex in range(StartComponentIndex + 1, EndCol): # EndCol is 1-based, so no +1 at the end
+		IsFinalComponent = (InsertIndex == EndCol - 1)
+		ComponentsAdded = True # whether any components added to Table
+		Table.Components.insert(InsertIndex, ExcelTable_Component(MergeToRight=not IsFinalComponent,
+			PositionRelativeTo=Table.Components[InsertIndex - 1], RelPosDirection=info.RightLabel,
+			TopBorder=StartComponent.TopBorder, BottomBorder=StartComponent.BottomBorder,
+			RightBorder = FinalRightBorder if IsFinalComponent else None))
+		ComponentToReturn = Table.Components[InsertIndex] # this will end up containing the rightmost new component
+	# if any cells were added, set StartComponent to merge to right
+	if ComponentsAdded: StartComponent.MergeToRight = True
+	# if no cells were added, apply FinalRightBorder to StartComponent
+	else:
+		StartComponent.RightBorder = FinalRightBorder
+		ComponentToReturn = StartComponent
+	return ComponentToReturn
