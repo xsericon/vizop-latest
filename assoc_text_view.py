@@ -8,57 +8,8 @@ import xml.etree.ElementTree as ElementTree # XML handling
 
 import core_classes, project_display, vizop_misc, info, utilities, faulttree, display_utilities, undo, projects,\
 	assoc_text_report
-from project_display import EditPanelAspectItem
+from project_display import EditPanelAspectItem, PHAElementItem
 from display_utilities import UIWidgetItem
-
-class PHAElementItem(object):
-	# proxy for a PHA element. Provides information required to display info about the element, and to jump to it
-
-	def __init__(self, ElementKindHumanName='', ElementHumanName='', ElementNumber='', HostKindHumanName='',
-		HostHumanName='', ElementID='', HostID=''):
-		# ElementKindHumanName: name of the kind of element, e.g. "initiating event"
-		# ElementHumanName: name of the actual element, e.g. "Pump P-100 trips"
-		# ElementNumber: currently displayed numbering of the element
-		# HostKindHumanName: name of the kind of PHA model containing the element, e.g. "Fault Tree"
-		# HostHumanName: name of the actual host PHA model, e.g. "SIF UC-1000"
-		# ElementID: ID of the element
-		# HostID: ID of the host PHA model
-		assert isinstance(ElementKindHumanName, str)
-		assert isinstance(ElementHumanName, str)
-		assert isinstance(ElementNumber, str)
-		assert isinstance(HostKindHumanName, str)
-		assert isinstance(HostHumanName, str)
-		assert isinstance(ElementID, str)
-		assert isinstance(HostID, str)
-		object.__init__(self)
-		self.ElementKindHumanName = ElementKindHumanName
-		self.ElementHumanName = ElementHumanName
-		self.ElementNumber = ElementNumber
-		self.HostKindHumanName = HostKindHumanName
-		self.HostHumanName = HostHumanName
-		self.ElementID = ElementID
-		self.HostID = HostID
-
-class AssocTextItemInDisplay(object):
-	# data for associated text items for display. Reflects data held in the actual associated text items in datacore
-
-	def __init__(self):
-		object.__init__(self)
-		self.ID = ''
-		self.Content = ''
-		self.Responsibility = ''
-		self.Deadline = ''
-		self.Status = ''
-		self.Numbering = ''
-		self.FilteredIn = True # bool; whether this item shows up in the current filters. Defined only if filters are applied.
-		self.Selected = False # bool; whether this item is currently selected by the user
-		self.PHAElements = [] # list of PHAElementItem instances; all elements in which this AT appears
-		self.GridRow = None # row number in grid at which this item is currently displayed, or None if not displayed
-
-	def GetWhereUsedHumanText(self):
-		# get human-readable text showing PHA elements where this AT is used
-		return '\n'.join([_('%s %s in %s' % (p.ElementHumanName, p.ElementNumber, p.HostHumanName))
-			for p in self.PHAElements ])
 
 class AssocTextListViewport(display_utilities.ViewportBaseClass):
 	# defines a viewport that lists associated texts for the whole project
@@ -101,7 +52,7 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 		self.SetupViewport(HostPanel=DisplDevice, Fonts=Fonts,
 			SystemFontNames=SystemFontNames, DateChoices=Args['DateChoices'])
 		# initialize attributes
-		self.AssocTexts = [] # list of AssocTextItemInDisplay instances
+		self.AssocTexts = [] # list of assoc_text_report.AssocTextItemInDisplay instances
 		self.ActionChoices = []  # list of ChoiceItem instances; choices currently offered in Action choice box
 		self.FilterApplied = False # whether filter is currently applied to AT display
 		self.FilterText = '' # filter text currently applied to AT display; might not be the same as contents of TextCtrl
@@ -340,7 +291,7 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 		# fetch tag for each associated text in the project
 		for ThisATTag in StartTag.findall(info.AssociatedTextTag):
 			# make an associated text instance, and store it in the list
-			ThisAT = AssocTextItemInDisplay()
+			ThisAT = assoc_text_report.AssocTextItemInDisplay()
 			self.AssocTexts.append(ThisAT)
 			# fetch associated item ID and numbering
 			ThisAT.ID = ThisATTag.findtext(info.AssociatedTextIDTag)
@@ -353,7 +304,7 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 			# fetch ID and display name for each PHA element using this AT, if any
 			for ThisElUsingTag in ThisATTag.findall(info.PHAElementTag):
 				ThisElUsing = PHAElementItem(ElementHumanName=ThisElUsingTag.text,
-					ElementID=ThisElUsingTag.get(info.IDTag))
+											 ElementID=ThisElUsingTag.get(info.IDTag))
 				ThisAT.PHAElements.append(ThisElUsing)
 
 	def ApplyFilters(self, FilterText='', FilterApplied=False):
@@ -385,7 +336,7 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 
 	def Prefill(self, SystemFontNames=None, CurrentAT=None): # prefill widgets for associated text display
 		# CurrentAT (AssocTextItemInDisplay instance or None): the AT the user is currently working with
-		assert isinstance(CurrentAT, AssocTextItemInDisplay) or (CurrentAT is None)
+		assert isinstance(CurrentAT, assoc_text_report.AssocTextItemInDisplay) or (CurrentAT is None)
 		# set header to e.g. "Showing 5 of 10 action items in the project"
 		self.SetMainHeaderLabel(ShowingCount=[i.FilteredIn for i in self.AssocTexts].count(True))
 		self.TextFilterText.Widget.ChangeValue(self.FilterText)
@@ -614,7 +565,7 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 		# AttribChanged: (str) one of 'Content', 'Responsibility', 'Deadline', 'Status'
 		# NewAttribContent: (str) new value of the attrib
 		print('AT447 in ChangeAssociatedText with AT ID: ', AssociatedTextObj.ID)
-		assert isinstance(AssociatedTextObj, AssocTextItemInDisplay)
+		assert isinstance(AssociatedTextObj, assoc_text_report.AssocTextItemInDisplay)
 		assert isinstance(ATRow, int)
 		assert 0 <= ATRow < len(self.AssocTexts) # however doesn't consider filtering
 		assert AttribChanged in ['Content', 'Responsibility', 'Deadline', 'Status']
@@ -633,12 +584,12 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 		# a datacore method. Provide data for redraw of this Viewport.
 		# Args needs 'Proj' as a minimum:
 		#	Proj (ProjectItem instance)
-		#	ATKind (str; info.ActionItemLabel or info.ParkingLotItemLabel) (now changed: this is in Viewport.RedrawData)
+		#	AssocTextKind (str; info.ActionItemLabel or info.ParkingLotItemLabel) (now changed: this is in Viewport.RedrawData)
 		# return the data as XML string
 
 		def MakeAssocTextLookupTable(Proj, ATKind):
 			# make and return dictionary with keys = ATs, values = list of PHA elements containing the AT
-			# We assume the element's attrib containing the AT is named the same as ATKind; if not,
+			# We assume the element's attrib containing the AT is named the same as AssocTextKind; if not,
 			# its ATs won't be found
 			assert ATKind in (info.ActionItemLabel, info.ParkingLotItemLabel)
 			ATTable = {}

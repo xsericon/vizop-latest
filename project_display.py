@@ -803,3 +803,31 @@ class EditPanelAspectItem(object): # class whose instances are aspects of the Ed
 
 	def SetWidgetVisibility(self, **Args): # set IsVisible attrib of each widget in self.WidgetList
 		self.SetWidgetVisibilityMethod(**Args)
+
+class PHAElementItem(object):
+	# proxy for a PHA element. Provides information required to display info about the element, and to jump to it
+
+	def __init__(self, ElementKindHumanName='', ElementHumanName='', ElementNumber='', HostKindHumanName='',
+		HostHumanName='', ElementID='', HostID=''):
+		# ElementKindHumanName: name of the kind of element, e.g. "initiating event"
+		# ElementHumanName: name of the actual element, e.g. "Pump P-100 trips"
+		# ElementNumber: currently displayed numbering of the element
+		# HostKindHumanName: name of the kind of PHA model containing the element, e.g. "Fault Tree"
+		# HostHumanName: name of the actual host PHA model, e.g. "SIF UC-1000"
+		# ElementID: ID of the element
+		# HostID: ID of the host PHA model
+		assert isinstance(ElementKindHumanName, str)
+		assert isinstance(ElementHumanName, str)
+		assert isinstance(ElementNumber, str)
+		assert isinstance(HostKindHumanName, str)
+		assert isinstance(HostHumanName, str)
+		assert isinstance(ElementID, str)
+		assert isinstance(HostID, str)
+		object.__init__(self)
+		self.ElementKindHumanName = ElementKindHumanName
+		self.ElementHumanName = ElementHumanName
+		self.ElementNumber = ElementNumber
+		self.HostKindHumanName = HostKindHumanName
+		self.HostHumanName = HostHumanName
+		self.ElementID = ElementID
+		self.HostID = HostID

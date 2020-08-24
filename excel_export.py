@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
 # Module excel_export: part of Vizop, (c) 2020 xSeriCon
 # contains common code for producing exported Excel files
-
-from openpyxl import Workbook
+import wx
+from openpyxl import Workbook, worksheet
 from openpyxl.worksheet import dimensions as Dimensions
 from openpyxl.styles import PatternFill, Border, Side, alignment, Protection, Font, fills
 # from openpyxl.utils import units
-import utilities
+import utilities, core_classes, info
 
 DefaultFontColourRGB = (0,0,0)
 MagicWidthRatio = 0.479 # mysterious ratio converting Excel column widths to actual values in mm
@@ -53,7 +53,7 @@ class ExcelTable_Table(object):
 		# RelativeWidths (list of int/float): relative widths assigned so far to all columns in WS.
 		# This method does not apply any borders; that's done in self.DrawBorders()
 		# return new RelativeWidths, next available Row, next available Col
-		assert isinstance(WS, openpyxl.worksheet.worksheet.Worksheet)
+		assert isinstance(WS, worksheet.worksheet.Worksheet)
 		assert isinstance(StartRow, int)
 		assert StartRow > 0
 		assert isinstance(StartCol, int)
@@ -87,15 +87,15 @@ class ExcelTable_Table(object):
 			# apply cell background colour
 			ThisCell.fill = PatternFill('solid', fgColor=utilities.HexTuple2str(ThisComponent.BackgColour))
 			# apply alignment
-			ThisCell.alignment = Alignment(horizontal={info.LeftLabel: 'left', info.CentreLabel: 'center',
+			ThisCell.alignment = alignment.Alignment(horizontal={info.LeftLabel: 'left', info.CentreLabel: 'center',
 				info.RightLabel: 'right'}[ThisComponent.HorizAlignment],
 				vertical={info.TopLabel: 'top', info.CentreLabel: 'center',
 				info.BottomLabel: 'bottom'}[ThisComponent.VertAlignment])
 			# apply font
 			if ThisComponent.FontStyle:
 				ThisCell.font = Font(name=ThisComponent.FontStyle.GetFaceName(),
-					size=int(round(ThisComponent.FontStyle.GetFractionalPointSize())),
-					bold=ThisComponent.FontStyle.GetNumericWeight() == wx.FONTWEIGHT_BOLD,
+					size=ThisComponent.FontStyle.GetPointSize(),
+					bold=ThisComponent.FontStyle.GetWeight() == wx.FONTWEIGHT_BOLD,
 					italic=ThisComponent.FontStyle.GetStyle() == wx.FONTSTYLE_ITALIC,
 					vertAlign=None, underline='none', strike=False,
 					color='FF' + utilities.HexTuple2str(getattr(ThisComponent.FontStyle, 'Colour', DefaultFontColourRGB)))
@@ -110,14 +110,14 @@ class ExcelTable_Table(object):
 				# if this cell isn't already in a merge group, create a new merge group and add this cell to it
 				if ThisMergeGroupIndex is None:
 					MergeGroups.append([ThisComponent])
-					ThisMergeGroupIndex = len(MergeGroups)
+					ThisMergeGroupIndex = len(MergeGroups) - 1
 				# add the cell to the right to MergeCoords, so that it will be added to the merge group when it's processed
 				MergeCoords[(ThisComponent.Row, ThisComponent.Col + 1)] = ThisMergeGroupIndex
 			if ThisComponent.MergeDown:
 				# if this cell isn't already in a merge group, create a new merge group and add this cell to it
 				if ThisMergeGroupIndex is None:
 					MergeGroups.append([ThisComponent])
-					ThisMergeGroupIndex = len(MergeGroups)
+					ThisMergeGroupIndex = len(MergeGroups) - 1
 				# add the cell below to MergeCoords, so that it will be added to the merge group when it's processed
 				MergeCoords[(ThisComponent.Row + 1, ThisComponent.Col)] = ThisMergeGroupIndex
 			# store the requested width for this cell
@@ -140,10 +140,10 @@ class ExcelTable_Table(object):
 		self.EndCol = max(c.Col for c in self.Components)
 		if self.GapToRight:
 			# allow space for one more column to the right, with relative width at least GapToRight
-			self.NextTableStartCol = MaxCol + 2
+			self.NextTableStartCol = self.EndCol + 2
 			MaxRelWidthsRequested.extend([0.0] * (1 + self.EndCol - len(MaxRelWidthsRequested)))
 			MaxRelWidthsRequested[self.EndCol + 1] = max(MaxRelWidthsRequested[self.EndCol + 1], self.GapToRight)
-		else: self.NextTableStartCol = MaxCol + 1
+		else: self.NextTableStartCol = self.EndCol + 1
 		self.NextTableStartRow = self.EndRow + 2 if self.GapBelow else self.EndRow + 1
 		return MaxRelWidthsRequested
 
@@ -163,7 +163,9 @@ class ExcelTable_Table(object):
 			if ThisComponent.Col == self.EndCol: BorderArgs['right'] = self.RightBorder.Side
 			elif ThisComponent.RightBorder: BorderArgs['right'] = ThisComponent.RightBorder.Side
 			# apply the borders, if any
-			if BorderArgs: ThisCell.border = Border(**BorderArgs)
+			if BorderArgs:
+				ThisCell = WS.cell(row=ThisComponent.Row, column=ThisComponent.Col)
+				ThisCell.border = Border(**BorderArgs)
 
 class ExcelTable_Component(object):
 	# defines a single cell in a table comprising part of an Excel export
@@ -213,7 +215,7 @@ class ExcelTable_Component(object):
 		self.LeftIndentInRelWidth = LeftIndentInRelWidth
 		self.FontStyle = FontStyle
 		self.BackgColour = BackgColour
-		self.RelWidth = Width
+		self.RelWidth = RelWidth
 		self.MergeToRight = MergeToRight
 		self.MergeDown = MergeDown
 		self.Row = self.Col = None # actual row and col address in the worksheet. Set in PopulateTable()
@@ -236,11 +238,11 @@ class ExcelTable_Sheet(object):
 		self.TargetWidth = TargetWidth
 		self.Tables = [] # ExcelTable_Table instances
 
-	def PopulateSheet(self, WS, AbsSheetWidth, StartRow, StartCol):
+	def PopulateSheet(self, WS, AbsSheetWidth, StartRow=1, StartCol=1):
 		# populate all Components into their respective Tables, then assemble Tables into worksheet WS
 		# The first Table is placed at cell StartRow, StartCol (1-based)
 		# Cell widths will be adjusted so that total sheet width is AbsSheetWidth in mm
-		assert isinstance(WS, openpyxl.worksheet.worksheet.Worksheet)
+		assert isinstance(WS, worksheet.worksheet.Worksheet)
 		assert isinstance(AbsSheetWidth, (int, float))
 		assert AbsSheetWidth > 0
 		assert isinstance(StartRow, int)
@@ -310,3 +312,9 @@ def SetupWorksheet(WB, TabName, TabColour=(255,255,255)):
 	ThisWS.title = TabName
 	ThisWS.sheet_properties.tabColor = utilities.HexTuple2str(TabColour)
 	return ThisWS
+
+def WriteWBToFile(WB, FilePath):
+	# write workbook WB to file in FilePath
+	# FilePath is assumed to be a writeable path
+	print('EE317 writing Excel file')
+	WB.save(filename=FilePath)

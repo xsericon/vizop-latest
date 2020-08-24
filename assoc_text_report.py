@@ -3,7 +3,7 @@
 # Codes the dialogue and export of a report of action items and parking lot items
 import os, os.path, wx, platform # wx provides basic GUI functions
 
-import display_utilities, project_display, info, core_classes, vizop_misc, excel_export
+import display_utilities, project_display, info, core_classes, vizop_misc, excel_export, projects, utilities
 from display_utilities import UIWidgetItem
 import xml.etree.ElementTree as ElementTree # XML handling
 
@@ -29,22 +29,25 @@ class AssocTextReportViewport(display_utilities.ViewportBaseClass):
 		display_utilities.ViewportBaseClass.__init__(self, Proj=Proj, PHAObjID=PHAObjID, DisplDevice=DisplDevice,
 			ParentWindow=ParentWindow, **Args)
 		self.SystemFontNames = SystemFontNames
-		self.ATKind = Args[info.AssociatedTextKindTag]
+		self.AssocTextKind = Args[info.AssociatedTextKindTag]
 		# make aspect object for dialogue
 		assert Args[info.ItemsToIncludeTag] in [info.AllItemsLabel, info.FilteredItemsLabel, info.NotSpecifiedLabel]
 		self.DialogueAspect = self.MakeATReportDialogueAspect(MyEditPanel=DisplDevice, Fonts=Fonts,
-			SystemFontNames=SystemFontNames, DateChoices=Args['DateChoices'], ATKind=self.ATKind,
-			ItemsToInclude=Args[info.ItemsToIncludeTag])
+															  SystemFontNames=SystemFontNames, DateChoices=Args['DateChoices'], ATKind=self.AssocTextKind,
+															  ItemsToInclude=Args[info.ItemsToIncludeTag])
 		# get connection to originating Viewport
 		assert isinstance(Args['OriginatingViewport'], display_utilities.ViewportBaseClass)
 		self.OriginatingViewport = Args['OriginatingViewport']
+		self.AssocTexts = [] # list of AssocTextItemInDisplay instances TODO populate me
 #		# get requested scope of export
 #		self.ScopeRequestedOnInit = Args[info.ItemsToIncludeTag]
 #		print('AR36 making ATR viewport with scope: ', Args[info.ItemsToIncludeTag])
 
 
-	def PrepareFullDisplay(self, XMLTree):
+	def PrepareFullDisplay(self, XMLData):
 		# display dialogue in our display device to get export parameters from user
+		# first, unpack data from datacore
+		self.UnpackDataFromDatacore(XMLData)
 		# build the dialogue: prefill widgets in new aspect and activate it
 		self.DialogueAspect.Prefill(self.Proj, SystemFontNames=self.SystemFontNames)
 		self.DialogueAspect.SetWidgetVisibility()
@@ -71,6 +74,7 @@ class AssocTextReportViewport(display_utilities.ViewportBaseClass):
 		MyEditPanel.ATReportDialogueAspect = AssocTextReportViewport.ATReportDialogueAspect(InternalName='ATReport',
 			ParentFrame=MyEditPanel, TopLevelFrame=MyEditPanel.TopLevelFrame)
 		ThisAspect = MyEditPanel.ATReportDialogueAspect
+		ThisAspect.Viewport = self
 		ThisAspect.TextWidgets = []
 		ThisAspect.ATKind = ATKind
 		ThisAspect.ItemsRequestedOnInit = ItemsToInclude
@@ -377,9 +381,10 @@ class AssocTextReportViewport(display_utilities.ViewportBaseClass):
 				'PageSizeLongAxis': core_classes.PaperSizes[self.PageSizeChoice.Widget.GetSelection()].SizeLongAxis,
 				'PageSizeShortAxis': core_classes.PaperSizes[self.PageSizeChoice.Widget.GetSelection()].SizeShortAxis,
 				'Orientation': 'Portrait' if self.PortraitRadio.Widget.GetValue() else 'Landscape',
-				'Font': self.ParentFrame.TopLevelFrame.SystemFontNames[self.FontChoice.Widget.GetSelection()] }
+				'FontName': self.ParentFrame.TopLevelFrame.SystemFontNames[self.FontChoice.Widget.GetSelection()] }
 #				'DateKind': core_classes.DateChoices[self.DateChoice.Widget.GetSelection()] }
-			self.ParentFrame.TopLevelFrame.DoExportATsToFile(**ExportInput)
+			self.Viewport.DoExportATsToFile(**ExportInput)
+#			self.ParentFrame.TopLevelFrame.CurrentViewport.DoExportATsToFile(**ExportInput)
 			self.StoreAttribsInProject()
 			self.ExitViewportAndRevert()
 
@@ -493,19 +498,21 @@ class AssocTextReportViewport(display_utilities.ViewportBaseClass):
 	def DoExportATsToFile(self, **ExportInput):
 		# handle request to proceed with export of ATs to Excel file
 		print('AR364 in DoExportATsToFile')
+		self.DoExportToExcel(**ExportInput)
 
 	@classmethod
 	def GetFullRedrawData(cls, Viewport=None, ViewportClass=None, **Args):
 		# a datacore method. Provide data for redraw of this Viewport.
 		# Args needs 'Proj' as a minimum:
 		#	Proj (ProjectItem instance)
-		#	ATKind (str; info.ActionItemLabel or info.ParkingLotItemLabel) (now changed: this is in Viewport.RedrawData)
+		#	AssocTextKind (str; info.ActionItemLabel or info.ParkingLotItemLabel) (now changed: this is in Viewport.RedrawData)
 		# return the data as XML string
-		# currently this method is identical to the one in class AssocTextListViewport. TODO reuse same code
+		# currently this method is identical to the one in class AssocTextListViewport.
+		# TODO reuse same code - could be done via decorator, as for UnpackDataFromDatacore()
 
 		def MakeAssocTextLookupTable(Proj, ATKind):
 			# make and return dictionary with keys = ATs, values = list of PHA elements containing the AT
-			# We assume the element's attrib containing the AT is named the same as ATKind; if not,
+			# We assume the element's attrib containing the AT is named the same as AssocTextKind; if not,
 			# its ATs won't be found
 			assert ATKind in (info.ActionItemLabel, info.ParkingLotItemLabel)
 			ATTable = {}
@@ -624,7 +631,7 @@ class AssocTextReportViewport(display_utilities.ViewportBaseClass):
 		# prepare default reply if command unknown
 		Reply = vizop_misc.MakeXMLMessage(RootName='Fail', RootText='CommandNotRecognised')
 		# handle incoming commands
-		if Command == 'RQ_ZZ_UpdateATExportAttribs': self.UpdateATExportAttribs(Proj, XMLRoot)
+		if Command == 'RQ_ZZ_UpdateATExportAttribs': cls.UpdateATExportAttribs(Proj, XMLRoot)
 		if Reply.tag == 'Fail': print('AR591 command not recognised: ', Command)
 		return Reply
 
@@ -632,7 +639,8 @@ class AssocTextReportViewport(display_utilities.ViewportBaseClass):
 		# wrap-up actions needed when display device is no longer showing associated texts report dialogue
 		self.DisplDevice = None
 
-	def UpdateATExportAttribs(self, Proj, XMLRoot):
+	@classmethod
+	def UpdateATExportAttribs(cls, Proj, XMLRoot):
 		# store attribs for AT report dialogue in project
 		assert isinstance(Proj, projects.ProjectItem)
 		Proj.ATExportFilename = XMLRoot.findtext('Filename')
@@ -647,14 +655,246 @@ class AssocTextReportViewport(display_utilities.ViewportBaseClass):
 #			NotFoundValue=core_classes.DateChoices[0])
 		return vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
 
-	def DoExportToExcel(self):
+	def DoExportToExcel(self, FontName='', FilePath='',
+				FileType='',
+				ShowWhat='',
+				PageSizeLongAxis=0,
+				PageSizeShortAxis=0,
+				Orientation='',**Args):
 		# build export Excel workbook of associated texts
 
-		# main procedure for DoExportToExcel()
+		def GetEmptyCell(MergeToRight=False):
+			# make and return new empty cell object. MergedToRight is set according to MergeToRight arg
+			assert isinstance(MergeToRight, bool)
+			return excel_export.ExcelTable_Component(MergeToRight=MergeToRight, RelPosDirection=info.RightLabel)
+
+		def MakeSummaryTable(Borders=None):
+			# build structure of table summarising the number of ATs shown, and other data
+			# return the Table
+			assert isinstance(Borders, excel_export.ExcelTable_Border)
+			ST = excel_export.ExcelTable_Table(GapBelow=1, TopBorder=Borders, BottomBorder=Borders,
+				LeftBorder=Borders, RightBorder=Borders)
+			Col1CellCount = 3 # number of horizontally merged cells in each table column
+			Col2CellCount = 3
+
+			# header row
+			HeaderRowFirstCell = excel_export.ExcelTable_Component(BottomBorder=NormalInnerBorder,
+				Content={info.ActionItemLabel: 'ACTION ITEMS', info.ParkingLotItemLabel: 'PARKING LOT'}[self.AssocTextKind],
+				VertAlignment=info.CentreLabel, HorizAlignment=info.CentreLabel, FontStyle=TitleFont,
+				BackgColour=TitleBackgColour, RelWidth=1.0, MergeToRight=True)
+			ST.Components.append(HeaderRowFirstCell)
+			# fill up to end of table on right
+			HeaderRowCells = [HeaderRowFirstCell]
+			for i in range(Col1CellCount + Col2CellCount - 2):
+				HeaderRowCells.append(GetEmptyCell(MergeToRight=True))
+			HeaderRowCells.append(GetEmptyCell())
+			# connect each cell to the one on the left
+			for (ThisIndex, ThisCell) in enumerate(HeaderRowCells[1:]):
+				ThisCell.PositionRelativeTo = HeaderRowCells[ThisIndex]
+			ST.Components.extend(HeaderRowCells)
+
+			# report date and edit number row
+			DateLabelCell = excel_export.ExcelTable_Component(BottomBorder=NormalInnerBorder,
+				Content=_('Date: '), PositionRelativeTo=HeaderRowFirstCell, RelPosDirection=info.BelowLabel,
+				VertAlignment=info.TopLabel, HorizAlignment=info.LeftLabel, FontStyle=NormalFont,
+				BackgColour=NormalBackgColour, RelWidth=1.0, MergeToRight=True)
+			DateRowCells = [DateLabelCell]
+			# fill up to end of column 1
+			for i in range(Col1CellCount - 2):
+				DateRowCells.append(GetEmptyCell(MergeToRight=True))
+			DateRowLastCell = GetEmptyCell()
+			DateRowCells.append(DateRowLastCell)
+			DateRowLastCell.RightBorder = LightInnerBorder
+			EditNumberCell = excel_export.ExcelTable_Component(BottomBorder=NormalInnerBorder,
+				Content=_('Edit number: %d ' % self.Proj.EditNumber), PositionRelativeTo=DateRowLastCell,
+				RelPosDirection=info.RightLabel,
+				VertAlignment=info.TopLabel, HorizAlignment=info.LeftLabel, FontStyle=NormalFont,
+				BackgColour=NormalBackgColour, RelWidth=1.0, MergeToRight=True)
+			DateRowCells.append(EditNumberCell)
+			# fill up to end of column 2
+			for i in range(Col2CellCount - 2):
+				DateRowCells.append(GetEmptyCell(MergeToRight=True))
+			DateRowCells.append(GetEmptyCell())
+			# connect each cell to the one on the left
+			for (ThisIndex, ThisCell) in enumerate(DateRowCells[1:]):
+				ThisCell.PositionRelativeTo = DateRowCells[ThisIndex]
+			ST.Components.extend(DateRowCells)
+
+			# status name and count header row
+			StatusNameLabelCell = excel_export.ExcelTable_Component(BottomBorder=NormalInnerBorder,
+				Content=_('Status'), PositionRelativeTo=DateLabelCell, RelPosDirection=info.BelowLabel,
+				VertAlignment=info.CentreLabel, HorizAlignment=info.CentreLabel, FontStyle=Header1Font,
+				BackgColour=NormalBackgColour, RelWidth=1.0, MergeToRight=True)
+			StatusHeaderRowCells = [StatusNameLabelCell]
+			# fill up to end of column 1
+			for i in range(Col1CellCount - 2):
+				StatusHeaderRowCells.append(GetEmptyCell(MergeToRight=True))
+			StatusHeaderRowLastCell = GetEmptyCell()
+			StatusHeaderRowCells.append(StatusHeaderRowLastCell)
+			StatusHeaderRowLastCell.RightBorder = LightInnerBorder
+			StatusCountLabelCell = excel_export.ExcelTable_Component(BottomBorder=NormalInnerBorder,
+				Content=_('Number of items'), PositionRelativeTo=StatusHeaderRowLastCell,
+				RelPosDirection=info.RightLabel,
+				VertAlignment=info.CentreLabel, HorizAlignment=info.CentreLabel, FontStyle=Header1Font,
+				BackgColour=NormalBackgColour, RelWidth=1.0, MergeToRight=True)
+			StatusHeaderRowCells.append(StatusCountLabelCell)
+			# fill up to end of column 2
+			for i in range(Col2CellCount - 2):
+				StatusHeaderRowCells.append(GetEmptyCell(MergeToRight=True))
+			StatusHeaderRowCells.append(GetEmptyCell())
+			# connect each cell to the one on the left
+			for (ThisIndex, ThisCell) in enumerate(StatusHeaderRowCells[1:]):
+				ThisCell.PositionRelativeTo = StatusHeaderRowCells[ThisIndex]
+			ST.Components.extend(StatusHeaderRowCells)
+
+			# rows for each AT status
+			StatusCounts = self.GetATStatusCounts()
+			RowStartReference = StatusNameLabelCell # position reference for the start of 1st row
+			for (ThisStatus, ThisStatusCount) in StatusCounts.items():
+				StatusNameCell = excel_export.ExcelTable_Component(BottomBorder=LightInnerBorder,
+					Content=ThisStatus, PositionRelativeTo=RowStartReference, RelPosDirection=info.BelowLabel,
+					VertAlignment=info.TopLabel, HorizAlignment=info.LeftLabel, FontStyle=NormalFont,
+					BackgColour=NormalBackgColour, RelWidth=1.0, MergeToRight=True)
+				StatusRowCells = [StatusNameCell]
+				RowStartReference = StatusNameCell # reference for starting next row
+				# fill up to end of column 1
+				for i in range(Col1CellCount - 2):
+					StatusRowCells.append(GetEmptyCell(MergeToRight=True))
+				StatusNameRowLastCell = GetEmptyCell()
+				StatusRowCells.append(StatusNameRowLastCell)
+				StatusNameRowLastCell.RightBorder = LightInnerBorder
+				# status count for this row
+				StatusCountCell = excel_export.ExcelTable_Component(BottomBorder=LightInnerBorder,
+					Content=ThisStatus, PositionRelativeTo=StatusNameRowLastCell, RelPosDirection=info.RightLabel,
+					VertAlignment=info.TopLabel, HorizAlignment=info.CentreLabel, FontStyle=NormalFont,
+					BackgColour=NormalBackgColour, RelWidth=1.0, MergeToRight=True)
+				StatusRowCells.append(StatusCountCell)
+				# fill up to end of column 2
+				for i in range(Col2CellCount - 2):
+					StatusRowCells.append(GetEmptyCell(MergeToRight=True))
+				StatusCountRowLastCell = GetEmptyCell()
+				StatusRowCells.append(StatusCountRowLastCell)
+				# connect each cell to the one on the left
+				for (ThisIndex, ThisCell) in enumerate(StatusRowCells[1:]):
+					ThisCell.PositionRelativeTo = StatusRowCells[ThisIndex]
+				ST.Components.extend(StatusRowCells)
+			return ST
+
+		def MakeATTable(Borders=None):
+			# build structure of table listing the required ATs
+			# return the Table
+			assert isinstance(Borders, excel_export.ExcelTable_Border)
+			ATT = excel_export.ExcelTable_Table(GapBelow=1, TopBorder=Borders, BottomBorder=Borders,
+				LeftBorder=Borders, RightBorder=Borders)
+			Col1CellCount = 3 # number of horizontally merged cells in each table column
+			Col2CellCount = 3
+			print('AR791 to complete routine to set up table structure')
+			return ATT
+
+		# main procedure for DoExportToExcel()%%%
+		assert isinstance(FontName, str)
+		assert isinstance(FilePath, str)
+		assert FileType == info.ExcelExtension
+		assert isinstance(ShowWhat, str)
+		assert isinstance(PageSizeLongAxis, (int, float))
+		assert isinstance(PageSizeShortAxis, (int, float))
+		assert 0 < PageSizeShortAxis <= PageSizeLongAxis
+		assert Orientation in [info.PortraitLabel, info.LandscapeLabel]
+		OuterBorderColour = (0x00, 0x00, 0x00) # black
+		InnerBorderColour = (0x80, 0x80, 0x80) # mid grey
+		TitleBackgColour = (0x6E, 0xDF, 0x6F) # pale green
+		NormalBackgColour = (0xff, 0xff, 0xff) # white
+		TitleFont = wx.Font(wx.FontInfo(14).FaceName(FontName).Bold())
+		Header1Font = wx.Font(wx.FontInfo(12).FaceName(FontName).Bold())
+		NormalFont = wx.Font(wx.FontInfo(12).FaceName(FontName))
 		XLWorkbook = excel_export.SetupWorkbook()
-		XLWorksheet = excel_export.SetupWorksheet(WB=XLWorkbook,
-			TabName=_({info.ActionItemLabel: 'Action items', info.ParkingLotItemLabel: 'Parking lot'}[self.ATKind]),
-			TabColour=(200,200,255))
+		TabName = _({info.ActionItemLabel: 'Action items', info.ParkingLotItemLabel: 'Parking lot'}[self.AssocTextKind])
+		TabColour = (200,200,255)
+		XLWorksheet = excel_export.SetupWorksheet(WB=XLWorkbook, TabName=TabName, TabColour=TabColour)
+		# make border objects
+		HeavyBorder = excel_export.ExcelTable_Border(Style='medium', Colour=OuterBorderColour)
+		NormalInnerBorder = excel_export.ExcelTable_Border(Style='thin', Colour=InnerBorderColour)
+		LightInnerBorder = excel_export.ExcelTable_Border(Style='hair', Colour=InnerBorderColour)
+		AbsWSWidth = PageSizeShortAxis if Orientation == info.PortraitLabel else PageSizeLongAxis
+		# make a ExcelSheet object to populate with tables
+		MySheet = excel_export.ExcelTable_Sheet(TabName=TabName, TabColour=TabColour,
+			TargetWidth=AbsWSWidth)
+		# make the tables and put them in MySheet
+		MySheet.Tables.append(MakeSummaryTable(Borders=HeavyBorder))
+#		MySheet.Tables.append(MakeATTable(Borders=HeavyBorder))
+		# generate the Excel spreadsheet
+		MySheet.PopulateSheet(WS=XLWorksheet, AbsSheetWidth=AbsWSWidth)
+		# write the Excel spreadsheet to file
+		excel_export.WriteWBToFile(WB=XLWorkbook, FilePath=FilePath)
+
+	def GetATStatusCounts(self, Scope=info.AllItemsLabel):
+		# make and return dict with keys = AT statuses, values = number of ATs in Scope
+		# status matching is case insensitive. The case returned for each status is the first one encountered
+		assert Scope in [info.AllItemsLabel, info.FilteredItemsLabel]
+		FilteredOnly = (Scope == info.FilteredItemsLabel)
+		StatusCounts = {} # values are counts of ATs with each status, keys in uppercase
+		StatusHash = {} # keys are uppercase stati, values are the casing of the first such status encountered
+		for ThisAT in self.AssocTexts:
+			if (not FilteredOnly) or ThisAT.FilteredIn:
+				# is this AT's status already in StatusCounts? If so, add to the count; else add a new key
+				if ThisAT.Status.upper() in StatusCounts.keys():
+					StatusCounts[ThisAT.Status.upper()] += 1
+				else:
+					StatusCounts[ThisAT.Status.upper()] = 1
+					StatusHash[ThisAT.Status.upper()] = ThisAT.Status
+		return dict( [(StatusHash[s], StatusCounts[s]) for s in StatusCounts.keys()] )
+
+	def UnpackDataFromDatacore(self, XMLTree):
+		# this method is the same as in class AssocTextListViewport
+		self.AssocTexts = [] # start with empty list of AT items
+		# find the starting tag
+		StartTag = XMLTree.find(info.PHAModelRedrawDataTag)
+		# confirm it came from this Viewport class
+		assert StartTag.get(info.PHAModelTypeTag) == self.InternalName
+		# find subelement containing the kind of associated text
+		ATKindEl = StartTag.find(info.AssociatedTextKindTag)
+		# confirm it indicates we received action items or parking lot items
+		print('AR837 ATKindEl.text, self.AssocTextKind: ', ATKindEl.text, self.AssocTextKind)
+		assert ATKindEl.text == self.AssocTextKind
+		# fetch tag for each associated text in the project
+		for ThisATTag in StartTag.findall(info.AssociatedTextTag):
+			# make an associated text instance, and store it in the list
+			ThisAT = AssocTextItemInDisplay()
+			self.AssocTexts.append(ThisAT)
+			# fetch associated item ID and numbering
+			ThisAT.ID = ThisATTag.findtext(info.AssociatedTextIDTag)
+			ThisAT.Numbering = ThisATTag.text
+			# fetch AT content, responsibility, deadline and status
+			ThisAT.Content = ThisATTag.findtext(info.ContentTag)
+			ThisAT.Responsibility = ThisATTag.findtext(info.ResponsibilityTag)
+			ThisAT.Deadline = ThisATTag.findtext(info.DeadlineTag)
+			ThisAT.Status = ThisATTag.findtext(info.StatusTag)
+			# fetch ID and display name for each PHA element using this AT, if any
+			for ThisElUsingTag in ThisATTag.findall(info.PHAElementTag):
+				ThisElUsing = project_display.PHAElementItem(ElementHumanName=ThisElUsingTag.text,
+					ElementID=ThisElUsingTag.get(info.IDTag))
+				ThisAT.PHAElements.append(ThisElUsing)
+
+class AssocTextItemInDisplay(object):
+	# data for associated text items for display. Reflects data held in the actual associated text items in datacore
+
+	def __init__(self):
+		object.__init__(self)
+		self.ID = ''
+		self.Content = ''
+		self.Responsibility = ''
+		self.Deadline = ''
+		self.Status = ''
+		self.Numbering = ''
+		self.FilteredIn = True # bool; whether this item shows up in the current filters. Defined only if filters are applied.
+		self.Selected = False # bool; whether this item is currently selected by the user
+		self.PHAElements = [] # list of PHAElementItem instances; all elements in which this AT appears
+		self.GridRow = None # row number in grid at which this item is currently displayed, or None if not displayed
+
+	def GetWhereUsedHumanText(self):
+		# get human-readable text showing PHA elements where this AT is used
+		return '\n'.join([_('%s %s in %s' % (p.ElementHumanName, p.ElementNumber, p.HostHumanName))
+			for p in self.PHAElements ])
 
 # %%% working here - transferring methods from ft_full_report. May still need:
 # StoreAttribsInProject

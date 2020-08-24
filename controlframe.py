@@ -3717,6 +3717,7 @@ class ControlFrame(wx.Frame):
 						Viewport=ThisViewportShadow,
 						ViewportClass=ThisViewportShadow.MyClass)
 				# make XML message with ID of PHA object, followed by full redraw data
+				# TODO ensure data always includes EditNumber - this needs to be sent to client side after every edit
 				FullXMLData = vizop_misc.MakeXMLMessage(RootName='RQ_RedrawViewport', RootText=ThisViewportShadow.ID,
 					Elements={info.IDTag: ThisViewportShadow.PHAObjID})
 				FullXMLData.append(RedrawXMLData)
