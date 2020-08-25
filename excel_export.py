@@ -12,7 +12,8 @@ DefaultFontColourRGB = (0,0,0)
 MagicWidthRatio = 0.479 # mysterious ratio converting Excel column widths to actual values in mm
 
 class ExcelTable_Table(object):
-	# defines a block of cells in an Excel export
+	# defines a block of cells in an Excel export. Each cell is one "Component" in the table. It's not necessary to
+	# define a Component for every cell in the Table; any missing edge cells will be created (for drawing borders).
 
 	def __init__(self, PositionRelativeTo=None, RelPosDirection='Right', GapToRight=0,
 		SkipGapToRightIfAtRightOfSheet=True, GapBelow=0, SkipGapBelowIfAtBottomOfSheet=True, TopBorder=None,
@@ -23,7 +24,7 @@ class ExcelTable_Table(object):
 		# SkipGapToRightIfAtRightOfSheet (bool): don't leave gap if there's no table to the right
 		# GapBelow (int): if nonzero, one blank cell with height = this number of lines is left blank below this table
 		# SkipGapBelowIfAtBottomOfSheet (bool): don't leave gap if there's no table below
-		# Borders: border object or None
+		# Borders: border object or None; borders to be drawn all round the table
 		assert isinstance(PositionRelativeTo, ExcelTable_Table) or (PositionRelativeTo is None)
 		assert RelPosDirection in [info.RightLabel, info.BelowLabel]
 		assert isinstance(GapToRight, (int, float))
@@ -150,21 +151,52 @@ class ExcelTable_Table(object):
 	def DrawBorders(self, WS):
 		# draw borders around table, and around components within table.
 		# Does not draw borders in inter-table gaps; that's done in Sheet.SetTableBorders()
+		# First, make lists of row coords in left and right table edge cells
+		LeftEdgeRows = [r for r in range(self.StartRow, self.EndRow + 1)]
+		RightEdgeRows = LeftEdgeRows[:]
+		# likewise for top and bottom edge cells, except corners as they're already covered by left and right edges
+		TopEdgeCols = [c for c in range(self.StartCol + 1, self.EndCol)]
+		BottomEdgeCols = TopEdgeCols[:]
 		for ThisComponent in self.Components:
-			# for each component, find out if it's at the top, bottom, left or right of the table.
+			# for each component, find out if it's at the top, bottom, left or right edge of the table.
 			# If so, draw table border on that edge. Otherwise, draw component's own border, if any
 			BorderArgs = {}
-			if ThisComponent.Row == self.StartRow: BorderArgs['top'] = self.TopBorder.Side
-			elif ThisComponent.TopBorder: BorderArgs['top'] = ThisComponent.TopBorder.Side
-			if ThisComponent.Row == self.EndRow: BorderArgs['bottom'] = self.BottomBorder.Side
-			elif ThisComponent.BottomBorder: BorderArgs['bottom'] = ThisComponent.BottomBorder.Side
-			if ThisComponent.Col == self.StartCol: BorderArgs['left'] = self.LeftBorder.Side
+			if ThisComponent.Col == self.StartCol:
+				BorderArgs['left'] = self.LeftBorder.Side
+				# the "if" is to avoid crash in case there's 2 cells at the same location, oops
+				if ThisComponent.Row in LeftEdgeRows: LeftEdgeRows.remove(ThisComponent.Row)
 			elif ThisComponent.LeftBorder: BorderArgs['left'] = ThisComponent.LeftBorder.Side
-			if ThisComponent.Col == self.EndCol: BorderArgs['right'] = self.RightBorder.Side
+			if ThisComponent.Col == self.EndCol:
+				BorderArgs['right'] = self.RightBorder.Side
+				if ThisComponent.Row in RightEdgeRows: RightEdgeRows.remove(ThisComponent.Row)
 			elif ThisComponent.RightBorder: BorderArgs['right'] = ThisComponent.RightBorder.Side
+			if ThisComponent.Row == self.StartRow:
+				BorderArgs['top'] = self.TopBorder.Side
+				if ThisComponent.Col in TopEdgeCols: TopEdgeCols.remove(ThisComponent.Col)
+			elif ThisComponent.TopBorder: BorderArgs['top'] = ThisComponent.TopBorder.Side
+			if ThisComponent.Row == self.EndRow:
+				BorderArgs['bottom'] = self.BottomBorder.Side
+				if ThisComponent.Col in BottomEdgeCols: BottomEdgeCols.remove(ThisComponent.Col)
+			elif ThisComponent.BottomBorder: BorderArgs['bottom'] = ThisComponent.BottomBorder.Side
 			# apply the borders, if any
 			if BorderArgs:
 				ThisCell = WS.cell(row=ThisComponent.Row, column=ThisComponent.Col)
+				ThisCell.border = Border(**BorderArgs)
+		# apply table border to any missing edge cells, in the order (left, right), (top, bottom)
+		for (ThisRowList, ThisEdge, ThisBorder, ThisCol) in [(LeftEdgeRows, 'left', self.LeftBorder, self.StartCol),
+				(RightEdgeRows, 'right', self.RightBorder, self.EndCol)]:
+			for EdgeRow in ThisRowList:
+				ThisCell = WS.cell(row=EdgeRow, column=ThisCol)
+				BorderArgs = {ThisEdge: ThisBorder.Side}
+				# add top or bottom border if this cell is at the top or bottom of the table
+				if EdgeRow == self.StartRow: BorderArgs['top'] = self.TopBorder.Side
+				if EdgeRow == self.EndRow: BorderArgs['bottom'] = self.BottomBorder.Side
+				ThisCell.border = Border(**BorderArgs)
+		for (ThisColList, ThisEdge, ThisBorder, ThisRow) in [(TopEdgeCols, 'top', self.TopBorder, self.StartRow),
+				(BottomEdgeCols, 'bottom', self.BottomBorder, self.EndRow)]:
+			for EdgeCol in ThisColList:
+				ThisCell = WS.cell(row=ThisRow, column=EdgeCol)
+				BorderArgs = {ThisEdge: ThisBorder.Side}
 				ThisCell.border = Border(**BorderArgs)
 
 class ExcelTable_Component(object):
@@ -319,9 +351,9 @@ def WriteWBToFile(WB, FilePath):
 	print('EE317 writing Excel file')
 	WB.save(filename=FilePath)
 
-def MergeAndFillCells(Table, StartComponent, EndCol, FinalRightBorder=None):
+def MergeAndFillCells(Table, StartComponent, TotalCols, FinalRightBorder=None):
 	# in Table, append after StartComponent a series of Components, on the right of StartComponent and merged to it
-	# EndCol (int): 1-based index of column to merge up to and including
+	# TotalCols (int): Total number of columns (including StartComponent's) to be merged into one cell
 	# FinalRightBorder: right border to apply to the last cell added
 	# return the final component added, if any. If no components added, return StartComponent. This may be needed as
 	# a positional reference for further components in the table
@@ -329,21 +361,21 @@ def MergeAndFillCells(Table, StartComponent, EndCol, FinalRightBorder=None):
 	assert isinstance(Table, ExcelTable_Table)
 	assert isinstance(StartComponent, ExcelTable_Component)
 	assert StartComponent in Table.Components
-	assert isinstance(EndCol, int)
-	assert EndCol >= 1
+	assert isinstance(TotalCols, int)
+	assert TotalCols >= 1
 	assert isinstance(FinalRightBorder, ExcelTable_Border) or (FinalRightBorder is None)
 	# first, find index of StartComponent in Table; we don't assume it's at the end of Table.Components
 	StartComponentIndex = Table.Components.index(StartComponent)
-	# insert empty cells up to the final cell - unless StartComponent is already at column EndCol
+	# insert empty cells up to the final cell, if TotalCols > 1
 	ComponentsAdded = False
-	for InsertIndex in range(StartComponentIndex + 1, EndCol): # EndCol is 1-based, so no +1 at the end
-		IsFinalComponent = (InsertIndex == EndCol - 1)
+	for InsertIndex in range(StartComponentIndex + 1, StartComponentIndex + TotalCols):
+		IsFinalComponent = (InsertIndex == StartComponentIndex + TotalCols - 1)
 		ComponentsAdded = True # whether any components added to Table
 		Table.Components.insert(InsertIndex, ExcelTable_Component(MergeToRight=not IsFinalComponent,
 			PositionRelativeTo=Table.Components[InsertIndex - 1], RelPosDirection=info.RightLabel,
 			TopBorder=StartComponent.TopBorder, BottomBorder=StartComponent.BottomBorder,
 			RightBorder = FinalRightBorder if IsFinalComponent else None))
-		ComponentToReturn = Table.Components[InsertIndex] # this will end up containing the rightmost new component
+		if IsFinalComponent: ComponentToReturn = Table.Components[InsertIndex] # store rightmost new component
 	# if any cells were added, set StartComponent to merge to right
 	if ComponentsAdded: StartComponent.MergeToRight = True
 	# if no cells were added, apply FinalRightBorder to StartComponent

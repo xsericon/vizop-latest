@@ -674,8 +674,8 @@ class AssocTextReportViewport(display_utilities.ViewportBaseClass):
 			assert isinstance(Borders, excel_export.ExcelTable_Border)
 			ST = excel_export.ExcelTable_Table(GapBelow=1, TopBorder=Borders, BottomBorder=Borders,
 				LeftBorder=Borders, RightBorder=Borders)
-			Col1CellCount = 3 # number of horizontally merged cells in each table column
-			Col2CellCount = 3
+			Col1CellCount = 2 # number of horizontally merged cells in each table column
+			Col2End = 6 # col number of end of "column" 2
 
 			# header row
 			HeaderRowFirstCell = excel_export.ExcelTable_Component(BottomBorder=NormalInnerBorder,
@@ -684,7 +684,7 @@ class AssocTextReportViewport(display_utilities.ViewportBaseClass):
 				BackgColour=TitleBackgColour, RelWidth=1.0, MergeToRight=True)
 			ST.Components.append(HeaderRowFirstCell)
 			# fill up to end of table on right
-			excel_export.MergeAndFillCells(Table=ST, StartComponent=HeaderRowFirstCell, EndCol=Col1CellCount + Col2CellCount)
+			excel_export.MergeAndFillCells(Table=ST, StartComponent=HeaderRowFirstCell, TotalCols=Col2End)
 #			HeaderRowCells = [HeaderRowFirstCell]
 #			for i in range(Col1CellCount + Col2CellCount - 2):
 #				HeaderRowCells.append(GetEmptyCell(MergeToRight=True))
@@ -694,99 +694,96 @@ class AssocTextReportViewport(display_utilities.ViewportBaseClass):
 #				ThisCell.PositionRelativeTo = HeaderRowCells[ThisIndex]
 #			ST.Components.extend(HeaderRowCells)
 
-			# report date and edit number row
-			DateLabelCell = excel_export.ExcelTable_Component(BottomBorder=NormalInnerBorder,
-				Content=_('Date: '), PositionRelativeTo=HeaderRowFirstCell, RelPosDirection=info.BelowLabel,
-				VertAlignment=info.TopLabel, HorizAlignment=info.LeftLabel, FontStyle=NormalFont,
-				BackgColour=NormalBackgColour, RelWidth=1.0, MergeToRight=True)
-			DateRowCells = [DateLabelCell]
-			# fill up to end of column 1
-			for i in range(Col1CellCount - 2):
-				DateRowCells.append(GetEmptyCell(MergeToRight=True))
-			DateRowLastCell = GetEmptyCell()
-			DateRowCells.append(DateRowLastCell)
-			DateRowLastCell.RightBorder = LightInnerBorder
-			EditNumberCell = excel_export.ExcelTable_Component(BottomBorder=NormalInnerBorder,
-				Content=_('Edit number: %d ' % self.Proj.EditNumber), PositionRelativeTo=DateRowLastCell,
+			# 2nd row: edit number in cols 1 and 2, then status summary table header
+#			DateLabelCell = excel_export.ExcelTable_Component(BottomBorder=NormalInnerBorder,
+#				Content=_('Date: '), PositionRelativeTo=HeaderRowFirstCell, RelPosDirection=info.BelowLabel,
+#				VertAlignment=info.TopLabel, HorizAlignment=info.LeftLabel, FontStyle=NormalFont,
+#				BackgColour=NormalBackgColour, RelWidth=1.0, MergeToRight=True)
+#			DateRowCells = [DateLabelCell]
+#			# fill up to end of column 1
+#			for i in range(Col1CellCount - 2):
+#				DateRowCells.append(GetEmptyCell(MergeToRight=True))
+#			DateRowLastCell = GetEmptyCell()
+#			DateRowCells.append(DateRowLastCell)
+#			DateRowLastCell.RightBorder = LightInnerBorder
+			EditNumberComponent = excel_export.ExcelTable_Component(BottomBorder=NormalInnerBorder,
+				Content=_('Edit number: %d ' % self.Proj.EditNumber), PositionRelativeTo=HeaderRowFirstCell,
+				RelPosDirection=info.BelowLabel,
+				VertAlignment=info.CentreLabel, HorizAlignment=info.LeftLabel, FontStyle=NormalFont,
+				BackgColour=NormalBackgColour)
+			ST.Components.append(EditNumberComponent)
+			FinalEditNumberComponent = excel_export.MergeAndFillCells(Table=ST, StartComponent=EditNumberComponent,
+				TotalCols=Col1CellCount, FinalRightBorder=NormalInnerBorder)
+			StatusSummaryHeaderComponent = excel_export.ExcelTable_Component(BottomBorder=NormalInnerBorder,
+				Content=_('Breakdown by status'), PositionRelativeTo=FinalEditNumberComponent,
 				RelPosDirection=info.RightLabel,
-				VertAlignment=info.TopLabel, HorizAlignment=info.LeftLabel, FontStyle=NormalFont,
-				BackgColour=NormalBackgColour, RelWidth=1.0, MergeToRight=True)
-			DateRowCells.append(EditNumberCell)
-			# fill up to end of column 2
-			for i in range(Col2CellCount - 2):
-				DateRowCells.append(GetEmptyCell(MergeToRight=True))
-			DateRowCells.append(GetEmptyCell())
-			# connect each cell to the one on the left
-			for (ThisIndex, ThisCell) in enumerate(DateRowCells[1:]):
-				ThisCell.PositionRelativeTo = DateRowCells[ThisIndex]
-			ST.Components.extend(DateRowCells)
+				VertAlignment=info.CentreLabel, HorizAlignment=info.CentreLabel, FontStyle=Header1Font,
+				BackgColour=Header1BackgColour)
+			ST.Components.append(StatusSummaryHeaderComponent)
+			FinalStatusSummaryHeaderComponent = excel_export.MergeAndFillCells(Table=ST,
+				StartComponent=StatusSummaryHeaderComponent, TotalCols=Col2End - Col1CellCount)
 
 			# status name and count header row
-			StatusNameLabelCell = excel_export.ExcelTable_Component(BottomBorder=NormalInnerBorder,
-				Content=_('Status'), PositionRelativeTo=DateLabelCell, RelPosDirection=info.BelowLabel,
+#			# first, provide empty cell on left edge, to ensure table border is drawn there
+#			StatusLabelLeftComponent = excel_export.ExcelTable_Component(PositionRelativeTo=EditNumberComponent,
+#				RelPosDirection=info.BelowLabel, BackgColour=NormalBackgColour)
+#			ST.Components.append(StatusLabelLeftComponent)
+			StatusNameLabelComponent = excel_export.ExcelTable_Component(BottomBorder=NormalInnerBorder,
+				Content=_('Status'), PositionRelativeTo=StatusSummaryHeaderComponent, RelPosDirection=info.BelowLabel,
 				VertAlignment=info.CentreLabel, HorizAlignment=info.CentreLabel, FontStyle=Header1Font,
-				BackgColour=NormalBackgColour, RelWidth=1.0, MergeToRight=True)
-			StatusHeaderRowCells = [StatusNameLabelCell]
-			# fill up to end of column 1
-			for i in range(Col1CellCount - 2):
-				StatusHeaderRowCells.append(GetEmptyCell(MergeToRight=True))
-			StatusHeaderRowLastCell = GetEmptyCell()
-			StatusHeaderRowCells.append(StatusHeaderRowLastCell)
-			StatusHeaderRowLastCell.RightBorder = LightInnerBorder
-			StatusCountLabelCell = excel_export.ExcelTable_Component(BottomBorder=NormalInnerBorder,
-				Content=_('Number of items'), PositionRelativeTo=StatusHeaderRowLastCell,
+				BackgColour=NormalBackgColour, LeftBorder=NormalInnerBorder)
+			ST.Components.append(StatusNameLabelComponent)
+			# fill 1 more cell
+			FinalStatusNameLabelComponent = excel_export.MergeAndFillCells(Table=ST, StartComponent=StatusNameLabelComponent,
+				TotalCols=2, FinalRightBorder=NormalInnerBorder)
+			StatusCountLabelComponent = excel_export.ExcelTable_Component(BottomBorder=NormalInnerBorder,
+				Content=_('Number of items'), PositionRelativeTo=FinalStatusNameLabelComponent,
 				RelPosDirection=info.RightLabel,
 				VertAlignment=info.CentreLabel, HorizAlignment=info.CentreLabel, FontStyle=Header1Font,
-				BackgColour=NormalBackgColour, RelWidth=1.0, MergeToRight=True)
-			StatusHeaderRowCells.append(StatusCountLabelCell)
-			# fill up to end of column 2
-			for i in range(Col2CellCount - 2):
-				StatusHeaderRowCells.append(GetEmptyCell(MergeToRight=True))
-			StatusHeaderRowCells.append(GetEmptyCell())
-			# connect each cell to the one on the left
-			for (ThisIndex, ThisCell) in enumerate(StatusHeaderRowCells[1:]):
-				ThisCell.PositionRelativeTo = StatusHeaderRowCells[ThisIndex]
-			ST.Components.extend(StatusHeaderRowCells)
+				BackgColour=NormalBackgColour)
+			ST.Components.append(StatusCountLabelComponent)
+			# fill up to end of column 2 (1 more cell)
+			FinalStatusCountLabelComponent = excel_export.MergeAndFillCells(Table=ST,
+				StartComponent=StatusCountLabelComponent, TotalCols=2)
 
 			# rows for each AT status
 			StatusCounts = self.GetATStatusCounts(Scope=self.GetScope())
-			RowStartReference = StatusNameLabelCell # position reference for the start of 1st row
+			StatusComponentReference = StatusNameLabelComponent # position reference for the start of 1st row
+#			LeftComponentReference = StatusLabelLeftComponent
 			for (ThisStatus, ThisStatusCount) in StatusCounts.items():
-				StatusNameCell = excel_export.ExcelTable_Component(BottomBorder=LightInnerBorder,
-					Content=ThisStatus, PositionRelativeTo=RowStartReference, RelPosDirection=info.BelowLabel,
-					VertAlignment=info.TopLabel, HorizAlignment=info.LeftLabel, FontStyle=NormalFont,
-					BackgColour=NormalBackgColour, RelWidth=1.0, MergeToRight=True)
-				StatusRowCells = [StatusNameCell]
-				RowStartReference = StatusNameCell # reference for starting next row
-				# fill up to end of column 1
-				for i in range(Col1CellCount - 2):
-					StatusRowCells.append(GetEmptyCell(MergeToRight=True))
-				StatusNameRowLastCell = GetEmptyCell()
-				StatusRowCells.append(StatusNameRowLastCell)
-				StatusNameRowLastCell.RightBorder = LightInnerBorder
-				# status count for this row
-				StatusCountCell = excel_export.ExcelTable_Component(BottomBorder=LightInnerBorder,
-					Content=ThisStatus, PositionRelativeTo=StatusNameRowLastCell, RelPosDirection=info.RightLabel,
+#				# first, provide empty cell on left edge, to ensure table border is drawn there
+#				StatusLeftComponent = excel_export.ExcelTable_Component(PositionRelativeTo=LeftComponentReference,
+#					RelPosDirection=info.BelowLabel, BackgColour=NormalBackgColour)
+#				ST.Components.append(StatusLeftComponent)
+#				LeftComponentReference = StatusLeftComponent # reference for next row
+				StatusNameComponent = excel_export.ExcelTable_Component(BottomBorder=LightInnerBorder,
+					Content=ThisStatus, PositionRelativeTo=StatusComponentReference, RelPosDirection=info.BelowLabel,
 					VertAlignment=info.TopLabel, HorizAlignment=info.CentreLabel, FontStyle=NormalFont,
-					BackgColour=NormalBackgColour, RelWidth=1.0, MergeToRight=True)
-				StatusRowCells.append(StatusCountCell)
-				# fill up to end of column 2
-				for i in range(Col2CellCount - 2):
-					StatusRowCells.append(GetEmptyCell(MergeToRight=True))
-				StatusCountRowLastCell = GetEmptyCell()
-				StatusRowCells.append(StatusCountRowLastCell)
-				# connect each cell to the one on the left
-				for (ThisIndex, ThisCell) in enumerate(StatusRowCells[1:]):
-					ThisCell.PositionRelativeTo = StatusRowCells[ThisIndex]
-				ST.Components.extend(StatusRowCells)
+					BackgColour=NormalBackgColour, LeftBorder=NormalInnerBorder)
+				ST.Components.append(StatusNameComponent)
+				StatusComponentReference = StatusNameComponent # reference for starting next row
+				# fill up to end of column 4
+				FinalStatusNameComponent = excel_export.MergeAndFillCells(Table=ST,
+					StartComponent=StatusNameComponent,
+					TotalCols=2, FinalRightBorder=LightInnerBorder)
+				# status count for this row
+				StatusCountComponent = excel_export.ExcelTable_Component(BottomBorder=LightInnerBorder,
+					Content=str(ThisStatusCount), PositionRelativeTo=FinalStatusNameComponent, RelPosDirection=info.RightLabel,
+					VertAlignment=info.TopLabel, HorizAlignment=info.CentreLabel, FontStyle=NormalFont,
+					BackgColour=NormalBackgColour)
+				ST.Components.append(StatusCountComponent)
+				# fill up to end of column 6
+				FinalStatusCountComponent = excel_export.MergeAndFillCells(Table=ST,
+					StartComponent=StatusCountComponent, TotalCols=2)
 			return ST
 
-		def MakeATTable(Borders=None):
+		def MakeATTable(Borders=None, PositionBelow=None):
 			# build structure of table listing the required ATs
 			# return the Table
 			assert isinstance(Borders, excel_export.ExcelTable_Border)
 			ATT = excel_export.ExcelTable_Table(GapBelow=1, TopBorder=Borders, BottomBorder=Borders,
-				LeftBorder=Borders, RightBorder=Borders)
+				LeftBorder=Borders, RightBorder=Borders, PositionRelativeTo=PositionBelow,
+				RelPosDirection=info.BelowLabel)
 			# find out which fields are to be shown
 			ShowPlacesUsed = self.DialogueAspect.ShowPlacesUsedCheck.Widget.GetValue()
 			ShowResponsibility = self.DialogueAspect.ShowResponsibilityCheck.Widget.GetValue()
@@ -795,7 +792,7 @@ class AssocTextReportViewport(display_utilities.ViewportBaseClass):
 			# Calculate number of columns allocated to "Description" field, depending on which fields are to be shown
 #			ItemNoCol = 1
 #			DescriptionCol = 2 # fixed starting column
-			DescriptionColEnd = 2 + [ShowPlacesUsed, ShowResponsibility, ShowDeadline, ShowStatus].count(False)
+			DescriptionColCount = 1 + [ShowPlacesUsed, ShowResponsibility, ShowDeadline, ShowStatus].count(False)
 #			# determine which column each field will be shown in (1-based. Item no and Description cols are always shown)
 #			PlacesUsedCol = 6 - [ShowResponsibility, ShowDeadline, ShowStatus].count(True)
 #			ResponsibilityCol = 6 - [ShowDeadline, ShowStatus].count(True)
@@ -814,7 +811,7 @@ class AssocTextReportViewport(display_utilities.ViewportBaseClass):
 			ATT.Components.append(HeaderRowDescriptionCell)
 			# add further cells for Description header, if needed
 			NextRefComponent = excel_export.MergeAndFillCells(Table=ATT, StartComponent=HeaderRowDescriptionCell,
-				EndCol=DescriptionColEnd, FinalRightBorder=NormalInnerBorder)
+				TotalCols=DescriptionColCount, FinalRightBorder=NormalInnerBorder)
 			# add remaining headers as needed
 			if ShowPlacesUsed:
 				NextRefComponent = excel_export.ExcelTable_Component(BottomBorder=NormalInnerBorder,
@@ -846,7 +843,7 @@ class AssocTextReportViewport(display_utilities.ViewportBaseClass):
 					# make item number component
 					ItemNumberComponent = excel_export.ExcelTable_Component(BottomBorder=LightInnerBorder,
 						Content=ThisAT.Numbering, RightBorder=LightInnerBorder, PositionRelativeTo=NextRowRefComponent,
-						VertAlignment=info.LeftLabel, HorizAlignment=info.TopLabel, FontStyle=NormalFont,
+						VertAlignment=info.TopLabel, HorizAlignment=info.RightLabel, FontStyle=NormalFont,
 						BackgColour=NormalBackgColour, RelPosDirection=info.BelowLabel)
 					NextRowRefComponent = ItemNumberComponent
 					ATT.Components.append(ItemNumberComponent)
@@ -854,21 +851,21 @@ class AssocTextReportViewport(display_utilities.ViewportBaseClass):
 					DescriptionComponent = excel_export.ExcelTable_Component(BottomBorder=LightInnerBorder,
 						Content=ThisAT.Content,
 						PositionRelativeTo=ItemNumberComponent,
-						VertAlignment=info.LeftLabel,
-						HorizAlignment=info.TopLabel, FontStyle=NormalFont,
+						VertAlignment=info.TopLabel,
+						HorizAlignment=info.LeftLabel, FontStyle=NormalFont,
 						BackgColour=NormalBackgColour,
 						RelPosDirection=info.RightLabel)
 					ATT.Components.append(DescriptionComponent)
 					# fill to right, if description takes more than one col
 					NextRefComponent = excel_export.MergeAndFillCells(Table=ATT, StartComponent=DescriptionComponent,
-						EndCol=DescriptionColEnd, FinalRightBorder=NormalInnerBorder)
+						TotalCols=DescriptionColCount, FinalRightBorder=NormalInnerBorder)
 					# make Places Used component
 					if ShowPlacesUsed:
 						NextRefComponent = excel_export.ExcelTable_Component(BottomBorder=LightInnerBorder,
 							Content=ThisAT.PHAElements, RightBorder=LightInnerBorder,
 							PositionRelativeTo=NextRefComponent,
-							VertAlignment=info.LeftLabel,
-							HorizAlignment=info.TopLabel, FontStyle=NormalFont,
+							VertAlignment=info.TopLabel,
+							HorizAlignment=info.LeftLabel, FontStyle=NormalFont,
 							BackgColour=NormalBackgColour,
 							RelPosDirection=info.RightLabel)
 						ATT.Components.append(NextRefComponent)
@@ -876,8 +873,8 @@ class AssocTextReportViewport(display_utilities.ViewportBaseClass):
 						NextRefComponent = excel_export.ExcelTable_Component(BottomBorder=LightInnerBorder,
 							Content=ThisAT.Responsibility, RightBorder=LightInnerBorder,
 							PositionRelativeTo=NextRefComponent,
-							VertAlignment=info.LeftLabel,
-							HorizAlignment=info.TopLabel, FontStyle=NormalFont,
+							VertAlignment=info.TopLabel,
+							HorizAlignment=info.LeftLabel, FontStyle=NormalFont,
 							BackgColour=NormalBackgColour,
 							RelPosDirection=info.RightLabel)
 						ATT.Components.append(NextRefComponent)
@@ -885,8 +882,8 @@ class AssocTextReportViewport(display_utilities.ViewportBaseClass):
 						NextRefComponent = excel_export.ExcelTable_Component(BottomBorder=LightInnerBorder,
 							Content=ThisAT.Deadline, RightBorder=LightInnerBorder,
 							PositionRelativeTo=NextRefComponent,
-							VertAlignment=info.LeftLabel,
-							HorizAlignment=info.TopLabel, FontStyle=NormalFont,
+							VertAlignment=info.TopLabel,
+							HorizAlignment=info.LeftLabel, FontStyle=NormalFont,
 							BackgColour=NormalBackgColour,
 							RelPosDirection=info.RightLabel)
 						ATT.Components.append(NextRefComponent)
@@ -894,8 +891,8 @@ class AssocTextReportViewport(display_utilities.ViewportBaseClass):
 						NextRefComponent = excel_export.ExcelTable_Component(BottomBorder=LightInnerBorder,
 							Content=ThisAT.Status,
 							PositionRelativeTo=NextRefComponent,
-							VertAlignment=info.LeftLabel,
-							HorizAlignment=info.TopLabel, FontStyle=NormalFont,
+							VertAlignment=info.TopLabel,
+							HorizAlignment=info.LeftLabel, FontStyle=NormalFont,
 							BackgColour=NormalBackgColour,
 							RelPosDirection=info.RightLabel)
 						ATT.Components.append(NextRefComponent)
@@ -913,6 +910,7 @@ class AssocTextReportViewport(display_utilities.ViewportBaseClass):
 		OuterBorderColour = (0x00, 0x00, 0x00) # black
 		InnerBorderColour = (0x80, 0x80, 0x80) # mid grey
 		TitleBackgColour = (0x6E, 0xDF, 0x6F) # pale green
+		Header1BackgColour = (0xb7, 0xef, 0xb7) # very pale green
 		NormalBackgColour = (0xff, 0xff, 0xff) # white
 		TitleFont = wx.Font(wx.FontInfo(14).FaceName(FontName).Bold())
 		Header1Font = wx.Font(wx.FontInfo(12).FaceName(FontName).Bold())
@@ -930,8 +928,9 @@ class AssocTextReportViewport(display_utilities.ViewportBaseClass):
 		MySheet = excel_export.ExcelTable_Sheet(TabName=TabName, TabColour=TabColour,
 			TargetWidth=AbsWSWidth)
 		# make the tables and put them in MySheet
-		MySheet.Tables.append(MakeSummaryTable(Borders=HeavyBorder))
-		MySheet.Tables.append(MakeATTable(Borders=HeavyBorder))
+		SummaryTable = MakeSummaryTable(Borders=HeavyBorder)
+		MySheet.Tables.append(SummaryTable)
+		MySheet.Tables.append(MakeATTable(Borders=HeavyBorder, PositionBelow=SummaryTable))
 		# generate the Excel spreadsheet
 		MySheet.PopulateSheet(WS=XLWorksheet, AbsSheetWidth=AbsWSWidth)
 		# write the Excel spreadsheet to file
