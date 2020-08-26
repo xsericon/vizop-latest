@@ -221,7 +221,7 @@ class ExcelTable_Component(object):
 		assert isinstance(BottomBorder, ExcelTable_Border) or (BottomBorder is None)
 		assert isinstance(LeftBorder, ExcelTable_Border) or (LeftBorder is None)
 		assert isinstance(RightBorder, ExcelTable_Border) or (RightBorder is None)
-		assert isinstance(Content, str)
+		assert isinstance(Content, str), 'Creating Component with Content %s, type %s' % (str(Content), str(type(Content)))
 		assert VertAlignment in [info.TopLabel, info.CentreLabel, info.BottomLabel]
 		assert HorizAlignment in [info.LeftLabel, info.CentreLabel, info.RightLabel]
 		assert isinstance(LeftIndentInmm, (int, float))
@@ -348,7 +348,6 @@ def SetupWorksheet(WB, TabName, TabColour=(255,255,255)):
 def WriteWBToFile(WB, FilePath):
 	# write workbook WB to file in FilePath
 	# FilePath is assumed to be a writeable path
-	print('EE317 writing Excel file')
 	WB.save(filename=FilePath)
 
 def MergeAndFillCells(Table, StartComponent, TotalCols, FinalRightBorder=None):

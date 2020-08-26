@@ -1098,7 +1098,7 @@ class FTEvent(FTBoxyObject): # FT event object in Viewport
 	# Used for causes, IPLs, intermediate events, final events
 	NeedsConnectButton = True # whether to provide connect buttons
 	# Attribs are used by ParseFTData() to populate object's attributes from data transferred from datacore (may be redundant)
-	Attribs = [(info.IDTag, int, False), ('EventTypeHumanName', str, False), ('Numbering', str, False), ('Description', str, False), ('Value', str, False),
+	Attribs = [(info.IDTag, int, False), ('HumanName', str, False), ('Numbering', str, False), ('Description', str, False), ('Value', str, False),
 		('ValueUnit', str, False), ('Status', int, False), ('CanEditValue', bool, False), ('ShowActionItems', bool, False), ('BackgColour', 'rgb', False),
 		('DescriptionComment', str, True), ('ValueComment', str, True), ('ValueUnitComment', str, True),
 		('ValueKindComment', str, True), ('ActionItems', str, True), ('ConnectTo', int, True)]
@@ -1125,7 +1125,7 @@ class FTEvent(FTBoxyObject): # FT event object in Viewport
 		# attribs transferred from datacore
 		self.ID = 0
 		self.IsIPL = False # Marker for IPLs. We may want to make them look different (indent? colour?)
-		self.EventTypeHumanName = ''
+		self.HumanName = ''
 		self.Numbering = '' # numbering string representation used by Viewport
 		self.EventDescription = ''
 		self.Value = ''
@@ -1264,7 +1264,7 @@ class FTEvent(FTBoxyObject): # FT event object in Viewport
 		# (variable elements are populated in CreateVariableTextElements() )
 		# The following list contains (attribs of FTEvent, element's InternalName)
 		# It's a combined list for both DescriptionElements and ValueElements, hence the "if" below
-		AttribInfo = [('EventTypeHumanName', 'EventType'), ('Value', 'Value'),
+		AttribInfo = [('HumanName', 'EventType'), ('Value', 'Value'),
 					  ('ValueUnit', 'EventValueUnit'), ('ValueKind', 'EventValueKind')]
 		# put the content into the elements
 		for (Attrib, Name) in AttribInfo:
@@ -5504,7 +5504,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 					setattr(NewEvent, Attrib, [El.text for El in XMLObj.findall(Tag)])
 			# populate event type name: internal name and human name
 			NewEvent.EventType = XMLObj.find('EventType').text
-			NewEvent.EventTypeHumanName = self.EventTypeNameHash[NewEvent.EventType]
+			NewEvent.HumanName = self.EventTypeNameHash[NewEvent.EventType]
 			# populate event type choice
 			NewEvent.EventTypeComponent.ObjectChoices = [core_classes.ChoiceItem(XMLName=ThisTag.text,
 				HumanName=self.EventTypeNameHash[ThisTag.text],
@@ -5577,7 +5577,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 						NumberingList.append(NumberingTag.text)
 			# populate connector type name: internal name and human name
 			NewConnector.EventType = XMLObj.find('EventType').text
-			NewConnector.EventTypeHumanName = self.EventTypeNameHash[NewConnector.EventType]
+			NewConnector.HumanName = self.EventTypeNameHash[NewConnector.EventType]
 			# populate value kind choice
 			PopulateValueOptions(XMLRoot=XMLObj, HostEl=NewConnector, ComponentName='',
 				 ListAttrib='ValueKindOptions', OptionTagName=info.ValueKindOptionTag,

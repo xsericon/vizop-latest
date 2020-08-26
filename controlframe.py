@@ -1160,7 +1160,7 @@ class ControlFrame(wx.Frame):
 					ComponentEnglishNames[self.TopLevelFrame.ComponentInControlPanel])
 			else:
 				self.NumericalValueAspect.HeaderLabel.Widget.SetLabel(_('Value: %s %s') %
-					(self.TopLevelFrame.PHAObjInControlPanel.EventTypeHumanName,
+					(self.TopLevelFrame.PHAObjInControlPanel.HumanName,
 					self.TopLevelFrame.PHAObjInControlPanel.Numbering))
 			# set up ValueText
 			self.NumericalValueAspect.ValueText.PHAObj = self.TopLevelFrame.PHAObjInControlPanel
@@ -2727,7 +2727,7 @@ class ControlFrame(wx.Frame):
 		# Possible Args:
 		#	ViewportInRedoRecord (Viewport instance) if Redoing
 		assert isinstance(Proj, projects.ProjectItem)
-		assert isinstance(PHAObj, core_classes.PHAModelBaseClass)
+		assert isinstance(PHAObj, core_classes.PHAModelBaseClass) or (PHAObj is None)
 		assert isinstance(Viewport, display_utilities.ViewportBaseClass)
 		assert isinstance(Redoing, bool)
 		assert isinstance(Chain, bool)
@@ -2743,8 +2743,8 @@ class ControlFrame(wx.Frame):
 		# The attribs in the dict below are used in DatacoreSwitchToViewport(). Many of them are not currently used;
 		# TODO remove unneeded attribs for bug resilience
 		TargetViewportAttribs = {'ControlFrame': self.ID, info.SkipRefreshTag: utilities.Bool2Str(Chain),
-			info.ProjIDTag: Proj.ID, info.ViewportTag: Viewport.ID,
-			info.PHAModelIDTag: PHAObj.ID}
+			info.ProjIDTag: Proj.ID, info.ViewportTag: Viewport.ID}
+		if PHAObj is not None: TargetViewportAttribs[info.PHAModelIDTag] = PHAObj.ID
 		if KeepingOldViewport:
 			TargetViewportAttribs.update({info.MilestoneIDTag: NewMilestone.ID})
 			vizop_misc.SendRequest(self.zmqOutwardSocket, Command=RequestToDatacore, **TargetViewportAttribs)
@@ -2776,13 +2776,14 @@ class ControlFrame(wx.Frame):
 				vizop_misc.SendRequest(self.zmqOutwardSocket, Command=RequestToDatacore, **TargetViewportAttribs)
 		# show VizopTalks confirmation message
 		if not Redoing:
-			VTMessage = PHAObj.HumanName + '\n\n' + _('Use back button to go back') if KeepingOldViewport \
-				else PHAObj.HumanName
-			self.MyVTPanel.SubmitVizopTalksMessage(Title=_('Now showing %s:') % type(PHAObj).HumanName,
-				MainText=VTMessage, Priority=ConfirmationPriority)
+			VTMessage = getattr(PHAObj, 'HumanName', '') + '\n\n' + _('Use back button to go back') if KeepingOldViewport \
+				else getattr(PHAObj, 'HumanName', '')
+			VTTitle = '' if PHAObj is None else _('Now showing %s:') % type(PHAObj).HumanName
+			self.MyVTPanel.SubmitVizopTalksMessage(Title=VTTitle, MainText=VTMessage, Priority=ConfirmationPriority)
 		return vizop_misc.MakeXMLMessage('Null', 'Null')
 
 	def SwitchToPHAObj(self, Proj, TargetPHAObjID, TargetViewport=None, ViewportToDestroy=None):
+		# client side method
 		# display a Viewport of PHA object with ID == TargetPHAObj.
 		# If TargetViewport (a Viewport shadow) is specified, display this Viewport; else display most recently viewed one
 		# If ViewportToDestroy (a Viewport shadow) is specified, also destroy the specified Viewport
@@ -2954,6 +2955,7 @@ class ControlFrame(wx.Frame):
 			PHAElementTag = DisplayAttribsTag.find(info.PHAElementTag)
 			PHAElement = utilities.ObjectWithID(Objects=[e for e in faulttree.WalkOverAllFTObjs(self.CurrentViewport)],
 				TargetID=PHAElementTag.text) if PHAElementTag is not None else None
+			print('CF2957 setting PHAElementInControlPanel. PHAElement found: ', PHAElement)
 			ComponentTag = DisplayAttribsTag.find(info.ComponentTag)
 			ThisComponent = utilities.InstanceWithAttribValue(ObjList=PHAElement.AllComponents, AttribName='InternalName',
 				TargetValue=ComponentTag.text,
@@ -3298,9 +3300,10 @@ class ControlFrame(wx.Frame):
 #		OriginatingViewport.DisplDevice.ReleaseViewportFromDisplDevice()
 		# First, check if there's already a suitable Viewport instance to switch to
 		CandidateViewport = Proj.FindViewportOfClass_Client(TargetClass=GotoViewportClass, MatchAttribs=Args)
-		# if there's none, create a new Viewport
 		if CandidateViewport:
-			self.SwitchToViewport(TargetViewport=CandidateViewport, XMLRoot=None, debug=3320) # TODO probably need to put redraw data in XMLRoot
+#			self.SwitchToViewport(TargetViewport=CandidateViewport, XMLRoot=None, debug=3320) # TODO probably need to put redraw data in XMLRoot
+			self.DoSwitchToViewportCommand(Proj=Proj, PHAObj=None, Viewport=CandidateViewport)
+		# if there's none, create a new Viewport
 		else:
 			ViewportArgs = Args
 			ViewportArgs.update({'ViewportToRevertTo': ViewportToRevertTo, 'OriginatingViewport': OriginatingViewport})

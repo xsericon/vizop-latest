@@ -247,7 +247,7 @@ class AssocTextReportViewport(display_utilities.ViewportBaseClass):
 			# First, check whether requested filename is usable
 			UserFilename = self.FilenameText.Widget.GetValue().strip()
 			FilenameStatus = self.UpdateFilenameStatusMessage(UserFilePath=UserFilename)
-			# set status of Go button %%% working here
+			# set status of Go button
 			SomeATsAreSelected = any(ThisViewport.OriginatingViewport.GetSelectedATs()) if \
 				hasattr(ThisViewport.OriginatingViewport, 'GetSelectedATs') else False
 			FilenameUsable = FilenameStatus in ['ReadyToMakeNewFile', 'ReadyToOverwrite']
@@ -384,7 +384,6 @@ class AssocTextReportViewport(display_utilities.ViewportBaseClass):
 				'FontName': self.ParentFrame.TopLevelFrame.SystemFontNames[self.FontChoice.Widget.GetSelection()] }
 #				'DateKind': core_classes.DateChoices[self.DateChoice.Widget.GetSelection()] }
 			self.Viewport.DoExportATsToFile(**ExportInput)
-#			self.ParentFrame.TopLevelFrame.CurrentViewport.DoExportATsToFile(**ExportInput)
 			self.StoreAttribsInProject()
 			self.ExitViewportAndRevert()
 
@@ -778,9 +777,10 @@ class AssocTextReportViewport(display_utilities.ViewportBaseClass):
 			return ST
 
 		def MakeATTable(Borders=None, PositionBelow=None):
-			# build structure of table listing the required ATs
+			# build structure of table listing the required ATs, positioned below table specified in PositionBelow
 			# return the Table
 			assert isinstance(Borders, excel_export.ExcelTable_Border)
+			assert isinstance(PositionBelow, excel_export.ExcelTable_Table) or (PositionBelow is None)
 			ATT = excel_export.ExcelTable_Table(GapBelow=1, TopBorder=Borders, BottomBorder=Borders,
 				LeftBorder=Borders, RightBorder=Borders, PositionRelativeTo=PositionBelow,
 				RelPosDirection=info.BelowLabel)
@@ -790,8 +790,6 @@ class AssocTextReportViewport(display_utilities.ViewportBaseClass):
 			ShowDeadline = self.DialogueAspect.ShowDeadlineCheck.Widget.GetValue()
 			ShowStatus = self.DialogueAspect.ShowStatusCheck.Widget.GetValue()
 			# Calculate number of columns allocated to "Description" field, depending on which fields are to be shown
-#			ItemNoCol = 1
-#			DescriptionCol = 2 # fixed starting column
 			DescriptionColCount = 1 + [ShowPlacesUsed, ShowResponsibility, ShowDeadline, ShowStatus].count(False)
 #			# determine which column each field will be shown in (1-based. Item no and Description cols are always shown)
 #			PlacesUsedCol = 6 - [ShowResponsibility, ShowDeadline, ShowStatus].count(True)
@@ -862,7 +860,7 @@ class AssocTextReportViewport(display_utilities.ViewportBaseClass):
 					# make Places Used component
 					if ShowPlacesUsed:
 						NextRefComponent = excel_export.ExcelTable_Component(BottomBorder=LightInnerBorder,
-							Content=ThisAT.PHAElements, RightBorder=LightInnerBorder,
+							Content=ThisAT.GetWhereUsedHumanText(), RightBorder=LightInnerBorder,
 							PositionRelativeTo=NextRefComponent,
 							VertAlignment=info.TopLabel,
 							HorizAlignment=info.LeftLabel, FontStyle=NormalFont,
@@ -898,7 +896,7 @@ class AssocTextReportViewport(display_utilities.ViewportBaseClass):
 						ATT.Components.append(NextRefComponent)
 			return ATT
 
-		# main procedure for DoExportToExcel()%%%
+		# main procedure for DoExportToExcel()
 		assert isinstance(FontName, str)
 		assert isinstance(FilePath, str)
 		assert FileType == info.ExcelExtension
@@ -927,9 +925,11 @@ class AssocTextReportViewport(display_utilities.ViewportBaseClass):
 		# make a ExcelSheet object to populate with tables
 		MySheet = excel_export.ExcelTable_Sheet(TabName=TabName, TabColour=TabColour,
 			TargetWidth=AbsWSWidth)
-		# make the tables and put them in MySheet
-		SummaryTable = MakeSummaryTable(Borders=HeavyBorder)
-		MySheet.Tables.append(SummaryTable)
+		# make the tables and put them in MySheet%%%
+		if info.HeaderLabel in ShowWhat:
+			SummaryTable = MakeSummaryTable(Borders=HeavyBorder)
+			MySheet.Tables.append(SummaryTable)
+		else: SummaryTable = None
 		MySheet.Tables.append(MakeATTable(Borders=HeavyBorder, PositionBelow=SummaryTable))
 		# generate the Excel spreadsheet
 		MySheet.PopulateSheet(WS=XLWorksheet, AbsSheetWidth=AbsWSWidth)
@@ -938,19 +938,26 @@ class AssocTextReportViewport(display_utilities.ViewportBaseClass):
 
 	def GetATStatusCounts(self, Scope=info.AllItemsLabel):
 		# make and return dict with keys = AT statuses, values = number of ATs in Scope
-		# status matching is case insensitive. The case returned for each status is the first one encountered
+		# status matching is case insensitive and ignores leading/trailing whitespace.
+		# The case returned for each status is the first one encountered.
+		# Empty status is replaced with info.NotDefinedText
 		assert Scope in [info.AllItemsLabel, info.FilteredItemsLabel]
 		FilteredOnly = (Scope == info.FilteredItemsLabel)
 		StatusCounts = {} # values are counts of ATs with each status, keys in uppercase
 		StatusHash = {} # keys are uppercase stati, values are the casing of the first such status encountered
 		for ThisAT in self.AssocTexts:
 			if (not FilteredOnly) or ThisAT.FilteredIn:
+				# determine the status text to be used for matching, and for display in the final list
+				ThisStatusForMatching = ThisAT.Status.strip().upper()
+				if ThisStatusForMatching == '':
+					ThisStatusForMatching = ThisStatusForDisplay = _(info.NotDefinedText)
+				else: ThisStatusForDisplay = ThisAT.Status.strip()
 				# is this AT's status already in StatusCounts? If so, add to the count; else add a new key
-				if ThisAT.Status.upper() in StatusCounts.keys():
-					StatusCounts[ThisAT.Status.upper()] += 1
+				if ThisStatusForMatching in StatusCounts.keys():
+					StatusCounts[ThisStatusForMatching] += 1
 				else:
-					StatusCounts[ThisAT.Status.upper()] = 1
-					StatusHash[ThisAT.Status.upper()] = ThisAT.Status
+					StatusCounts[ThisStatusForMatching] = 1
+					StatusHash[ThisStatusForMatching] = ThisStatusForDisplay
 		return dict( [(StatusHash[s], StatusCounts[s]) for s in StatusCounts.keys()] )
 
 	def UnpackDataFromDatacore(self, XMLTree):
