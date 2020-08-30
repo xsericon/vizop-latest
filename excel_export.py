@@ -5,7 +5,6 @@ import wx
 from openpyxl import Workbook, worksheet
 from openpyxl.worksheet import dimensions as Dimensions
 from openpyxl.styles import PatternFill, Border, Side, alignment, Protection, Font, fills
-# from openpyxl.utils import units
 import utilities, core_classes, info
 
 DefaultFontColourRGB = (0,0,0)
@@ -91,7 +90,7 @@ class ExcelTable_Table(object):
 			ThisCell.alignment = alignment.Alignment(horizontal={info.LeftLabel: 'left', info.CentreLabel: 'center',
 				info.RightLabel: 'right'}[ThisComponent.HorizAlignment],
 				vertical={info.TopLabel: 'top', info.CentreLabel: 'center',
-				info.BottomLabel: 'bottom'}[ThisComponent.VertAlignment])
+				info.BottomLabel: 'bottom'}[ThisComponent.VertAlignment], wrapText=ThisComponent.Wrap)
 			# apply font
 			if ThisComponent.FontStyle:
 				ThisCell.font = Font(name=ThisComponent.FontStyle.GetFaceName(),
@@ -204,13 +203,14 @@ class ExcelTable_Component(object):
 
 	def __init__(self, PositionRelativeTo=None, RelPosDirection='Right', TopBorder=None,
 		BottomBorder=None, LeftBorder=None, RightBorder=None, Content='', VertAlignment=info.TopLabel,
-		HorizAlignment=info.LeftLabel, LeftIndentInmm=0, LeftIndentInRelWidth=0, FontStyle=None,
+		HorizAlignment=info.LeftLabel, Wrap=True, LeftIndentInmm=0, LeftIndentInRelWidth=0, FontStyle=None,
 		BackgColour=(255,255,255), RelWidth=1.0, MergeToRight=False, MergeDown=False):
 		# PositionRelativeTo: another Component or None - the component this one should be oriented relative to
 		# RelPosDirection (str): which direction this component should be oriented relative to the one named above
 		# Borders: border object or None
 		# Content: text to put in the cell
 		# VertAlignment, HorizAlignment: text alignment in the cell
+		# Wrap (bool): whether to apply word wrap to text
 		# LeftIndent: text indent to apply. LeftIndentInmm takes priority.
 		# FontStyle: a wx.Font object or None. The wx.Font object can optionally have attrib 'Colour' (rgb tuple)
 		# RelWidth: relative width of cell relative to all other cells in the sheet
@@ -224,6 +224,7 @@ class ExcelTable_Component(object):
 		assert isinstance(Content, str), 'Creating Component with Content %s, type %s' % (str(Content), str(type(Content)))
 		assert VertAlignment in [info.TopLabel, info.CentreLabel, info.BottomLabel]
 		assert HorizAlignment in [info.LeftLabel, info.CentreLabel, info.RightLabel]
+		assert isinstance(Wrap, bool)
 		assert isinstance(LeftIndentInmm, (int, float))
 		assert LeftIndentInmm >= 0
 		assert isinstance(LeftIndentInRelWidth, (int, float))
@@ -243,6 +244,7 @@ class ExcelTable_Component(object):
 		self.Content = Content
 		self.VertAlignment = VertAlignment
 		self.HorizAlignment = HorizAlignment
+		self.Wrap = Wrap
 		self.LeftIndentInmm = LeftIndentInmm
 		self.LeftIndentInRelWidth = LeftIndentInRelWidth
 		self.FontStyle = FontStyle
@@ -258,16 +260,16 @@ class ExcelTable_Sheet(object):
 	def __init__(self, TabName, TabColour, TargetWidth):
 		# TabName (str): Name to be shown on Excel worksheet tab. Can't be blank
 		# TabColour (rgb tuple, 3 x int): Colour to be applied to Excel worksheet tab
-		# TargetWidth (int): Total width of all cells in the Sheet, in mm
+		# TargetWidth (int/float): Total width of all cells in the Sheet, in mm. Gets rounded to the nearest mm here
 		assert isinstance(TabName, str)
 		assert TabName.strip() # ensure it's not blank or whitespace only
 		assert isinstance(TabColour, tuple)
-		assert isinstance(TargetWidth, int)
+		assert isinstance(TargetWidth, (int, float))
 		assert TargetWidth > 0
 		object.__init__(self)
 		self.TabName = TabName
 		self.TabColour = TabColour
-		self.TargetWidth = TargetWidth
+		self.TargetWidth = int(round(TargetWidth))
 		self.Tables = [] # ExcelTable_Table instances
 
 	def PopulateSheet(self, WS, AbsSheetWidth, StartRow=1, StartCol=1):
@@ -307,6 +309,8 @@ class ExcelTable_Sheet(object):
 			WS.column_dimensions[core_classes.UpperCaseLetterNumberSystem.HumanValue(TargetValue=ThisCol + 1)].width = \
 				ThisWidth * ColWidthRatio
 		# set borders around and between tables
+		# TODO consider adding dummy cells (containing whitespace only) between tables, so that user can select the
+		# entire Sheet in Excel using Ctrl + A
 		self.SetTableBorders(WS=WS)
 
 	def SetTableBorders(self, WS):

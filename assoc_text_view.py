@@ -684,9 +684,9 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 		# first, remove all widgets from the sizer and active text widget list
 		self.Deactivate(Widgets=self.WidgetsToActivate)
 		self.HeaderSizer.Clear()
-		# destroy the widgets
-		for ThisWidget in self.WidgetsToActivate:
-			ThisWidget.Widget.Destroy()
+#		# destroy the widgets - no longer doing this, as the Viewport and dialogue aspect are not destroyed
+#		for ThisWidget in self.WidgetsToActivate:
+#			ThisWidget.Widget.Destroy()
 		if GotoPreviousViewport:
 			# destroy this Viewport and switch to the previous Viewport (for now, just go to the first PHA model in the project)
 			# TODO build mechanism to identify the last touched PHA model
@@ -694,7 +694,7 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 				TargetViewport=None, ViewportToDestroy=self)
 
 	def Deactivate(self, Widgets=[], **Args): # deactivate widgets for this Viewport
-		self.DisplDevice.TopLevelFrame.DeactivateWidgetsInPanel(Widgets=Widgets, **Args)
+		display_utilities.DeactivateWidgetsInPanel(Widgets=Widgets, HideAllWidgets=True, **Args)
 		# remove widgets from text widgets list, so that they're no longer checked in OnIdle
 		self.DisplDevice.TextWidgActive = []
 
@@ -718,7 +718,7 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 		# extract display-related parms to store in undo records
 		Zoom = XMLRoot.findtext(info.ZoomTag)
 		# prepare default reply if command unknown
-		Reply = vizop_misc.MakeXMLMessage(RootName='Fail', RootText='CommandNotRecognised')
+		Reply = vizop_misc.MakeXMLMessage(RootName='Fail', RootText='CommandNotRecognised721')
 		if Command == 'RQ_PR_UpdateAssocTextFullViewAttribs': # store parms for associated text display
 			Reply = cls.UpdateAssocTextFullViewAttribs(Proj=Proj, XMLRoot=XMLRoot)
 		elif Command == 'RQ_AT_ChangeAssociatedText':
@@ -883,8 +883,18 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 		assert Scope in [info.AllItemsLabel, info.FilteredItemsLabel]
 		self.StoreAttribsInProject()
 		self.ExitViewportAndRevert(GotoPreviousViewport=False)
-		# following lines are pasted to use as basis for calling export viewport%%% working here
+		# following lines are pasted to use as basis for calling export viewport
 		NamedArgs = {info.AssociatedTextKindTag: self.AssocTextKind, info.ItemsToIncludeTag: Scope}
 		self.DisplDevice.TopLevelFrame.CloseViewportAndGotoViewport(Proj=self.Proj,
 			GotoViewportClass=assoc_text_report.AssocTextReportViewport, ViewportToRevertTo=self,
 			OriginatingViewport=self, **NamedArgs)
+
+	def GetFilteredATIDs(self):
+		# return a list of IDs of currently filtered ATs
+		# This method is used by other Viewports as a hygienic way of getting AT statuses
+		return [ThisAT.ID for ThisAT in self.AssocTexts if ThisAT.FilteredIn]
+
+	def GetSelectedATIDs(self):
+		# return a list of IDs of currently selected ATs, irrespective of whether they are visible (filtered-in)
+		# This method is used by other Viewports as a hygienic way of getting AT statuses
+		return [ThisAT.ID for ThisAT in self.AssocTexts if ThisAT.Selected]

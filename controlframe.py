@@ -16,7 +16,7 @@ from platform import system
 import settings, text, vizop_misc, art, display_utilities, info, utilities, core_classes, projects, project_display
 import undo
 # modules containing Viewport and PHA model definitions
-import faulttree, ft_full_report, assoc_text_view
+import faulttree, ft_full_report, assoc_text_view, assoc_text_report
 from display_utilities import UIWidgetItem, UIWidgetPlaceholderItem
 
 # ColourSwatchButtonSize = (60,20) # size for 'change colour' buttons. Not applied in all cases, yet
@@ -1980,7 +1980,7 @@ class ControlFrame(wx.Frame):
 					HighlightBkgColour=self.TopLevelFrame.ColScheme.BackHighlight, **Args)
 
 			def Deactivate(self, Widgets=[], **Args): # deactivate widgets for this aspect
-				self.TopLevelFrame.DeactivateWidgetsInPanel(Widgets=Widgets, **Args)
+				display_utilities.DeactivateWidgetsInPanel(Widgets=Widgets, **Args)
 
 			def Prefill(self, **Args): # initialise value of each appropriate widget in self.WidgetList
 				self.PrefillMethod(**Args)
@@ -2010,20 +2010,27 @@ class ControlFrame(wx.Frame):
 	# 			KeyPressHash = vizop_misc.RegisterKeyPressHandler(
 	# 				KeyPressHash, ThisWidget.KeyStroke, ThisWidget.Handler, getattr(ThisWidget, 'KeyPressHandlerArgs', {}))
 	#
-	def DeactivateWidgetsInPanel(self, Widgets=[], **Args):
+	def DeactivateWidgetsInPanel(self, Widgets=[], HideAllWidgets=False, **Args):
+		# Moved to module display_utilities. Can be deleted from here
 		# deactivate widgets that are ceasing to be displayed in a panel of the Control Frame
+		# This method does 3 things:
+		# 1. All widgets in Widgets (UIWidget instances) are unbound from their event handlers
+		# 2. Disable any keyboard shortcuts registered for the widgets
+		# 3. If HideAllWidgets is True, all widgets are hidden
 		# TODO: as ActivateWidgetsInPanel was moved to module display_utilities, also move this function
-		# TODO: do we need to delete any variable widgets?
 		# unbind widget event handlers
 		assert isinstance(Widgets, list)
 		global KeyPressHash
 		for ThisWidget in Widgets:
+			# 1. unbind event handler
 			if ThisWidget.Handler:
 				for Event in ThisWidget.Events:
 					ThisWidget.Widget.Unbind(Event)
-			# disable keyboard shortcuts
+			# 2. disable keyboard shortcut
 			if getattr(ThisWidget, 'KeyStroke', None):
 				KeyPressHash = vizop_misc.UnregisterKeyPressHandler(KeyPressHash, ThisWidget.KeyStroke)
+			# 3. hide widget
+			if HideAllWidgets: ThisWidget.Widget.Hide()
 
 	class ViewPanel(wx.Panel): # define the View panel in the control frame, used to provide selectors for current Viewports
 
@@ -2250,7 +2257,7 @@ class ControlFrame(wx.Frame):
 		# - have attributes "HostMenu" (wx.Menu instance) and  "InternalName" (str);
 		# - be appended to self.ViewportMenuItems;
 		# - be mentioned in the MenuCommandsAvailable attrib of all Viewport classes that require the menu item
-		# - be listed in InsertBeforeMe attrib of one other menu item
+		# - be listed in InsertBeforeMe attrib of one other menu item that's guaranteed to be available
 
 		# Set up the "File" menu
 		FileMenu = wx.Menu()
@@ -2258,13 +2265,25 @@ class ControlFrame(wx.Frame):
 		self.Bind(wx.EVT_MENU, projects.SaveEntireProjectRequest, Savemitem)
 		FileMenu.AppendSeparator() # add a separating line in the menu
 
+		self.ActionItemsReportmitemID = wx.NewId()
+		self.ActionItemsReportmitem = FileMenu.Append(self.ActionItemsReportmitemID, _('Export action items...'), '')
+		self.Bind(wx.EVT_MENU, lambda Event: self.OnExportATRequest(Event, Scope=info.ActionItemLabel),
+			self.ActionItemsReportmitem)
+#		self.ActionItemsReportmitem.HostMenu = FileMenu
+#		self.ActionItemsReportmitem.InternalName = 'ActionItemsExport'
+		self.ParkingLotReportmitemID = wx.NewId()
+		self.ParkingLotReportmitem = FileMenu.Append(self.ParkingLotReportmitemID, _('Export parking lot...'), '')
+		self.Bind(wx.EVT_MENU, lambda Event: self.OnExportATRequest(Event, Scope=info.ParkingLotItemLabel),
+			self.ParkingLotReportmitem)
+#		self.ParkingLotReportmitem.HostMenu = FileMenu
+#		self.ParkingLotReportmitem.InternalName = 'ParkingLotExport'
 		self.FTFullReportmitem = FileMenu.Append(-1, _('Export full Fault Tree...'), '')
 		self.Bind(wx.EVT_MENU, self.OnExportFullFTRequest, self.FTFullReportmitem)
 		self.FTFullReportmitem.HostMenu = FileMenu
 		self.FTFullReportmitem.InternalName = 'FTFullExport'
 
 		self.FileMenuSeparatorAfterViewportCommands = FileMenu.AppendSeparator()
-		# InsertBeforeMe: list of  menu items to insert above this location
+		# InsertBeforeMe: list of menu items to insert above this location
 		self.FileMenuSeparatorAfterViewportCommands.InsertBeforeMe = [self.FTFullReportmitem]
 		Aboutmitem = FileMenu.Append(-1, _('About &Vizop...'), '')
 		self.Bind(wx.EVT_MENU, vizop_misc.OnAboutRequest, Aboutmitem) # OnAboutRequest is shared with welcome frame
@@ -2317,6 +2336,9 @@ class ControlFrame(wx.Frame):
 
 	def UpdateMenuStatus(self): # update texts and stati of menu items in control frame
 		Proj = self.CurrentProj
+		# Items that should be enabled only if a Viewport is currently on display
+		self.MenuBar.Enable(self.ActionItemsReportmitemID, bool(self.CurrentViewport))
+		self.MenuBar.Enable(self.ParkingLotReportmitemID, bool(self.CurrentViewport))
 		# Undo menu item
 		if Proj.UndoList:
 			# find record that will be undone 'up to' (skipping over any chained records)
@@ -2964,6 +2986,7 @@ class ControlFrame(wx.Frame):
 		self.RefreshGUIAfterDataChange(Proj=Proj)
 		# show appropriate aspect in Control Panel
 		if hasattr(self.CurrentViewport, 'PreferredControlPanelAspect'):
+			print('CF2967 switching to control panel aspect: ', self.CurrentViewport.InternalName, self.CurrentViewport.PreferredControlPanelAspect)
 			self.MyControlPanel.GotoControlPanelAspect(NewAspect=self.CurrentViewport.PreferredControlPanelAspect,
 				PHAObjInControlPanel=self.CurrentViewport, PHAElementInControlPanel=PHAElement,
 				ComponentInControlPanel=ThisComponent, debug=2673)
@@ -2973,8 +2996,6 @@ class ControlFrame(wx.Frame):
 		global UndoChainWaiting
 		assert isinstance(Proj, projects.ProjectItem)
 		assert isinstance(UndoRecord, undo.UndoItem)
-#		# find out which Control Frame sent the undo request (so that we know which one to reply to)
-#		RequestingControlFrameID = Args['RequestingControlFrameID']
 		# find out which datacore socket to send messages on
 		SocketFromDatacore = vizop_misc.SocketWithName(TargetName=Args['SocketFromDatacoreName'])
 		# find and remove the new Viewport object
@@ -3235,6 +3256,7 @@ class ControlFrame(wx.Frame):
 		return Reply
 
 	def HandleMessageToLocalViewport(self, MessageReceived=None, MessageAsXMLTree=None, **Args):
+		# Client side method
 		# process message received on socket requiring attention by local Viewport
 		# returns acknowledgement message as XML string
 		if MessageReceived is None:
@@ -3246,7 +3268,6 @@ class ControlFrame(wx.Frame):
 		# get message root
 		MessageRoot = XMLTreeToSend.tag
 		# if message is 'OK', it's just an acknowledgement with no action required
-#		if MessageRoot == 'OK': return None # no reply message needed to CheckForIncoming Messages()
 		if MessageRoot == 'OK':
 			# check whether the incoming message includes information requiring a VizopTalks message
 			if XMLTreeToSend.text == info.ValueOutOfRangeMsg:
@@ -3328,6 +3349,15 @@ class ControlFrame(wx.Frame):
 			Fonts['NormalWidgetFont'] = core_classes.FontInstance(Size=11, Bold=False)
 			Fonts['BoldWidgetFont'] = core_classes.FontInstance(Size=11, Bold=True)
 		return Fonts
+
+	def OnExportATRequest(self, Event, Scope):
+		# handle menu request to produce associated text (action items or parking lot) export
+		assert Scope in [info.ActionItemLabel, info.ParkingLotItemLabel]
+		NamedArgs = {info.AssociatedTextKindTag: Scope, info.ItemsToIncludeTag: info.NotSpecifiedLabel}
+		self.CloseViewportAndGotoViewport(Proj=self.CurrentProj,
+			GotoViewportClass=assoc_text_report.AssocTextReportViewport,
+			ViewportToRevertTo=self.CurrentViewport,
+			OriginatingViewport=self.CurrentViewport, **NamedArgs)
 
 	def OnExportFullFTRequest(self, Event): # handle menu request to produce FT export
 		# first, detach any Viewport from the edit panel

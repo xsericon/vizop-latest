@@ -1374,10 +1374,17 @@ class NumberingItem(object):
 #
 #	Serial = property(fget=GetSerialValue, fset=SetSerialValue)
 
+class StrNumberChunkItem(object):
+	# a chunk in a NumberingItem instance, that inserts a fixed string
+	XMLName = info.NumberSystemStringType
+
+	def __init__(self):
+		object.__init__(self)
+		self.Value = ''
 
 class ParentNumberChunkItem(object):
 	# a chunk in a NumberingItem instance, that takes numbering from a PHA object (eg node, cause).
-	XMLName = 'Parent'
+	XMLName = info.NumberSystemParentType
 
 	def __init__(self):
 		object.__init__(self)
@@ -1408,19 +1415,19 @@ class ParentNumberChunkItem(object):
 	Result = property(fget=GetMyNumber)
 
 class SerialNumberChunkItem(object):  # a chunk in a NumberingItem instance, that provides a serial number for a PHA object
-	XMLName = 'Serial'
+	XMLName = info.NumberSystemSerialType
 
 	def __init__(self):
 		object.__init__(self)
-		self.FieldWidth = 3  # how many digits to return
-		self.PadChar = '0'  # left padding to use in returned number to fill up FieldWidth
+		self.FieldWidth = 3  # (int) how many digits to return
+		self.PadChar = '0'  # (str) left padding to use in returned number to fill up FieldWidth
 		self.StartSequenceAt = 1 # (int) number to return for first item in sequence
 		self.SkipTo = None # if defined (int), returns this number if greater than position in sequence
 			# (taking GapBefore into account)
 		self.GapBefore = 0 # (int >= 0) how many unused values to leave before this item
-		self.IncludeInNumbering = True # whether to count this item in serial numbering
+		self.IncludeInNumbering = True # (bool) whether to count this item in serial numbering
 			# (if False, GetMyNumber() returns NoValue string)
-		self.NoValue = '- -' # value returned if IncludeInNumbering is False
+		self.NoValue = '- -' # (str) value returned if IncludeInNumbering is False
 
 	def __eq__(self, other):
 		assert isinstance(other, SerialNumberChunkItem)
@@ -1774,30 +1781,28 @@ def FontInstance(Size=12, Italics=False, Bold=False, Underlined=False, Font=''):
 
 class TeamMember(object):
 
-	def __init__(self, iD = 0, name = '', role = '', affiliation = ''):
+	def __init__(self, ID = '', Name = '', Role = '', Affiliation = ''):
 		object.__init__(self)
-		assert type(iD) == int
-		assert type(name) == str
-		assert type(role) == str
-		assert type(affiliation) == str
-
-		self.iD = iD # team member ID
-		self.name = name # team member name
-		self.role = role # team member role
-		self.affiliation = affiliation # team member affiliation
-		pass
-	pass
+		assert type(ID) == str
+		assert ID # ensure it's not blank
+		assert type(Name) == str
+		assert type(Role) == str
+		assert type(Affiliation) == str
+		self.ID = ID # team member ID
+		self.Name = Name # team member name
+		self.Role = Role # team member role
+		self.Affiliation = Affiliation # team member affiliation
 
 class Comment(object):
-	# implement a simple comment system for XML export
-	def __init__(self, iD = 0, content = '', isVisible = True, showInReport = True):
+	# implement a simple comment system for XML export. Not used; comments are instances of AssociatedTextItem
+	def __init__(self, ID = 0, content = '', isVisible = True, showInReport = True):
 		object.__init__(self)
-		assert type(iD) == int
+		assert type(ID) == int
 		assert type(content) == str
 		assert type(isVisible) == bool
 		assert type(showInReport) == bool
 
-		self.iD = iD # comment ID
+		self.ID = ID # comment ID
 		self.content = content # content
 		self.isVisible = isVisible # flag if visible or not, initially always True. For potential future features
 		self.showInReport = showInReport # flag if shown in the report, initially always True. For potential future features

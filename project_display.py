@@ -794,7 +794,7 @@ class EditPanelAspectItem(object): # class whose instances are aspects of the Ed
 		if 'TextWidgets' in Args: self.ParentFrame.TextWidgActive = Args['TextWidgets'][:]
 
 	def Deactivate(self, Widgets=[], **Args): # deactivate widgets for this aspect
-		self.TopLevelFrame.DeactivateWidgetsInPanel(Widgets=Widgets, **Args)
+		display_utilities.DeactivateWidgetsInPanel(Widgets=Widgets, **Args)
 		# remove widgets from text widgets list, so that they're no longer checked in OnIdle
 		self.ParentFrame.TextWidgActive = []
 

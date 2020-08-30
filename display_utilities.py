@@ -304,10 +304,34 @@ def ActivateWidgetsInPanel(Widgets=[], Sizer=None, ActiveWidgetList=[], DefaultF
 		if ThisWidget.Handler:
 			for Event in ThisWidget.Events:
 				ThisWidget.Widget.Bind(Event, ThisWidget.Handler)
-		# set keyboard shortcuts; TODO rethink where KeyPressHash should be stored, maybe in RegisterKeyPressHandler
+		# set keyboard shortcuts
+		# TODO rethink where KeyPressHash should be stored, maybe in RegisterKeyPressHandler; same issue in
+		# DeactivateWidgetsInPanel
 		if getattr(ThisWidget, 'KeyStroke', None): pass
 #			KeyPressHash = vizop_misc.RegisterKeyPressHandler(
 #				KeyPressHash, ThisWidget.KeyStroke, ThisWidget.Handler, getattr(ThisWidget, 'KeyPressHandlerArgs', {}))
+
+def DeactivateWidgetsInPanel(Widgets=[], HideAllWidgets=False, **Args):
+	# deactivate widgets that are ceasing to be displayed in a panel of the Control Frame
+	# This method does 3 things:
+	# 1. All widgets in Widgets (UIWidget instances) are unbound from their event handlers
+	# 2. Disable any keyboard shortcuts registered for the widgets
+	# 3. If HideAllWidgets is True, all widgets are hidden
+	assert isinstance(Widgets, list)
+	assert isinstance(HideAllWidgets, bool)
+	# unbind widget event handlers
+	assert isinstance(Widgets, list)
+	global KeyPressHash
+	for ThisWidget in Widgets:
+		# 1. unbind event handler
+		if ThisWidget.Handler:
+			for Event in ThisWidget.Events:
+				ThisWidget.Widget.Unbind(Event)
+		# 2. disable keyboard shortcut
+		if getattr(ThisWidget, 'KeyStroke', None): pass
+#			KeyPressHash = vizop_misc.UnregisterKeyPressHandler(KeyPressHash, ThisWidget.KeyStroke)
+		# 3. hide widget
+		if HideAllWidgets: ThisWidget.Widget.Hide()
 
 class ZoomWidgetObj(object):
 	# widget allowing user to control zoom of a Viewport

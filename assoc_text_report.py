@@ -438,7 +438,8 @@ class AssocTextReportViewport(display_utilities.ViewportBaseClass):
 			self.OverwriteCheck.Widget.SetValue(self.Overwrite)
 			# set scope checkboxes and radio buttons
 			self.ShowHeaderCheck.Widget.SetValue(info.HeaderLabel in Proj.ATExportShowWhat)
-			if self.ItemsRequestedOnInit == info.AllItemsLabel or not SomeATsAreSelected:
+			if self.ItemsRequestedOnInit == info.AllItemsLabel:
+#			if self.ItemsRequestedOnInit == info.AllItemsLabel or not SomeATsAreSelected:
 				self.AllItemsRadio.Widget.SetValue(True)
 			elif self.ItemsRequestedOnInit == info.FilteredItemsLabel:
 				self.FilteredItemsRadio.Widget.SetValue(True)
@@ -628,9 +629,10 @@ class AssocTextReportViewport(display_utilities.ViewportBaseClass):
 		# extract display-related parms to store in undo records
 		Zoom = XMLRoot.findtext(info.ZoomTag)
 		# prepare default reply if command unknown
-		Reply = vizop_misc.MakeXMLMessage(RootName='Fail', RootText='CommandNotRecognised')
+		Reply = vizop_misc.MakeXMLMessage(RootName='Fail', RootText='CommandNotRecognised631')
 		# handle incoming commands
-		if Command == 'RQ_ZZ_UpdateATExportAttribs': cls.UpdateATExportAttribs(Proj, XMLRoot)
+		print('AR633 handling command: ', Command)
+		if Command == 'RQ_ZZ_UpdateATExportAttribs': Reply = cls.UpdateATExportAttribs(Proj, XMLRoot)
 		if Reply.tag == 'Fail': print('AR591 command not recognised: ', Command)
 		return Reply
 
@@ -836,6 +838,7 @@ class AssocTextReportViewport(display_utilities.ViewportBaseClass):
 				BackgColour=TitleBackgColour, RelWidth=1.0, RelPosDirection=info.RightLabel)
 				ATT.Components.append(NextRefComponent)
 			# make rows for each AT to be shown
+			print('AR841 AT scope: ', self.GetScope() == info.AllItemsLabel)
 			for ThisAT in self.AssocTexts:
 				if (self.GetScope() == info.AllItemsLabel) or ThisAT.FilteredIn:
 					# make item number component
@@ -925,7 +928,9 @@ class AssocTextReportViewport(display_utilities.ViewportBaseClass):
 		# make a ExcelSheet object to populate with tables
 		MySheet = excel_export.ExcelTable_Sheet(TabName=TabName, TabColour=TabColour,
 			TargetWidth=AbsWSWidth)
-		# make the tables and put them in MySheet%%%
+		# update the filtered and selected status of ATs
+		self.UpdateATStatus()
+		# make the tables and put them in MySheet
 		if info.HeaderLabel in ShowWhat:
 			SummaryTable = MakeSummaryTable(Borders=HeavyBorder)
 			MySheet.Tables.append(SummaryTable)
@@ -935,6 +940,26 @@ class AssocTextReportViewport(display_utilities.ViewportBaseClass):
 		MySheet.PopulateSheet(WS=XLWorksheet, AbsSheetWidth=AbsWSWidth)
 		# write the Excel spreadsheet to file
 		excel_export.WriteWBToFile(WB=XLWorkbook, FilePath=FilePath)
+
+	def UpdateATStatus(self):
+		# Try to find an AT list Viewport showing the correct AT kind in this instance of Vizop.
+		# If it exists, ask it for the current status of the ATs it's displaying (which ones are filtered and selected)
+		# If no suitable AT list Viewport is found, set all ATs to filtered and selected.
+		# First, find any AT list Viewport with the same AT kind as this AT report Viewport
+		ATListViewport = ([v for v in self.Proj.ClientViewports if v.InternalName == 'AssocTextList'
+			if v.AssocTextKind == self.AssocTextKind] + [None])[0]
+		print('AR951 Viewport found: ', ATListViewport)
+		if ATListViewport:
+			# request AT list Viewport to provide lists of IDs of currently filtered and selected ATs
+			FilteredATIDs = ATListViewport.GetFilteredATIDs()
+			SelectedATIDs = ATListViewport.GetSelectedATIDs()
+			# set AT filtered and selected status to match the AT list Viewport
+			for ThisAT in self.AssocTexts:
+				ThisAT.FilteredIn = (ThisAT.ID in FilteredATIDs)
+				ThisAT.Selected = (ThisAT.ID in SelectedATIDs)
+		else: # no AT list Viewport found; set all AT filtered and selected status to True
+			for ThisAT in self.AssocTexts:
+				ThisAT.FilteredIn = ThisAT.Selected = True
 
 	def GetATStatusCounts(self, Scope=info.AllItemsLabel):
 		# make and return dict with keys = AT statuses, values = number of ATs in Scope
@@ -965,6 +990,7 @@ class AssocTextReportViewport(display_utilities.ViewportBaseClass):
 		self.AssocTexts = [] # start with empty list of AT items
 		# find the starting tag
 		StartTag = XMLTree.find(info.PHAModelRedrawDataTag)
+		print('AR968 in UnpackData with XMLTree: ', XMLTree, XMLTree.text)
 		# confirm it came from this Viewport class
 		assert StartTag.get(info.PHAModelTypeTag) == self.InternalName
 		# find subelement containing the kind of associated text

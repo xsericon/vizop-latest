@@ -1098,7 +1098,7 @@ class FTEvent(FTBoxyObject): # FT event object in Viewport
 	# Used for causes, IPLs, intermediate events, final events
 	NeedsConnectButton = True # whether to provide connect buttons
 	# Attribs are used by ParseFTData() to populate object's attributes from data transferred from datacore (may be redundant)
-	Attribs = [(info.IDTag, int, False), ('HumanName', str, False), ('Numbering', str, False), ('Description', str, False), ('Value', str, False),
+	Attribs = [(info.IDTag, int, False), ('EventTypeHumanName', str, False), ('Numbering', str, False), ('Description', str, False), ('Value', str, False),
 		('ValueUnit', str, False), ('Status', int, False), ('CanEditValue', bool, False), ('ShowActionItems', bool, False), ('BackgColour', 'rgb', False),
 		('DescriptionComment', str, True), ('ValueComment', str, True), ('ValueUnitComment', str, True),
 		('ValueKindComment', str, True), ('ActionItems', str, True), ('ConnectTo', int, True)]
@@ -1264,7 +1264,7 @@ class FTEvent(FTBoxyObject): # FT event object in Viewport
 		# (variable elements are populated in CreateVariableTextElements() )
 		# The following list contains (attribs of FTEvent, element's InternalName)
 		# It's a combined list for both DescriptionElements and ValueElements, hence the "if" below
-		AttribInfo = [('HumanName', 'EventType'), ('Value', 'Value'),
+		AttribInfo = [('EventTypeHumanName', 'EventType'), ('Value', 'Value'),
 					  ('ValueUnit', 'EventValueUnit'), ('ValueKind', 'EventValueKind')]
 		# put the content into the elements
 		for (Attrib, Name) in AttribInfo:
@@ -4750,7 +4750,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		PanX = XMLRoot.findtext(info.PanXTag)
 		PanY = XMLRoot.findtext(info.PanYTag)
 		# prepare default reply if command unknown
-		Reply = vizop_misc.MakeXMLMessage(RootName='Fail', RootText='CommandNotRecognised')
+		Reply = vizop_misc.MakeXMLMessage(RootName='Fail', RootText='CommandNotRecognised4753')
 		# process the command
 		if Command == 'RQ_FT_NewElement':
 			Reply = self.AddNewElement(Proj=Proj, ColNo=XMLRoot.findtext('ColNo'), Zoom=Zoom, PanX=PanX, PanY=PanY,
@@ -5504,7 +5504,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 					setattr(NewEvent, Attrib, [El.text for El in XMLObj.findall(Tag)])
 			# populate event type name: internal name and human name
 			NewEvent.EventType = XMLObj.find('EventType').text
-			NewEvent.HumanName = self.EventTypeNameHash[NewEvent.EventType]
+			NewEvent.EventTypeHumanName = self.EventTypeNameHash[NewEvent.EventType]
 			# populate event type choice
 			NewEvent.EventTypeComponent.ObjectChoices = [core_classes.ChoiceItem(XMLName=ThisTag.text,
 				HumanName=self.EventTypeNameHash[ThisTag.text],
@@ -5577,7 +5577,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 						NumberingList.append(NumberingTag.text)
 			# populate connector type name: internal name and human name
 			NewConnector.EventType = XMLObj.find('EventType').text
-			NewConnector.HumanName = self.EventTypeNameHash[NewConnector.EventType]
+			NewConnector.EventTypeHumanName = self.EventTypeNameHash[NewConnector.EventType]
 			# populate value kind choice
 			PopulateValueOptions(XMLRoot=XMLObj, HostEl=NewConnector, ComponentName='',
 				 ListAttrib='ValueKindOptions', OptionTagName=info.ValueKindOptionTag,
