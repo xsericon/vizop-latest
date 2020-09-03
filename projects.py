@@ -61,6 +61,8 @@ class ProjectFontItem(object): # virtual fonts for use with texts in PHA objects
 DefaultProjectFontItem = ProjectFontItem(_('<System default>'), '')
 
 class ProjectItem(object): # class of PHA project instances
+	# below: attrib lists containing project-level objects with numbering
+	ListsOfObjsWithNumbering = ['ActionItems', 'ParkingLot']
 
 	def __init__(self, ID): # ID (int): unique ID to assign to ProjectItem instance
 		assert isinstance(ID, int)
@@ -314,6 +316,12 @@ class ProjectItem(object): # class of PHA project instances
 					break
 		return MatchingViewport
 
+	def GetAllObjsWithNumberSystems(self):
+		# generator returning all project-level objects containing a numbering item.
+		for ThisAttribName in self.ListsOfObjsWithNumbering:
+			for ThisObj in getattr(self, ThisAttribName):
+				yield ThisObj
+
 	def ConvertProjectToXML(self, ProjectFilename):
 		# convert project to XML. Return the root element of the XML tree
 
@@ -377,6 +385,53 @@ class ProjectItem(object): # class of PHA project instances
 				else:
 					raise TypeError('Supplied attrib with type %s' % AttribType)
 
+		def AddValueElement(StartEl, ValueTag, ValueObj):
+			# add a subelement with tag = ValueTag (str) to StartEl (an ElementTree element), containing all required
+			# data for numerical value in ValueObj (instance of subclass of NumValueItem)
+			# Return the value subelement XML subelement
+			assert isinstance(StartEl, ElementTree.Element)
+			assert isinstance(ValueTag, str)
+			assert isinstance(ValueObj, core_classes.NumValueItem)
+			TopTag = ElementTree.SubElement(parent=StartEl, tag=ValueTag)
+			# add 'Kind' tag
+			ValueKindHash = {core_classes.UserNumValueItem: info.UserTag, core_classes.ConstNumValueItem: info.ConstantTag,
+				core_classes.LookupNumValueItem: info.LookupTag, core_classes.ParentNumValueItem: info.CopiedTag,
+				core_classes.UseParentValueItem: info.LinkedFromTag}
+			KindXML = ValueKindHash.get(type(ValueObj), info.UnknownTag)
+			KindTag = ElementTree.SubElement(parent=TopTag, tag=KindXML)
+			KindTag.text = KindXML
+			# populate sub-elements for each number kind
+			if KindXML in [info.UserTag, info.CopiedTag]:
+				for ThisRR in ValueObj.ValueFamily.keys():
+					ThisRRTag = ElementTree.SubElement(parent=TopTag, tag=info.RiskReceptorTag)
+					ThisRRIDTag = ElementTree.SubElement(parent=ThisRRTag, tag=info.IDTag)
+					ThisRRIDTag.text = ThisRR.ID
+					ThisRRValueTag = ElementTree.SubElement(parent=ThisRRTag, tag=info.ValueTag)
+					ThisRRValueTag.text = str(ValueObj.GetMyValue(RR=ThisRR))
+					if ValueObj.InfinityFlagFamily[ThisRR]:
+						ThisRRInfiniteTag = ElementTree.SubElement(parent=ThisRRTag, tag=info.InfiniteTag)
+						ThisRRInfiniteTag.text = info.TrueLabel
+				ThisUnitTag = ElementTree.SubElement(parent=TopTag, tag=info.UnitTag)
+				ThisUnitTag.text = ValueObj.GetMyUnit().XMLName
+				if KindXML == info.CopiedTag:
+					ThisCopiedFromTag = ElementTree.SubElement(parent=TopTag, tag=info.CopiedFromTag)
+					ThisCopiedFromTag.text = info.NoneTag if ValueObj.ParentPHAObj is None else ValueObj.ParentPHAObj.ID
+			elif KindXML == info.ConstantTag:
+				ThisIDTag = ElementTree.SubElement(parent=TopTag, tag=info.IDTag)
+				ThisIDTag.text = info.NoneTag if ValueObj.Constant is None else ValueObj.Constant.ID
+			elif KindXML == info.LookupTag:
+				ThisIDTag = ElementTree.SubElement(parent=TopTag, tag=info.IDTag)
+				ThisIDTag.text = info.NoneTag if ValueObj.LookupTable is None else ValueObj.LookupTable.ID
+				# add <Value> tag: if no lookup value defined, store 'None' as text, else store a value item
+				if ValueObj.InputValue is None:
+					ThisValueTag = ElementTree.SubElement(parent=TopTag, tag=info.ValueTag)
+					ThisValueTag.text = info.NoneTag
+				else: AddValueElement(StartEl=ThisValueTag, ValueTag=info.ValueTag, ValueObj=ValueObj.InputValue)
+			elif KindXML == info.LinkedFromTag: pass # TODO
+				ThisLinkedFromTag = ElementTree.SubElement(parent=TopTag, tag=info.LinkedFromTag)
+				ThisLinkedFromTag.text = info.NoneTag if ValueObj.ParentPHAObj is None else ValueObj.ParentPHAObj.ID
+			return TopTag
+
 		def AddProjectInformationTags(XMLRoot):
 			# add project information tags to XMLRoot
 			ShortTitleElement = ElementTree.SubElement(parent=XMLRoot, tag=info.ShortTitleTag)
@@ -427,31 +482,91 @@ class ProjectItem(object): # class of PHA project instances
 							info.SkipToTag: 'SkipTo'})
 			return AllNumberingSystems
 
-		def AddSimpleStructuredObjectTags(XMLRoot):
+		def AddSimpleStructuredObjectTags(XMLRoot, NumberingSystemHash):
 			# add tags for simple cases of structured objects: process units, risk receptors, constants, action items,
 			# and parking lot items
-			# SOInfo contains a tuple for each kind of structured object:
+			# SOInfo contains a tuple for some kinds of structured object:
 			# Attrib name in project, XML tag,
 			# SubElements (dict with keys = XML tags for individual attribs, values = attrib names)
-			#  %%%
 			SOInfo = [ ('ProcessUnits', info.ProcessUnitTag, {info.IDTag: info.IDAttribName,
 				info.UnitNumberTag: info.UnitNumberAttribName,
 				info.ShortNameTag: info.ShortNameAttribName, info.LongNameTag: info.LongNameAttribName} ),
-				('RiskReceptors', info.RiskReceptorTag, {info.IDTag: info.IDAttribName, info.NameTag: 'Name'}),
-				('Constants', info.ConstantTag, {info.IDTag: info.IDAttribName, info.NameTag: 'Name'}),
-				('ActionItems', info.ActionItemTag, {info.IDTag: info.IDAttribName, 'Text': 'Content',
-				info.ResponsibilityTag: 'Responsibility', info.DeadlineTag: 'Deadline',
-				info.StatusTag: 'Status'}),
-				('ParkingLot', info.ParkingLotItemTag, {info.IDTag: info.IDAttribName, 'Text': 'Content',
-				info.ResponsibilityTag: 'Responsibility', info.DeadlineTag: 'Deadline',
-				info.StatusTag: 'Status'}) ]
-				# ActionItems, parking lot items: still need to add Numbering (do this next)
-				# Constants: need to add ConstValue
-				# Still to do: comments, risk matrices
+				('RiskReceptors', info.RiskReceptorTag, {info.IDTag: info.IDAttribName, info.NameTag: 'Name'}) ]
 			for ThisSOKindName, TagName, SubElements in SOInfo:
 				for ThisSO in getattr(self, ThisSOKindName):
 					ThisSOElement = MakeStructuredElement(StartEl=XMLRoot, SubElTag=TagName, DataObj=ThisSO,
 						SubElements=SubElements)
+			# add action items, with numbering tag
+			for ThisActionItem in self.ActionItems:
+				ThisATTag = ElementTree.SubElement(parent=XMLRoot, tag=info.ActionItemTag)
+				AddAttribsInSubelements(StartEl=ThisATTag, DataObj=ThisActionItem,
+					SubElements={info.IDTag: info.IDAttribName, 'Text': 'Content',
+					info.ResponsibilityTag: 'Responsibility', info.DeadlineTag: 'Deadline',
+					info.StatusTag: 'Status'})
+				ThisNumberingTag = ElementTree.SubElement(parent=ThisATTag, tag=info.NumberingTag)
+				ThisNumberingTag.text = str(NumberingSystemHash[ThisActionItem])
+			# add parking lot items, with numbering tag
+			for ThisParkingLotItem in self.ParkingLot:
+				ThisATTag = ElementTree.SubElement(parent=XMLRoot, tag=info.ParkingLotItemTag)
+				AddAttribsInSubelements(StartEl=ThisATTag, DataObj=ThisParkingLotItem,
+					SubElements={info.IDTag: info.IDAttribName, 'Text': 'Content',
+					info.ResponsibilityTag: 'Responsibility', info.DeadlineTag: 'Deadline',
+					info.StatusTag: 'Status'})
+				ThisNumberingTag = ElementTree.SubElement(parent=ThisATTag, tag=info.NumberingTag)
+				ThisNumberingTag.text = str(NumberingSystemHash[ThisParkingLotItem])
+			# add Constants
+			for ThisConstant in self.Constants:
+				ThisConstantTag = ElementTree.SubElement(parent=XMLRoot, tag=info.ConstantTag)
+				AddAttribsInSubelements(StartEl=ThisATTag, DataObj=ThisActionItem,
+					SubElements={info.IDTag: info.IDAttribName, info.NameTag: 'HumanName'})
+				AddValueElement(StartEl=ThisConstantTag, ValueTag=info.ConstValueTag, ValueObj=ThisConstant)
+			# add risk matrices
+			for ThisMatrix in self.RiskMatrices:
+				ThisMatrixTag = ElementTree.SubElement(parent=XMLRoot, tag=info.RiskMatrixTag)
+				# store categories
+				for ThisDimensionCatList in ThisMatrix.Keys:
+					for ThisCat in ThisDimensionCatList:
+						MakeStructuredElement(StartEl=ThisMatrixTag, SubElTag=info.CategoryTag, DataObj=ThisCat,
+							SubElements={info.XMLNameTag: 'XMLName', info.HumanNameTag: 'HumanName',
+							info.DescriptionTag: 'HumanDescription'})
+				# store severity dimension index
+				SeverityDimIndexTag = ElementTree.SubElement(parent=ThisMatrixTag, tag=info.SeverityDimensionTag)
+				SeverityDimIndexTag.text = info.NoneTag if ThisMatrix.SeverityDimensionIndex is None \
+					else str(ThisMatrix.SeverityDimensionIndex)
+				# store dimension names and the keys in each dimension
+				for ThisDimensionIndex in range(ThisMatrix.HowManyDimensions):
+					DimensionTag = ElementTree.SubElement(parent=ThisMatrixTag, tag=info.DimensionTag)
+					NameTag = ElementTree.SubElement(parent=DimensionTag, tag=info.NameTag)
+					NameTag.text = ThisMatrix.DimensionHumanNames[ThisDimensionIndex]
+					UnitTag = ElementTree.SubElement(parent=DimensionTag, tag=info.UnitTag)
+					UnitTag.text = ThisMatrix.DimensionUnits[ThisDimensionIndex].XMLName
+					# store keys for this dimension
+					for ThisKey in ThisMatrix.Keys[ThisDimensionIndex]:
+						KeyTag = ElementTree.SubElement(parent=DimensionTag, tag=info.KeyTag)
+						XMLNameTag = ElementTree.SubElement(parent=KeyTag, tag=info.XMLNameTag)
+						XMLNameTag.text = ThisKey.XMLName
+				# store values for the matrix
+				for ThisValue in utilities.flatten(ThisMatrix.Values):
+					AddValueElement(StartEl=ThisMatrixTag, ValueTag=info.ValueTag, ValueObj=ThisValue)
+
+		def AddPHAObjTags(XMLRoot, NumberingSystemHash):
+			# add tags for each PHA object in the project. Return comment hash (dict):
+			# Keys are comment IDs (str), values are comment texts (str)
+			CommentHash = {}
+			MaxCommentIDSoFar = 0
+			for ThisPHAObj in self.PHAObjs:
+				ThisPHAObjTag = ElementTree.SubElement(parent=XMLRoot, tag=info.PHAObjTag)
+				ThisKindTag = ElementTree.SubElement(parent=ThisPHAObjTag, tag=info.KindTag)
+				ThisKindTag.text = type(ThisPHAObj).InternalName
+				ThisIDTag = ElementTree.SubElement(parent=ThisPHAObjTag, tag=info.IDTag)
+				ThisIDTag.text = ThisPHAObj.ID
+				# ask the PHA object to add all of its own data in ThisPHAObjTag, and return all comments found%%%
+				ThisCommentHash, MaxCommentIDSoFar = ThisPHAObj.StoreAllDataInXML(StartTag=ThisPHAObjTag,
+					NumberingSystemHash=NumberingSystemHash, MaxCommentIDSoFar=MaxCommentIDSoFar)
+				assert isinstance(ThisCommentHash, dict)
+				assert isinstance(MaxCommentIDSoFar, int)
+				CommentHash.update(ThisCommentHash)
+			return CommentHash
 
 		# start of main procedure for ConvertProjectToXML()
 		assert isinstance(ProjectFilename, str)
@@ -465,8 +580,15 @@ class ProjectItem(object): # class of PHA project instances
 		AddProjectInformationTags(XMLRoot=MyXMLRoot)
 		# add numbering system tags
 		NumberingSystems = AddNumberingSystemTags(XMLRoot=MyXMLRoot)
+		# make a numbering system hash for all numbered objects in the project:
+		# keys are objects, values are numbering system indices
+		NumberingSystemHash = {}
+		for ThisIndex, ThisObjList in enumerate(NumberingSystems):
+			NumberingSystemHash.update(dict([(ThisObj, ThisIndex) for ThisObj in ThisObjList]))
 		# add structured object tags for simple objects
-		AddSimpleStructuredObjectTags(XMLRoot=MyXMLRoot)
+		AddSimpleStructuredObjectTags(XMLRoot=MyXMLRoot, NumberingSystemHash=NumberingSystemHash)
+		# add tags for each PHA object
+		AddPHAObjTags(XMLRoot=MyXMLRoot, NumberingSystemHash=NumberingSystemHash)
 
 		#Process Units
 		if len(self.ProcessUnits) > 0:
@@ -1315,8 +1437,8 @@ def GetAllNumberingSystems(Proj):
 	assert isinstance(Proj, ProjectItem)
 	NumSystems = [] # a list of all unique number systems found
 	NumSystemsUsageLists = [] # list of lists of PHA objects, for return
-	# iterate over all PHA objects that contain number systems
-	for ThisPHAObj in Proj.PHAObjs:
+	# iterate over all PHA objects that contain number systems, plus the project itself (to capture e.g. action items)
+	for ThisPHAObj in [Proj] + Proj.PHAObjs:
 		for ThisElement in ThisPHAObj.GetAllObjsWithNumberSystems():
 			ThisNumSystem = ThisElement.Numbering
 			# check for a matching number system in NumSystems (can't just use 'in' as they are different objects,

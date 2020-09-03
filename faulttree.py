@@ -3395,7 +3395,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			if (FirstTime or (Old1stRROnDisplay in g))][0]
 
 	def GetAllObjsWithNumberSystems(self):
-		# a generator yielding FT components from FT that contain numbering systems
+		# a generator yielding FT elements from FT that contain numbering systems
 		# This is a required method for all PHA object classes
 		# first, return the FT itself
 		yield self
