@@ -2262,7 +2262,7 @@ class ControlFrame(wx.Frame):
 		# Set up the "File" menu
 		FileMenu = wx.Menu()
 		Savemitem = FileMenu.Append(-1, _('&Save Vizop project'), '')
-		self.Bind(wx.EVT_MENU, projects.SaveEntireProjectRequest, Savemitem)
+		self.Bind(wx.EVT_MENU, self.OnSaveEntireProjectRequest, Savemitem)
 		FileMenu.AppendSeparator() # add a separating line in the menu
 
 		self.ActionItemsReportmitemID = wx.NewId()
@@ -2396,6 +2396,14 @@ class ControlFrame(wx.Frame):
 		if not ReturnArgs['SkipRefresh']: # update GUI
 			self.UpdateMenuStatus() # update menu status to show next un/redoable action
 			self.MyControlPanel.UpdateNavigationButtonStatus(Proj=self.CurrentProj)
+
+	def OnSaveEntireProjectRequest(self, Event=None):
+		# save entire project
+		# variables and methods for testing purpose
+		print('CF2403 saving project file')
+		test_OutputPath = '/Users/peter/Downloads/'
+		test_OutputFileName = 'VizopProject1.xml'
+		projects.SaveEntireProject(Proj=self.CurrentProj, OutputFilename=test_OutputPath + test_OutputFileName, Close=True)
 
 	def OnClose(self, event):
 		# do cleanup tasks when Control frame is closed. Called when EVT_CLOSE is raised

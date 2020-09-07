@@ -1022,6 +1022,14 @@ class AssocTextReportViewport(display_utilities.ViewportBaseClass):
 		return [w.XMLLabel for w in [self.DialogueAspect.AllItemsRadio, self.DialogueAspect.FilteredItemsRadio]
 			if w.Widget.GetValue()][0]
 
+	def StoreAllDataInXML(self, StartTag):
+		# create an XML element as a subelement of StartTag (ElementTree.Element) and populate it with all Viewport
+		# data required to be stored in project file.
+		assert isinstance(StartTag, ElementTree.Element)
+		# First, make top level XML element, and add common tags
+		TopTag = projects.StoreViewportCommonDataInXML(Viewport=self, StartTag=StartTag)
+		# TODO add any more tags that should be stored
+
 class AssocTextItemInDisplay(object):
 	# data for associated text items for display. Reflects data held in the actual associated text items in datacore
 

@@ -697,6 +697,14 @@ class ProjectInfoModelForDisplay(display_utilities.ViewportBaseClass): # object 
 		self.DisplDevice = None
 #		self.MyNotebook.Hide()
 
+	def StoreAllDataInXML(self, StartTag):
+		# create an XML element as a subelement of StartTag (ElementTree.Element) and populate it with all Viewport
+		# data required to be stored in project file.
+		assert isinstance(StartTag, ElementTree.Element)
+		# First, make top level XML element, and add common tags
+		TopTag = projects.StoreViewportCommonDataInXML(Viewport=self, StartTag=StartTag)
+		# TODO add any more tags that should be stored
+
 def AddPHAObjsTags(Proj, XMLRoot, CurrentPHAObj=None):
 	# add PHAObjects tags to XMLRoot (an ElementTree XML element) providing info about all PHA objects in Proj.
 	# CurrentPHAObj (a PHAModel subclass instance): which PHA Object is currently displayed. This one will be flagged

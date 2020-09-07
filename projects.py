@@ -322,7 +322,7 @@ class ProjectItem(object): # class of PHA project instances
 			for ThisObj in getattr(self, ThisAttribName):
 				yield ThisObj
 
-	def ConvertProjectToXML(self, ProjectFilename):
+	def ConvertProjectToXML(self):
 		# convert project to XML. Return the root element of the XML tree
 
 		def LegalString(InStr, Strip=True, FilterForbiddenChar=False, NoSpace=False) -> str:
@@ -351,9 +351,9 @@ class ProjectItem(object): # class of PHA project instances
 			assert isinstance(SubElTag, str)
 			assert SubElTag.strip() # ensure not empty string
 			assert isinstance(SubElements, dict)
-			TopEl = ElementTree.SubElement(parent=StartEl, tag=SubElTag)
+			TopEl = ElementTree.SubElement(StartEl, SubElTag)
 			for ThisTag, ThisAttribName in SubElements.items():
-				SubEl = ElementTree.SubElement(parent=TopEl, tag=ThisTag)
+				SubEl = ElementTree.SubElement(TopEl, ThisTag)
 				AttribType = type(getattr(DataObj, ThisAttribName))
 				if AttribType is str:
 					SubEl.text = LegalString(InStr=str(getattr(DataObj, ThisAttribName)))
@@ -364,88 +364,20 @@ class ProjectItem(object): # class of PHA project instances
 					raise TypeError('Supplied attrib with type %s' % AttribType)
 			return TopEl
 
-		def AddAttribsInSubelements(StartEl, DataObj, SubElements):
-			# add subelements to StartEl, whose text is the attrib value in DataObj specified in SubElements
-			# (dict with keys = subelement tags, values = attrib names in DataObj)
-			# Attrib values in DataObj can be str, int, bool, or None. If bool, they are converted to 'True' or 'False'.
-			# If None, the value info.NoneTag is stored.
-			assert isinstance(StartEl, ElementTree.Element)
-			assert isinstance(SubElements, dict)
-			for ThisTag, ThisAttribName in SubElements.items():
-				SubEl = ElementTree.SubElement(parent=StartEl, tag=ThisTag)
-				AttribType = type(getattr(DataObj, ThisAttribName))
-				if AttribType is str:
-					SubEl.text = LegalString(InStr=str(getattr(DataObj, ThisAttribName)))
-				elif AttribType is int:
-					SubEl.text = str(getattr(DataObj, ThisAttribName))
-				elif AttribType is bool:
-					SubEl.text = utilities.Bool2Str(Input=getattr(DataObj, ThisAttribName), TrueStr='True',
-						FalseStr='False')
-				elif getattr(DataObj, ThisAttribName) is None: SubEl.text = info.NoneTag
-				else:
-					raise TypeError('Supplied attrib with type %s' % AttribType)
-
-		def AddValueElement(StartEl, ValueTag, ValueObj):
-			# add a subelement with tag = ValueTag (str) to StartEl (an ElementTree element), containing all required
-			# data for numerical value in ValueObj (instance of subclass of NumValueItem)
-			# Return the value subelement XML subelement
-			assert isinstance(StartEl, ElementTree.Element)
-			assert isinstance(ValueTag, str)
-			assert isinstance(ValueObj, core_classes.NumValueItem)
-			TopTag = ElementTree.SubElement(parent=StartEl, tag=ValueTag)
-			# add 'Kind' tag
-			ValueKindHash = {core_classes.UserNumValueItem: info.UserTag, core_classes.ConstNumValueItem: info.ConstantTag,
-				core_classes.LookupNumValueItem: info.LookupTag, core_classes.ParentNumValueItem: info.CopiedTag,
-				core_classes.UseParentValueItem: info.LinkedFromTag}
-			KindXML = ValueKindHash.get(type(ValueObj), info.UnknownTag)
-			KindTag = ElementTree.SubElement(parent=TopTag, tag=KindXML)
-			KindTag.text = KindXML
-			# populate sub-elements for each number kind
-			if KindXML in [info.UserTag, info.CopiedTag]:
-				for ThisRR in ValueObj.ValueFamily.keys():
-					ThisRRTag = ElementTree.SubElement(parent=TopTag, tag=info.RiskReceptorTag)
-					ThisRRIDTag = ElementTree.SubElement(parent=ThisRRTag, tag=info.IDTag)
-					ThisRRIDTag.text = ThisRR.ID
-					ThisRRValueTag = ElementTree.SubElement(parent=ThisRRTag, tag=info.ValueTag)
-					ThisRRValueTag.text = str(ValueObj.GetMyValue(RR=ThisRR))
-					if ValueObj.InfinityFlagFamily[ThisRR]:
-						ThisRRInfiniteTag = ElementTree.SubElement(parent=ThisRRTag, tag=info.InfiniteTag)
-						ThisRRInfiniteTag.text = info.TrueLabel
-				ThisUnitTag = ElementTree.SubElement(parent=TopTag, tag=info.UnitTag)
-				ThisUnitTag.text = ValueObj.GetMyUnit().XMLName
-				if KindXML == info.CopiedTag:
-					ThisCopiedFromTag = ElementTree.SubElement(parent=TopTag, tag=info.CopiedFromTag)
-					ThisCopiedFromTag.text = info.NoneTag if ValueObj.ParentPHAObj is None else ValueObj.ParentPHAObj.ID
-			elif KindXML == info.ConstantTag:
-				ThisIDTag = ElementTree.SubElement(parent=TopTag, tag=info.IDTag)
-				ThisIDTag.text = info.NoneTag if ValueObj.Constant is None else ValueObj.Constant.ID
-			elif KindXML == info.LookupTag:
-				ThisIDTag = ElementTree.SubElement(parent=TopTag, tag=info.IDTag)
-				ThisIDTag.text = info.NoneTag if ValueObj.LookupTable is None else ValueObj.LookupTable.ID
-				# add <Value> tag: if no lookup value defined, store 'None' as text, else store a value item
-				if ValueObj.InputValue is None:
-					ThisValueTag = ElementTree.SubElement(parent=TopTag, tag=info.ValueTag)
-					ThisValueTag.text = info.NoneTag
-				else: AddValueElement(StartEl=ThisValueTag, ValueTag=info.ValueTag, ValueObj=ValueObj.InputValue)
-			elif KindXML == info.LinkedFromTag: pass # TODO
-				ThisLinkedFromTag = ElementTree.SubElement(parent=TopTag, tag=info.LinkedFromTag)
-				ThisLinkedFromTag.text = info.NoneTag if ValueObj.ParentPHAObj is None else ValueObj.ParentPHAObj.ID
-			return TopTag
-
 		def AddProjectInformationTags(XMLRoot):
 			# add project information tags to XMLRoot
-			ShortTitleElement = ElementTree.SubElement(parent=XMLRoot, tag=info.ShortTitleTag)
+			ShortTitleElement = ElementTree.SubElement(XMLRoot, info.ShortTitleTag)
 			ShortTitleElement.text = LegalString(InStr=self.ShortTitle)
-			ProjNumberElement = ElementTree.SubElement(parent=XMLRoot, tag=info.ProjNumberTag)
+			ProjNumberElement = ElementTree.SubElement(XMLRoot, info.ProjNumberTag)
 			ProjNumberElement.text = LegalString(InStr=self.ProjNumber)
-			ProjDescriptionElement = ElementTree.SubElement(parent=XMLRoot, tag=info.DescriptionTag)
+			ProjDescriptionElement = ElementTree.SubElement(XMLRoot, info.DescriptionTag)
 			ProjDescriptionElement.text = LegalString(InStr=self.Description)
-			EditNumberElement = ElementTree.SubElement(parent=XMLRoot, tag=info.EditNumberTag)
+			EditNumberElement = ElementTree.SubElement(XMLRoot, info.EditNumberTag)
 			EditNumberElement.text = str(self.EditNumber)
 			# add TeamMember tags
-			TMTopElement = ElementTree.SubElement(parent=XMLRoot, tag=info.TeamMembersTag)
+			TMTopElement = ElementTree.SubElement(XMLRoot, info.TeamMembersTag)
 			for ThisTM in self.TeamMembers:
-				TMElement = ElementTree.SubElement(parent=TMTopElement, tag=info.TeamMemberTag,
+				TMElement = ElementTree.SubElement(TMTopElement, info.TeamMemberTag,
 					attrib={info.NameTag: LegalString(InStr=ThisTM.Name), info.RoleTag: LegalString(InStr=ThisTM.Role),
 					info.AffiliationTag: LegalString(InStr=ThisTM.Affiliation)})
 				TMElement.text = ThisTM.ID
@@ -455,9 +387,9 @@ class ProjectItem(object): # class of PHA project instances
 			AllNumberingSystems = GetAllNumberingSystems(Proj=self)
 			# write a tag for each NS
 			for ThisNSIndex, ThisNSElementList in enumerate(AllNumberingSystems):
-				ThisNSElement = ElementTree.SubElement(parent=XMLRoot, tag=info.NumberSystemTag)
+				ThisNSElement = ElementTree.SubElement(XMLRoot, info.NumberSystemTag)
 				# store an 'ID' for the NS = its index in AllNumberingSystems
-				ThisIDTag = ElementTree.SubElement(parent=ThisNSElement, tag=info.IDTag)
+				ThisIDTag = ElementTree.SubElement(ThisNSElement, info.IDTag)
 				ThisIDTag.text = str(ThisNSIndex)
 				ThisNS = ThisNSElementList[0].Numbering # pick the NS from one of the elements in the list
 				# store Chunk subelements for this NS
@@ -467,12 +399,12 @@ class ProjectItem(object): # class of PHA project instances
 						info.ShowInOutputTag: 'ShowInOutput', info.NumberChunkKindTag: 'XMLName'})
 					# add specific XML tags for each chunk kind
 					if ThisChunk.XMLName == info.NumberSystemStringType:
-						ValueTag = ElementTree.SubElement(parent=ThisChunkTag, tag=info.ValueTag)
+						ValueTag = ElementTree.SubElement(ThisChunkTag, info.ValueTag)
 						ValueTag.text = LegalString(InStr=ThisChunk.Value)
 					elif ThisChunk.XMLName == info.NumberSystemParentType:
-						IDTag = ElementTree.SubElement(parent=ThisChunkTag, tag=info.IDTag)
+						IDTag = ElementTree.SubElement(ThisChunkTag, info.IDTag)
 						IDTag.text = ThisChunk.Source.ID
-						LevelsTag = ElementTree.SubElement(parent=ThisChunkTag, tag=info.LevelsTag)
+						LevelsTag = ElementTree.SubElement(ThisChunkTag, info.LevelsTag)
 						LevelsTag.text = str(ThisChunk.HierarchyLevels)
 					elif ThisChunk.XMLName == info.NumberSystemSerialType:
 						AddAttribsInSubelements(StartEl=ThisChunkTag, DataObj=ThisChunk,
@@ -498,31 +430,31 @@ class ProjectItem(object): # class of PHA project instances
 						SubElements=SubElements)
 			# add action items, with numbering tag
 			for ThisActionItem in self.ActionItems:
-				ThisATTag = ElementTree.SubElement(parent=XMLRoot, tag=info.ActionItemTag)
+				ThisATTag = ElementTree.SubElement(XMLRoot, info.ActionItemTag)
 				AddAttribsInSubelements(StartEl=ThisATTag, DataObj=ThisActionItem,
 					SubElements={info.IDTag: info.IDAttribName, 'Text': 'Content',
 					info.ResponsibilityTag: 'Responsibility', info.DeadlineTag: 'Deadline',
 					info.StatusTag: 'Status'})
-				ThisNumberingTag = ElementTree.SubElement(parent=ThisATTag, tag=info.NumberingTag)
+				ThisNumberingTag = ElementTree.SubElement(ThisATTag, info.NumberingTag)
 				ThisNumberingTag.text = str(NumberingSystemHash[ThisActionItem])
 			# add parking lot items, with numbering tag
 			for ThisParkingLotItem in self.ParkingLot:
-				ThisATTag = ElementTree.SubElement(parent=XMLRoot, tag=info.ParkingLotItemTag)
+				ThisATTag = ElementTree.SubElement(XMLRoot, info.ParkingLotItemTag)
 				AddAttribsInSubelements(StartEl=ThisATTag, DataObj=ThisParkingLotItem,
 					SubElements={info.IDTag: info.IDAttribName, 'Text': 'Content',
 					info.ResponsibilityTag: 'Responsibility', info.DeadlineTag: 'Deadline',
 					info.StatusTag: 'Status'})
-				ThisNumberingTag = ElementTree.SubElement(parent=ThisATTag, tag=info.NumberingTag)
+				ThisNumberingTag = ElementTree.SubElement(ThisATTag, info.NumberingTag)
 				ThisNumberingTag.text = str(NumberingSystemHash[ThisParkingLotItem])
 			# add Constants
 			for ThisConstant in self.Constants:
-				ThisConstantTag = ElementTree.SubElement(parent=XMLRoot, tag=info.ConstantTag)
+				ThisConstantTag = ElementTree.SubElement(XMLRoot, info.ConstantTag)
 				AddAttribsInSubelements(StartEl=ThisATTag, DataObj=ThisActionItem,
 					SubElements={info.IDTag: info.IDAttribName, info.NameTag: 'HumanName'})
 				AddValueElement(StartEl=ThisConstantTag, ValueTag=info.ConstValueTag, ValueObj=ThisConstant)
 			# add risk matrices
 			for ThisMatrix in self.RiskMatrices:
-				ThisMatrixTag = ElementTree.SubElement(parent=XMLRoot, tag=info.RiskMatrixTag)
+				ThisMatrixTag = ElementTree.SubElement(XMLRoot, info.RiskMatrixTag)
 				# store categories
 				for ThisDimensionCatList in ThisMatrix.Keys:
 					for ThisCat in ThisDimensionCatList:
@@ -530,20 +462,20 @@ class ProjectItem(object): # class of PHA project instances
 							SubElements={info.XMLNameTag: 'XMLName', info.HumanNameTag: 'HumanName',
 							info.DescriptionTag: 'HumanDescription'})
 				# store severity dimension index
-				SeverityDimIndexTag = ElementTree.SubElement(parent=ThisMatrixTag, tag=info.SeverityDimensionTag)
+				SeverityDimIndexTag = ElementTree.SubElement(ThisMatrixTag, info.SeverityDimensionTag)
 				SeverityDimIndexTag.text = info.NoneTag if ThisMatrix.SeverityDimensionIndex is None \
 					else str(ThisMatrix.SeverityDimensionIndex)
 				# store dimension names and the keys in each dimension
 				for ThisDimensionIndex in range(ThisMatrix.HowManyDimensions):
-					DimensionTag = ElementTree.SubElement(parent=ThisMatrixTag, tag=info.DimensionTag)
-					NameTag = ElementTree.SubElement(parent=DimensionTag, tag=info.NameTag)
+					DimensionTag = ElementTree.SubElement(ThisMatrixTag, info.DimensionTag)
+					NameTag = ElementTree.SubElement(DimensionTag, info.NameTag)
 					NameTag.text = ThisMatrix.DimensionHumanNames[ThisDimensionIndex]
-					UnitTag = ElementTree.SubElement(parent=DimensionTag, tag=info.UnitTag)
+					UnitTag = ElementTree.SubElement(DimensionTag, info.UnitTag)
 					UnitTag.text = ThisMatrix.DimensionUnits[ThisDimensionIndex].XMLName
 					# store keys for this dimension
 					for ThisKey in ThisMatrix.Keys[ThisDimensionIndex]:
-						KeyTag = ElementTree.SubElement(parent=DimensionTag, tag=info.KeyTag)
-						XMLNameTag = ElementTree.SubElement(parent=KeyTag, tag=info.XMLNameTag)
+						KeyTag = ElementTree.SubElement(DimensionTag, info.KeyTag)
+						XMLNameTag = ElementTree.SubElement(KeyTag, info.XMLNameTag)
 						XMLNameTag.text = ThisKey.XMLName
 				# store values for the matrix
 				for ThisValue in utilities.flatten(ThisMatrix.Values):
@@ -555,12 +487,12 @@ class ProjectItem(object): # class of PHA project instances
 			CommentHash = {}
 			MaxCommentIDSoFar = 0
 			for ThisPHAObj in self.PHAObjs:
-				ThisPHAObjTag = ElementTree.SubElement(parent=XMLRoot, tag=info.PHAObjTag)
-				ThisKindTag = ElementTree.SubElement(parent=ThisPHAObjTag, tag=info.KindTag)
+				ThisPHAObjTag = ElementTree.SubElement(XMLRoot, info.PHAObjTag)
+				ThisKindTag = ElementTree.SubElement(ThisPHAObjTag, info.KindTag)
 				ThisKindTag.text = type(ThisPHAObj).InternalName
-				ThisIDTag = ElementTree.SubElement(parent=ThisPHAObjTag, tag=info.IDTag)
+				ThisIDTag = ElementTree.SubElement(ThisPHAObjTag, info.IDTag)
 				ThisIDTag.text = ThisPHAObj.ID
-				# ask the PHA object to add all of its own data in ThisPHAObjTag, and return all comments found%%%
+				# ask the PHA object to add all of its own data in ThisPHAObjTag, and return all comments found
 				ThisCommentHash, MaxCommentIDSoFar = ThisPHAObj.StoreAllDataInXML(StartTag=ThisPHAObjTag,
 					NumberingSystemHash=NumberingSystemHash, MaxCommentIDSoFar=MaxCommentIDSoFar)
 				assert isinstance(ThisCommentHash, dict)
@@ -568,10 +500,24 @@ class ProjectItem(object): # class of PHA project instances
 				CommentHash.update(ThisCommentHash)
 			return CommentHash
 
+		def AddAssociatedTextTags(XMLRoot, NumberingSystemHash):
+			# add tags for action items and parking lot
+			for ThisATKindName, ThisATKindTag in [('ActionItems', info.ActionItemTag),
+				('ParkingLot', info.ParkingLotItemTag)]:
+				for ThisAT in getattr(self, ThisATKindName):
+					ThisATTag =  ElementTree.SubElement(XMLRoot, ThisATKindTag)
+					AddAttribsInSubelements(StartEl=ThisATTag, DataObj=ThisAT,
+						SubElements={info.IDTag: 'ID', info.ContentTag: 'Content',
+						info.ResponsibilityTag: info.ResponsibilityLabel, info.DeadlineTag: info.DeadlineLabel,
+						info.StatusTag: info.StatusLabel})
+					# add Numbering tag
+					ThisNumberingTag = ElementTree.SubElement(ThisATTag, info.NumberingTag)
+					ThisNumberingTag.text = NumberingSystemHash[ThisAT]
+
 		# start of main procedure for ConvertProjectToXML()
-		assert isinstance(ProjectFilename, str)
 		# First, create XML tree containing root XML element
-		MyXMLRoot = ElementTree.Element(tag=info.ProjectRootTag, attrib={info.VizopVersionTag: info.VERSION})
+#		MyXMLRoot = ElementTree.Element(tag=info.ProjectRootTag, attrib={info.VizopVersionTag: info.VERSION})
+		MyXMLRoot = ElementTree.Element(info.ProjectRootTag)
 		MyXMLTree = ElementTree.ElementTree(element=MyXMLRoot)
 #		# set the skeleton as the XML tree root element
 #		MyXMLTree._setroot(ET.fromstring(projects.XMLTreeSkeleton))
@@ -588,554 +534,17 @@ class ProjectItem(object): # class of PHA project instances
 		# add structured object tags for simple objects
 		AddSimpleStructuredObjectTags(XMLRoot=MyXMLRoot, NumberingSystemHash=NumberingSystemHash)
 		# add tags for each PHA object
-		AddPHAObjTags(XMLRoot=MyXMLRoot, NumberingSystemHash=NumberingSystemHash)
-
-		#Process Units
-		if len(self.ProcessUnits) > 0:
-			# create outer XML tag
-			MyXMLRoot_ProcessUnits = ET.SubElement(MyXMLRoot, info.ProcessUnitsTag)
-
-			for each_ProcessUnit in self.ProcessUnits:
-				MyXMLRoot_ProcessUnits_ProcessUnit = ET.SubElement(MyXMLRoot_ProcessUnits, info.ProcessUnitTag)
-				assert type(each_ProcessUnit) == projects.ProcessUnit
-
-				# <ID [ID int as str] />
-				MyXMLRoot_ProcessUnits_ProcessUnit_ID = ET.SubElement(MyXMLRoot_ProcessUnits_ProcessUnit, info.IDTag)
-				MyXMLRoot_ProcessUnits_ProcessUnit_ID.text = pS(str(each_ProcessUnit.ID))
-
-				# <UnitNumber [UnitNumber as str] />
-				MyXMLRoot_ProcessUnits_ProcessUnit_UnitNumber = ET.SubElement(MyXMLRoot_ProcessUnits_ProcessUnit, info.UnitNumberTag)
-				MyXMLRoot_ProcessUnits_ProcessUnit_UnitNumber.text = pS(str(each_ProcessUnit.UnitNumber))
-
-				# <ShortName [ShortName as str] />
-				MyXMLRoot_ProcessUnits_ProcessUnit_ShortName = ET.SubElement(MyXMLRoot_ProcessUnits_ProcessUnit, info.ShortNameTag)
-				MyXMLRoot_ProcessUnits_ProcessUnit_ShortName.text = pS(str(each_ProcessUnit.ShortName))
-
-				# <LongName [LongName as str] />
-				MyXMLRoot_ProcessUnits_ProcessUnit_LongName = ET.SubElement(MyXMLRoot_ProcessUnits_ProcessUnit, info.LongNameTag)
-				MyXMLRoot_ProcessUnits_ProcessUnit_LongName.text = pS(str(each_ProcessUnit.LongName))
-
-		#Risk Receptors
-		if len(self.RiskReceptors) > 0:
-			# create outer XML tag
-			MyXMLRoot_RiskReceptors = ET.SubElement(MyXMLRoot, info.RiskReceptorsTag)
-
-			for each_RiskReceptor in self.RiskReceptors:
-				assert type(each_RiskReceptor) == core_classes.RiskReceptorItem
-				MyXMLRoot_RiskReceptors_RiskReceptor = ET.SubElement(MyXMLRoot_RiskReceptors, info.RiskReceptorTag)
-
-				# <ID [ID int as str] />
-				MyXMLRoot_RiskReceptors_RiskReceptor_ID = ET.SubElement(MyXMLRoot_RiskReceptors_RiskReceptor, info.IDTag)
-				MyXMLRoot_RiskReceptors_RiskReceptor_ID.text = pS(str(each_RiskReceptor.ID))
-
-				#<Name [HumanName as str] />
-				MyXMLRoot_RiskReceptors_RiskReceptor_HumanName = ET.SubElement(MyXMLRoot_RiskReceptors_RiskReceptor, info.NameTag)
-				MyXMLRoot_RiskReceptors_RiskReceptor_HumanName.text = pS(each_RiskReceptor.HumanName)
-
-		# Numbering Systems
-		if len(self.NumberSystems) > 0:
-			# create outer XML tag
-			MyXMLRoot_NumberSystem = ET.SubElement(MyXMLRoot, info.NumberSystemTag)
-
-			for each_NumberSystem in self.NumberSystems:
-				#TODO J: cannot map NumberSystem ID
-
-				# create outer XML tag
-				MyXMLRoot_NumberSystem_Chunk = ET.SubElement(MyXMLRoot_NumberSystem, info.NumberSystemTag)
-
-				#each_NumberSystem: str
-				if type(each_NumberSystem) == str:
-					MyXMLRoot_NumberSystem_Chunk_Type = ET.SubElement(MyXMLRoot_NumberSystem_Chunk, info.TypeTag)
-					MyXMLRoot_NumberSystem_Chunk_Type.text = pS(info.NumberSystemStringType)
-
-					MyXMLRoot_NumberSystem_Chunk_Value = ET.SubElement(MyXMLRoot_NumberSystem_Chunk, info.ValueTag)
-					MyXMLRoot_NumberSystem_Chunk_Value.text = pS(each_NumberSystem)
-
-				#each_NumberSystem: core_classes.ParentNumberChunkItem
-				elif type(each_NumberSystem) == core_classes.ParentNumberChunkItem:
-					MyXMLRoot_NumberSystem_Chunk_Type = ET.SubElement(MyXMLRoot_NumberSystem_Chunk, info.TypeTag)
-					MyXMLRoot_NumberSystem_Chunk_Type.text = pS(info.NumberSystemParentType)
-
-					MyXMLRoot_NumberSystem_Chunk_ID = ET.SubElement(MyXMLRoot_NumberSystem_Chunk, info.IDAttribName)
-					MyXMLRoot_NumberSystem_Chunk_ID.text = pS(each_NumberSystem.Source)
-
-				#each_NumberSystem: core_classes.SerialNumberChunkItem
-				elif type(each_NumberSystem) == core_classes.SerialNumberChunkItem:
-					MyXMLRoot_NumberSystem_Chunk_Type = ET.SubElement(MyXMLRoot_NumberSystem_Chunk, info.TypeTag)
-					MyXMLRoot_NumberSystem_Chunk_Type.text = pS(info.NumberSystemSerialType)
-
-					#FieldWidth
-					MyXMLRoot_NumberSystem_Chunk_FieldWidth = ET.SubElement(MyXMLRoot_NumberSystem_Chunk, info.FieldWidthTag)
-					MyXMLRoot_NumberSystem_Chunk_FieldWidth.text = pS(str(each_NumberSystem.FieldWidth))
-
-					#PadChar
-					MyXMLRoot_NumberSystem_Chunk_PadChar = ET.SubElement(MyXMLRoot_NumberSystem_Chunk, info.PadCharTag)
-					MyXMLRoot_NumberSystem_Chunk_PadChar.text = pS(str(each_NumberSystem.PadChar))
-
-					#StartSequenceAt
-					MyXMLRoot_NumberSystem_Chunk_StartSequenceAt = ET.SubElement(MyXMLRoot_NumberSystem_Chunk, info.StartSequenceAtTag)
-					MyXMLRoot_NumberSystem_Chunk_StartSequenceAt.text  = pS(str(each_NumberSystem.StartSequenceAt))
-
-					#SkipTo
-					if each_NumberSystem.SkipTo is not None:
-						MyXMLRoot_NumberSystem_Chunk_SkipTo = ET.SubElement(MyXMLRoot_NumberSystem_Chunk, info.SkipToTag)
-						MyXMLRoot_NumberSystem_Chunk_SkipTo.text = pS(str(each_NumberSystem.SkipTo))
-
-					#GapBefore
-					MyXMLRoot_NumberSystem_Chunk_GapBefore = ET.SubElement(MyXMLRoot_NumberSystem_Chunk, info.GapBeforeTag)
-					MyXMLRoot_NumberSystem_Chunk_GapBefore.text = pS(str(each_NumberSystem.GapBefore))
-
-					#IncludeInNumbering
-					MyXMLRoot_NumberSystem_Chunk_IncludeInNumbering = ET.SubElement(MyXMLRoot_NumberSystem_Chunk, info.IncludeInNumberingTag)
-					MyXMLRoot_NumberSystem_Chunk_IncludeInNumbering.text = pS(str(each_NumberSystem.IncludeInNumbering))
-
-					#NoValue
-					MyXMLRoot_NumberSystem_Chunk_NoValue = ET.SubElement(MyXMLRoot_NumberSystem_Chunk, info.NoValueTag)
-					MyXMLRoot_NumberSystem_Chunk_NoValue.text = pS(each_NumberSystem.NoValue)
-
-				else:
-					raise Exception('NumberSystem type incorrect.')
-
-		# Risk Matrix
-		if len(self.RiskMatrices) > 0:
-
-			# LookupTableItem
-			for each_RiskMatrix in self.RiskMatrices:
-				assert type(each_RiskMatrix) == core_classes.LookupTableItem
-				MyXMLRoot_RiskMatrix = ET.SubElement(MyXMLRoot, info.RiskMatrixTag)
-
-				# <Category>
-				# Map to Keys
-				if len(each_RiskMatrix.Keys) > 0:
-					each_Category: core_classes.CategoryNameItem
-					# TODO J: cannot map the object attribute which stores the list of categories
-					for each_Category in each_RiskMatrix.Value:
-
-						#Category
-						MyXMLRoot_RiskMatrix_Category = ET.SubElement(MyXMLRoot_RiskMatrix, info.CategoryTag)
-
-						# ID
-						# TODO J: cannot map Catergory ID
-						"""
-						MyXMLRoot_RiskMatrix_Category_ID = ET.SubElement(MyXMLRoot_RiskMatrix_Category, info.IDTag)
-						MyXMLRoot_RiskMatrix_Category_ID.text = pS(each_Key.)
-						"""
-
-						# Name
-						MyXMLRoot_RiskMatrix_Category_Name = ET.SubElement(MyXMLRoot_RiskMatrix_Category, info.NameTag)
-						MyXMLRoot_RiskMatrix_Category_Name.text = pS(each_Category.HumanName)
-
-						# Description
-						MyXMLRoot_RiskMatrix_Category_Description = ET.SubElement(MyXMLRoot_RiskMatrix_Category,info.DescriptionTag)
-						MyXMLRoot_RiskMatrix_Category_Description.text = pS(each_Category.HumanDescription)
-						pass
-
-					MyXMLRoot_RiskMatrix_SeverityDimensionIndex = ET.SubElement(MyXMLRoot_RiskMatrix, info.SeverityDimensionTag)
-					MyXMLRoot_RiskMatrix_SeverityDimensionIndex.text = pS(str(each_RiskMatrix.SeverityDimensionIndex))
-
-					# Dimension
-					each_list_of_keys: core_classes.CategoryNameItem
-					for each_list_of_keys in each_RiskMatrix.Keys:
-						for inner_list in each_list_of_keys:
-							MyXMLRoot_RiskMatrix_Dimension = ET.SubElement(MyXMLRoot_RiskMatrix, info.DimensionTag)
-
-							# TODO J: what is the attribute
-							"""
-							MyXMLRoot_RiskMatrix_Dimension_Name = ET.SubElement(MyXMLRoot_RiskMatrix_Dimension, info.NameTag)
-							MyXMLRoot_RiskMatrix_Dimension_Name.text = pS(inner_list.)
-	
-							MyXMLRoot_RiskMatrix_Dimension_Key = ET.SubElement(MyXMLRoot_RiskMatrix_Dimension, info.KeyTag)
-							MyXMLRoot_RiskMatrix_Dimension_Key.text = pS(inner_list.)
-							"""
-							# ID
-							# TODO J: cannot map Catergory ID
-
-					# Value
-					for each_value in each_RiskMatrix.Value:
-						#assert type(each_value) == core_classes.RiskReceptorItem
-						# TODO how risk receptor contains a value? By which attribute?
-
-						assert issubclass(type(each_value), core_classes.NumValueItem)
-						MyXMLRoot_RiskMatrix_Entry = ET.SubElement(MyXMLRoot_RiskMatrix, info.EntryTag)
-
-						if type(each_value) == core_classes.UserNumValueItem:
-							# Kind
-							MyXMLRoot_RiskMatrix_Entry_Kind = ET.SubElement(MyXMLRoot_RiskMatrix_Entry, info.KindTag)
-
-							# RiskReceptor
-							MyXMLRoot_RiskMatrix_Entry_RiskReceptor = ET.SubElement(MyXMLRoot_RiskMatrix_Entry, info.RiskReceptorTag)
-							MyXMLRoot_RiskMatrix_Entry_RiskReceptor.text = None
-
-
-							pass
-						elif type(each_value) == core_classes.ConstantItem:
-
-							pass
-						elif type(each_value) == core_classes.LookupNumValueItem:
-
-							pass
-						elif type(each_value) == core_classes.CategoryNameItem:
-
-							pass
-						elif type(each_value) == core_classes.ParentNumValueItem:
-
-							pass
-
-
-						pass
-
-					pass
-				pass
-			pass
-
-		#Constants
-		# J: TODO
-		if len(self.Constants) > 0:
-			# create outer XML tag
-			MyXMLRoot_Constants = ET.SubElement(MyXMLRoot, info.ConstantsTag)
-
-			for each_Constant in self.Constants:
-				assert type(each_Constant) == core_classes.ConstantItem
-				each_Constant: core_classes.ConstantItem
-				MyXMLRoot_Constants_Constant = ET.SubElement(MyXMLRoot_Constants, info.ConstantTag)
-
-				#ID
-				MyXMLRoot_Constants_Constant_Id = ET.SubElement(MyXMLRoot_Constants_Constant, info.IDTag)
-				MyXMLRoot_Constants_Constant_Id.text = each_Constant.ID
-
-				#Name
-				MyXMLRoot_Constants_Constant_Name = ET.SubElement(MyXMLRoot_Constants_Constant, info.NameTag)
-				MyXMLRoot_Constants_Constant_Name.text = each_Constant.HumanName
-
-				#ConstValue
-				#MyXMLRoot_Constants_Constant_ConstValue = ET.SubElement(MyXMLRoot_Constants_Constant, info.ConstValueTag)
-				#MyXMLRoot_Constants_Constant_ConstValue.text = each_Constant.
-
-
-		#FaultTree
-		if len(self.FaultTree) > 0:
-			# create outer XML tag
-			MyXMLRoot_FaultTrees = ET.SubElement(MyXMLRoot, info.FaultTreesTag)
-
-			each_FaultTree: faulttree.FTObjectInCore
-			for each_FaultTree in self.FaultTrees:
-				assert type(each_FaultTree) == faulttree.FTObjectInCore
-
-				MyXMLRoot_FaultTrees_FaultTree = ET.SubElement(MyXMLRoot_FaultTrees, info.FaultTreeTag)
-
-				#ID
-				MyXMLRoot_FaultTrees_FaultTree_Id = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree, info.IDTag)
-				MyXMLRoot_FaultTrees_FaultTree_Id.text = pS(str(each_FaultTree.ID))
-
-				#SIFName
-				MyXMLRoot_FaultTrees_FaultTree_SIFName = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree, info.SIFNameTag)
-				MyXMLRoot_FaultTrees_FaultTree_SIFName.text = pS(str(each_FaultTree.SIFName))
-
-				#OpMode
-				MyXMLRoot_FaultTrees_FaultTree_OpMode = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree, info.OpModeTag)
-				MyXMLRoot_FaultTrees_FaultTree_OpMode.text = pS(str(each_FaultTree.OpMode.XMLName))
-
-				#Rev
-				MyXMLRoot_FaultTrees_FaultTree_Rev = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree, info.RevTag)
-				MyXMLRoot_FaultTrees_FaultTree_Rev.text = pS(each_FaultTree.Rev)
-
-				#TargetRiskRedMeasure
-				MyXMLRoot_FaultTrees_FaultTree_TargetRiskRedMeasure = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree, info.TargetRiskRedMeasureTag)
-				MyXMLRoot_FaultTrees_FaultTree_TargetRiskRedMeasure.text = pS(each_FaultTree.TargetRiskRedMeasure)
-
-				#SILTargetValue
-				MyXMLRoot_FaultTrees_FaultTree_SILTargetValue = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree, info.SILTargetValueTag)
-				MyXMLRoot_FaultTrees_FaultTree_SILTargetValue.text = pS(each_FaultTree.SILTargetValue)
-
-				#BackgColour
-				MyXMLRoot_FaultTrees_FaultTree_BackgColour = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree, info.BackgColour)
-				MyXMLRoot_FaultTrees_FaultTree_BackgColour.text = pS(each_FaultTree.BackgColour)
-
-				#TextColour
-				MyXMLRoot_FaultTrees_FaultTree_TextColour = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree, info.TextColour)
-				MyXMLRoot_FaultTrees_FaultTree_TextColour.text = pS(each_FaultTree.TextColour)
-
-				#Columns
-				MyXMLRoot_FaultTrees_FaultTree_Columns = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree, info.ColumnsTag)
-
-				each_Column: FTColumnInCore
-				for each_Column in each_FaultTree.Columns:
-					#Column
-					MyXMLRoot_FaultTrees_FaultTree_Columns_Column = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns,info.FTColumnTag)
-
-					for each_FTEvent in each_Column:
-
-						if type(each_FTEvent) == faulttree.FTEventInCore:
-							#FTEvent
-							MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column, info.FTEventTag)
-
-							#ID
-							MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent_ID =  ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent, info.IDTag)
-							MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent_ID.text = pS(str(each_FTEvent.ID))
-
-							#IsIPL
-							MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent_IsIPL = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent, info.IsIPLTag)
-							MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent_IsIPL.text = pS(str(each_FTEvent.IsIPL))
-
-							#EventType
-							MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent_EventType = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent, info.EventTypeTag)
-							MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent_EventType.text = pS(str(each_FTEvent.EventType))
-
-							#NumberingID
-							#TODO cannot map ID
-							MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent_Numbering = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent, info.NumberingTag)
-							MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent_Numbering.text = pS(str(each_FTEvent.NumberingID))
-
-							#EventDescription
-							MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent_EventDescription = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent, info.EventDescriptionTag)
-							MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent_EventDescription.text = pS(str(each_FTEvent.EventDescription))
-
-							#OldFreqValue
-							MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent_OldFreqValue = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent, info.OldFreqValueTag)
-							MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent_OldFreqValue.text = pS(each_FTEvent.OldFreqValue.XMLName)
-
-							#OldProbValue
-							MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent_OldProbValue = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent, info.OldProbValueTag)
-							MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent_OldProbValue.text = pS(each_FTEvent.OldProbValue.XMLName)
-
-							each_LastSelectedUnitPerQtyKind_Key: str
-							for each_LastSelectedUnitPerQtyKind_Key in each_FTEvent.LastSelectedUnitPerQtyKind:
-								# LastSelectedUnit
-								MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent_LastSelectedUnit = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent, info.LastSelectedUnitTag)
-
-								# QtyKind
-								MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent_LastSelectedUnit_QtyKind = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent_LastSelectedUnit, info.QtyKindTag)
-								MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent_LastSelectedUnit_QtyKind.text = pS(str(each_FTEvent.LastSelectedUnitPerQtyKind))
-
-								#Unit
-								MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent_LastSelectedUnit_Unit = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent_LastSelectedUnit, info.UnitTag)
-								MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent_LastSelectedUnit_Unit.text = pS(str(each_FTEvent.LastSelectedUnitPerQtyKind.get(each_LastSelectedUnitPerQtyKind_Key)))
-
-							#IsSIFFailureEventInRelevantOpmode
-							MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent_IsSIFFailureEventInRelevantOpmode = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent,info.IsSIFFailureEventInRelevantOpmodeTag)
-							MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent_IsSIFFailureEventInRelevantOpmode.text = pS(str(each_FTEvent.IsSIFFailureEventInRelevantOpMode))
-
-							#RiskReceptors
-							if len(each_FTEvent.ApplicableRiskReceptors) > 0:
-								'''
-								tempRiskReceptorList = []
-								for each_RiskReceptor in each_FTEvent.ApplicableRiskReceptors:
-									tempRiskReceptorList.append(each_RiskReceptor.ID)
-								'''
-								MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent_RiskReceptors = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent, info.RiskReceptorsTag)
-								each_RiskReceptor: core_classes.RiskReceptorItem
-								MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent_RiskReceptors.text = pS(','.join(list(map(lambda each_RiskReceptor: each_RiskReceptor.ID, each_FTEvent.ApplicableRiskReceptors))))
-
-							#BackgColour
-							MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent_BackgColour = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent, info.BackgColourTag)
-							MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent_BackgColour.text = pS(str(each_FTEvent.BackgColour))
-
-							#EventDescriptionComments
-							if len(each_FTEvent.EventDescriptionComments) > 0:
-								MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent_EventDescriptionComments = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent, info.EventDescriptionCommentsTag)
-								# J:since AssociatedTextItem does not have an ID, match core_classes.Comment instead
-								each_EventDescriptionComment: core_classes.Comment
-								MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent_EventDescriptionComments.text = pS(','.join(list(map(lambda each_EventDescriptionComment: each_EventDescriptionComment.ID, each_FTEvent.EventDescriptionComments))))
-
-							#ValueComments
-							if len(each_FTEvent.ValueComments) > 0:
-								MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent_ValueComments = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent, info.ValueCommentsTag)
-								# J:since AssociatedTextItem does not have an ID, match core_classes.Comment instead
-								each_ValueComment: core_classes.Comment
-								MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent_ValueComments.text = pS(','.join(list(map(lambda each_ValueComment: each_ValueComment.ID, each_FTEvent.ValueComments))))
-
-							#ShowDescriptionComments
-							MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent_ShowDescriptionComments = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent, info.ShowDescriptionCommentsTag)
-							MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent_ShowDescriptionComments.text = pS(str(each_FTEvent.ShowValueComments))
-
-							#ShowValueComments
-							MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent_ShowValueComments = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent, info.ShowValueCommentsTag)
-							MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent_ShowValueComments.text = pS(str(each_FTEvent.ShowValueComments))
-
-							#ConnectTo
-							if len(each_FTEvent.ConnectTo) > 0:
-								MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent_ConnectTo = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent, info.ConnectToTag)
-								each_FTEvent.ConnectTo: faulttree.FTEventInCore
-								MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent_ConnectTo.text = pS(','.join(list(map(lambda each_FTEvent: each_FTEvent.ID, each_FTEvent.ConnectTo))))
-
-							#LinkedFrom
-							#TODO J: what is the type of LinkedFrom item?
-							if len(each_FTEvent.LinkedFrom) > 0:
-								MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent_LinkedFrom = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent, info.LinkedFromTag)
-								each_LinkedFromItem: faulttree.FTEventInCore.LinkedFrom
-								MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTEvent_LinkedFrom.text = pS(','.join(list(map(lambda each_FTEvent: each_FTEvent.ID, each_FTEvent.ConnectTo))))
-
-						if type(each_FTEvent) == faulttree.FTGateItemInCore:
-							#FTGate
-
-							MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTGate = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column, info.FTGateTag)
-
-							MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTGate_ID = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTGate, info.IDTag)
-							MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTGate_ID.text = pS(each_FTEvent.ID)
-
-							MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTGate_GateDescription = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTGate, info.GateDescriptionTag)
-							MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTGate_GateDescription.text = pS(str(each_FTEvent.GateDescription))
-
-							MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTGate_ShowDescriptionComments = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTGate, info.ShowDescriptionCommentsTag)
-							MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTGate_ShowDescriptionComments.text = pS(str(each_FTEvent.ShowDescriptionComments))
-
-							if len(each_FTEvent.ActionItems) > 0:
-								MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTGate_ActionItems = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTGate, info.ActionItemsTag)
-								# J:since AssociatedTextItem does not have an ID, match core_classes.Comment instead
-								each_ActionItem: core_classes.Comment
-								MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTGate_ActionItems.text = pS(','.join(list(map(lambda each_ActionItem: each_ActionItem.ID, each_FTEvent.ActionItems))))
-
-							MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTGate_ShowActionItems = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTGate, info.ShowActionItemsTag)
-							MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTGate_ShowActionItems.text = pS(str(each_FTEvent.ShowActionItems))
-
-						if type(each_FTEvent) == faulttree.FTConnectorItemInCore:
-							#TODO J: In Out should be determined by flag Out: faulttree.FTConnectorItemInCore.Out?
-
-							each_FTEvent: faulttree.FTConnectorItemInCore
-							if (each_FTEvent.Out):
-								# FTConnectorOut
-								MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTConnector = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column, info.FTConnectorOutTag)
-							else:
-								# FTConnectorIn
-								MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTConnector = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column, info.FTConnectorInTag)
-
-							# ID
-							MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTConnector_ID = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTConnector, info.IDTag)
-							MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTConnector_ID.text = pS(str(each_FTEvent.ID))
-
-							# ConnectorDescription
-							MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTConnector_ConnectorDescription = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTConnector, info.ConnectorDescriptionTag)
-							MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTConnector_ConnectorDescription.text = pS(str(each_FTEvent.ConnectorDescription))
-
-							# ConnectorDescriptionComments
-							if len(each_FTEvent.ConnectorDescriptionComments) > 0:
-								MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTConnector_ConnectorDescriptionComments = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTConnector,info.ConnectorDescriptionCommentsTag)
-								# J:since AssociatedTextItem does not have an ID, match core_classes.Comment instead
-								each_ConnectorDescriptionComment: core_classes.Comment
-								MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTGate_ActionItems.text = pS(','.join(list(map(lambda each_ConnectorDescriptionComment: each_ConnectorDescriptionComment.ID,each_FTEvent.ConnectorDescriptionComments))))
-
-							MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTConnector_ShowDescriptionComments = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTConnector, info.ShowDescriptionCommentsTag)
-							MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTConnector_ShowDescriptionComments.text = pS(str(each_FTEvent.ShowDescriptionComments))
-
-							# BackgColour
-							MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTConnector_BackgColour = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTConnector, info.BackgColourTag)
-							MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTConnector_BackgColour.text = pS(str(each_FTEvent.BackgColour))
-
-							if(each_FTEvent.Out):
-
-								pass
-
-							else:
-								#RelatedConnector
-								if each_FTEvent.RelatedCX is not None:
-									each_FTEvent.RelatedCX: faulttree.FTConnectorItemInCore
-									MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTConnector_RelatedConnector = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTConnector, info.RelatedConnectorTag)
-									MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTConnector_RelatedConnector.text = pS(each_FTEvent.RelatedCX.ID)
-
-								#ConnectTo
-								MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTConnector_ConnectTo = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTConnector, info.ConnectToTag)
-								MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTConnector_ConnectTo.text = pS(str(each_FTEvent))
-
-							#Numbering
-							MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTConnectorIn_Numbering = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTConnectorIn, info.NumberingTag)
-							MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTConnectorIn_Numbering.text = pS(str(each_FTEvent))
-
-							#Style
-							MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTConnector_Style = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTConnector, info.StyleTag)
-							MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTConnector_Style.text = pS(str(each_FTEvent.Style))
-
-							#RiskReceptors
-							if len(each_FTEvent.ApplicableRiskReceptors) > 0:
-								MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTConnector_RiskReceptors = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTConnector, info.RiskReceptorsTag)
-								each_RiskReceptor: core_classes.RiskReceptorItem
-								MyXMLRoot_FaultTrees_FaultTree_Columns_Column_FTConnector_RiskReceptors.text = pS(','.join(list(map(lambda each_RiskReceptor: each_RiskReceptor.ID,each_FTEvent.ApplicableRiskReceptors))))
-
-				#TolRiskModel
-				MyXMLRoot_FaultTrees_FaultTree_TolRiskModel = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree, info.TolRiskModelTag)
-				each_FaultTree.MyTolRiskModel: core_classes.TolRiskModel
-				MyXMLRoot_FaultTrees_FaultTree_TolRiskModel = pS(each_FaultTree.MyTolRiskModel.ID)
-
-				#Severity
-				MyXMLRoot_FaultTrees_FaultTree_Severity = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree, info.SeverityTag)
-
-				each_list_of_keys: core_classes.RiskReceptorItem
-				for each_list_of_keys in each_FaultTree.Severity:
-					# RR
-					MyXMLRoot_FaultTrees_FaultTree_Severity_RR = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Severity, info.RRTag)
-					# Name
-					MyXMLRoot_FaultTrees_FaultTree_Severity_RR_Name = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Severity_RR, info.NameTag)
-					MyXMLRoot_FaultTrees_FaultTree_Severity_RR_Name.text = pS(each_list_of_keys.XMLName)
-					# SeverityValue
-					MyXMLRoot_FaultTrees_FaultTree_Severity_RR_SeverityValue = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_Severity_RR, info.SeverityValueTag)
-					MyXMLRoot_FaultTrees_FaultTree_Severity_RR_SeverityValue.text = pS(each_FaultTree.Severity.get(each_list_of_keys))
-
-					pass
-
-				#TolFreq
-				#TODO
-				MyXMLRoot_FaultTrees_FaultTree_TolFreq = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree, info.TolFreqTag)
-				MyXMLRoot_FaultTrees_FaultTree_TolFreq.text = pS(str(each_FaultTree.TolFreq))
-
-				#RRGrouping
-				MyXMLRoot_FaultTrees_FaultTree_RRGrouping = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree, info.RRGroupingTag)
-				MyXMLRoot_FaultTrees_FaultTree_RRGrouping.text = pS(each_FaultTree.RRGroupingOption)
-
-				if len(each_FaultTree.CollapseGroups) > 0:
-					# CollapseGroups
-					MyXMLRoot_FaultTrees_FaultTree_CollapseGroups = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree,info.CollapseGroupsTag)
-					for each_CollapseGroup in CollapseGroups:
-						assert type(each_CollapseGroup) == faulttree.FTCollapseGroupInCore
-						# CollapseGroup
-						each_CollapseGroup: faulttree.FTCollapseGroupInCore
-						MyXMLRoot_FaultTrees_FaultTree_CollapseGroup = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree_CollapseGroups, info.CollapseGroupTag)
-						MyXMLRoot_FaultTrees_FaultTree_CollapseGroup.text = pS(str(each_CollapseGroup.ID))
-
-				#ModelGate
-				if each_FaultTree.ModelGate is not None:
-					MyXMLRoot_FaultTrees_FaultTree_ModelGate = ET.SubElement(MyXMLRoot_FaultTrees_FaultTree, info.ModelGateTag)
-					each_FaultTree.ModelGate: faulttree.FTGateItemInCore
-					MyXMLRoot_FaultTrees_FaultTree_ModelGate.text = pS(str(each_FaultTree.ModelGate.ID))
-
-				pass
-
-		#Comment
-		if len(self.Comments) > 0:
-			MyXMLRoot_Comments = ET.SubElement(MyXMLRoot, info.CommentsTag)
-
-			each_Comment: core_classes.Comment
-			for each_Comment in self.Comments:
-				assert type(each_Comment) == core_classes.Comment
-				MyXMLRoot_Comments_Comment = ET.SubElement(MyXMLRoot_Comments,info.CommentTag)
-
-				MyXMLRoot_Comments_Comment_Id = ET.SubElement(MyXMLRoot_Comments_Comment, info.IDTag)
-				MyXMLRoot_Comments_Comment_Id.text = pS(str(each_Comment.iD))
-
-				MyXMLRoot_Comments_Comment_Content = ET.SubElement(MyXMLRoot_Comments_Comment, info.ContentTag)
-				MyXMLRoot_Comments_Comment_Content.text = pS(str(each_Comment.content))
-
-				MyXMLRoot_Comments_Comment_isVisible = ET.SubElement(MyXMLRoot_Comments_Comment, info.isVisibleTag)
-				MyXMLRoot_Comments_Comment_isVisible.text = pS(str(each_Comment.isVisible))
-
-				MyXMLRoot_Comments_Comment_showInReport = ET.SubElement(MyXMLRoot_Comments_Comment, info.showInReportTag)
-				MyXMLRoot_Comments_Comment_showInReport.text = pS(str(each_Comment.showInReport))
-
-
-
-		pass
-
-		# later, add more code here to write all PHA objects into the XML tree
-		# write the XML file
-
-		# generate tag Id for all element
-		autoGenerateTagID(MyXMLRoot)
-
-		MyXMLTree.write(ProjectFilename, encoding="UTF-8", xml_declaration=True)
-
-		'''
-		#J: Display XML tree on screen
-		ET.dump(MyXMLTree)
-		'''
-		pass
+		CommentHash = AddPHAObjTags(XMLRoot=MyXMLRoot, NumberingSystemHash=NumberingSystemHash)
+		# add comment tags
+		for (ThisCommentID, ThisCommentText) in CommentHash.items():
+			ThisCommentTag = ElementTree.SubElement(MyXMLRoot, info.CommentTag)
+			ThisCommentIDTag = ElementTree.SubElement(ThisCommentTag, info.IDTag)
+			ThisCommentIDTag.text = ThisCommentID
+			ThisCommentContentTag = ElementTree.SubElement(ThisCommentTag, info.ContentTag)
+			ThisCommentContentTag.text = LegalString(InStr=ThisCommentText, Strip=True, FilterForbiddenChar=False)
+		# add action item and parking lot tags
+		AddAssociatedTextTags(XMLRoot=MyXMLRoot, NumberingSystemHash=NumberingSystemHash)
+		return MyXMLRoot
 
 def TestProjectsOpenable(ProjectFilenames, ReadOnly=False):
 	"""
@@ -1253,17 +662,6 @@ def PopulateProjectFromFile(Proj, DocTreeTop):
 	ProblemReport = '' # this is just dummy code for now
 	return OpenedOK, ProblemReport
 
-def SaveEntireProjectRequest(Parent=None, event=None):
-	# save entire project
-	# variables and methods for testing purpose
-
-	test_OutputPath = './test_projectfile/'
-	test_OutputFileName = 'test_OutputXML.xml'
-
-	Proj = CreateProject()
-	SaveEntireProject(Proj, test_OutputPath + test_OutputFileName)
-	pass
-
 def SaveEntireProject(Proj: ProjectItem, OutputFilename, ProblemReport='', Close=False):
 	# Create a new file with OutputFilename (full path).
 	# Write the entire data from Proj into it.
@@ -1283,35 +681,35 @@ def SaveEntireProject(Proj: ProjectItem, OutputFilename, ProblemReport='', Close
 			return TextToAdd
 
 	Report = ProblemReport # final report to return to user
+	print('PR684 in SaveEntireProject with OutputFilename, writeable: ', OutputFilename, vizop_misc.IsWritableLocation(os.path.dirname(OutputFilename)))
 	# First, try to create the project file
 	if vizop_misc.IsWritableLocation(os.path.dirname(OutputFilename)):
 #		ProjFile = open(OutputFilename, 'w') # create the file
-		WriteOK, WriteReport = WriteEntireProjectToFile(Proj, OutputFilename) # write all the data into the file
+		# write all the data into the file
+		WriteOK, WriteReport = WriteEntireProjectToFile(Proj, OutputFilename, Close=Close)
 		Report = AddToReport(Report, WriteReport)
-#		if Close: ProjFile.close()
 	else:
 		WriteOK = False
 		Report = AddToReport(Report, _('Unable to write project file at %s') % os.path.dirname(OutputFilename) )
 	return WriteOK, Report
 
-def WriteEntireProjectToFile(Proj, ProjFilename):
+def WriteEntireProjectToFile(Proj, ProjFilename, Close):
 	# write all data for Proj (ProjectItem) into ProjFilename (str), already confirmed as writable.
+	# Close the file if Close (bool)
 	# Return: WriteOK (bool) - whether data written successfully;
 	#         ProblemReport (str) - human readable description of any problem encountered.
 	# Make the XML tree, starting with the Document node.
 	# TODO make this into a method of class ProjectItem
 	assert type(Proj) == ProjectItem
 	assert type(ProjFilename) == str
-
-	try:
-		Proj.ConvertProjectToXML(Proj, ProjFilename)
-		ProblemReport = ''
-	except Exception as e:
-		ProblemReport = e
-		return False, ProblemReport
-
+	assert isinstance(Close, bool)
+#	ProjFile = open(ProjFilename, 'w') # create the file
+	XMLRoot = Proj.ConvertProjectToXML()
+	print('PR708 writing XML to file')
+	XMLRoot.write(ProjFilename, encoding="UTF-8", xml_declaration=True)
+	ProblemReport = ''
+#	if Close: ProjFile.close()
 	return True, ProblemReport
-	# TODO items to include: core_classes.ConstantItem.AllConstants
 
 def SetupDefaultTolRiskModel(Proj):
 	# set up a default tolerable risk model (severity categories) in project instance Proj
@@ -1453,6 +851,116 @@ def GetAllNumberingSystems(Proj):
 				NumSystems.append(ThisElement.Numbering)
 				NumSystemsUsageLists.append( [ThisElement] )
 	return NumSystemsUsageLists
+
+def AddAttribsInSubelements(StartEl, DataObj, SubElements):
+	# add subelements to StartEl, whose text is the attrib value in DataObj specified in SubElements
+	# (dict with keys = subelement tags, values = attrib names in DataObj)
+	# Attrib values in DataObj can be str, int, bool, or None. If bool, they are converted to 'True' or 'False'.
+	# If None, the value info.NoneTag is stored.
+	assert isinstance(StartEl, ElementTree.Element)
+	assert isinstance(SubElements, dict)
+	for ThisTag, ThisAttribName in SubElements.items():
+		SubEl = ElementTree.SubElement(StartEl, ThisTag)
+		AttribType = type(getattr(DataObj, ThisAttribName))
+		if AttribType is str:
+			SubEl.text = LegalString(InStr=str(getattr(DataObj, ThisAttribName)))
+		elif AttribType is int:
+			SubEl.text = str(getattr(DataObj, ThisAttribName))
+		elif AttribType is bool:
+			SubEl.text = utilities.Bool2Str(Input=getattr(DataObj, ThisAttribName), TrueStr='True',
+											FalseStr='False')
+		elif getattr(DataObj, ThisAttribName) is None:
+			SubEl.text = info.NoneTag
+		else:
+			raise TypeError('Supplied attrib with type %s' % AttribType)
+
+def AddAttribIDsInSubelements(StartEl, DataObj, SubElements):
+	# add subelements to StartEl, whose text is the ID attrib of the attrib value in DataObj specified in SubElements
+	# (dict with keys = subelement tags, values = attrib names in DataObj)
+	# If the attrib value is None, the value info.NoneTag is stored.
+	assert isinstance(StartEl, ElementTree.Element)
+	assert isinstance(SubElements, dict)
+	for ThisTag, ThisAttribName in SubElements.items():
+		SubEl = ElementTree.SubElement(StartEl, ThisTag)
+		ThisAttrib = getattr(DataObj, ThisAttribName)
+		SubEl.text = info.NoneTag if ThisAttrib is None else ThisAttrib.ID
+
+def AddIDListAttribsInSubelements(StartEl, DataObj, SubElements):
+	# add subelements to StartEl, with tags = keys in SubElements (dict)
+	# Values in SubElements are names of attribs in DataObj. Those attribs should be lists of objects with IDs.
+	# The text of the subelements is a comma-separated list of those IDs.
+	assert isinstance(StartEl, ElementTree.Element)
+	assert isinstance(SubElements, dict)
+	for ThisTag, ThisAttribName in SubElements.items():
+		SubEl = ElementTree.SubElement(StartEl, ThisTag)
+		SubEl.text = ','.join(ThisObj.ID for ThisObj in gettatr(DataObj, ThisAttribName))
+
+def AddValueElement(StartEl, ValueTag, ValueObj):
+	# add a subelement with tag = ValueTag (str) to StartEl (an ElementTree element), containing all required
+	# data for numerical value in ValueObj (instance of subclass of NumValueItem)
+	# Return the value subelement XML subelement
+	assert isinstance(StartEl, ElementTree.Element)
+	assert isinstance(ValueTag, str)
+	assert isinstance(ValueObj, core_classes.NumValueItem)
+	TopTag = ElementTree.SubElement(StartEl, ValueTag)
+	# add 'Kind' tag
+	ValueKindHash = {core_classes.UserNumValueItem: info.UserTag, core_classes.ConstNumValueItem: info.ConstantTag,
+		core_classes.LookupNumValueItem: info.LookupTag, core_classes.ParentNumValueItem: info.CopiedTag,
+		core_classes.UseParentValueItem: info.LinkedFromTag}
+	KindXML = ValueKindHash.get(type(ValueObj), info.UnknownTag)
+	KindTag = ElementTree.SubElement(TopTag, KindXML)
+	KindTag.text = KindXML
+	# populate sub-elements for each number kind
+	if KindXML in [info.UserTag, info.CopiedTag]:
+		for ThisRR in ValueObj.ValueFamily.keys():
+			ThisRRTag = ElementTree.SubElement(TopTag, info.RiskReceptorTag)
+			ThisRRIDTag = ElementTree.SubElement(ThisRRTag, info.IDTag)
+			ThisRRIDTag.text = ThisRR.ID
+			ThisRRValueTag = ElementTree.SubElement(ThisRRTag, info.ValueTag)
+			ThisRRValueTag.text = str(ValueObj.GetMyValue(RR=ThisRR))
+			if ValueObj.InfinityFlagFamily[ThisRR]:
+				ThisRRInfiniteTag = ElementTree.SubElement(ThisRRTag, info.InfiniteTag)
+				ThisRRInfiniteTag.text = info.TrueLabel
+		ThisUnitTag = ElementTree.SubElement(TopTag, info.UnitTag)
+		ThisUnitTag.text = ValueObj.GetMyUnit().XMLName
+		if KindXML == info.CopiedTag:
+			ThisCopiedFromTag = ElementTree.SubElement(TopTag, info.CopiedFromTag)
+			ThisCopiedFromTag.text = info.NoneTag if ValueObj.ParentPHAObj is None else ValueObj.ParentPHAObj.ID
+	elif KindXML == info.ConstantTag:
+		ThisIDTag = ElementTree.SubElement(TopTag, info.IDTag)
+		ThisIDTag.text = info.NoneTag if ValueObj.Constant is None else ValueObj.Constant.ID
+	elif KindXML == info.LookupTag:
+		ThisIDTag = ElementTree.SubElement(TopTag, info.IDTag)
+		ThisIDTag.text = info.NoneTag if ValueObj.LookupTable is None else ValueObj.LookupTable.ID
+		# add <Value> tag: if no lookup value defined, store 'None' as text, else store a value item
+		if ValueObj.InputValue is None:
+			ThisValueTag = ElementTree.SubElement(TopTag, info.ValueTag)
+			ThisValueTag.text = info.NoneTag
+		else: AddValueElement(StartEl=TopTag, ValueTag=info.ValueTag, ValueObj=ValueObj.InputValue)
+	elif KindXML == info.LinkedFromTag:
+		ThisLinkedFromTag = ElementTree.SubElement(TopTag, info.LinkedFromTag)
+		ThisLinkedFromTag.text = info.NoneTag if ValueObj.ParentPHAObj is None else ValueObj.ParentPHAObj.ID
+	return TopTag
+
+def StoreViewportCommonDataInXML(Viewport, StartTag):
+	# create an XML element as a subelement of StartTag (ElementTree.Element) and populate it with common Viewport
+	# data required to be stored in project file.
+	# Return the <Viewport> tag, so that individual Viewport subclasses can add their own specific tags.
+	# (This method belongs more naturally in module display_utilities as a method of ViewportBaseClass, but we can't
+	# put it there as that would create a circular import.)
+	assert isinstance(StartTag, ElementTree.Element)
+	# First, make top level XML element
+	TopTag = ElementTree.SubElement(StartTag, info.ViewportTag)
+	# Add common tags
+	projects.AddAttribsInSubelements(StartEl=TopTag, DataObj=Viewport,
+		SubElements={info.KindTag: 'InternalName', info.IDTag: 'ID', info.PHAObjTag: 'PHAObjID',
+		info.PanXTag: 'PanX', info.PanYTag: 'PanY'})
+	projects.AddAttribIDsInSubelements(StartEl=TopTag, DataObj=Viewport,
+		SubElements={info.DisplayDeviceTag: 'DisplDevice', info.ViewportToRevertToTag: 'ViewportToRevertTo'})
+	# add Zoom tag
+	ThisZoomTag = ElementTree.SubElement(TopTag, info.ZoomTag)
+	ThisZoomTag.text = str(Viewport.Zoom)
+	return TopTag
 
 del _ # remove dummy definition
 

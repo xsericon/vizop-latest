@@ -1158,7 +1158,7 @@ class FTEvent(FTBoxyObject): # FT event object in Viewport
 		self.ShowProblemIndicator = False # whether problem indicator button is visible
 		self.Bitmap = wx.Bitmap(width=10, height=10, depth=wx.BITMAP_SCREEN_DEPTH)
 
-	# colours for text and background are defined for individual text Elements, not for whole FTEvent
+	# colours for text and background are defined for individual text components, not for whole FTEvent
 
 	def CreateFixedTextElements(self):
 		# create elements for fixed text items in FTEvent. Return (list of elements at top of FTEvent, list of elements relating to FTEvent's value)
@@ -1362,6 +1362,18 @@ class FTEvent(FTBoxyObject): # FT event object in Viewport
 		return AcceptableUnits
 
 	AcceptableUnits = property(fget=GetMyAcceptableUnits) # this is accessed in PrefillWidgetsForNumericalValueAspect()
+
+	def StoreAllDataInXML(self, StartTag):
+		# create an XML element as a subelement of StartTag (ElementTree.Element) and populate it with all FTEvent
+		# data required to be stored in project file.
+		assert isinstance(StartTag, ElementTree.Element)
+		# First, make top level XML element
+		TopTag = ElementTree.SubElement(parent=StartTag, tag=info.FTEventTag)
+		# store Viewport-level tags specific to this element
+		projects.AddAttribsInSubelements(StartEl=TopTag, DataObj=self,
+			SubElements={info.IDTag: 'ID', info.ShowDescriptionCommentsTag: 'ShowDescriptionComments',
+			info.ShowValueCommentsTag: 'ShowValueComments', info.ShowActionItemsTag: 'ShowActionItems',
+			info.ShowParkingLotItemsTag: 'ShowParkingLotItems'})
 
 class FTGate(FTBoxyObject): # object containing FT gates for display in Viewport. These belong to FTColumn's.
 	NeedsConnectButton = True # whether to provide connect buttons
@@ -1775,6 +1787,18 @@ class FTGate(FTBoxyObject): # object containing FT gates for display in Viewport
 		self.FT.StoreMilestoneForRedraw()
 		self.FT.DisplDevice.Redraw(FullRefresh=True) # refresh the display to show detailed gate style
 
+	def StoreAllDataInXML(self, StartTag):
+		# create an XML element as a subelement of StartTag (ElementTree.Element) and populate it with all FTGate
+		# data required to be stored in project file.
+		assert isinstance(StartTag, ElementTree.Element)
+		# First, make top level XML element
+		TopTag = ElementTree.SubElement(parent=StartTag, tag=info.FTGateTag)
+		# store Viewport-level tags specific to this element
+		projects.AddAttribsInSubelements(StartEl=TopTag, DataObj=self,
+			SubElements={info.IDTag: 'ID', info.ShowCommentsTag: 'ShowComments',
+			info.DetailedViewTag: 'DetailedView', info.ShowActionItemsTag: 'ShowActionItems',
+			info.ShowParkingLotItemsTag: 'ShowParkingLotItems'})
+
 class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for display in Viewport. These belong to FTColumn's.
 	# Is the superclass of FTConnectorIn and FTConnectorOut
 	ConnectorStyles = ['Default'] # future, will define various connector appearances (squares, arrows, circles etc)
@@ -2006,6 +2030,19 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 		DrawBackgroundBox(DC, Zoom)
 		self.DrawElements(DC, self.AllComponents, Zoom)
 
+	def StoreAllDataInXML(self, StartTag):
+		# create an XML element as a subelement of StartTag (ElementTree.Element) and populate it with all FTConnector
+		# data required to be stored in project file.
+		assert isinstance(StartTag, ElementTree.Element)
+		# First, make top level XML element
+		TopTag = ElementTree.SubElement(parent=StartTag, tag=info.FTConnectorTag)
+		# store Viewport-level tags specific to this element
+		projects.AddAttribsInSubelements(StartEl=TopTag, DataObj=self,
+			SubElements={info.IDTag: 'ID', info.StyleTag: 'Style',
+			info.ShowDescriptionCommentsTag: 'ShowDescriptionComments', info.ShowValueCommentsTag: 'ShowValueComments',
+			info.ShowActionItemsTag: 'ShowActionItems',
+			info.ShowParkingLotItemsTag: 'ShowParkingLotItems'})
+
 class FTConnectorIn(FTConnector):
 	HumanName = _('Inward connector') # class name
 
@@ -2044,14 +2081,27 @@ class FTConnectorOut(FTConnector):
 		# this Connector-Out
 		return self.ConnectorInsAvailable
 
-class FTCollapseGroup(object): # depiction of a group of FT objects that have been collapsed to a single display object
+class FTCollapseGroupInCore(object): # depiction of a group of FT objects that have been collapsed to a single display object
 	# The CollapseGroup is not actually an FT object in itself, and is not stored in any column.
+	# TODO: decide whether this is really a datacore object, or whether it should exist in Viewports only.
 
 	def __init__(self, ID): # ID (int): the ID in the data from DataCore. Used (only?) for grabbing attribs from DataCore
 		object.__init__(self)
 		self.ID = ID
+		self.HumanName = ''
 		self.Collapsed = False # whether group is currently displayed as collapsed
 		self.PosZ = 0
+		self.Elements = [] # element instances included in this CollapseGroup
+
+	def StoreAllDataInXML(self, TopTag):
+		# write all storeable data into an XML subelement of TopTag
+		assert isinstance(TopTag, ElementTree.Element)
+		MyTopTag = ElementTree.SubElement(parent=TopTag, tag=info.CollapseGroupTag)
+		projects.AddAttribsInSubelements(StartEl=MyTopTag, DataObj=self, SubElements={info.IDTag: 'ID',
+			info.NameTag: 'HumanName'})
+		# add elements
+		ThisElementsTag = ElementTree.SubElement(parent=MyTopTag, tag=info.ElementsTag)
+		ThisElements.text = ','.join(ThisEl.ID for ThisEl in self.Elements)
 
 class FTBuilder(FTBoxyObject): # 'add' button object within an FTColumn.
 	# Created and managed within Viewport, so no data <--> DataCore.
@@ -2370,7 +2420,6 @@ class FTEventInCore(FTElementInCore): # FT event object used in DataCore by FTOb
 	HumanName = _('FT event')
 	EventTypes = ['InitiatingEvent', 'SIFFailureEvent', 'IntermediateEvent', 'IPL', 'TopEvent',
 		'EnablingCondition', 'ConditionalModifier']
-#		'ConnectorIn', 'ConnectorOut', 'EnablingCondition', 'ConditionalModifier']
 	# event types for which the user must supply a value
 	EventTypesWithUserValues = ['InitiatingEvent', 'IPL', 'EnablingCondition', 'ConditionalModifier']
 	# event types for which user can supply a value, or it can be derived from elsewhere
@@ -2814,6 +2863,53 @@ class FTEventInCore(FTElementInCore): # FT event object used in DataCore by FTOb
 
 	ClassHumanName = property(fget=GetMyClassHumanName)
 
+	def StoreAllDataInXML(self, ParentTag, NumberingSystemHash, MaxCommentIDSoFar):
+		# create XML element as subelement of ParentTag (an XML element instance) and populate it with all data required
+		# to be stored in project file
+		# NumberingSystemHash (dict): keys are objects having numbering objects, values are numbering system indices to
+		# store in the file
+		# MaxCommentIDSoFar (int): base for assigning ID numbers to comments
+		# returns:
+		#	ThisCommentHash (dict) with keys = comment IDs (str), values are comment texts (str)
+		#	MaxCommentIDSoFar (int) - highest comment ID number used
+		assert isinstance(ParentTag, ElementTree.Element)
+		assert isinstance(NumberingSystemHash, dict)
+		assert isinstance(MaxCommentIDSoFar, int)
+		ThisCommentHash = {}
+		# First, add IDs to comments and make ThisCommentHash
+		LastCommentID = MaxCommentIDSoFar
+		ThisCommentHash = {}
+		for ThisComment in self.EventDescriptionComments + self.ValueComments:
+			LastCommentID += 1
+			ThisComment.ID = LastCommentID
+			ThisCommentHash[str(LastCommentID)] = ThisComment.Content
+		# make top level XML element, and add simple tags
+		TopTag = ElementTree.SubElement(parent=ParentTag, tag=info.FTEventTag)
+		projects.AddAttribsInSubelements(StartEl=TopTag, DataObj=self,
+			SubElements={info.IDTag: 'ID', info.IsIPLTag: 'IsIPL', info.EventTypeTag: 'EventType',
+			info.EventDescriptionTag: 'EventDescription', info.BackgColourTag: 'BackgColour',
+			info.IsSIFFailureEventInRelevantOpmodeTag: 'IsSIFFailureEventInRelevantOpmode'})
+		# add tags containing lists of IDs
+		projects.AddIDListAttribsInSubelements(StartEl=TopTag, DataObj=self,
+			SubElements={info.RiskReceptorsTag: 'ApplicableRiskReceptors',
+			info.EventDescriptionCommentsTag: 'EventDescriptionComments', info.ValueCommentsTag: 'ValueComments',
+			info.ActionItemsTag: 'ActionItems', info.ParkingLotItemsTag: 'ParkingLot',
+			info.ConnectToTag: 'ConnectTo', info.LinkedFromTag: 'LinkedFrom'})
+		# add Numbering tag
+		ThisNumberingTag = ElementTree.SubElement(parent=TopTag, tag=info.NumberingTag)
+		ThisNumberingTag.text = NumberingSystemHash[self]
+		# add Value tags
+		projects.AddValueElement(StartEl=self, ValueTag=info.ValueTag, ValueObj=self.Value)
+		projects.AddValueElement(StartEl=self, ValueTag=info.OldFreqValueTag, ValueObj=self.OldFreqValue)
+		projects.AddValueElement(StartEl=self, ValueTag=info.OldProbValueTag, ValueObj=self.OldProbValue)
+		# add LastSelectedUnit tags
+		for ThisQtyKind, ThisUnit in self.LastSelectedUnitPerQtyKind.items():
+			LastUnitTag = ElementTree.SubElement(parent=TopTag, tag=info.LastSelectedUnitTag)
+			ThisQtyKindTag = ElementTree.SubElement(parent=LastUnitTag, tag=info.QtyKindTag)
+			ThisQtyKindTag.text = ThisQtyKind
+			ThisUnitTag = ElementTree.SubElement(parent=LastUnitTag, tag=info.UnitTag)
+			ThisQtyKindTag.text = ThisUnit.XMLName
+
 class FTGateItemInCore(object): # logic gate in a Fault Tree, used in DataCore
 #	AllFTGatesInCore = [] # register of all FTGates created; used to generate IDs
 	InternalName = 'FTGateInCore'
@@ -2851,7 +2947,6 @@ class FTGateItemInCore(object): # logic gate in a Fault Tree, used in DataCore
 		self.ShowDescriptionComments = False # whether description comments are visible
 		self.ActionItems = [] # list of AssociatedTextItem instances
 		self.ShowActionItems = False
-#		self.LinkedTo = [] # list of LinkItem instances of which this item is a LinkMaster
 		self.LinkedFrom = [] # list of LinkItem instances for linking individual attribs to a master element elsewhere in the project
 		# set up gate formatting based on ModelGate
 		if ModelGate:
@@ -3078,6 +3173,52 @@ class FTGateItemInCore(object): # logic gate in a Fault Tree, used in DataCore
 
 	ClassHumanName = property(fget=GetMyClassHumanName)
 
+
+	def StoreAllDataInXML(self, ParentTag, NumberingSystemHash, MaxCommentIDSoFar):
+		# create XML element as subelement of ParentTag (an XML element instance) and populate it with all gate data
+		# required to be stored in project file
+		# NumberingSystemHash (dict): keys are objects having numbering objects, values are numbering system indices to
+		# store in the file
+		# MaxCommentIDSoFar (int): base for assigning ID numbers to comments
+		# returns:
+		#	ThisCommentHash (dict) with keys = comment IDs (str), values are comment texts (str)
+		#	MaxCommentIDSoFar (int) - highest comment ID number used
+		assert isinstance(ParentTag, ElementTree.Element)
+		assert isinstance(NumberingSystemHash, dict)
+		assert isinstance(MaxCommentIDSoFar, int)
+		ThisCommentHash = {}
+		# First, add IDs to comments and make ThisCommentHash
+		LastCommentID = MaxCommentIDSoFar
+		ThisCommentHash = {}
+		for ThisComment in self.GateDescriptionComments:
+			LastCommentID += 1
+			ThisComment.ID = LastCommentID
+			ThisCommentHash[str(LastCommentID)] = ThisComment.Content
+		# make top level XML element, and add simple tags
+		TopTag = ElementTree.SubElement(parent=ParentTag, tag=info.FTGateTag)
+		projects.AddAttribsInSubelements(StartEl=TopTag, DataObj=self,
+			SubElements={info.IDTag: 'ID', info.IsIPLTag: 'IsIPL',
+			info.GateDescriptionTag: 'GateDescription', info.AlgorithmTag: 'Algorithm',
+			info.BackgColourTag: 'BackgColour'})
+		# add tags containing lists of IDs
+		projects.AddIDListAttribsInSubelements(StartEl=TopTag, DataObj=self,
+			SubElements={info.GateDescriptionCommentsTag: 'GateDescriptionComments',
+			info.ActionItemsTag: 'ActionItems',
+			info.ParkingLotItemsTag: 'ParkingLot',
+			info.ConnectToTag: 'ConnectTo',
+			info.LinkedFromTag: 'LinkedFrom'})
+		# add IsModelGate tag
+		ThisIsModelGateTag = ElementTree.SubElement(TopTag, info.IsModelGateTag)
+		ThisIsModelGateTag.text = utilities.Bool2Str(Input=(self.FT.ModelGate is self), TrueStr='True', FalseStr='False')
+		# add LastSelectedUnit tags
+		for ThisQtyKind, ThisUnit in self.LastSelectedUnitPerQtyKind.items():
+			LastUnitTag = ElementTree.SubElement(TopTag, info.LastSelectedUnitTag)
+			ThisQtyKindTag = ElementTree.SubElement(LastUnitTag, info.QtyKindTag)
+			ThisQtyKindTag.text = ThisQtyKind
+			ThisUnitTag = ElementTree.SubElement(LastUnitTag, info.UnitTag)
+			ThisQtyKindTag.text = ThisUnit.XMLName
+		return ThisCommentHash, LastCommentID
+
 def NextCombination(Length, PassMark):
 	# generator function returning the next combination (list) in a sequence of combinations.
 	# Each combination is a Length-long (int) list of True's and False's, of which exactly PassMark (int) items are True
@@ -3289,8 +3430,46 @@ class FTConnectorItemInCore(FTElementInCore): # in- and out-connectors (CX's) to
 
 	ClassHumanName = property(fget=GetMyClassHumanName)
 
-class FTCollapseGroupInCore(object): # collapse group containing one or more FT elements that can be shown collapsed
-	# into a single object for more compact display
+	def StoreAllDataInXML(self, ParentTag, NumberingSystemHash, MaxCommentIDSoFar):
+		# create XML element as subelement of ParentTag (an XML element instance) and populate it with all connector
+		# data required to be stored in project file
+		# NumberingSystemHash (dict): keys are objects having numbering objects, values are numbering system indices to
+		# store in the file
+		# MaxCommentIDSoFar (int): base for assigning ID numbers to comments
+		# returns:
+		#	ThisCommentHash (dict) with keys = comment IDs (str), values are comment texts (str)
+		#	MaxCommentIDSoFar (int) - highest comment ID number used
+		assert isinstance(ParentTag, ElementTree.Element)
+		assert isinstance(NumberingSystemHash, dict)
+		assert isinstance(MaxCommentIDSoFar, int)
+		ThisCommentHash = {}
+		# First, add IDs to comments and make ThisCommentHash
+		LastCommentID = MaxCommentIDSoFar
+		ThisCommentHash = {}
+		for ThisComment in self.ConnectorDescriptionComments:
+			LastCommentID += 1
+			ThisComment.ID = LastCommentID
+			ThisCommentHash[str(LastCommentID)] = ThisComment.Content
+		# make top level XML element, and add simple tags
+		TopTag = ElementTree.SubElement(ParentTag, info.FTConnectorTag)
+		projects.AddAttribsInSubelements(StartEl=TopTag, DataObj=self,
+			SubElements={info.IDTag: 'ID', info.OutTag: 'Out', info.StyleTag: 'Style',
+			info.ConnectorDescriptionTag: 'ConnectorDescription',
+			info.RelatedConnectorTag: 'RelatedCX',
+			info.BackgColourTag: 'BackgColour'})
+		# add tags containing lists of IDs
+		projects.AddIDListAttribsInSubelements(StartEl=TopTag, DataObj=self,
+			SubElements={info.ConnectorDescriptionCommentsTag: 'ConnectorDescriptionComments',
+			info.ActionItemsTag: 'ActionItems',
+			info.ParkingLotItemsTag: 'ParkingLot',
+			info.ConnectToTag: 'ConnectTo', info.RiskReceptorsTag: 'ApplicableRiskReceptors'})
+		# add Numbering tag
+		ThisNumberingTag = ElementTree.SubElement(TopTag, info.NumberingTag)
+		ThisNumberingTag.text = NumberingSystemHash[self]
+		return ThisCommentHash, LastCommentID
+
+class FTCollapseGroup(object): # collapse group containing one or more FT elements that can be shown collapsed
+	# into a single object for more compact display. This is a Viewport object, not datacore.
 
 	def __init__(self, FT): # FT is the FaultTree object this connector belongs to
 		object.__init__(self)
@@ -3304,6 +3483,13 @@ class FTCollapseGroupInCore(object): # collapse group containing one or more FT 
 			# Users can collapse/expand collapse groups in the Viewports without changing this attribute, so it doesn't
 			# necessarily reflect the current status of collapse groups - only the status when loaded from file.
 		self.BackgColour = '0,0,255' # blue
+
+	def StoreAllDataInXML(self, ParentTag):
+		# write all storeable data into an XML subelement of ParentTag. %%% incomplete TODO
+		assert isinstance(ParentTag, ElementTree.Element)
+		MyTopTag = ElementTree.SubElement(ParentTag, info.CollapseGroupTag)
+		projects.AddAttribsInSubelements(StartEl=MyTopTag, DataObj=self, SubElements={info.IDTag: 'ID',
+			info.NameTag: 'HumanName'})
 
 class FTForDisplay(display_utilities.ViewportBaseClass): # forward definition to allow use in FTObjectInCore
 	InternalName = 'Forward'
@@ -5200,6 +5386,55 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 	def WalkOverAllElements(self): # generator to return all FT elements
 		return WalkOverAllFTObjs(FT=self)
 
+	def StoreAllDataInXML(self, StartTag, NumberingSystemHash, MaxCommentIDSoFar):
+		# create an XML element as a subelement of StartTag (ElementTree.Element) and populate it with all data required
+		# to be stored in project file.
+		# NumberingSystemHash (dict): keys are objects having numbering objects, values are numbering system indices to
+		# store in the file
+		# MaxCommentIDSoFar (int): base for assigning ID numbers to comments
+		# returns:
+		#	ThisCommentHash (dict) with keys = comment IDs (str), values are comment texts (str)
+		#	MaxCommentIDSoFar (int) - highest comment ID number used
+		assert isinstance(StartTag, ElementTree.Element)
+		assert isinstance(NumberingSystemHash, dict)
+		assert isinstance(MaxCommentIDSoFar, int)
+		ThisCommentHash = {}
+		# First, make top level XML element, and add FT-level tags
+		TopTag = ElementTree.SubElement(parent=StartTag, tag=info.PHAObjTag)
+		projects.AddAttribsInSubelements(StartEl=TopTag, DataObj=self,
+			SubElements={info.KindTag: 'InternalName', info.IDTag: 'ID', info.SIFNameTag: 'SIFName',
+			info.RevTag: 'Rev', info.TargetRiskRedMeasureTag: 'TargetRiskRedMeasure',
+			info.SILTargetValueTag: 'SILTargetValue', info.RiskReceptorGroupingOptionTag: 'RRGroupingOption',
+			info.BackgColourTag: 'BackgColour', info.TextColourTag: 'TextColour'})
+		OpModeTag = ElementTree.SubElement(parent=TopTag, tag=info.OpModeTag)
+		OpModeTag.text = self.OpMode.XMLName
+		TolRiskModelTag = ElementTree.SubElement(parent=TopTag, tag=info.TolRiskModelTag)
+		TolRiskModelTag.text = self.MyTolRiskModel.ID
+		projects.AddValueElement(StartEl=TopTag, ValueTag=info.TolFreqTag, ValueObj=self.TolFreq)
+		if self.ModelGate is not None:
+			ThisModelGateTag = ElementTree.SubElement(parent=TopTag, tag=info.ModelGateTag)
+			ThisModelGateTag.text = self.ModelGate.ID
+		# add Severity tag
+		ThisSeverityTag = ElementTree.SubElement(parent=TopTag, tag=info.SeverityTag)
+		for ThisRR, ThisSeverity in self.Severity.items():
+			ThisRRTag = ElementTree.SubElement(parent=ThisSeverityTag, tag=info.RRTag)
+			ThisRRNameTag = ElementTree.SubElement(parent=ThisRRTag, tag=info.NameTag)
+			ThisRRNameTag.text = ThisRR.XMLName
+			ThisRRSeverityTag = ElementTree.SubElement(parent=ThisRRTag, tag=info.SeverityValueTag)
+			ThisRRSeverityTag.text = ThisSeverity.XMLName
+		# add Column tags containing all FT elements
+		for ThisCol in self.Columns:
+			ThisColTag = ElementTree.SubElement(parent=TopTag, tag=info.FTColumnTag)
+			# store all storeable elements in the column (e.g. FT events, gates etc)
+			for ThisEl in ThisCol:
+				if hasattr(ThisEl, 'StoreAllDataInXML'):
+					MaxCommentIDSoFar = ThisEl.StoreAllDataInXML(ThisColTag, NumberingSystemHash, MaxCommentIDSoFar)
+		# add CollapseGroup tags
+		for ThisCG in self.CollapseGroups:
+			# store all storeable data in the collapse group
+			ThisCG.StoreAllDataInXML(TopTag)
+		return ThisCommentHash, MaxCommentIDSoFar
+
 class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all data needed to display full FT on screen
 	# Each separate sub-object (header, cause etc) has attributes whose names are assumed to be same as in the data message from DataCore
 	# NB this class has a forward definition earlier in this module.
@@ -5248,7 +5483,8 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			self.XMLName = XMLName
 			self.Applicable = Applicable
 
-	def __init__(self, PHAObjID, **Args): # FT object initiation. Args must include Proj and can include DisplDevice and ParentWindow
+	def __init__(self, PHAObjID, **Args): # FT object initiation.
+		# Args must include Proj and can include DisplDevice and ParentWindow
 		# self.PHAObj, Zoom, PanX, PanY, OffsetX, OffsetY defined in base class
 		# attrib PHAObjID is set in superclass
 		# attribs PHAObj and DatacoreHandler are set in DoNewViewport()
@@ -5262,11 +5498,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		self.SeverityCatObjs = [] # SeverityCatInFT instances, in the order severity categories should be displayed
 		self.Header = FTHeader(FT=self)
 		self.Columns = [] # this will be FTColumn objects
-		self.InterColumnStripWidth = 100 # in canvas coords
-#		self.Zoom = 1.0 # ratio of canvas coords to screen coords (absolute ratio, not %)
-#		self.PanX = self.PanY = 0 # offset of drawing origin, in screen coords
-#		self.OffsetX = self.OffsetY = 0 # offset of Viewport in display panel, in screen coords;
-#			# referenced in utilities.CanvasCoordsViewport() but not currently used
+		self.InterColumnStripWidth = 100 # (int) in canvas coords
 		self.ElementIDContainingComponentToHighlight = None # ID of element containing a highlighted component;
 			# if highlighted component is in FT header, value is same as self.ID
 		self.ComponentNameToHighlight = '' # Name of component to highlight in specified element
@@ -6678,6 +6910,23 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 					ThisElInMilestone = self.MilestoneForRedraw.ViewportData['Elements'][ElHash[ThisEl.ID]]
 					for ThisAttribName, ThisAttribValue in ThisElInMilestone.items():
 						if ThisAttribName != 'ElementID': setattr(ThisEl, ThisAttribName, ThisAttribValue)
+
+	def StoreAllDataInXML(self, StartTag):
+		# create an XML element as a subelement of StartTag (ElementTree.Element) and populate it with all Viewport
+		# data required to be stored in project file.
+		assert isinstance(StartTag, ElementTree.Element)
+		# First, make top level XML element, and add common tags
+		TopTag = projects.StoreViewportCommonDataInXML(Viewport=self, StartTag=StartTag)
+		# store Viewport-level tags specific to this Viewport
+		projects.AddAttribsInSubelements(StartEl=TopTag, DataObj=self,
+			SubElements={info.NameTag: 'HumanName', info.InterColumnStripWidthTag: 'InterColumnStripWidth'})
+		# add <Column> tag for each column
+		for ThisCol in self.Columns:
+			ThisColTag = ElementTree.SubElement(parent=TopTag, tag=info.FTColumnTag)
+			# add and populate tag for each element in this column (except e.g. builder buttons)
+			for ThisEl in ThisCol.FTElements:
+				if hasattr(ThisEl, 'StoreAllDataInXML'):
+					ThisEl.StoreAllDataInXML(StartTag=ThisColTag)
 
 FTObjectInCore.DefaultViewportType = FTForDisplay # set here (not in FTForDisplay class) due to the order of the
 	# class definitions

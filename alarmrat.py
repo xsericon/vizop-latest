@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Module alarmrat: part of Vizop, (c) 2019 xSeriCon
+# Module alarmrat: part of Vizop, (c) 2020 xSeriCon
 # Implements alarm rationalization PHA model and associated Viewports
 
 # library modules
@@ -16,8 +16,6 @@ import text, utilities, core_classes, info, vizop_misc, projects, art, display_u
 from display_utilities import UIWidgetItem
 
 # constants applicable to alarm rationalization
-
-# class AlarmList(object): pass # forward definition
 
 AllAlarmKinds = []
 
@@ -951,5 +949,13 @@ class AlarmList(display_utilities.ViewportBaseClass): # object containing all da
 	def OnScrollHorizButton(self, Event): pass
 	def BuildFilterWidgets(self): # make filter widgets for currently visible alarm attribute columns
 		pass
+
+	def StoreAllDataInXML(self, StartTag):
+		# create an XML element as a subelement of StartTag (ElementTree.Element) and populate it with all Viewport
+		# data required to be stored in project file.
+		assert isinstance(StartTag, ElementTree.Element)
+		# First, make top level XML element, and add common tags
+		TopTag = projects.StoreViewportCommonDataInXML(Viewport=self, StartTag=StartTag)
+		# TODO add any more tags that should be stored
 
 ARObjectInCore.DefaultViewportType = AlarmList # we put this here because class ARObjectInCore is defined before class AlarmList

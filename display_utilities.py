@@ -51,6 +51,8 @@ class ViewportBaseClass(object, metaclass=ViewportMetaClass): # base class for a
 		self.ViewportToRevertTo = Args.get('ViewportToRevertTo', None)
 #		self.GotoMilestoneOnUndoCreate = None # a milestone instance to revert to, if creation of this Viewport is undone
 
+#	method StoreViewportCommonDataInXML() is in module projects
+
 def CreateViewport(Proj, ViewportClass, DisplDevice=None, PHAObj=None, DatacoreIsLocal=True, Fonts=[], **Args):
 	# Client side method.
 	# create new Viewport instance of class ViewportClass in project Proj, and attach it to DisplDevice.

@@ -898,3 +898,11 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 		# return a list of IDs of currently selected ATs, irrespective of whether they are visible (filtered-in)
 		# This method is used by other Viewports as a hygienic way of getting AT statuses
 		return [ThisAT.ID for ThisAT in self.AssocTexts if ThisAT.Selected]
+
+	def StoreAllDataInXML(self, StartTag):
+		# create an XML element as a subelement of StartTag (ElementTree.Element) and populate it with all Viewport
+		# data required to be stored in project file.
+		assert isinstance(StartTag, ElementTree.Element)
+		# First, make top level XML element, and add common tags
+		TopTag = projects.StoreViewportCommonDataInXML(Viewport=self, StartTag=StartTag)
+		# TODO add any more tags that should be stored
