@@ -2059,7 +2059,7 @@ class ControlFrame(wx.Frame):
 	class EditPanel(wx.Panel): # define the Edit panel in the control frame, used to display a Viewport
 
 		# main EditPanel handling routine
-		def __init__(self, wxParent, size, ViewportOwner=None, ColScheme=None):
+		def __init__(self, wxParent, size, ViewportOwner=None, ColScheme=None, ID="1"):
 			# ViewportOwner is the entity with attribute CurrentViewport
 			wx.Panel.__init__(self, wxParent, -1, (0,0), size, wx.RAISED_BORDER)
 			self.TopLevelFrame = wxParent
@@ -2067,6 +2067,7 @@ class ControlFrame(wx.Frame):
 				# Viewports look similarly scaled on each device
 			self.TolXInPx = self.TolYInPx = 2 # precision of clicking on objects & hotspots, in pixels
 			self.ColScheme = ColScheme
+			self.ID = ID # used for identifying display device in ViewportShadow
 			self.BackgColour = self.ColScheme.BackMid # set background colour
 			self.ViewportOwner = ViewportOwner
 			self.LatestViewport = {}
@@ -2666,7 +2667,7 @@ class ControlFrame(wx.Frame):
 		# request datacore to create new viewport shadow
 		NewViewportAttribs = {'ControlFrame': self.ID, info.SkipRefreshTag: utilities.Bool2Str(Args['Chain']),
 			'ViewportClass': Args['ViewportClass'].InternalName, info.ProjIDTag: Proj.ID, 'Viewport': NewViewport.ID,
-			info.PHAModelIDTag: getattr(Args['PHAModel'], 'ID', ''),
+			info.PHAModelIDTag: getattr(Args['PHAModel'], 'ID', ''), info.DisplayDeviceTag: self.MyEditPanel.ID,
 			info.PHAModelTypeTag: getattr(Args['PHAModel'], 'InternalName', ''),
 			info.MilestoneIDTag: NewMilestone.ID, info.D2CSocketNoTag: str(D2CSocketNo),
 			info.C2DSocketNoTag: str(C2DSocketNo), info.HumanNameTag: NewViewport.HumanName}
@@ -3079,12 +3080,13 @@ class ControlFrame(wx.Frame):
 			NewViewportID = XMLRoot.find('Viewport').text
 			NewViewportHumanName = XMLRoot.find(info.HumanNameTag).text
 			PHAModelID = XMLRoot.find(info.PHAModelIDTag).text # will be '' if this Viewport has no associated PHAModel
+			DisplDeviceID = XMLRoot.find(info.DisplayDeviceTag).text
 			ExistingPHAObj = utilities.ObjectWithID(ThisProj.PHAObjs, PHAModelID) if PHAModelID else None
 			Chain = 'Stepwise' # TODO need 'NoChain' if we are adding new Viewport to existing PHA model
 		# check if we can proceed to create the Viewport; we may need editing rights (TODO remove this requirement)
 		if Proj.EditAllowed:
 			# make the Viewport shadow
-			NewViewport = ViewportShadow(ThisProj, NewViewportID, MyClass=NewViewportClass,
+			NewViewport = ViewportShadow(ThisProj, NewViewportID, MyClass=NewViewportClass, DisplDeviceID=DisplDeviceID,
 				 HumanName=NewViewportHumanName,
 				 D2CSocketNumber=int(XMLRoot.find(info.D2CSocketNoTag).text),
 				 C2DSocketNumber=int(XMLRoot.find(info.C2DSocketNoTag).text), PHAObj=ExistingPHAObj, XMLRoot=XMLRoot)
@@ -3606,7 +3608,7 @@ class ControlFrame(wx.Frame):
 #		SizeX = ControlFrameSize[0] - ControlPanelSize[0]
 #		SizeY = ControlFrameSize[1] - MenuBarAllowance
 		self.MyEditPanel = self.EditPanel(wxParent=self, size=EditPanelSize, ViewportOwner=self,
-			ColScheme=self.ColScheme)
+			ColScheme=self.ColScheme, ID="1")
 #		self.MyEditPanel.SetMinSize( (SizeX, SizeY) )
 		self.MyEditPanel.EditPanelMode(self.CurrentViewport, 'Select') # set up mouse pointer and bindings (needs OffsetX/Y)
 		self.MyVTPanel = self.VTPanel(self, size=VTPanelSize)
@@ -3866,11 +3868,11 @@ def DatacoreStopDisplayingViewport(Proj, XMLRoot=None):
 		Elements={})
 
 class ViewportShadow(object): # defines objects that represent Viewports in the datacore.
-	# These are not the actual (visible) Viewports - those live in the controlframe (local or remote) and aren't
-	# directly accessible by the datacore.
+	# These are not the actual (visible) Viewports - those live in the client side controlframe (local or remote)
+	# and aren't directly accessible by the datacore.
 
 	def __init__(self, Proj, ID, MyClass=None, D2CSocketNumber=None, C2DSocketNumber=None, PHAObj=None,
-				 HumanName='', XMLRoot=None):
+			 HumanName='', XMLRoot=None, DisplDeviceID=None):
 		# ID (str) is the same as the ID of the corresponding "real" Viewport
 		# MyClass (ViewportClasses instance): class of actual Viewport shadowed by this one
 		# D2CSocketNumber and C2DSocketNumber (2 x int): socket numbers assigned in display_utilities.CreateViewport
@@ -3882,13 +3884,15 @@ class ViewportShadow(object): # defines objects that represent Viewports in the 
 		assert isinstance(D2CSocketNumber, int)
 		assert isinstance(C2DSocketNumber, int)
 		assert isinstance(HumanName, str)
+		assert isinstance(DisplDeviceID, str)
 		object.__init__(self)
 		self.ID = ID
 		self.MyClass = MyClass
 		self.HumanName = HumanName
+		self.DisplDeviceID = DisplDeviceID # None if this Viewport is currently not displayed
 		self.PHAObjID = getattr(PHAObj, 'ID', '') # storing ID, not the actual PHAObj, for consistency with real Viewports
 		self.PersistentAttribs = {} # attribs that can be reused when the Viewport is recreated, and also to be stored
-			# in project file
+			# in project file. Keys must be XML-friendly strings, values are strings stored in project file as-is
 		# Grab any additional attribs required by this Viewport class
 		if hasattr(MyClass, 'GetClassAttribsOnInit'):
 #			self.__dict__.update(MyClass.GetClassAttribsOnInit(XMLRoot=XMLRoot))

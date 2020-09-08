@@ -59,7 +59,7 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 		self.InitializeActionChoices()
 
 	def GetMyPersistentAttribs(self):
-		# return dict with keys: attrib names for persistent attribs, values: str
+		# return dict with keys: attrib names for persistent attribs (must be XML-friendly), values: str
 		return {'AssocTextKind': self.AssocTextKind}
 
 	PersistentAttribs = property(fget=GetMyPersistentAttribs)

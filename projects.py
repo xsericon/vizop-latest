@@ -92,8 +92,8 @@ class ProjectItem(object): # class of PHA project instances
 		self.Constants = [] # instances of ConstantItem
 		# the following is for testing
 		TestConstant = core_classes.ConstantItem(HumanName='Alarm failure', ID=self.GetNewID())
-		TestConstant.SetMyValue(0.1)
-		TestConstant.SetMyUnit(core_classes.ProbabilityUnit)
+		TestConstant.Value.SetMyValue(0.1)
+		TestConstant.Value.SetMyUnit(core_classes.ProbabilityUnit)
 		self.Constants.append(TestConstant)
 		self.ProcessUnits = [ProcessUnit(Proj=self, UnitNumber='120', ShortName='Wash', LongName='Plastic washing area'),
 			ProcessUnit(Proj=self, UnitNumber='565', ShortName='Pyrolysis 1', LongName='Pyrolysis reactor no. 1')]
@@ -153,7 +153,7 @@ class ProjectItem(object): # class of PHA project instances
 		self.VizopVersion = CurrentProjDocType # str; Vizop Version
 		self.ShortTitle = 'CHAZOP of gas treatment plant' # project short title for display
 		self.ProjNumber = '141688' # str; user's project reference number
-		self.Description = 'A great excuse to spend 4 weeks in Seoul' # longer description of project
+		self.Description = 'Gas Desulfurization Upgrade Project, Seoul' # longer description of project
 		self.EditNumber = 0 # int; incremented every time the project's dataset is changed
 		self.TeamMembers = [core_classes.TeamMember('101', 'Amy Stone', 'Consultant','ABC Consultants'),
 			core_classes.TeamMember('102', 'Ben Smith', 'Project Manager','BigChemCo')] # list of team members
@@ -323,23 +323,7 @@ class ProjectItem(object): # class of PHA project instances
 				yield ThisObj
 
 	def ConvertProjectToXML(self):
-		# convert project to XML. Return the root element of the XML tree
-
-		def LegalString(InStr, Strip=True, FilterForbiddenChar=False, NoSpace=False) -> str:
-			# return modified InStr (str). If Strip, remove leading and trailing white space.
-			# If FilterForbiddenChar, remove any char not in approved list. If NoSpace, replace all spaces with _
-			ValidChars = "!#$%()*+,-.:;=?@[]^_`{|}~ '\"" + string.ascii_letters + string.digits
-			assert type(InStr) == str
-			assert type(Strip) == bool
-			assert type(FilterForbiddenChar) == bool
-			assert type(NoSpace) == bool
-			FormattedString = InStr
-			if Strip: FormattedString = FormattedString.strip()
-			if FilterForbiddenChar:
-				FormattedString = ''.join(c for c in FormattedString if c in ValidChars)
-			if NoSpace:
-				FormattedString = '_'.join(FormattedString.split(' '))
-			return FormattedString
+		# convert project to XML. Return an ElementTree object containing all elements of the XML tree
 
 		def MakeStructuredElement(StartEl, SubElTag, DataObj, SubElements):
 			# make a subelement of StartEl (XML element) with tag = SubElTag (str).
@@ -378,7 +362,8 @@ class ProjectItem(object): # class of PHA project instances
 			TMTopElement = ElementTree.SubElement(XMLRoot, info.TeamMembersTag)
 			for ThisTM in self.TeamMembers:
 				TMElement = ElementTree.SubElement(TMTopElement, info.TeamMemberTag,
-					attrib={info.NameTag: LegalString(InStr=ThisTM.Name), info.RoleTag: LegalString(InStr=ThisTM.Role),
+					attrib={info.IDTag: ThisTM.ID, info.NameTag: LegalString(InStr=ThisTM.Name),
+					info.RoleTag: LegalString(InStr=ThisTM.Role),
 					info.AffiliationTag: LegalString(InStr=ThisTM.Affiliation)})
 				TMElement.text = ThisTM.ID
 
@@ -396,7 +381,10 @@ class ProjectItem(object): # class of PHA project instances
 				for ThisChunk in ThisNS.NumberStructure:
 					ThisChunkTag = MakeStructuredElement(StartEl=ThisNSElement, SubElTag=info.NumberChunkTag,
 						DataObj=ThisNS, SubElements={info.ShowInDisplayTag: 'ShowInDisplay',
-						info.ShowInOutputTag: 'ShowInOutput', info.NumberChunkKindTag: 'XMLName'})
+						info.ShowInOutputTag: 'ShowInOutput'})
+					# add tag for the chunk kind
+					ThisKindTag = ElementTree.SubElement(ThisChunkTag, info.NumberChunkKindTag)
+					ThisKindTag.text = type(ThisChunk).XMLName
 					# add specific XML tags for each chunk kind
 					if ThisChunk.XMLName == info.NumberSystemStringType:
 						ValueTag = ElementTree.SubElement(ThisChunkTag, info.ValueTag)
@@ -423,7 +411,8 @@ class ProjectItem(object): # class of PHA project instances
 			SOInfo = [ ('ProcessUnits', info.ProcessUnitTag, {info.IDTag: info.IDAttribName,
 				info.UnitNumberTag: info.UnitNumberAttribName,
 				info.ShortNameTag: info.ShortNameAttribName, info.LongNameTag: info.LongNameAttribName} ),
-				('RiskReceptors', info.RiskReceptorTag, {info.IDTag: info.IDAttribName, info.NameTag: 'Name'}) ]
+				('RiskReceptors', info.RiskReceptorTag, {info.IDTag: info.IDAttribName,
+				info.XMLNameTag: 'XMLName', info.HumanNameTag: 'HumanName'}) ]
 			for ThisSOKindName, TagName, SubElements in SOInfo:
 				for ThisSO in getattr(self, ThisSOKindName):
 					ThisSOElement = MakeStructuredElement(StartEl=XMLRoot, SubElTag=TagName, DataObj=ThisSO,
@@ -449,9 +438,9 @@ class ProjectItem(object): # class of PHA project instances
 			# add Constants
 			for ThisConstant in self.Constants:
 				ThisConstantTag = ElementTree.SubElement(XMLRoot, info.ConstantTag)
-				AddAttribsInSubelements(StartEl=ThisATTag, DataObj=ThisActionItem,
+				AddAttribsInSubelements(StartEl=ThisConstantTag, DataObj=ThisConstant,
 					SubElements={info.IDTag: info.IDAttribName, info.NameTag: 'HumanName'})
-				AddValueElement(StartEl=ThisConstantTag, ValueTag=info.ConstValueTag, ValueObj=ThisConstant)
+				AddValueElement(StartEl=ThisConstantTag, ValueTag=info.ValueTag, ValueObj=ThisConstant.Value)
 			# add risk matrices
 			for ThisMatrix in self.RiskMatrices:
 				ThisMatrixTag = ElementTree.SubElement(XMLRoot, info.RiskMatrixTag)
@@ -478,7 +467,7 @@ class ProjectItem(object): # class of PHA project instances
 						XMLNameTag = ElementTree.SubElement(KeyTag, info.XMLNameTag)
 						XMLNameTag.text = ThisKey.XMLName
 				# store values for the matrix
-				for ThisValue in utilities.flatten(ThisMatrix.Values):
+				for ThisValue in utilities.Flatten(ThisMatrix.Values):
 					AddValueElement(StartEl=ThisMatrixTag, ValueTag=info.ValueTag, ValueObj=ThisValue)
 
 		def AddPHAObjTags(XMLRoot, NumberingSystemHash):
@@ -500,6 +489,26 @@ class ProjectItem(object): # class of PHA project instances
 				CommentHash.update(ThisCommentHash)
 			return CommentHash
 
+		def AddViewportTags(XMLRoot):
+			# add tags for each Viewport in the project
+			for ThisViewport in self.AllViewportShadows: # not sure if we also need to look at self.ViewportsWithoutPHAObjs
+				ThisViewportTag = ElementTree.SubElement(XMLRoot, info.ViewportTag)
+				ThisKindTag = ElementTree.SubElement(ThisViewportTag, info.KindTag)
+				ThisKindTag.text = ThisViewport.MyClass.InternalName
+				ThisIDTag = ElementTree.SubElement(ThisViewportTag, info.IDTag)
+				ThisIDTag.text = ThisViewport.ID
+				# add tag containing ID of any associated PHA object
+				ThisPHAObjTag = ElementTree.SubElement(ThisViewportTag, info.PHAObjTag)
+				ThisPHAObjTag.text = ThisViewport.PHAObjID if ThisViewport.PHAObjID else info.NoneTag
+				# add tag indicating any display device currently showing this Viewport
+				ThisDisplDeviceTag = ElementTree.SubElement(ThisViewportTag, info.DisplayDeviceTag)
+				ThisDisplDeviceTag.text = info.NoneTag if ThisViewport.DisplDeviceID is None \
+					else ThisViewport.DisplDeviceID
+				# store persistent attribs (originally supplied from client-side Viewport)
+				for ThisTagName, ThisAttribValue in ThisViewport.PersistentAttribs.items():
+					ThisPATag = ElementTree.SubElement(ThisViewportTag, ThisTagName)
+					ThisPATag.text = ThisAttribValue
+
 		def AddAssociatedTextTags(XMLRoot, NumberingSystemHash):
 			# add tags for action items and parking lot
 			for ThisATKindName, ThisATKindTag in [('ActionItems', info.ActionItemTag),
@@ -519,9 +528,6 @@ class ProjectItem(object): # class of PHA project instances
 #		MyXMLRoot = ElementTree.Element(tag=info.ProjectRootTag, attrib={info.VizopVersionTag: info.VERSION})
 		MyXMLRoot = ElementTree.Element(info.ProjectRootTag)
 		MyXMLTree = ElementTree.ElementTree(element=MyXMLRoot)
-#		# set the skeleton as the XML tree root element
-#		MyXMLTree._setroot(ET.fromstring(projects.XMLTreeSkeleton))
-#		MyXMLRoot = MyXMLTree.getroot()
 		# add project information tags, including team members%%%
 		AddProjectInformationTags(XMLRoot=MyXMLRoot)
 		# add numbering system tags
@@ -535,6 +541,8 @@ class ProjectItem(object): # class of PHA project instances
 		AddSimpleStructuredObjectTags(XMLRoot=MyXMLRoot, NumberingSystemHash=NumberingSystemHash)
 		# add tags for each PHA object
 		CommentHash = AddPHAObjTags(XMLRoot=MyXMLRoot, NumberingSystemHash=NumberingSystemHash)
+		# add Viewport tags
+		AddViewportTags(XMLRoot=MyXMLRoot)
 		# add comment tags
 		for (ThisCommentID, ThisCommentText) in CommentHash.items():
 			ThisCommentTag = ElementTree.SubElement(MyXMLRoot, info.CommentTag)
@@ -544,7 +552,23 @@ class ProjectItem(object): # class of PHA project instances
 			ThisCommentContentTag.text = LegalString(InStr=ThisCommentText, Strip=True, FilterForbiddenChar=False)
 		# add action item and parking lot tags
 		AddAssociatedTextTags(XMLRoot=MyXMLRoot, NumberingSystemHash=NumberingSystemHash)
-		return MyXMLRoot
+		return MyXMLTree
+
+def LegalString(InStr, Strip=True, FilterForbiddenChar=False, NoSpace=False) -> str:
+	# return modified InStr (str) for storing in XML. If Strip, remove leading and trailing white space.
+	# If FilterForbiddenChar, remove any char not in approved list. If NoSpace, replace all spaces with _
+	ValidChars = "!#$%()*+,-.:;=?@[]^_`{|}~ '\"" + string.ascii_letters + string.digits
+	assert type(InStr) == str
+	assert type(Strip) == bool
+	assert type(FilterForbiddenChar) == bool
+	assert type(NoSpace) == bool
+	FormattedString = InStr
+	if Strip: FormattedString = FormattedString.strip()
+	if FilterForbiddenChar:
+		FormattedString = ''.join(c for c in FormattedString if c in ValidChars)
+	if NoSpace:
+		FormattedString = '_'.join(FormattedString.split(' '))
+	return FormattedString
 
 def TestProjectsOpenable(ProjectFilenames, ReadOnly=False):
 	"""
@@ -681,7 +705,6 @@ def SaveEntireProject(Proj: ProjectItem, OutputFilename, ProblemReport='', Close
 			return TextToAdd
 
 	Report = ProblemReport # final report to return to user
-	print('PR684 in SaveEntireProject with OutputFilename, writeable: ', OutputFilename, vizop_misc.IsWritableLocation(os.path.dirname(OutputFilename)))
 	# First, try to create the project file
 	if vizop_misc.IsWritableLocation(os.path.dirname(OutputFilename)):
 #		ProjFile = open(OutputFilename, 'w') # create the file
@@ -908,7 +931,7 @@ def AddValueElement(StartEl, ValueTag, ValueObj):
 		core_classes.LookupNumValueItem: info.LookupTag, core_classes.ParentNumValueItem: info.CopiedTag,
 		core_classes.UseParentValueItem: info.LinkedFromTag}
 	KindXML = ValueKindHash.get(type(ValueObj), info.UnknownTag)
-	KindTag = ElementTree.SubElement(TopTag, KindXML)
+	KindTag = ElementTree.SubElement(TopTag, info.KindTag)
 	KindTag.text = KindXML
 	# populate sub-elements for each number kind
 	if KindXML in [info.UserTag, info.CopiedTag]:

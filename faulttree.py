@@ -1368,7 +1368,7 @@ class FTEvent(FTBoxyObject): # FT event object in Viewport
 		# data required to be stored in project file.
 		assert isinstance(StartTag, ElementTree.Element)
 		# First, make top level XML element
-		TopTag = ElementTree.SubElement(parent=StartTag, tag=info.FTEventTag)
+		TopTag = ElementTree.SubElement(StartTag, info.FTEventTag)
 		# store Viewport-level tags specific to this element
 		projects.AddAttribsInSubelements(StartEl=TopTag, DataObj=self,
 			SubElements={info.IDTag: 'ID', info.ShowDescriptionCommentsTag: 'ShowDescriptionComments',
@@ -1792,7 +1792,7 @@ class FTGate(FTBoxyObject): # object containing FT gates for display in Viewport
 		# data required to be stored in project file.
 		assert isinstance(StartTag, ElementTree.Element)
 		# First, make top level XML element
-		TopTag = ElementTree.SubElement(parent=StartTag, tag=info.FTGateTag)
+		TopTag = ElementTree.SubElement(StartTag, info.FTGateTag)
 		# store Viewport-level tags specific to this element
 		projects.AddAttribsInSubelements(StartEl=TopTag, DataObj=self,
 			SubElements={info.IDTag: 'ID', info.ShowCommentsTag: 'ShowComments',
@@ -2035,7 +2035,7 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 		# data required to be stored in project file.
 		assert isinstance(StartTag, ElementTree.Element)
 		# First, make top level XML element
-		TopTag = ElementTree.SubElement(parent=StartTag, tag=info.FTConnectorTag)
+		TopTag = ElementTree.SubElement(StartTag, info.FTConnectorTag)
 		# store Viewport-level tags specific to this element
 		projects.AddAttribsInSubelements(StartEl=TopTag, DataObj=self,
 			SubElements={info.IDTag: 'ID', info.StyleTag: 'Style',
@@ -2096,11 +2096,11 @@ class FTCollapseGroupInCore(object): # depiction of a group of FT objects that h
 	def StoreAllDataInXML(self, TopTag):
 		# write all storeable data into an XML subelement of TopTag
 		assert isinstance(TopTag, ElementTree.Element)
-		MyTopTag = ElementTree.SubElement(parent=TopTag, tag=info.CollapseGroupTag)
+		MyTopTag = ElementTree.SubElement(TopTag, info.CollapseGroupTag)
 		projects.AddAttribsInSubelements(StartEl=MyTopTag, DataObj=self, SubElements={info.IDTag: 'ID',
 			info.NameTag: 'HumanName'})
 		# add elements
-		ThisElementsTag = ElementTree.SubElement(parent=MyTopTag, tag=info.ElementsTag)
+		ThisElementsTag = ElementTree.SubElement(MyTopTag, info.ElementsTag)
 		ThisElements.text = ','.join(ThisEl.ID for ThisEl in self.Elements)
 
 class FTBuilder(FTBoxyObject): # 'add' button object within an FTColumn.
@@ -2884,7 +2884,7 @@ class FTEventInCore(FTElementInCore): # FT event object used in DataCore by FTOb
 			ThisComment.ID = LastCommentID
 			ThisCommentHash[str(LastCommentID)] = ThisComment.Content
 		# make top level XML element, and add simple tags
-		TopTag = ElementTree.SubElement(parent=ParentTag, tag=info.FTEventTag)
+		TopTag = ElementTree.SubElement(ParentTag, info.FTEventTag)
 		projects.AddAttribsInSubelements(StartEl=TopTag, DataObj=self,
 			SubElements={info.IDTag: 'ID', info.IsIPLTag: 'IsIPL', info.EventTypeTag: 'EventType',
 			info.EventDescriptionTag: 'EventDescription', info.BackgColourTag: 'BackgColour',
@@ -2896,7 +2896,7 @@ class FTEventInCore(FTElementInCore): # FT event object used in DataCore by FTOb
 			info.ActionItemsTag: 'ActionItems', info.ParkingLotItemsTag: 'ParkingLot',
 			info.ConnectToTag: 'ConnectTo', info.LinkedFromTag: 'LinkedFrom'})
 		# add Numbering tag
-		ThisNumberingTag = ElementTree.SubElement(parent=TopTag, tag=info.NumberingTag)
+		ThisNumberingTag = ElementTree.SubElement(TopTag, info.NumberingTag)
 		ThisNumberingTag.text = NumberingSystemHash[self]
 		# add Value tags
 		projects.AddValueElement(StartEl=self, ValueTag=info.ValueTag, ValueObj=self.Value)
@@ -2904,10 +2904,10 @@ class FTEventInCore(FTElementInCore): # FT event object used in DataCore by FTOb
 		projects.AddValueElement(StartEl=self, ValueTag=info.OldProbValueTag, ValueObj=self.OldProbValue)
 		# add LastSelectedUnit tags
 		for ThisQtyKind, ThisUnit in self.LastSelectedUnitPerQtyKind.items():
-			LastUnitTag = ElementTree.SubElement(parent=TopTag, tag=info.LastSelectedUnitTag)
-			ThisQtyKindTag = ElementTree.SubElement(parent=LastUnitTag, tag=info.QtyKindTag)
+			LastUnitTag = ElementTree.SubElement(TopTag, info.LastSelectedUnitTag)
+			ThisQtyKindTag = ElementTree.SubElement(LastUnitTag, info.QtyKindTag)
 			ThisQtyKindTag.text = ThisQtyKind
-			ThisUnitTag = ElementTree.SubElement(parent=LastUnitTag, tag=info.UnitTag)
+			ThisUnitTag = ElementTree.SubElement(LastUnitTag, info.UnitTag)
 			ThisQtyKindTag.text = ThisUnit.XMLName
 
 class FTGateItemInCore(object): # logic gate in a Fault Tree, used in DataCore
@@ -3195,7 +3195,7 @@ class FTGateItemInCore(object): # logic gate in a Fault Tree, used in DataCore
 			ThisComment.ID = LastCommentID
 			ThisCommentHash[str(LastCommentID)] = ThisComment.Content
 		# make top level XML element, and add simple tags
-		TopTag = ElementTree.SubElement(parent=ParentTag, tag=info.FTGateTag)
+		TopTag = ElementTree.SubElement(ParentTag, info.FTGateTag)
 		projects.AddAttribsInSubelements(StartEl=TopTag, DataObj=self,
 			SubElements={info.IDTag: 'ID', info.IsIPLTag: 'IsIPL',
 			info.GateDescriptionTag: 'GateDescription', info.AlgorithmTag: 'Algorithm',
@@ -5399,40 +5399,39 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		assert isinstance(NumberingSystemHash, dict)
 		assert isinstance(MaxCommentIDSoFar, int)
 		ThisCommentHash = {}
-		# First, make top level XML element, and add FT-level tags
-		TopTag = ElementTree.SubElement(parent=StartTag, tag=info.PHAObjTag)
-		projects.AddAttribsInSubelements(StartEl=TopTag, DataObj=self,
-			SubElements={info.KindTag: 'InternalName', info.IDTag: 'ID', info.SIFNameTag: 'SIFName',
+		# First, add FT-level tags
+		projects.AddAttribsInSubelements(StartEl=StartTag, DataObj=self,
+			SubElements={info.KindTag: 'InternalName', info.IDTag: 'ID', info.HumanNameTag: 'HumanName',
 			info.RevTag: 'Rev', info.TargetRiskRedMeasureTag: 'TargetRiskRedMeasure',
 			info.SILTargetValueTag: 'SILTargetValue', info.RiskReceptorGroupingOptionTag: 'RRGroupingOption',
 			info.BackgColourTag: 'BackgColour', info.TextColourTag: 'TextColour'})
-		OpModeTag = ElementTree.SubElement(parent=TopTag, tag=info.OpModeTag)
+		OpModeTag = ElementTree.SubElement(StartTag, info.OpModeTag)
 		OpModeTag.text = self.OpMode.XMLName
-		TolRiskModelTag = ElementTree.SubElement(parent=TopTag, tag=info.TolRiskModelTag)
+		TolRiskModelTag = ElementTree.SubElement(StartTag, info.TolRiskModelTag)
 		TolRiskModelTag.text = self.MyTolRiskModel.ID
-		projects.AddValueElement(StartEl=TopTag, ValueTag=info.TolFreqTag, ValueObj=self.TolFreq)
+		projects.AddValueElement(StartEl=StartTag, ValueTag=info.TolFreqTag, ValueObj=self.TolFreq)
 		if self.ModelGate is not None:
-			ThisModelGateTag = ElementTree.SubElement(parent=TopTag, tag=info.ModelGateTag)
+			ThisModelGateTag = ElementTree.SubElement(StartTag, info.ModelGateTag)
 			ThisModelGateTag.text = self.ModelGate.ID
 		# add Severity tag
-		ThisSeverityTag = ElementTree.SubElement(parent=TopTag, tag=info.SeverityTag)
+		ThisSeverityTag = ElementTree.SubElement(StartTag, info.SeverityTag)
 		for ThisRR, ThisSeverity in self.Severity.items():
-			ThisRRTag = ElementTree.SubElement(parent=ThisSeverityTag, tag=info.RRTag)
-			ThisRRNameTag = ElementTree.SubElement(parent=ThisRRTag, tag=info.NameTag)
-			ThisRRNameTag.text = ThisRR.XMLName
-			ThisRRSeverityTag = ElementTree.SubElement(parent=ThisRRTag, tag=info.SeverityValueTag)
+			ThisRRTag = ElementTree.SubElement(ThisSeverityTag, info.RRTag)
+			ThisRRIDTag = ElementTree.SubElement(ThisRRTag, info.IDTag)
+			ThisRRIDTag.text = ThisRR.ID
+			ThisRRSeverityTag = ElementTree.SubElement(ThisRRTag, info.SeverityValueTag)
 			ThisRRSeverityTag.text = ThisSeverity.XMLName
 		# add Column tags containing all FT elements
 		for ThisCol in self.Columns:
-			ThisColTag = ElementTree.SubElement(parent=TopTag, tag=info.FTColumnTag)
+			ThisColTag = ElementTree.SubElement(StartTag, info.FTColumnTag)
 			# store all storeable elements in the column (e.g. FT events, gates etc)
-			for ThisEl in ThisCol:
+			for ThisEl in ThisCol.FTElements:
 				if hasattr(ThisEl, 'StoreAllDataInXML'):
 					MaxCommentIDSoFar = ThisEl.StoreAllDataInXML(ThisColTag, NumberingSystemHash, MaxCommentIDSoFar)
 		# add CollapseGroup tags
 		for ThisCG in self.CollapseGroups:
 			# store all storeable data in the collapse group
-			ThisCG.StoreAllDataInXML(TopTag)
+			ThisCG.StoreAllDataInXML(StartTag)
 		return ThisCommentHash, MaxCommentIDSoFar
 
 class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all data needed to display full FT on screen
@@ -6922,7 +6921,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			SubElements={info.NameTag: 'HumanName', info.InterColumnStripWidthTag: 'InterColumnStripWidth'})
 		# add <Column> tag for each column
 		for ThisCol in self.Columns:
-			ThisColTag = ElementTree.SubElement(parent=TopTag, tag=info.FTColumnTag)
+			ThisColTag = ElementTree.SubElement(TopTag, info.FTColumnTag)
 			# add and populate tag for each element in this column (except e.g. builder buttons)
 			for ThisEl in ThisCol.FTElements:
 				if hasattr(ThisEl, 'StoreAllDataInXML'):

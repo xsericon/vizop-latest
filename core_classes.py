@@ -694,18 +694,16 @@ class UserNumValueItem(NumValueItem): # class of NumValues for which user suppli
 		self.MyAcceptableUnits = NewAcceptableUnits
 		return True
 
-class ConstantItem(NumValueItem): # user-defined constants that can be attached to any number of ConstNumValueItems
+class ConstantItem(object): # user-defined constants that can be attached to any number of ConstNumValueItems
 	# has values per RR, and a Unit
-#	AllConstants = [] # register of all constants in use; not used, stored in Project instance instead
 	def __init__(self, HumanName='', ID='', **Args):
 		assert isinstance(HumanName, str)
 		assert isinstance(ID, str)
 		assert ID # ensure ID is not blank
-		NumValueItem.__init__(self)
+		object.__init__(self)
 		self.HumanName = HumanName
 		self.ID = ID
-#		ConstantItem.AllConstants.append(self) # add self to register.
-		# NB if a constant is deleted, we must delete from the register (to avoid problems when storing the project)
+		self.Value = UserNumValueItem(HostObj=self, **Args)
 
 class ConstNumValueItem(NumValueItem): # class of constant NumValues. Refers to a ConstantItem instance
 	HumanName = _('Constant')
