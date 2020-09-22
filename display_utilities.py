@@ -34,10 +34,10 @@ class ViewportBaseClass(object, metaclass=ViewportMetaClass): # base class for a
 	CanBeCreatedManually = True # whether user can be invited to create a Viewport of this class.
 	IsBaseClass = True # needed by metaclass
 
-	def __init__(self, **Args): # Args must include Proj, a ProjectItem instance
+	def __init__(self, **Args): # Args must include Proj, a ProjectItem instance. 'ID' is optional arg
 		object.__init__(self)
 		self.DisplDevice = None # which wx.Window object the Viewport is displayed on (needs to take a wx.DC)
-		self.ID = None # assigned in CreateViewport()
+		self.ID = Args.get('ID', None) # if no ID is supplied, it's assigned in CreateViewport()
 		self.Proj = Args['Proj']
 		self.PHAObjID = Args.get('PHAObjID', None) # storing ID, not the actual object, in case datacore isn't local
 		self.Zoom = 1.0 # ratio of canvas coords to screen coords (absolute ratio, not %)
@@ -53,23 +53,27 @@ class ViewportBaseClass(object, metaclass=ViewportMetaClass): # base class for a
 
 #	method StoreViewportCommonDataInXML() is in module projects
 
-def CreateViewport(Proj, ViewportClass, DisplDevice=None, PHAObj=None, DatacoreIsLocal=True, Fonts=[], **Args):
+def CreateViewport(Proj, ViewportClass, DisplDevice=None, PHAObj=None, DatacoreIsLocal=True, Fonts=[], ID=None, **Args):
 	# Client side method.
 	# create new Viewport instance of class ViewportClass in project Proj, and attach it to DisplDevice.
 	# PHAObj: PHA object shadow to which the Viewport belongs, if any (None if the Viewport is project-wide)
 	# DatacoreIsLocal (bool): whether datacore is in this instance of Vizop
 	# Fonts: (dict) keys are strings such as 'SmallHeadingFont'; values are wx.Font instances
+	# ID (str or None): if None, a new ID is fetched (but see FIXME below). If str, the supplied ID is used
 	# Return the Viewport instance, and D2C and C2D socket numbers (2 x int)
 	# Also returns VizopTalksArgs (dict of attrib: value; these are args to controlframe.SubmitVizopTalksMessage)
 	# and VizopTalksTips (list of dicts, same as VizopTalksArgs)
 	assert isinstance(DatacoreIsLocal, bool)
+	assert (isinstance(ID, str) and bool(ID)) or (ID is None) # ensure any ID supplied is nonblank
 	# prepare dict of args to send to new Viewport
 	ArgsToSupply = Args
 	ArgsToSupply.update({'DateChoices': core_classes.DateChoices})
 	NewViewport = ViewportClass(Proj=Proj, PHAObjID=getattr(PHAObj, 'ID', None), ParentWindow=DisplDevice,
-		DisplDevice=DisplDevice, Fonts=Fonts, **ArgsToSupply)
+		DisplDevice=DisplDevice, Fonts=Fonts, ID=ID, **ArgsToSupply)
 	# append the Viewport to the project's list
-	NewViewport.ID = str(Proj.GetNewID()) # generate unique ID; stored as str. FIXME this is getting ID from client side Proj!
+	Proj.ClientViewports.append(NewViewport)
+	if ID is None:
+		NewViewport.ID = str(Proj.GetNewID()) # generate unique ID; stored as str. FIXME this is getting ID from client side Proj!
 	# assign default name to Viewport
 	Proj.AssignDefaultNameToViewport(Viewport=NewViewport)
 	# set up sockets for communication with the new Viewport:

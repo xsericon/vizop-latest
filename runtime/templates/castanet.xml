@@ -6,13 +6,7 @@
 		<!ELEMENT id (#PCDATA)>
 		<!ELEMENT title (#PCDATA)>
 	]>
-<vizopProject>
-<vizopversion>VizopProject0.1</vizopversion> <FaultTree>
-	<id>
-	1643
-	</id>
-	<title>
-	A sample fault tree for a dangerous case
-	</title>
-</FaultTree>
-</vizopProject>
+<VizopProject VizopVersion="0.1">
+<EditNumber> "2476" </EditNumber>
+<MaxID>"9"</MaxID>
+</VizopProject>

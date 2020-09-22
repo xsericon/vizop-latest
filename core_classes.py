@@ -10,21 +10,23 @@ import xml.etree.ElementTree as ElementTree # XML handling
 
 # other vizop modules required here
 import text, utilities, info
-# from display_utilities import * # hidden so we can find out where these functions are used; having circular import problems
 
 def _(DummyArg): return DummyArg # dummy definition of _(); the real definition is elsewhere
 
 class RiskReceptorItem(object): # class of risk receptors
-	RRs = [] # list of all risk receptor instances defined in the open projects
+#	RRs = [] # list of all risk receptor instances defined in the open projects
 
-	def __init__(self, XMLName='', HumanName='<undefined>'):
+	def __init__(self, ID='', XMLName='', HumanName='<undefined>'):
+		assert isinstance(ID, str)
+		assert ID # ensure it's nonblank
 		object.__init__(self)
 		self.XMLName = XMLName
 		self.HumanName = HumanName
-		self.ID = str(utilities.NextID(RiskReceptorItem.RRs)) # generate unique ID; stored as str
-		RiskReceptorItem.RRs.append(self) # add this RiskReceptorItem to register (must be after NextID() call)
+		self.ID = ID
+#		self.ID = str(utilities.NextID(RiskReceptorItem.RRs)) # generate unique ID; stored as str
+#		RiskReceptorItem.RRs.append(self) # add this RiskReceptorItem to register (must be after NextID() call)
 
-DefaultRiskReceptor = RiskReceptorItem(XMLName='Default', HumanName=_('Default'))
+DefaultRiskReceptor = RiskReceptorItem(ID=info.GenericRRID, XMLName='Default', HumanName=_('Default'))
 
 # --- arithmetic operators ---
 
@@ -355,7 +357,7 @@ class OpModeType(object): # class of SIF operating modes; consistent with implem
 	def __init__(self, HumanName, XMLName, PermissibleTargetKinds):
 		object.__init__(self)
 		self.HumanName = HumanName # visible to user
-		self.XMLName = XMLName # name used in XML input/output and passed to calculation engine
+		self.XMLName = XMLName # name used in XML input/output
 		self.PermissibleTargetKinds = PermissibleTargetKinds # list of str of TargetKinds such as 'PFDavg'
 
 UndefinedMode = OpModeType(_('<Undefined>'), 'Undefined', ['PFDavg', 'RRF', 'PFH'])
@@ -413,8 +415,20 @@ class NumValueItem(object): # superclass of objects in Datacore having a numeric
 		self.InfinityFlagFamily = {DefaultRiskReceptor: False} # bool per risk receptor; whether value is infinite
 		self.SigFigs = {DefaultRiskReceptor: info.DefaultSigFigs} # int per risk receptor; how many sig figs for display
 		self.Sci = {DefaultRiskReceptor: False} # bool per risk receptor; whether to always use scientific notation
+			# TODO: consider whether SigFigs and Sci should be common for all RR's
 		self.MyUnit = NullUnit
 		self.HostObj = HostObj
+
+	def AddRiskReceptor(self, RR):
+		# add a new risk receptor RR (RiskReceptorItem instance) to the number
+		assert isinstance(RR, RiskReceptorItem)
+		assert not (RR in self.ValueFamily.keys()) # to avoid overwriting existing RR
+		self.ValueFamily[RR] = None
+		self.UserValueFamily[RR] = None
+		self.IsSetFlagFamily[RR] = 'ValueStatus_Unset'
+		self.InfinityFlagFamily[RR] = False
+		self.SigFigs[RR] = info.DefaultSigFigs
+		self.Sci[RR] = False
 
 	def GetMyValue(self, RR=DefaultRiskReceptor, FormulaAntecedents=[], InvalidResult=0.0, **Args):
 		# return numerical value of object, appropriate to risk receptor RR
@@ -439,7 +453,7 @@ class NumValueItem(object): # superclass of objects in Datacore having a numeric
 			return float(self.ValueFamily[RR])
 		else: return InvalidResult
 
-	def SetMyValue(self, NewValue, RR=DefaultRiskReceptor):  # set numerical value of object per risk receptor
+	def SetMyValue(self, NewValue, RR=DefaultRiskReceptor): # set numerical value of object per risk receptor
 		# error checking first
 		assert isinstance(NewValue, int) or isinstance(NewValue, float),\
 			"NewValue '%s' isn't a valid number" % str(NewValue)
@@ -447,6 +461,11 @@ class NumValueItem(object): # superclass of objects in Datacore having a numeric
 		self.UserValueFamily[RR] = float(NewValue) # store manually-entered value for restoration
 		self.IsSetFlagFamily[RR] = True
 		self.InfinityFlagFamily[RR] = False
+		self.SetMyStatus(NewStatus='ValueStatus_OK', RR=RR)
+
+	def SetToInfinite(self, RR=DefaultRiskReceptor): # set value as infinite for this risk receptor
+		assert RR in self.ValueFamily.keys()
+		self.InfinityFlagFamily[RR] = True
 		self.SetMyStatus(NewStatus='ValueStatus_OK', RR=RR)
 
 	def GetMyUnit(self): # returns unit (instance of UnitItem)
@@ -695,7 +714,9 @@ class UserNumValueItem(NumValueItem): # class of NumValues for which user suppli
 		return True
 
 class ConstantItem(object): # user-defined constants that can be attached to any number of ConstNumValueItems
-	# has values per RR, and a Unit
+	# A ConstantItem is the actual constant definition, e.g. "Explosion probability". The ConstNumValueItem instances
+	# are the specific places where that value is used in the PHA objects.
+	# Each constant has values per RR, and a Unit; these are wrapped in a NumValueItem instance
 	def __init__(self, HumanName='', ID='', **Args):
 		assert isinstance(HumanName, str)
 		assert isinstance(ID, str)
@@ -712,7 +733,7 @@ class ConstNumValueItem(NumValueItem): # class of constant NumValues. Refers to 
 
 	def __init__(self, ConstantToReferTo=None, **Args):
 		NumValueItem.__init__(self)
-		self.Constant = ConstantToReferTo # needs to be assigned to an instance of ConstantItem
+		self.Constant = ConstantToReferTo # instance of ConstantItem, or None
 
 	def GetMyValue(self, RR=DefaultRiskReceptor, FormulaAntecedents=[]):
 		assert isinstance(self.Constant, ConstantItem)
@@ -879,8 +900,8 @@ class LookupNumValueItem(NumValueItem): # class of values found by reference to 
 
 	def __init__(self, **Args):
 		NumValueItem.__init__(self)
-		self.LookupTable = None  # instance of LookupTableItem
-		self.InputValue = None  # instance of NumValueItem subclass; the value to look up in the table
+		self.LookupTable = None # instance of LookupTableItem
+		self.InputValue = None # instance of NumValueItem subclass; the value to look up in the table
 		# TODO: need to develop for multidimensional lookup (currently only 1-D)
 
 	def GetMyValue(self, RR=DefaultRiskReceptor, **args):  # return value from lookup table
@@ -1108,22 +1129,29 @@ NumValueClasses = [UserNumValueItem, ConstNumValueItem, CalcNumValueItem, NumPro
 NumValueClassesToCheckValid = (UserNumValueItem, ConstNumValueItem, LookupNumValueItem,
 	ParentNumValueItem, UseParentValueItem) # only these classes are checked in CheckValue() methods
 	# this is a tuple, not a list, so it can be used directly in isinstance()
-NumValueClassHumanNames = [c.HumanName for c in NumValueClasses]  # list of names used in choice box
+NumValueClassHumanNames = [c.HumanName for c in NumValueClasses] # list of names used in choice box
+NumValueKindHash = dict( (c.XMLName, c) for c in NumValueClasses )
 
 class LookupTableItem(object):
 	# class of tables containing values that can be looked up by reference to a key value
 	# The values are assumed to support all risk receptors, so there's no explicit handling of RR's here
 
-	def __init__(self):
+	def __init__(self, ID):
+		assert isinstance(ID, str)
+		assert ID # ensure it's not blank
 		object.__init__(self)
+		self.ID = ID
+		self.HumanName = ''
 		self.HowManyDimensions = 1
-		self.DimensionHumanNames = ['<Dimension1>'] # list of str, one per dimension
-		self.DimensionUnits = [DimensionlessUnit] # list of UnitItem, one per dimension
+		self.DimensionHumanNames = [] # list of str, one per dimension
+		self.DimensionUnits = [] # list of UnitItem, one per dimension. Redundant, as units are stored in Values
+		# Keys: list of lists of key value objects (CategoryNameItem instances) - one inner list per dimension
+		# Example: [ [SlightItem, ModerateItem, SevereItem], [RareItem, ...etc] ]
 		self.Keys = [ [] ]
-			# list of lists of key value objects (CategoryNameItem instances) - one inner list per dimension
-			# Example: [ [SlightItem, ModerateItem, SevereItem], [RareItem, ...etc] ]
 		# Values: nested lists of value objects (subclasses of NumItem). Nesting depth = no of dimensions.
 		# Top level list is for categories in 1st dimension; next level for 2nd dimension, etc.
+		# Number of lists at each depth = number of categories in that dimension (eg. number of top level lists =
+		# number of categories in 1st dimension)
 		# e.g. for 3 dimensions: [ [ [D1C1;D2C1;D3C1 , D1C1;D2C1;D3C2 ... ], [D1C1;D2C2;D3C1 , D1C1;D2C2;D3C2 ... ] ],
 		# and more lists for D1C2, D1C3 etc ]
 		self.Values = []
@@ -1248,8 +1276,13 @@ class PHAModelBaseClass(object, metaclass=PHAModelMetaClass):
 	IsBaseClass = True # needed by metaclass. Subclasses should set this to False
 
 	def __init__(self, Proj, **Args):
+		# if ID is supplied as an arg, reapply it as existing ID, else fetch a new ID
 		object.__init__(self)
-		self.ID = Proj.GetNewID() # find next available ID
+		if 'ID' in Args.keys():
+			assert isinstance(Args['ID'], str)
+			assert Args['ID'] # ensure it's not blank
+			self.ID = Args['ID']
+		else: self.ID = Proj.GetNewID() # find next available ID
 		PHAModelBaseClass.AllPHAModelObjects.append(self) # add instance to register; must do after assigning self.ID
 		self.Proj = Proj
 		self.Viewports = [] # list of Viewport shadow instances for this PHA model instance
@@ -1301,7 +1334,8 @@ class NumberingItem(object):
 
 	def __init__(self):
 		object.__init__(self)
-		self.NumberStructure = [] # list of numbering chunks, see comment just above
+		self.NumberStructure = [] # list of numbering chunks, see comment just above; instances of types listed in
+		#	NumberChunkTypes
 		self.ShowInDisplay = True # whether number is displayed in Viewport
 		self.ShowInOutput = True # whether number is displayed in PHA model export
 
@@ -1386,16 +1420,16 @@ class ParentNumberChunkItem(object):
 
 	def __init__(self):
 		object.__init__(self)
-		self.Source = None  # PHA item instance to take numbering from
-		self.HierarchyLevels = 999 # how many levels of numbering to return. If <=1, only return the serial number of the Source item
+		self.Source = None # (str) PHA item instance to take numbering from
+		# Note: If Source is any object other than a PHA element, update projects.ReconnectParentNumberChunks()
+		self.HierarchyLevels = 999 # (int) how many levels of numbering to return.
+			# If <=1, only return the serial number of the Source item
 
 	def __eq__(self, other):
 		assert isinstance(other, ParentNumberChunkItem)
 		return (self.Source == other.Source) and (self.HierarchyLevels == other.HierarchyLevels)
 
-#	def GetMyNumber(self, Levels=999,
-#					PHAObjectsReferenced=[]):  # Gets number of Source, up to a maximum <Levels> levels
-	def GetMyNumber(self, PHAObjectsReferenced=[]):  # Gets number of Source, up to a maximum <Levels> levels
+	def GetMyNumber(self, PHAObjectsReferenced=[]): # Gets number of Source
 		# returns tuple: (self.Source's number (limited to the last <Levels> numerical items), how many levels returned)
 		# PHAObjectsReferenced is for circular reference trapping
 		if self.Source:
@@ -1458,14 +1492,14 @@ class SerialNumberChunkItem(object):  # a chunk in a NumberingItem instance, tha
 				else:  # PHAItem isn't in its host list, that's a bug
 					Serial = self.FieldWidth * '?'
 					print("Oops, PHA item not found in its host list (problem code CC723). This is a bug; please report it")
+					raise ValueError
 			else: return NoValue # IncludeInNumbering is False
 		else:  # no PHAItem defined
 			Serial = self.FieldWidth * '?'
 			print("Oops, PHA item not defined in numbering scheme (problem code CC726). This is a bug; please report it")
 		return Serial
 
-#	Result = property(fget=GetMyNumber)
-
+NumberChunkTypes = [StrNumberChunkItem, ParentNumberChunkItem, SerialNumberChunkItem]
 
 class NumberSystem(object):  # superclass of numbering systems such as 1/2/3, a/b/c, I/II/III
 	# Only classes are invoked, not instances, so there's no __init__ method
@@ -1478,7 +1512,6 @@ class NumberSystem(object):  # superclass of numbering systems such as 1/2/3, a/
 		assert isinstance(MaxValue, int)
 		if MaxValue == 0: return 1
 		else: return int(math.log(abs(MaxValue) - int(not cls.HasZero)) // cls.LogDigits) + 1
-
 
 class ArabicNumberSystem(NumberSystem):  # decimal number system using 0/1/2...
 
@@ -1591,9 +1624,9 @@ class TextItem(object):  # text forming part of a PHA object, such as a descript
 	DefaultTextHorizAlignment = 'Centre'
 	DefaultTextVertAlignment = 'Centre'
 
-	def __init__(self, Proj,
-			PHAObjClass, Host):  # PHAObjectClass is the class of PHA object with which the text is associated
-		# Host: the parent PHA object (e.g. FTEvent)
+	def __init__(self, Proj, PHAObjClass=None, Host=None):
+		# PHAObjectClass is the class of PHA object with which the text is associated
+		# Host: the parent PHA object (e.g. FTEvent) - not currently used
 		object.__init__(self)
 		self.Content = '' # content as rich string with embedded formatting commands
 		self.ParaHorizAlignment = TextItem.DefaultTextHorizAlignment
@@ -1603,7 +1636,7 @@ class TextItem(object):  # text forming part of a PHA object, such as a descript
 
 class AssociatedTextItem(TextItem):  # 'smart text' used for comments, action items and parking lot items
 
-	def __init__(self, Proj, PHAObjClass, Host):
+	def __init__(self, Proj, PHAObjClass=None, Host=None):
 		# names of attribs marked + are assumed to match corresponding labels in module info, e.g. info.ResponsibilityLabel
 		TextItem.__init__(self, Proj, PHAObjClass, Host)
 		self.ID = ''
@@ -1799,15 +1832,10 @@ class Comment(object):
 		assert type(content) == str
 		assert type(isVisible) == bool
 		assert type(showInReport) == bool
-
 		self.ID = ID # comment ID
 		self.content = content # content
 		self.isVisible = isVisible # flag if visible or not, initially always True. For potential future features
 		self.showInReport = showInReport # flag if shown in the report, initially always True. For potential future features
-
-		pass
-
-	pass
 
 class Bookmark(object):
 	# implement a simple bookmark system for XML export
@@ -1900,5 +1928,19 @@ FTCreationDate = ChoiceItem(XMLName='FTCreation', HumanName='Fault tree created'
 LastEditDate = ChoiceItem(XMLName='LastEdit', HumanName='Last edited', Default=True)
 TodayDate = ChoiceItem(XMLName='Today', HumanName='Today')
 DateChoices = [ProjCreationDate, FTCreationDate, LastEditDate, TodayDate]
+
+class ProblemReportItem(object):
+	# defines a problem found during project file loading/saving
+	def __init__(self, ProblemKind='', HumanDescription='', Fatal=False):
+		assert isinstance(ProblemKind, str)
+		assert ProblemKind # ensure it's not blank
+		assert isinstance(HumanDescription, str)
+		assert HumanDescription
+		assert isinstance(Fatal, bool)
+		object.__init__(self)
+		self.ProblemKind = ProblemKind # a category of problem. Can be used to group problems or eliminate duplicates.
+		#	Valid ProblemKind values not yet defined
+		self.HumanDescription = HumanDescription # already translated
+		self.Fatal = Fatal # whether the problem makes it impossible to complete the task, e.g. loading a project file
 
 del _ # remove dummy definition

@@ -766,9 +766,10 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 			if hasattr(self.FT.DisplDevice, 'GotoControlPanelAspect'):
 				self.FT.DisplDevice.GotoControlPanelAspect(AspectName=self.ControlPanelAspect, debug=739,
 					PHAObjInControlPanel=self.HostObject, ComponentInControlPanel=ComponentName)
-		# set the host object to be the only currently selected element in the FT
-		self.FT.SetElementAsCurrent(TargetFTElement=self.HostObject, UnsetPrevious=True, RedrawEntireFT=True,
-			SetAsLastSelected=True)
+		# set the host object to be the only currently selected element in the FT (except if user clicked in header)
+		if not isinstance(self.HostObject, FTHeader):
+			self.FT.SetElementAsCurrent(TargetFTElement=self.HostObject, UnsetPrevious=True, RedrawEntireFT=True,
+				SetAsLastSelected=True)
 		# proceed with editing only if allowed to edit in this instance of Vizop
 		if self.FT.EditAllowed:
 			# get absolute position of textbox for editing: position within element + column + FT, then apply zoom and pan
@@ -793,42 +794,26 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 			elif self.InternalName == 'EventValueUnit' and ThisEventType == 'SIFFailureEvent': MyEditBehaviour = None
 			elif self.InternalName == 'EventValueKind' and ThisEventType == 'SIFFailureEvent': MyEditBehaviour = None
 			if MyEditBehaviour == 'Text':
-				print('FT789 detected edit behaviour = Text')
 				# store info required to close out editing when finished
-#				self.FT.CurrentEditTextCtrl = self.EditTextCtrl # TODO next, change this to EditTextComponent and set colours when rendered
 				self.FT.CurrentEditComponent = self
 				self.FT.DisplDevice.SetKeystrokeHandlerOnOff(On=False) # turn off keypress shortcut detection in control frame
 				self.StartEditingAsText(Zoom=Zoom)
-#				# make and populate a TextCtrl for editing
-#				self.FT.PaintNeeded = False # suppress paint while TextCtrl is in use, as the cursor blinking triggers
-#					# needless paint events - see ControlFrame.EditPanel.OnPaint()
-#					# TODO resolve issue in MacOS - we get a thick white border during editing
-#				self.EditTextCtrl = wx.TextCtrl(parent=self.FT.DisplDevice, value=self.Text.Content,
-#					pos=(self.TextCtrlPosXInPxWithinDisplDevice, self.TextCtrlPosYInPxWithinDisplDevice),
-#					size=(self.SizeXInCU * Zoom, (self.SizeYInCU + 5) * Zoom),
-#					style=wx.TE_PROCESS_ENTER | wx.HSCROLL | wx.TE_BESTWRAP) # + 5 for better visual effect
-#				self.EditTextCtrl.SetFocus()
-#				self.EditTextCtrl.SetInsertionPointEnd() # set cursor to end of existing text
-#				self.EditTextCtrl.SetFont(wx.Font(pointSize=int(round(self.Text.PointSize * Zoom)), family=DefaultFontFamily,
-#					style=wx.FONTSTYLE_NORMAL, weight=wx.FONTWEIGHT_NORMAL, faceName=self.Text.Font))
-#				self.EditTextCtrl.SetForegroundColour(self.Text.Colour)
-#				self.EditTextCtrl.SetBackgroundColour(self.BkgColour)
 			elif MyEditBehaviour == 'Choice':
 				# make and populate a Choice widget
-				self.EditChoice = wx.Choice(parent=self.FT.DisplDevice,
+				self.FT.EditChoice = wx.Choice(parent=self.FT.DisplDevice,
 					pos=(self.TextCtrlPosXInPxWithinDisplDevice, self.TextCtrlPosYInPxWithinDisplDevice - 2),
 					size=((self.SizeXInCU + 20) * Zoom, (self.SizeYInCU + 3) * Zoom),
 					choices=[getattr(c, self.DisplAttrib) for c in self.ObjectChoices])
-				self.EditChoice.SetFocus()
-				self.EditChoice.SetFont(wx.Font(wx.FontInfo(pointSize=int(round(self.Text.PointSize * Zoom))).Family(wx.FONTFAMILY_SWISS)))
-				self.EditChoice.SetForegroundColour(self.Text.Colour)
-				self.EditChoice.SetBackgroundColour(self.BkgColour)
+				self.FT.EditChoice.SetFocus()
+				self.FT.EditChoice.SetFont(wx.Font(wx.FontInfo(pointSize=int(round(self.Text.PointSize * Zoom))).Family(wx.FONTFAMILY_SWISS)))
+				self.FT.EditChoice.SetForegroundColour(self.Text.Colour)
+				self.FT.EditChoice.SetBackgroundColour(self.BkgColour)
 				# pre-select the current selection in the choice box
-				self.EditChoice.SetSelection([c.Applicable for c in self.ObjectChoices].index(True))
-				self.FT.CurrentEditChoice = self.EditChoice
-				self.FT.CurrentEditComponent = self
+				self.FT.EditChoice.SetSelection([c.Applicable for c in self.ObjectChoices].index(True))
+				self.FT.CurrentEditChoice = self # set which component is currently being edited as a choice
+#				self.FT.CurrentEditComponent = self
 				self.FT.DisplDevice.SetKeystrokeHandlerOnOff(On=False) # turn off keypress shortcut detection in control frame
-				self.EditChoice.Bind(wx.EVT_CHOICE, self.OnEditChoice) # bind handler for click in choice box
+				self.FT.EditChoice.Bind(wx.EVT_CHOICE, self.OnEditChoice) # bind handler for click in choice box
 			elif MyEditBehaviour == 'EditInControlPanel': # can't edit in place, editing in control panel only
 				pass
 
@@ -901,7 +886,6 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 		if ExtendSelection:
 			# if cursor position has returned to highlight start position, clear highlight
 			if self.Text.Highlighted and (NewIndex == self.Text.HighlightStartIndex):
-				print('FT867 returned to highlight start')
 				self.Text.Highlighted = False
 				self.FT.TextEditCursorIndex = self.Text.HighlightStartIndex = NewIndex # move cursor to NewIndex
 			else:
@@ -1369,6 +1353,8 @@ class FTEvent(FTBoxyObject): # FT event object in Viewport
 		assert isinstance(StartTag, ElementTree.Element)
 		# First, make top level XML element
 		TopTag = ElementTree.SubElement(StartTag, info.FTEventTag)
+		ThisKindTag = ElementTree.SubElement(TopTag, info.KindTag)
+		ThisKindTag.text = vizop_misc.ReverseLookup(Dic=ElementInFullTreeViewportKindHash, TargetValue=type(self))
 		# store Viewport-level tags specific to this element
 		projects.AddAttribsInSubelements(StartEl=TopTag, DataObj=self,
 			SubElements={info.IDTag: 'ID', info.ShowDescriptionCommentsTag: 'ShowDescriptionComments',
@@ -1791,8 +1777,10 @@ class FTGate(FTBoxyObject): # object containing FT gates for display in Viewport
 		# create an XML element as a subelement of StartTag (ElementTree.Element) and populate it with all FTGate
 		# data required to be stored in project file.
 		assert isinstance(StartTag, ElementTree.Element)
-		# First, make top level XML element
+		# First, make top level XML element, and store Kind tag
 		TopTag = ElementTree.SubElement(StartTag, info.FTGateTag)
+		ThisKindTag = ElementTree.SubElement(TopTag, info.KindTag)
+		ThisKindTag.text = vizop_misc.ReverseLookup(Dic=ElementInFullTreeViewportKindHash, TargetValue=type(self))
 		# store Viewport-level tags specific to this element
 		projects.AddAttribsInSubelements(StartEl=TopTag, DataObj=self,
 			SubElements={info.IDTag: 'ID', info.ShowCommentsTag: 'ShowComments',
@@ -2036,6 +2024,8 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 		assert isinstance(StartTag, ElementTree.Element)
 		# First, make top level XML element
 		TopTag = ElementTree.SubElement(StartTag, info.FTConnectorTag)
+		ThisKindTag = ElementTree.SubElement(TopTag, info.KindTag)
+		ThisKindTag.text = vizop_misc.ReverseLookup(Dic=ElementInFullTreeViewportKindHash, TargetValue=type(self))
 		# store Viewport-level tags specific to this element
 		projects.AddAttribsInSubelements(StartEl=TopTag, DataObj=self,
 			SubElements={info.IDTag: 'ID', info.StyleTag: 'Style',
@@ -2172,7 +2162,7 @@ class FTBuilder(FTBoxyObject): # 'add' button object within an FTColumn.
 		# request PHA object to add new element by sending message through zmq
 #		print('FT1494 FT sending request on socket: ',  [(s.SocketNo, s.SocketLabel) for s in vizop_misc.RegisterSocket.Register if s.Socket == self.FT.C2DSocketREQ])
 		vizop_misc.SendRequest(Socket=self.FT.C2DSocketREQ, Command='RQ_FT_NewElement',
-			Proj=self.FT.Proj.ID, PHAObj=self.FT.PHAObj.ID, Viewport=self.FT.ID, Zoom=str(self.FT.Zoom),
+			Proj=self.FT.Proj.ID, PHAObj=self.FT.PHAObjID, Viewport=self.FT.ID, Zoom=str(self.FT.Zoom),
 			PanX=str(self.FT.PanX), PanY=str(self.FT.PanY),
 			ObjKindRequested=self.ObjTypeRequested.InternalName, ColNo=str(self.ColNo), IndexInCol=str(IndexInCol))
 
@@ -2472,7 +2462,7 @@ class FTEventInCore(FTElementInCore): # FT event object used in DataCore by FTOb
 		self.LastSelectedUnitPerQtyKind = {'Probability': FTEventInCore.DefaultProbUnit,
 			'Frequency': FTEventInCore.DefaultFreqUnit, 'Time': FTEventInCore.DefaultTimeUnit,
 			'Ratio': FTEventInCore.DefaultRatioUnit}
-		for ThisRR in FT.MyTolRiskModel.RiskReceptors:
+		for ThisRR in FT.Severity.keys():
 			self.Value.SetMyValue(FTEventInCore.DefaultLikelihood, RR=ThisRR)
 			self.OldFreqValue.SetMyValue(FTEventInCore.DefaultLikelihood, RR=ThisRR)
 			self.OldProbValue.SetMyValue(FTEventInCore.DefaultProbability, RR=ThisRR)
@@ -2490,7 +2480,7 @@ class FTEventInCore(FTElementInCore): # FT event object used in DataCore by FTOb
 		self.IsSIFFailureEventInRelevantOpMode = False # whether this event was the SIF failure event when we were in
 			# relevant opmodes (used to restore SIF failure event if we change back to those modes)
 		self.CanEditValue = True # False if the value should only be calculated and not overridden by user
-		self.ApplicableRiskReceptors = FT.MyTolRiskModel.RiskReceptors[:] # set which risk receptors apply to this event
+		self.ApplicableRiskReceptors = FT.Severity.keys() # set which risk receptors apply to this event
 		self.BackgColour = '0,0,0'
 		self.EventDescriptionComments = [] # list of AssociatedTextItem instances
 		self.ValueComments = [] # list of AssociatedTextItem instances
@@ -2875,16 +2865,16 @@ class FTEventInCore(FTElementInCore): # FT event object used in DataCore by FTOb
 		assert isinstance(ParentTag, ElementTree.Element)
 		assert isinstance(NumberingSystemHash, dict)
 		assert isinstance(MaxCommentIDSoFar, int)
-		ThisCommentHash = {}
 		# First, add IDs to comments and make ThisCommentHash
-		LastCommentID = MaxCommentIDSoFar
 		ThisCommentHash = {}
 		for ThisComment in self.EventDescriptionComments + self.ValueComments:
-			LastCommentID += 1
-			ThisComment.ID = LastCommentID
-			ThisCommentHash[str(LastCommentID)] = ThisComment.Content
+			MaxCommentIDSoFar += 1
+			ThisComment.ID = str(MaxCommentIDSoFar)
+			ThisCommentHash[str(MaxCommentIDSoFar)] = ThisComment.Content
 		# make top level XML element, and add simple tags
 		TopTag = ElementTree.SubElement(ParentTag, info.FTEventTag)
+		ThisKindTag = ElementTree.SubElement(TopTag, info.KindTag)
+		ThisKindTag.text = vizop_misc.ReverseLookup(Dic=ElementInCoreKindHash, TargetValue=type(self))
 		projects.AddAttribsInSubelements(StartEl=TopTag, DataObj=self,
 			SubElements={info.IDTag: 'ID', info.IsIPLTag: 'IsIPL', info.EventTypeTag: 'EventType',
 			info.EventDescriptionTag: 'EventDescription', info.BackgColourTag: 'BackgColour',
@@ -2909,6 +2899,52 @@ class FTEventInCore(FTElementInCore): # FT event object used in DataCore by FTOb
 			ThisQtyKindTag.text = ThisQtyKind
 			ThisUnitTag = ElementTree.SubElement(LastUnitTag, info.UnitTag)
 			ThisQtyKindTag.text = ThisUnit.XMLName
+		return ThisCommentHash, MaxCommentIDSoFar
+
+	def FetchAllDataFromXML(self, StartTag,
+					NumberingSystems, Comments, ActionItems, ParkingLotItems):
+		# populate event from StartTag.
+		# return ProblemReports, ParentNumValueInstances (2 x list)
+		ProblemReports = []
+		ParentNumValueInstances = []
+		# first, populate simple attribs
+		self.ID = StartTag.findtext(info.IDTag)
+		self.IsIPL = utilities.Bool2Str(Input=StartTag.findtext(info.IsIPLTag))
+		self.EventDescription = StartTag.findtext(info.EventDescriptionTag)
+		self.BackgColour = StartTag.findtext(info.BackgColourTag)
+		self.IsSIFFailureEventInRelevantOpmode = utilities.Bool2Str(Input=StartTag.findtext(
+			info.IsSIFFailureEventInRelevantOpmodeTag))
+		# unpack tags containing lists of IDs
+		self.ApplicableRiskReceptors = utilities.FetchObjsFromIDList(IDList=StartTag.findtext(info.RiskReceptorsTag),
+			ObjList=self.Proj.RiskReceptors)
+		self.EventDescriptionComments = [Comments[i] for i in
+			StartTag.findtext(info.EventDescriptionCommentsTag).replace(',', ' ').split()]
+		self.ValueComments = [Comments[i] for i in StartTag.findtext(info.ValueCommentsTag).replace(',', ' ').split()]
+		self.ActionItems = [ActionItems[i] for i in StartTag.findtext(info.ActionItemsTag).replace(',', ' ').split()]
+		self.ParkingLot = [ParkingLotItems[i] for i in StartTag.findtext(info.ParkingLotItemsTag).replace(',', ' ').split()]
+		self.ConnectToID = StartTag.findtext(info.ConnectToTag) # store ID list for now; convert to objects later
+		self.LinkedFromID = StartTag.findtext(info.LinkedFromTag) # store ID list for now; convert to objects later
+		# fetch numbering
+		self.Numbering = copy.copy(NumberingSystems[int(StartTag.findtext(info.NumberingTag))])
+		# fetch values
+		self.Value, NewProblemReports, NewParentNumValueInstances = projects.UnpackValueFromXML(Proj=self.Proj,
+			XMLEl=StartTag.find(info.ValueTag))
+		ProblemReports.extend(NewProblemReports)
+		ParentNumValueInstances.extend(NewParentNumValueInstances)
+		self.OldFreqValue, NewProblemReports, NewParentNumValueInstances = projects.UnpackValueFromXML(Proj=self.Proj,
+			XMLEl=StartTag.find(info.OldFreqValueTag))
+		ProblemReports.extend(NewProblemReports)
+		ParentNumValueInstances.extend(NewParentNumValueInstances)
+		self.OldProbValue, NewProblemReports, NewParentNumValueInstances = projects.UnpackValueFromXML(Proj=self.Proj,
+			XMLEl=StartTag.find(info.OldProbValueTag))
+		ProblemReports.extend(NewProblemReports)
+		ParentNumValueInstances.extend(NewParentNumValueInstances)
+		# fetch LastSelectedUnit
+		for ThisUnitTag in StartTag.findall(info.LastSelectedUnitTag):
+			self.LastSelectedUnitPerQtyKind[StartTag.findtext(info.ThisQtyKindTag)] = \
+				utilities.InstanceWithAttribValue(ObjList=core_classes.AllSelectableUnits, AttribName='XMLName',
+				TargetValue=StartTag.findtext(info.ThisUnitTag))
+		return ProblemReports, ParentNumValueInstances
 
 class FTGateItemInCore(object): # logic gate in a Fault Tree, used in DataCore
 #	AllFTGatesInCore = [] # register of all FTGates created; used to generate IDs
@@ -2919,13 +2955,11 @@ class FTGateItemInCore(object): # logic gate in a Fault Tree, used in DataCore
 	MaxElementsConnectedToThis = 100 # arbitrary limit on number of inputs
 
 	def __init__(self, Proj=None, FT=None, Column=None, ModelGate=None, **Args):
-		# ModelGate is another FTGateItemInCore to derive formatting attributes from
+		# ModelGate is another FTGateItemInCore to derive formatting attributes from, or None
 		assert isinstance(Proj, projects.ProjectItem)
 		assert isinstance(FT, FTObjectInCore)
 		assert isinstance(Column, FTColumnInCore)
 		object.__init__(self)
-#		FT.MaxElementID += 1 # find next available ID
-#		self.ID = str(FT.MaxElementID)
 		self.ID = FT.Proj.GetNewID() # find next available ID
 		self.Proj = Proj
 		self.FT = FT
@@ -3186,18 +3220,19 @@ class FTGateItemInCore(object): # logic gate in a Fault Tree, used in DataCore
 		assert isinstance(ParentTag, ElementTree.Element)
 		assert isinstance(NumberingSystemHash, dict)
 		assert isinstance(MaxCommentIDSoFar, int)
-		ThisCommentHash = {}
 		# First, add IDs to comments and make ThisCommentHash
 		LastCommentID = MaxCommentIDSoFar
 		ThisCommentHash = {}
 		for ThisComment in self.GateDescriptionComments:
 			LastCommentID += 1
-			ThisComment.ID = LastCommentID
+			ThisComment.ID = str(LastCommentID)
 			ThisCommentHash[str(LastCommentID)] = ThisComment.Content
 		# make top level XML element, and add simple tags
 		TopTag = ElementTree.SubElement(ParentTag, info.FTGateTag)
+		ThisKindTag = ElementTree.SubElement(TopTag, info.KindTag)
+		ThisKindTag.text = vizop_misc.ReverseLookup(Dic=ElementInCoreKindHash, TargetValue=type(self))
 		projects.AddAttribsInSubelements(StartEl=TopTag, DataObj=self,
-			SubElements={info.IDTag: 'ID', info.IsIPLTag: 'IsIPL',
+			SubElements={info.IDTag: 'ID',
 			info.GateDescriptionTag: 'GateDescription', info.AlgorithmTag: 'Algorithm',
 			info.BackgColourTag: 'BackgColour'})
 		# add tags containing lists of IDs
@@ -3218,6 +3253,34 @@ class FTGateItemInCore(object): # logic gate in a Fault Tree, used in DataCore
 			ThisUnitTag = ElementTree.SubElement(LastUnitTag, info.UnitTag)
 			ThisQtyKindTag.text = ThisUnit.XMLName
 		return ThisCommentHash, LastCommentID
+
+	def FetchAllDataFromXML(self, StartTag,
+					NumberingSystems, Comments, ActionItems, ParkingLotItems):
+		# populate gate from StartTag.
+		# return ProblemReports, ParentNumValueInstances (2 x list)
+		ProblemReports = []
+		ParentNumValueInstances = []
+		# first, populate simple attribs
+		self.ID = StartTag.findtext(info.IDTag)
+		self.GateDescription = StartTag.findtext(info.GateDescriptionTag)
+		self.Algorithm = StartTag.findtext(info.AlgorithmTag)
+		self.BackgColour = StartTag.findtext(info.BackgColourTag)
+		self.IsSIFFailureEventInRelevantOpmode = utilities.Bool2Str(Input=StartTag.findtext(
+			info.IsSIFFailureEventInRelevantOpmodeTag))
+		# unpack tags containing lists of IDs
+		self.GateDescriptionComments = [Comments[i] for i in
+			StartTag.findtext(info.GateDescriptionCommentsTag).replace(',', ' ').split()]
+		self.ValueComments = [Comments[i] for i in StartTag.findtext(info.ValueCommentsTag).replace(',', ' ').split()]
+		self.ActionItems = [ActionItems[i] for i in StartTag.findtext(info.ActionItemsTag).replace(',', ' ').split()]
+		self.ParkingLot = [ParkingLotItems[i] for i in StartTag.findtext(info.ParkingLotItemsTag).replace(',', ' ').split()]
+		self.ConnectToID = StartTag.findtext(info.ConnectToTag) # store ID list for now; convert to objects later
+		self.LinkedFromID = StartTag.findtext(info.LinkedFromTag) # store ID list for now; convert to objects later
+		# fetch LastSelectedUnit
+		for ThisUnitTag in StartTag.findall(info.LastSelectedUnitTag):
+			self.LastSelectedUnitPerQtyKind[StartTag.findtext(info.ThisQtyKindTag)] = \
+				utilities.InstanceWithAttribValue(ObjList=core_classes.AllSelectableUnits, AttribName='XMLName',
+				TargetValue=StartTag.findtext(info.ThisUnitTag))
+		return ProblemReports, ParentNumValueInstances
 
 def NextCombination(Length, PassMark):
 	# generator function returning the next combination (list) in a sequence of combinations.
@@ -3304,7 +3367,7 @@ class FTConnectorItemInCore(FTElementInCore): # in- and out-connectors (CX's) to
 		self.Numbering = core_classes.NumberingItem() # NumberingItem instance TODO use SetupNumbering() from FTEventInCore
 			# NB, in-CX should use numbering from any related out-CX; but if RelatedCX is None, it still needs its own Numbering
 		self.Style = FTConnector.ConnectorStyles[0]
-		self.ApplicableRiskReceptors = FT.MyTolRiskModel.RiskReceptors[:] # set which risk receptors apply to this connector
+		self.ApplicableRiskReceptors = FT.Severity.keys() # set which risk receptors apply to this connector
 			# NB, in-CX should use RR's from any related out-CX; but if RelatedCX is None, it still needs its own RR list
 		# set up Value attrib
 		self.Value = core_classes.UserNumValueItem(HostObj=self) # use ChangeNumberKind() if needed
@@ -3344,6 +3407,7 @@ class FTConnectorItemInCore(FTElementInCore): # in- and out-connectors (CX's) to
 		AI.Numbering.NumberStructure = [SerialObj]
 		PLI = core_classes.AssociatedTextItem(Proj=self.Proj, PHAObjClass=type(self), Host=self)
 		PLI.Content = 'Test parking lot item for connector'
+		PLI.ID = self.Proj.GetNewID()
 		self.ParkingLot.append(PLI)
 		self.Proj.ParkingLot.append(PLI)
 		PLI.Numbering = core_classes.NumberingItem()
@@ -3442,31 +3506,70 @@ class FTConnectorItemInCore(FTElementInCore): # in- and out-connectors (CX's) to
 		assert isinstance(ParentTag, ElementTree.Element)
 		assert isinstance(NumberingSystemHash, dict)
 		assert isinstance(MaxCommentIDSoFar, int)
-		ThisCommentHash = {}
 		# First, add IDs to comments and make ThisCommentHash
 		LastCommentID = MaxCommentIDSoFar
 		ThisCommentHash = {}
 		for ThisComment in self.ConnectorDescriptionComments:
 			LastCommentID += 1
-			ThisComment.ID = LastCommentID
+			ThisComment.ID = str(LastCommentID)
 			ThisCommentHash[str(LastCommentID)] = ThisComment.Content
 		# make top level XML element, and add simple tags
 		TopTag = ElementTree.SubElement(ParentTag, info.FTConnectorTag)
+		ThisKindTag = ElementTree.SubElement(TopTag, info.KindTag)
+		ThisKindTag.text = vizop_misc.ReverseLookup(Dic=ElementInCoreKindHash, TargetValue=type(self))
 		projects.AddAttribsInSubelements(StartEl=TopTag, DataObj=self,
 			SubElements={info.IDTag: 'ID', info.OutTag: 'Out', info.StyleTag: 'Style',
 			info.ConnectorDescriptionTag: 'ConnectorDescription',
-			info.RelatedConnectorTag: 'RelatedCX',
 			info.BackgColourTag: 'BackgColour'})
-		# add tags containing lists of IDs
+		# add RelatedConnector tag
+		ThisRelatedConnectorTag = ElementTree.SubElement(TopTag, info.RelatedConnectorTag)
+		ThisRelatedConnectorTag.text = 'None' if self.RelatedCX is None else self.RelatedCX.ID
+		# # add tags containing lists of IDs
 		projects.AddIDListAttribsInSubelements(StartEl=TopTag, DataObj=self,
 			SubElements={info.ConnectorDescriptionCommentsTag: 'ConnectorDescriptionComments',
 			info.ActionItemsTag: 'ActionItems',
-			info.ParkingLotItemsTag: 'ParkingLot',
+			info.ParkingLotItemsTag: 'ParkingLot', info.LinkedFromTag: 'LinkedFrom',
 			info.ConnectToTag: 'ConnectTo', info.RiskReceptorsTag: 'ApplicableRiskReceptors'})
 		# add Numbering tag
 		ThisNumberingTag = ElementTree.SubElement(TopTag, info.NumberingTag)
 		ThisNumberingTag.text = NumberingSystemHash[self]
+		# add Value tag
+		projects.AddValueElement(StartEl=TopTag, ValueTag=info.ValueTag, ValueObj=self.Value)
 		return ThisCommentHash, LastCommentID
+
+	def FetchAllDataFromXML(self, StartTag,
+			NumberingSystems, Comments, ActionItems, ParkingLotItems):
+		# populate connector from StartTag.
+		# return ProblemReports, ParentNumValueInstances (2 x list)
+		assert isinstance(StartTag, ElementTree.Element)
+		ProblemReports = []
+		ParentNumValueInstances = []
+		# first, populate simple attribs
+		self.ID = StartTag.findtext(info.IDTag)
+		self.Out = utilities.Bool2Str(Input=StartTag.findtext(info.OutTag))
+		self.Style = StartTag.findtext(info.StyleTag)
+		self.ConnectorDescription = StartTag.findtext(info.ConnectorDescriptionTag)
+		self.BackgColour = StartTag.findtext(info.BackgColourTag)
+		# populate RelatedCXID; will be used to populate actual RelatedCX later
+		ThisRelatedCX = StartTag.findtext(info.RelatedConnectorTag)
+		self.RelatedCXID = None if ThisRelatedCX == 'None' else ThisRelatedCX
+		# unpack tags containing lists of IDs
+		self.ApplicableRiskReceptors = utilities.FetchObjsFromIDList(IDList=StartTag.findtext(info.RiskReceptorsTag),
+			ObjList=self.Proj.RiskReceptors)
+		self.ConnectorDescriptionComments = [Comments[i] for i in
+			StartTag.findtext(info.ConnectorDescriptionCommentsTag).replace(',', ' ').split()]
+		self.ActionItems = [ActionItems[i] for i in StartTag.findtext(info.ActionItemsTag).replace(',', ' ').split()]
+		self.ParkingLot = [ParkingLotItems[i] for i in StartTag.findtext(info.ParkingLotItemsTag).replace(',', ' ').split()]
+		self.ConnectToID = StartTag.findtext(info.ConnectToTag) # store ID list for now; convert to objects later
+		self.LinkedFromID = StartTag.findtext(info.LinkedFromTag) # store ID list for now; convert to objects later
+		# fetch numbering
+		self.Numbering = copy.copy(NumberingSystems[int(StartTag.findtext(info.NumberingTag))])
+		# fetch values
+		self.Value, NewProblemReports, NewParentNumValueInstances = projects.UnpackValueFromXML(Proj=self.Proj,
+			XMLEl=StartTag.find(info.ValueTag))
+		ProblemReports.extend(NewProblemReports)
+		ParentNumValueInstances.extend(NewParentNumValueInstances)
+		return ProblemReports, ParentNumValueInstances
 
 class FTCollapseGroup(object): # collapse group containing one or more FT elements that can be shown collapsed
 	# into a single object for more compact display. This is a Viewport object, not datacore.
@@ -3540,10 +3643,12 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		self.Columns = [FTColumnInCore(self)] # contains FTColumnInCore instances. Start with one empty column
 		# AttribTypeHash (dict): keys are attrib names in FTObjectInCore (str), values are acceptable values for the attrib (list)
 		# Need a key for each attrib that presents to the user as a choice widget
-		self.MyTolRiskModel = Proj.CurrentTolRiskModel
+		self.MyTolRiskModel = Proj.RiskMatrices[0]
 		# set initial severity per risk receptor = maximum severity. Severity is dict: {RR: Severity category object}
-		SeverityObjs = self.MyTolRiskModel.TolFreqTable.Keys[self.MyTolRiskModel.TolFreqTable.SeverityDimensionIndex]
-		self.Severity = dict([(RR, SeverityObjs[-1]) for RR in self.MyTolRiskModel.RiskReceptors])
+		SeverityObjs = self.MyTolRiskModel.Keys[self.MyTolRiskModel.SeverityDimensionIndex]
+		# preset default severity per risk receptor to max severity. List of RRs is grabbed from 0th value in RiskMatrix
+		self.Severity = dict([(RR, SeverityObjs[-1])
+			for RR in utilities.Flatten(l=self.MyTolRiskModel.Values)[0].ValueFamily.keys()])
 		# get initial tolerable frequency value (value object containing all RRs), based on defaults in tolerable risk model
 		self.TolFreq = core_classes.UserNumValueItem(MaxValue=1e3, MinValue=1e-20, MaxMinUnit=core_classes.PerYearUnit)
 		self.SetTolFreq()
@@ -3555,17 +3660,21 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		self.CollapseGroups = [] # list of instances of FTCollapseGroupInCore
 
 	def SetTolFreq(self): # set tolerable frequency for all risk receptors, by lookup in risk model according to severity
-		for RR in self.MyTolRiskModel.RiskReceptors:
-			TolFreqValueObj = self.MyTolRiskModel.TolFreqTable.Lookup(Categories=[self.Severity[RR]])
+		for RR in self.Severity.keys():
+			TolFreqValueObj = self.MyTolRiskModel.Lookup(Categories=[self.Severity[RR]])
 			# copy value and unit from tol freq table (to avoid creating link between TolFreq and an item in the table)
 			self.TolFreq.SetMyValue(TolFreqValueObj.GetMyValue(RR=RR), RR=RR)
 			self.TolFreq.SetMyUnit(TolFreqValueObj.GetMyUnit()) # setting the same unit several times, never mind
 		# set lists of permissible units and ValueKinds; used elsewhere to offer options to user
-		self.TolFreq.AcceptableUnits = core_classes.FrequencyUnits
-		self.TolFreq.ValueKindOptions = [core_classes.UserNumValueItem, core_classes.ConstNumValueItem,
-			core_classes.LookupNumValueItem, core_classes.UseParentValueItem, core_classes.ParentNumValueItem]
+		self.SetTolFreqNumberKindAttribs()
 
-	def AcceptableValueKinds(self): # return list of value kinds (subclasses of NumValueItem) for FT's TolFreq
+	def SetTolFreqNumberKindAttribs(self):
+		# set persistent attribs that are special attribs of self.TolFreq. These are restored when loading from file.
+		self.TolFreq.AcceptableUnits = core_classes.FrequencyUnits
+		self.TolFreq.ValueKindOptions = self.AcceptableValueKinds()
+
+	def AcceptableValueKinds(self): # return list of value kinds (subclasses of NumValueItem)
+		# for FT's TolFreq and other numbers
 		return [core_classes.UserNumValueItem, core_classes.ConstNumValueItem, core_classes.LookupNumValueItem,
 			core_classes.ParentNumValueItem, core_classes.UseParentValueItem]
 
@@ -3723,7 +3832,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		# in the FT. Otherwise, return separate groups for each risk receptor.
 		# returns list of lists: inner lists are RiskReceptorItem instances that can be grouped together
 		if GroupingOption == 'Grouped':
-			RemainingRiskReceptors = self.MyTolRiskModel.RiskReceptors[:] # RR's to consider
+			RemainingRiskReceptors = [k for k in self.Severity.keys()] # RR's to consider
 			OutputList = [] # list of lists of grouped RR's
 			while RemainingRiskReceptors:
 				ThisRR = RemainingRiskReceptors.pop(0) # get RR to compare against, popped from start of the list
@@ -3747,7 +3856,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 					RemainingRiskReceptors = [] # remove it from the 'remaining' list
 			return OutputList
 		elif GroupingOption == 'Singly':
-			return [ [r] for r in self.MyTolRiskModel.RiskReceptors] # return RR's in individual groups
+			return [ [r] for r in self.Severity.keys() ] # return RR's in individual groups
 		else: raise ValueError("Unknown GroupingOption '%s'" % GroupingOption)
 
 	def GetFullRedrawData(self, Viewport=None, ViewportClass=None, **Args):
@@ -3771,7 +3880,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 				RREl.set(info.ApplicableAttribName, utilities.Bool2Str(ThisRRGroup == self.RiskReceptorGroupOnDisplay))
 				RREl.set(info.SerialTag, str(ThisRRGroupIndex)) # add risk receptor group serial number
 			# add HumanNames of severity categories
-			ThisTolFreqTable = self.MyTolRiskModel.TolFreqTable
+			ThisTolFreqTable = self.MyTolRiskModel
 			for (ThisSeverityCatIndex, ThisSeverityCategory) in \
 					enumerate(ThisTolFreqTable.Keys[ThisTolFreqTable.SeverityDimensionIndex]):
 				SeverityCatEl = ElementTree.SubElement(El, info.SeverityCatTag)
@@ -3842,15 +3951,12 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 					EventEl=AttribEl, OptionXMLTagName=info.UnitOptionTag, OfferConvertOptions=True)
 				PopulateValueOptionField(CurrentOption=type(Attrib), AcceptableOptions=Attrib.ValueKindOptions,
 					EventEl=AttribEl, OptionXMLTagName=info.ValueKindOptionTag, OfferConvertOptions=False)
-#				for ThisValueKindOption in Attrib.ValueKindOptions:
-#					ValueKindOptionEl = ElementTree.SubElement(AttribEl, info.ValueKindOptionTag)
-#					ValueKindOptionEl.text = str(ThisValueKindOption.XMLName)
 				for ThisConstantOption in self.Proj.Constants:
 					ConstantOptionEl = ElementTree.SubElement(AttribEl, info.ConstantOptionTag)
 					ConstantOptionEl.text = str(ThisConstantOption.HumanName)
 					IDEl = ElementTree.SubElement(ConstantOptionEl, info.IDTag)
 					IDEl.text = ThisConstantOption.ID
-				for ThisMatrixOption in self.Proj.TolRiskModels:
+				for ThisMatrixOption in self.Proj.RiskMatrices:
 					MatrixOptionEl = ElementTree.SubElement(AttribEl, info.MatrixOptionTag)
 					MatrixOptionEl.text = str(ThisMatrixOption.HumanName)
 					MatrixOptionIDEl = ElementTree.SubElement(MatrixOptionEl, info.IDTag)
@@ -4263,8 +4369,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		assert 0 <= ThisColIndex <= len(self.Columns) # allows for ThisColIndex to be 1+no of columns
 		if ThisColIndex < len(self.Columns): assert 0 <= ThisIndexInCol <= len(self.Columns[ThisColIndex].FTElements)
 		# First, decide what kind of event to insert
-		NewEventClass = {'FTEventInCore': FTEventInCore, 'FTGateInCore': FTGateItemInCore,
-			'FTConnectorInCore': FTConnectorItemInCore}[ObjKindRequested]
+		NewEventClass = ElementInCoreKindHash[ObjKindRequested]
 		# insert new column if needed
 		if ThisColIndex == len(self.Columns): self.CreateColumn(NewColIndex=len(self.Columns))
 		# insert new event
@@ -4559,8 +4664,8 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			ComponentHost = HostElement
 		# update component's value (TODO add undo)
 		if ComponentToUpdate == 'Severity': # update severity in all currently displayed risk receptors
-			NewSeverityObj = [s for s in self.MyTolRiskModel.TolFreqTable.Keys[
-				self.MyTolRiskModel.TolFreqTable.SeverityDimensionIndex] if s.XMLName == NewValue][0]
+			NewSeverityObj = [s for s in self.MyTolRiskModel.Keys[
+				self.MyTolRiskModel.SeverityDimensionIndex] if s.XMLName == NewValue][0]
 			for ThisRR in self.RiskReceptorGroupOnDisplay: # update severity and tol freq for applicable risk receptors
 				self.Severity[ThisRR] = NewSeverityObj
 			self.SetTolFreq() # update tolerable frequency
@@ -5409,7 +5514,10 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		OpModeTag.text = self.OpMode.XMLName
 		TolRiskModelTag = ElementTree.SubElement(StartTag, info.TolRiskModelTag)
 		TolRiskModelTag.text = self.MyTolRiskModel.ID
-		projects.AddValueElement(StartEl=StartTag, ValueTag=info.TolFreqTag, ValueObj=self.TolFreq)
+		RRGroupingOpenTag = ElementTree.SubElement(StartTag, info.RiskReceptorGroupingOptionTag)
+		RRGroupingOpenTag.text = self.RRGroupingOption
+		# not storing TolFreq explictly. It is recalculated from the tol risk model when the file is loaded
+#		projects.AddValueElement(StartEl=StartTag, ValueTag=info.TolFreqTag, ValueObj=self.TolFreq)
 		if self.ModelGate is not None:
 			ThisModelGateTag = ElementTree.SubElement(StartTag, info.ModelGateTag)
 			ThisModelGateTag.text = self.ModelGate.ID
@@ -5427,12 +5535,97 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			# store all storeable elements in the column (e.g. FT events, gates etc)
 			for ThisEl in ThisCol.FTElements:
 				if hasattr(ThisEl, 'StoreAllDataInXML'):
-					MaxCommentIDSoFar = ThisEl.StoreAllDataInXML(ThisColTag, NumberingSystemHash, MaxCommentIDSoFar)
+					NewComments, MaxCommentIDSoFar = ThisEl.StoreAllDataInXML(ThisColTag, NumberingSystemHash,
+						MaxCommentIDSoFar)
+					ThisCommentHash.update(NewComments)
 		# add CollapseGroup tags
 		for ThisCG in self.CollapseGroups:
 			# store all storeable data in the collapse group
 			ThisCG.StoreAllDataInXML(StartTag)
 		return ThisCommentHash, MaxCommentIDSoFar
+
+	def FetchAllDataFromXML(self, Proj, StartTag,
+			NumberingSystems, Comments,
+			ActionItems, ParkingLotItems):
+		# populate FT from data saved in project file, extracting it from XMLRoot
+		assert isinstance(StartTag, ElementTree.Element)
+		# make sure stored data matches this kind of PHA object
+		assert StartTag.findtext(info.KindTag) == type(self).InternalName
+		ProblemReports = []
+		ParentNumValueInstances = []
+		# fetch FT-level data from XML
+		self.HumanName = StartTag.findtext(info.HumanNameTag)
+		self.Rev = StartTag.findtext(info.RevTag)
+		self.TargetRiskRedMeasure = StartTag.findtext(info.TargetRiskRedMeasureTag)
+		self.SILTargetValue = StartTag.findtext(info.SILTargetValueTag)
+		self.RRGroupingOption = StartTag.findtext(info.RiskReceptorGroupingOptionTag)
+		self.BackgColour = StartTag.findtext(info.BackgColourTag)
+		self.TextColour = StartTag.findtext(info.SILTargetValueTag)
+		self.OpMode = utilities.InstanceWithAttribValue(ObjList=core_classes.OpModes, AttribName='XMLName',
+			TargetValue=StartTag.findtext(info.OpModeTag))
+		self.MyTolRiskModel = utilities.ObjectWithID(Objects=Proj.RiskMatrices,
+			TargetID=StartTag.findtext(info.TolRiskModelTag))
+		self.RRGroupingOption = StartTag.findtext(info.RiskReceptorGroupingOptionTag)
+		# fetch severity for each risk receptor. In the project file, the severity is an index in AvailableSeverities
+		SeverityTopTag = StartTag.find(info.SeverityTag)
+		AvailableSeverities = self.MyTolRiskModel.Keys[self.MyTolRiskModel.SeverityDimensionIndex]
+		self.Severity = {} # remove default risk receptors, only use RR's loaded from project file
+		for ThisRRTag in SeverityTopTag.findall(info.RRTag):
+			self.Severity[utilities.ObjectWithID(Objects=Proj.RiskReceptors, TargetID=ThisRRTag.findtext(info.IDTag))] \
+				= AvailableSeverities[int(ThisRRTag.findtext(info.SeverityValueTag))]
+#				= utilities.InstanceWithAttribValue(ObjList=AvailableSeverities, AttribName='XMLName',
+#				TargetValue=ThisRRTag.findtext(info.XMLNameTag))
+		# set TolFreq based on severity
+		self.SetTolFreq()
+		# get ModelGate tag, if any, ready to identify actual gate
+		ThisModelGateID = StartTag.findtext(info.ModelGateTag, default='')
+		# unpack columns
+		self.Columns = []
+		ElementHash = {} # for populating element references after unpacking
+		for ThisColTag in StartTag.findall(info.FTColumnTag):
+			# make a new column
+			self.CreateColumn(NewColIndex=len(self.Columns))
+			ThisColumn = self.Columns[-1]
+			# fetch each element in the column
+			for ThisElTag in ThisColTag:
+				NewElementClass = ElementInCoreKindHash[ThisElTag.findtext(info.KindTag)]
+				# create new event
+				NewElement = NewElementClass(Proj=Proj, FT=self, Column=ThisColumn, ModelGate=None,
+					ColNo=len(self.Columns) - 1, ColIndex=len(self.Columns) - 1)
+				ThisColumn.FTElements.append(NewElement)
+				# get the new element to fetch its own data from XML
+				NewProblemReports, NewParentNumValueInstances = NewElement.FetchAllDataFromXML(ThisElTag,
+					NumberingSystems, Comments, ActionItems, ParkingLotItems)
+				ProblemReports.extend(NewProblemReports)
+				ParentNumValueInstances.extend(NewParentNumValueInstances)
+				# if the element is the model gate, store it in the FT's ModelGate attrib
+				if (NewElementClass is FTGateItemInCore) and (NewElement.ID == ThisModelGateID):
+					self.ModelGate = NewElement
+				ElementHash[NewElement.ID] = NewElement
+		# unpack collapse groups
+		for ThisCollapseGroupTag in StartTag.findall(info.CollapseGroupTag):
+			NewCG = FTCollapseGroupInCore(ID=ThisCollapseGroupTag.findtext(info.IDTag))
+			self.CollapseGroups.append(NewCG)
+			NewProblemReports = newCG.FetchAllDataFromXML(ThisCollapseGroupTag)
+			ProblemReports.extend(NewProblemReports)
+		# populate each element's ConnectTo, LinkedFrom and RelatedCX attribs from ID stored during element unpacking
+		for ThisElID, ThisEl in ElementHash.items():
+			if hasattr(ThisEl, 'ConnectToID'):
+				# in the following, we use replace().split() instead of split(',') to avoid problems when ConnectToID is ''
+				ThisEl.ConnectTo = [ElementHash[i] for i in ThisEl.ConnectToID.replace(',', ' ').split()]
+				del ThisEl.ConnectToID # remove for memory conservation and to avoid it becoming out of date
+			if hasattr(ThisEl, 'LinkedFromID'):
+				ThisEl.LinkedFrom = [ElementHash[i] for i in ThisEl.LinkedFromID.replace(',', ' ').split()]
+				del ThisEl.LinkedFromID
+			if getattr(ThisEl, 'RelatedCXID', None) is not None:
+				ThisEl.RelatedCX = ElementHash[ThisEl.RelatedCXID]
+				del ThisEl.RelatedCXID
+		 # work out risk receptor grouping
+		self.RefreshRiskReceptorGrouping(GroupingOption=self.RRGroupingOption, FirstTime=True)
+		return ProblemReports, ParentNumValueInstances, ElementHash
+
+ElementInCoreKindHash = {info.FTEventLabel: FTEventInCore, info.FTGateLabel: FTGateItemInCore,
+						 info.FTConnectorLabel: FTConnectorItemInCore}
 
 class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all data needed to display full FT on screen
 	# Each separate sub-object (header, cause etc) has attributes whose names are assumed to be same as in the data message from DataCore
@@ -5489,7 +5682,6 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		# attribs PHAObj and DatacoreHandler are set in DoNewViewport()
 		display_utilities.ViewportBaseClass.__init__(self, PHAObjID=PHAObjID, **Args)
 		self.Proj = Args['Proj']
-		self.ID = None # assigned in display_utilities.CreateViewport()
 		self.HumanName = '' # default name is assigned in Proj.AssignDefaultNameToViewport()
 		self.DisplDevice = Args.get('DisplDevice', None)
 		self.RiskReceptorObjs = [] # ChoiceItem instances, in the order RR groups should be displayed
@@ -5514,7 +5706,9 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		# initialize zoom widget
 		self.MyZoomWidget = display_utilities.ZoomWidgetObj(Viewport=self, InitialZoom=self.Zoom)
 		self.LastElLClicked = self.LastElMClicked = self.LastElRClicked = None
-		self.CurrentEditComponent = None # which text component is currently being edited with a TextCtrl
+		self.CurrentEditComponent = None # which text component is currently being edited as text
+		self.CurrentEditChoice = None # which component is currently being edited with a Choice widget
+		self.EditChoice = None # the actual wx.Choice widget for editing a choice component
 		self.PaintNeeded = True # whether to execute DoRedraw() in display device's OnPaint() handler (bool)
 		self.OpMode = core_classes.DefaultOpMode
 		self.EditingConnection = False # whether user is currently editing a connection between elements
@@ -5715,7 +5909,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			DataInfoAsStr = [ (info.IDTag, 'ID'), ('Numbering', 'Numbering'),
 				('EventDescription', 'EventDescription'), ('Value', 'Value'), ('ValueProblemObjectID', 'ValueProblemObjectID'),
 				('Unit', 'ValueUnit'), ('ValueProblemID', 'ValueProblemID'), ('BackgColour', 'BackgColour') ]
-			for Tag, Attrib in DataInfoAsStr: # %%%
+			for Tag, Attrib in DataInfoAsStr:
 				setattr(NewEvent, Attrib, XMLObj.findtext(Tag, default=''))
 			DataInfoAsBool = [ ('CanEditValue', 'CanEditValue'), (info.ShowActionItemTag, 'ShowActionItems'),
 				('IsIPL', 'IsIPL'),  ('FTEventLinked', 'Linked'),
@@ -6358,14 +6552,14 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 	def HandleMouseLDrag(self, MouseX, MouseY, Event):
 		# handle mouse drag with left button pressed
 		if self.CurrentEditComponent: # dragging during text editing-in-place
-			print('FT6046 in drag handler')
 			self.CurrentEditComponent.HandleMouseLDragOnMe(MouseX=MouseX, MouseY=MouseY, Event=Event)
-		if self.EditingConnection: # dragging from a connect button
+		elif self.EditingConnection: # dragging from a connect button
 			self.HandleMouseLDragEditingConnection(MouseX, MouseY)
 		elif self.LastElLClicked: # did we click on an element?
-			if hasattr(self.LastElLClicked, 'HandleMouseLDragOnMe'):
-				self.LastElLClicked.HandleMouseLDragOnMe(Hotspot=self.LastElLClickedHotspot, HostViewport=self,
-					MouseX=MouseX, MouseY=MouseY, Event=Event)
+			pass # currently no action if we drag on a non-text element
+#			if hasattr(self.LastElLClicked, 'HandleMouseLDragOnMe'):
+#				self.LastElLClicked.HandleMouseLDragOnMe(Hotspot=self.LastElLClickedHotspot, HostViewport=self,
+#					MouseX=MouseX, MouseY=MouseY, Event=Event)
 		else: # dragging in empty space: pan PHA model display
 			# set mouse pointer
 			wx.SetCursor(wx.Cursor(display_utilities.StockCursors['+Arrow']))
@@ -6578,12 +6772,13 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			return TextContentLean.replace(info.NewlineSymbol + '\n', '\n')
 
 		assert isinstance(AcceptEdits, bool) or (AcceptEdits is None)
-		# check if any editing operation was in progress
+		if isinstance(AcceptEdits, bool): AcceptEditsThisTime = AcceptEdits
+		else: AcceptEditsThisTime = self.DisplDevice.Parent.EditAllowed
+		# check if any text editing operation was in progress
 		if self.CurrentEditComponent:
-			if isinstance(AcceptEdits, bool): AcceptEditsThisTime = AcceptEdits
-			else: AcceptEditsThisTime = self.DisplDevice.Parent.EditAllowed
 			CurrentEditBehaviour = getattr(self.CurrentEditComponent,'EditBehaviour', None)
-			# check if it was a text editing operation
+			# check if it was a text editing operation (Currently this is the only option, so it's redundant,
+			# but we could keep this structure in case we implement a different sort of editing behaviour later)
 			if CurrentEditBehaviour == 'Text':
 				# get the text typed by the user, and remove newline symbols
 				TextEntered = RemoveNewlineSymbols(self.CurrentEditComponent.Text.Content)
@@ -6600,35 +6795,37 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 				# redraw the element containing the edited component
 				self.CurrentEditComponent = None
 				self.PaintNeeded = True # turn off paint suppression while TextCtrl was in use; redundant?
-			elif CurrentEditBehaviour == 'Choice': # it was a choice editing operation
-				# get the option selected by the user
-				TextSelected = self.CurrentEditChoice.GetStringSelection()
-				# check if any changes made
-				if AcceptEditsThisTime and (TextSelected != self.CurrentEditComponent.Text.Content):
-					if isinstance(self.CurrentEditComponent.HostObject, FTHeader):
-						ElementID = 'Header'
-					else:
-						ElementID = self.CurrentEditComponent.HostObject.ID
-					EditComponentInternalName = self.CurrentEditComponent.InternalName
-					# get matching XMLName of user's selection
-					ChosenXMLName = [i.XMLName for i in self.CurrentEditComponent.ObjectChoices if i.HumanName == TextSelected][0]
-					# destroy the Choice widget (to avoid memory leak) (do this before SendRequest() so that the FT gets fully
-					# refreshed by ControlFrame's OnPaint() afterwards)
-					self.CurrentEditChoice.Destroy()
-					self.CurrentEditComponent = self.CurrentEditChoice = None
-					# request PHA object to update choice attribute by sending message through zmq
-					vizop_misc.SendRequest(Socket=self.C2DSocketREQ, Command='RQ_FT_ChangeChoice',
-						ProjID=self.Proj.ID, PHAObj=self.PHAObjID, Viewport=self.ID, Zoom=str(self.Zoom),
-						PanX=str(self.PanX), PanY=str(self.PanY),
-						Element=ElementID, TextComponent=EditComponentInternalName,
-						NewValue=ChosenXMLName)
-					# store current element's ID to set as "current" when display is refreshed
-					if ElementID != 'Header':
-						self.CurrentElementIDsToSelectOnRefresh = [ElementID]
-				else: # no change made, or change rejected; destroy the choice widget
-					self.CurrentEditChoice.Destroy()
-					self.CurrentEditComponent = self.CurrentEditChoice = None
-				self.DisplDevice.SetKeystrokeHandlerOnOff(On=True) # turn on keypress shortcut detection in control frame
+		if self.CurrentEditChoice:
+#			elif CurrentEditBehaviour == 'Choice': # it was a choice editing operation
+			# get the option selected by the user
+			TextSelected = self.EditChoice.GetStringSelection()
+			# check if any changes made: find the XMLName of old and new options selected
+			PreviousOptionXMLName = [c.XMLName for c in self.CurrentEditChoice.ObjectChoices if c.Applicable][0]
+			NewOptionXMLName = [i.XMLName for i in self.CurrentEditChoice.ObjectChoices if i.HumanName == TextSelected][0]
+			if AcceptEditsThisTime and (PreviousOptionXMLName != NewOptionXMLName):
+				# find which element (or header) hosts the component being edited
+				if isinstance(self.CurrentEditChoice.HostObject, FTHeader):
+					ElementID = 'Header'
+				else:
+					ElementID = self.CurrentEditChoice.HostObject.ID
+				# destroy the Choice widget (to avoid memory leak) (do this before SendRequest() so that the FT gets
+				# fully refreshed by ControlFrame's OnPaint() afterwards)
+				self.EditChoice.Destroy()
+				# request PHA object to update choice attribute by sending message through zmq
+				vizop_misc.SendRequest(Socket=self.C2DSocketREQ, Command='RQ_FT_ChangeChoice',
+					ProjID=self.Proj.ID, PHAObj=self.PHAObjID, Viewport=self.ID, Zoom=str(self.Zoom),
+					PanX=str(self.PanX), PanY=str(self.PanY),
+					Element=ElementID, TextComponent=self.CurrentEditChoice.InternalName,
+					NewValue=NewOptionXMLName)
+				self.EditChoice = self.CurrentEditChoice = None
+				# store current element's ID to set as "current" when display is refreshed
+				if ElementID != 'Header':
+					self.CurrentElementIDsToSelectOnRefresh = [ElementID]
+			else: # no change made, or change rejected; destroy the choice widget
+				self.EditChoice.Destroy()
+				self.CurrentEditChoice = None
+				self.EditChoice = None
+			self.DisplDevice.SetKeystrokeHandlerOnOff(On=True) # turn on keypress shortcut detection in control frame
 
 	def RequestChangeText(self, ElementID, EditComponentInternalName, NewValue):
 		# send request to Datacore to update text attribute. Also used for updating value fields, in which case
@@ -6873,7 +7070,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		# get data relating to FT as a whole
 		ReturnArgs['SelectedElements'] = self.CurrentElements[:]
 		ReturnArgs['SelectedElementIDs'] = [e.ID for e in self.CurrentElements]
-		# get data for each element%%%
+		# get data for each element
 		ReturnArgs['Elements'] = []
 		# list of potential attribs in each element that should be stored if they exist
 		TargetAttribNames = ['ShowComments', 'DetailedView', 'ShowDescriptionComments', 'ShowValueComments',
@@ -6926,6 +7123,9 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			for ThisEl in ThisCol.FTElements:
 				if hasattr(ThisEl, 'StoreAllDataInXML'):
 					ThisEl.StoreAllDataInXML(StartTag=ThisColTag)
+
+ElementInFullTreeViewportKindHash = {info.FTEventLabel: FTEvent, info.FTGateLabel: FTGate,
+	info.FTConnectorLabel: FTConnector}
 
 FTObjectInCore.DefaultViewportType = FTForDisplay # set here (not in FTForDisplay class) due to the order of the
 	# class definitions

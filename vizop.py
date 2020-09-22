@@ -330,8 +330,8 @@ while not RequestedToQuit:
 			if ProjectsToCreateFromTemplates:  # any new projects to create?
 				NewlyOpenedProjects, SuccessReport = \
 					projects.CreateProjects(ProjectsToCreateFromTemplates, SaveOnFly, ProjectFilesToOpen)
-			else:  # opening existing projects
-				NewlyOpenedProjects, SuccessReport = projects.OpenProjectFiles(ProjectFilesToOpen)
+			else: # opening existing projects; temporarily setting SaveOnFly to False
+				NewlyOpenedProjects, SuccessReport = projects.OpenProjectFiles(ProjectFilesToOpen, SaveOnFly=False)
 			# TODO: give user feedback based on SuccessReport
 			OpenProjects += NewlyOpenedProjects
 			# set CurrentProject

@@ -198,6 +198,17 @@ def ObjectWithID(Objects, TargetID): # return object instance among Objects (lis
 		print("ObjectWithID: warning, requested object ID '%s' not found" % str(TargetID))
 		return None
 
+def FetchObjsFromIDList(IDList, ObjList):
+	# extract and return list of objects from ObjList whose ID attrib is in IDList, in order of IDList
+	# It is assumed that every object in ObjList has an ID attrib, and that every ID in IDList is included in ObjList
+	# IDList can be either a list, or a string containing IDs separated by commas
+	assert isinstance(IDList, (list, str))
+	assert isinstance(ObjList, list)
+	# below, we use replace().split() instead of split(',') to avoid problems if IDList is ''
+	IDsToFind = IDList.replace(',', ' ').split() if isinstance(IDList, str) else IDList
+	return [ObjectWithID(Objects=ObjList, TargetID=i) for i in IDsToFind]
+	# TODO for efficiency, insert code from ObjectWithID() here; don't make list of object IDs every time
+
 def IsEffectivelyZero(TestVal=0.0):
 	# returns True if TestVal (int or float) is close to zero, ie unsuitable as a dividend
 	assert isinstance(TestVal, (int, float))
@@ -323,6 +334,28 @@ def Flatten(l, ltypes=(list, tuple)):
 				l[i:i + 1] = l[i]
 		i += 1
 	return ltype(l)
+
+def SplitList(InList, HowManySublists):
+	# split items in InList into a list of lists, containing a total of HowManySublists inner lists
+	# e.g. SplitList([1,2,3,4,5,6], 3) returns [[1,2],[3,4],[5,6]]
+	assert hasattr(InList, '__iter__')
+	assert isinstance(HowManySublists, int)
+	assert HowManySublists > 0
+	assert len(InList) % HowManySublists == 0 # len(InList) must be exact multiple of HowManySublists
+	return [InList[c*len(InList)//HowManySublists:((c+1)*len(InList)//HowManySublists)] for c in range(HowManySublists)]
+
+def SplitListNested(InList, HowManySublistsPerLevel):
+	# split items in InList into a nested list of lists, containing HowManySublistsPerLevel[n] sublists at level n
+	# e.g. SplitList([1,2,3,4,5,6,7,8,9,10,11,12], [2,3]) returns [[[1,2],[3,4],[5,6]],[[7,8],[9,10],[11,12]]
+	assert hasattr(InList, '__iter__')
+	assert hasattr(HowManySublistsPerLevel, '__iter__')
+	if len(HowManySublistsPerLevel) == 1: # this is the last level of depth
+		if isinstance(InList[0], list): # if InList already contains lists, split each list
+			return [SplitList(InList=InList[i], HowManySublists=HowManySublistsPerLevel[0]) for i in range(len(InList))]
+		else: return SplitList(InList=InList, HowManySublists=HowManySublistsPerLevel[0])
+	else: # not the last level of depth; split at this level, and iterate for each new list created
+		return [SplitListNested(InList=j, HowManySublistsPerLevel=HowManySublistsPerLevel[1:])
+			for j in SplitList(InList=InList, HowManySublists=HowManySublistsPerLevel[0])]
 
 def CompareTuple(first, second, element=0):
 	"""

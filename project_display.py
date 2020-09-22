@@ -208,11 +208,10 @@ class ProjectInfoModelForDisplay(display_utilities.ViewportBaseClass): # object 
 
 	def __init__(self, **Args): # project display object initiation. Args must include Proj and Fonts (dict)
 		# and can include DisplDevice and ParentWindow
-		# attrib PHAObjID is set in superclass
+		# attribs ID and PHAObjID is set in superclass
 		# attribs PHAObj and DatacoreHandler are set in DoNewViewport()
 		display_utilities.ViewportBaseClass.__init__(self, **Args)
 		self.Proj = Args['Proj']
-		self.ID = None # assigned in display_utilities.CreateViewport()
 		self.DisplDevice = Args.get('DisplDevice', None)
 		self.Fonts = Args['Fonts']
 		self.MaxIDInDisplayModel = 0 # highest ID of any element in this Viewport instance
@@ -839,3 +838,4 @@ class PHAElementItem(object):
 		self.HostHumanName = HostHumanName
 		self.ElementID = ElementID
 		self.HostID = HostID
+

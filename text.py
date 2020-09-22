@@ -936,7 +936,6 @@ def FindCharAtPosXInLine(TextObj, PosX, TargetLineIndex):
 	assert isinstance(TargetLineIndex, int)
 	assert 0 <= TargetLineIndex < len(TextObj.SublineX)
 	TargetSublineX = TextObj.SublineX[TargetLineIndex]
-	print('TE923 finding char at X: TargetSublineX, PosX, SUblineXStart: ', TargetSublineX, PosX, TextObj.SublineXStart[TargetLineIndex])
 	# find X distance to nearest char in the target line
 #	# first, find which chunk contains PosX
 #	ChunksXStart = TargetSublineX[0]

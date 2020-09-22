@@ -116,7 +116,9 @@ def select_file_from_all(message='', default_path=None,
 	Returns list of full file paths selected (or [] if none were selected)
 	"""
 	# **Args is to soak up obsolete arg read_only (no longer recognised by wxPython)
-	# First, get default directory to show in dialogue
+	# force MacOS to apply filter in wildcard
+	wx.SystemOptions.SetOption(u"osx.openfiledialog.always-show-types", 1)
+	# get default directory to show in dialogue
 	if default_path is None:
 		sm = SettingsManager()
 		try: # get saved path from config file
@@ -125,7 +127,7 @@ def select_file_from_all(message='', default_path=None,
 			default_path = os.path.expanduser('~')
 
 	dialogue = wx.FileDialog(message=message, defaultDir=default_path,
-							 wildcard=wildcard,
+							 wildcard='Vizop project files (*.vip)|*.vip',
 							 style=((wx.FD_MULTIPLE * allow_multi_files) | wx.FD_OPEN),
 							 parent=parent_frame, pos=(100, 100))
 

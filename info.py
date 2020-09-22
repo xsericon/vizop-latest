@@ -25,6 +25,7 @@ SHORT_DESCRIPTION = _("")
 LONG_DESCRIPTION = _("")
 YEAR_LAST_RELEASED = '2020'
 SRC_FILE_LICENSE_TEXT = _("# This file is part of %s. Copyright %s %s"%(PROG_SHORT_NAME, YEAR_LAST_RELEASED, OWNER))
+UsableProjDocVersions = ['0.1'] # project file versions parsable by this version of Vizop
 
 # definitions of where runtime files are expected
 ProjTemplateFolderTail = 'templates'
@@ -73,8 +74,11 @@ SeverityCatTag = 'SeverityCategory'
 ApplicableAttribName = 'Applicable'
 FTColumnTag = 'Column'
 FTEventTag = 'FTEvent'
+FTEventLabel = 'FTEventInCore'
 FTGateTag = 'FTGate'
+FTGateLabel = 'FTGateInCore'
 FTConnectorTag = 'FTConnector'
+FTConnectorLabel = 'FTConnectorInCore'
 EventTypeOptionTag = 'FTEventTypeOption'
 UnitTag = 'Unit'
 UnitOptionTag = 'UnitOption'
@@ -139,6 +143,7 @@ DisplayAttribTag = 'DisplayAttribs'
 PersistentAttribsTag = 'PersistentAttribs'
 DisplayDeviceTag = 'DisplayDevice'
 ViewportToRevertToTag = 'ViewportToRevertTo'
+MaxIDTag = 'MaxID'
 
 # for alarm list
 AlarmCountTag = 'AlarmCount'
@@ -231,6 +236,7 @@ NumberSystemParentType = 'Parent'
 NumberSystemSerialType = 'Serial'
 InfiniteTag = 'Infinite'
 XMLNameTag = 'XMLName'
+GenericRRID = 'DefRR' # ID used for 'default' risk receptor, used for number objects when multiple RR's aren't needed
 
 RevTag = 'Rev'
 TargetRiskRedMeasureTag = 'TargetRiskRedMeasure'
@@ -246,6 +252,7 @@ FTConnectorOutTag = 'FTConnectorOut'
 IsIPLTag = 'IsIPL'
 EventTypeTag = 'EventType'
 EventDescriptionTag = 'EventDescription'
+ConnectorDescriptionTag = 'ConnectorDescription'
 OldFreqValueTag = 'OldFreqValue'
 OldProbValueTag = 'OldProbValue'
 LastSelectedUnitTag = 'LastSelectedUnit'
@@ -253,6 +260,7 @@ IsSIFFailureEventInRelevantOpmodeTag = 'IsSIFFailureEventInRelevantOpmode'
 ShowActionItemsTag = 'ShowActionItems'
 ShowParkingLotItemsTag = 'ShowParkingLotItems'
 EventDescriptionCommentsTag = 'EventDescriptionComments'
+GateDescriptionCommentsTag = 'GateDescriptionComments'
 ConnectorDescriptionCommentsTag = 'ConnectorDescriptionComments'
 ValueCommentsTag = 'ValueComments'
 ShowDescriptionCommentsTag = 'ShowDescriptionComments'

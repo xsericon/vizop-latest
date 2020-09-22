@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# This file is part of Vizop. Copyright xSeriCon, 2018
+# This file is part of Vizop. Copyright xSeriCon, 2020
 """Implements the Welcome screen"""
 
 import gettext, wx
@@ -24,19 +24,6 @@ from platform import system # gets name of OS; see Beazley p329
 
 KeyPressHash = [] # list of tuples: (keystroke code, handling routines when those keystrokes are detected,
 # dict of args to supply to handler)
-
-# def launch_gui(app):
-# 	"""Launches the Vizop welcome frame. Redundant.
-# 	app - the wx App that the GUI is going to run in.
-# 	"""
-# 	#run all the initialisation tasks
-# 	InitializeVizop()
-#
-# 	# launch welcome frame
-# 	NoProjectOpenFrame(None, -1, info.PROG_NAME)
-# 	app.MainLoop()
-# 	#run_exit_tasks()
-
 
 def InitializeVizop():
 	"""Runs all the initialisation tasks needed for Vizop startup.
@@ -224,10 +211,11 @@ class NoProjectOpenFrame(wx.Frame):
 		global KeyPressHash
 		KeyPressHash = self.OldKPR
 
-	def HandleOpenFileRequest(self, Filenames, NewFilenames=[], NewProjects=False, SaveOnFly=True):
-		# Check whether Filenames (list of paths) contains openable projects.
+	def HandleNewFileRequest(self, Filenames, NewFilenames=[], NewProjects=False, SaveOnFly=True):
+		# Check NewFilenames can be opened.
+		# Check whether Filenames (list of paths) contains openable project templates.
 		# NewFilename: full paths of files to create for new project
-		# NewProjects (bool): whether the Filenames are templates to use for creation of new projects
+		# NewProjects (bool): whether the Filenames are templates to use for creation of new projects (always True)
 		# SaveOnFly (bool): if creating new project, whether work should be saved on the fly
 		# If any openable projects, call WrapUpAfterOpeningProjects() to close Welcome Frame and send data to datacore.
 		# Return values: OpenableProjFiles (list of paths that contain valid and openable projects)
@@ -239,6 +227,30 @@ class NoProjectOpenFrame(wx.Frame):
 		OpenableProjFiles = [Filenames[i] for i in range(len(Filenames))
 							 if ProjOpenData[i]['Openable']
 							 if (IsWritableLocation(os.path.dirname(NewFilenames[i])) or not SaveOnFly)]
+		# Note, the writability check is duplicated in projects.SaveEntireProject() and might be redundant here
+		if OpenableProjFiles: # can any of the selected project files be opened?
+			if NewProjects: # tidy up and exit Welcome Frame
+				self.WrapUpAfterOpeningProjects(ProjFiles=NewFilenames, TemplateFiles=OpenableProjFiles,
+												SaveOnFly=SaveOnFly)
+			else:
+				self.WrapUpAfterOpeningProjects(ProjFiles=OpenableProjFiles, TemplateFiles=[])
+		return OpenableProjFiles, ProjOpenData
+
+	def HandleOpenFileRequest(self, Filenames, NewFilenames=[], NewProjects=False, SaveOnFly=True):
+		# Check whether Filenames (list of existing paths) contains openable projects.
+		# NewFilename: full paths of files to create for new project (redundant, now using HandleNewFileRequest() )
+		# NewProjects (bool): whether the Filenames are templates to use for creation of new projects - always False
+		# SaveOnFly (bool): if creating new project, whether work should be saved on the fly
+		# If any openable projects, call WrapUpAfterOpeningProjects() to close Welcome Frame and send data to datacore.
+		# Return values: OpenableProjFiles (list of paths that contain valid and openable projects)
+		#       ProjOpenData (list of dict of data for each file, returned from projects.TestProjectsOpenable)
+		ProjOpenData = projects.TestProjectsOpenable(Filenames, ReadOnly=False) # find out if the projects can be opened
+		# expected return value (ProjOpenData): a list of dict, one for each project file in Filenames
+		# dict keys are: Openable (bool), Comment (str) - explaining why project is not openable (for user feedback)
+		# make list of openable/creatable project files
+		OpenableProjFiles = [Filenames[i] for i in range(len(Filenames))
+							 if ProjOpenData[i]['Openable']
+							 if (IsWritableLocation(os.path.dirname(Filenames[i])) or not SaveOnFly)]
 		# Note, the writability check is duplicated in projects.SaveEntireProject() and might be redundant here
 		if OpenableProjFiles: # can any of the selected project files be opened?
 			if NewProjects: # tidy up and exit Welcome Frame
@@ -274,7 +286,7 @@ class NoProjectOpenFrame(wx.Frame):
 			self.ReinstateKeypresses()
 
 
-	def OnOpenExistingButton(self, event=None):
+	def OnOpenExistingButton(self, Event=None):
 		# handle click on Open Existing button
 		self.DisableKeypresses()
 		FilenamesSelected = projects.GetProjectFilenamesToOpen(self)
@@ -285,7 +297,6 @@ class NoProjectOpenFrame(wx.Frame):
 		# allow user to continue working in Welcome Frame if no projects can be opened. TODO give user feedback
 		if not OpenSuccess:
 			self.ReinstateKeypresses()
-
 
 	def OnNewButton(self, event=None):
 		# handle click on New project button
@@ -302,7 +313,7 @@ class NoProjectOpenFrame(wx.Frame):
 			TargetTemplateFile, ProjFilename, SaveOnFly = DialogueBox.ReturnData
 			# force the project filename to have expected extension
 			ProjFilename = EnsureFilenameHasExtension(ProjFilename, ProjFileExt)
-			CreatableProjFiles, ProjOpenData = self.HandleOpenFileRequest(
+			CreatableProjFiles, ProjOpenData = self.HandleNewFileRequest(
 				[TargetTemplateFile], NewFilenames=[ProjFilename], NewProjects=True, SaveOnFly=SaveOnFly)
 			OpenSuccess = bool(CreatableProjFiles)
 		# allow user to continue working in Welcome Frame if no projects can be created. TODO give user feedback
