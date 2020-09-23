@@ -2147,6 +2147,7 @@ class ControlFrame(wx.Frame):
 				self.Bind(wx.EVT_MOUSEWHEEL, lambda Event: self.OnMouseWheel(Event, Viewport=Viewport,
 					Mode=NewMode))
 				self.Bind(wx.EVT_LEFT_UP, lambda Event: self.OnMouseLUpEdit(Event, NewMode))
+				self.Bind(wx.EVT_CONTEXT_MENU, self.OnContextMenuRequest)
 				SetUp4EditText()
 				wx.SetCursor(wx.Cursor(display_utilities.StockCursors['Normal'])) # normal mouse pointer
 				self.Unbind(wx.EVT_ENTER_WINDOW)
@@ -2155,6 +2156,7 @@ class ControlFrame(wx.Frame):
 				self.Unbind(wx.EVT_LEFT_DOWN)
 				self.Unbind(wx.EVT_LEFT_DCLICK)
 				self.Unbind(wx.EVT_MOUSEWHEEL)
+				self.Unbind(wx.EVT_CONTEXT_MENU)
 				self.Bind(wx.EVT_ENTER_WINDOW, lambda Event: OnMouseEntersViewportPanel(Event=Event, Mode=NewMode))
 					# bind method that changes mouse pointer when mouse enters display mode panel
 			# set required mouse pointer style for current screen position
@@ -2223,7 +2225,7 @@ class ControlFrame(wx.Frame):
 				Viewport.HandleMouseMClick(ScreenX, ScreenY, CanStartDrag=CanStartDrag, CanSelect=CanSelect)
 
 		def OnMouseRClickEdit(self, event, Viewport, CanStartDrag=True, CanSelect=True):
-			# handle mouse right button click inside EditPanel
+			# handle mouse right button click inside EditPanel. Not currently used
 			# if CanStartDrag, this click can be treated as start of dragging gesture
 			# if CanSelect, click can change which Elements are selected
 			Viewport = self.ViewportOwner.CurrentViewport
@@ -2235,6 +2237,14 @@ class ControlFrame(wx.Frame):
 		def OnMouseWheel(self, Event, Viewport, Mode): # handle mouse wheel event
 			(ScreenX, ScreenY) = Event.GetPosition() # get mouse coords
 			Viewport.HandleMouseWheel(ScreenX, ScreenY, Event=Event) # pass event to Viewport's handler
+
+		def OnContextMenuRequest(self, Event): # handle request for context menu (right click, Mac OS ^Click)
+			# check if the Viewport has a suitable handler; if so, call it
+			Viewport = self.ViewportOwner.CurrentViewport
+			if hasattr(Viewport, 'HandleContextMenuRequest'):
+				# get mouse coords relative to EditPanel
+				(ScreenX, ScreenY) = Event.GetPosition()
+				Viewport.HandleContextMenuRequest(ScreenX, ScreenY, Event=Event)
 
 		def SetKeystrokeHandlerOnOff(self, On=True):
 			# switch on or off keystroke handling

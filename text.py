@@ -935,22 +935,15 @@ def FindCharAtPosXInLine(TextObj, PosX, TargetLineIndex):
 	assert isinstance(PosX, int)
 	assert isinstance(TargetLineIndex, int)
 	assert 0 <= TargetLineIndex < len(TextObj.SublineX)
+	# get x-coords of each character in target subline
 	TargetSublineX = TextObj.SublineX[TargetLineIndex]
-	# find X distance to nearest char in the target line
-#	# first, find which chunk contains PosX
-#	ChunksXStart = TargetSublineX[0]
-#	ChunksXEnd = [TargetSublineX[ChunkNo][-1]
-#	ChunkContainsPosX = [(ChunksXStart[ChunkNo] <= PosX <= ChunksXEnd[ChunkNo] for ChunkNo in range(len(TargetSublineX)))]
-#	if True in ChunkContainsPosX: # PosX is within range of a chunk
-#		# find which chunk contains PosX
-#		TargetChunkNo = ChunkContainsPosX.index(True)
 	# make a list indicating, for each character in this subline, whether it's to the right of PosX
 	PosXToUse = PosX - TextObj.SublineXStart[TargetLineIndex] # take account of X gap to left of subline
 	CharIsToRight = [ThisCharX >= PosXToUse for ThisCharX in TargetSublineX]
 	# is the 0th character to the right of PosX? If so, pick the 0th character
 	if CharIsToRight[0]: TargetCharIndexInSubline = 0
 	# is the last char to the left of PosX? If so, pick the last character
-	if not CharIsToRight[-1]: TargetCharIndexInSubline = len(CharIsToRight) - 1
+	elif not CharIsToRight[-1]: TargetCharIndexInSubline = len(CharIsToRight) - 1
 	else:
 		# find X of the first char to the right of PosX, and X of the char to the left of this
 		FirstCharToRightIndex = CharIsToRight.index(True)
@@ -960,13 +953,6 @@ def FindCharAtPosXInLine(TextObj, PosX, TargetLineIndex):
 		if (PosXToUse - FirstCharToLeftX) < (FirstCharToRightX - PosXToUse):
 			TargetCharIndexInSubline = FirstCharToRightIndex - 1
 		else: TargetCharIndexInSubline = FirstCharToRightIndex
-#	else: # no chunk contains PosX
-#		# if 0th chunk starts to the right of PosX, take the 0th char of 0th chunk
-#		if ChunksXStart[0] > PosX:
-#			TargetChunkNo = TargetCharIndexInChunk = 0
-#		else: # take the last char of the last chunk
-#			TargetChunkNo = len(TargetSublineX) - 1
-#			TargetCharIndexInChunk = TargetSublineX[TargetChunkNo][-1]
 	# find how many chars (in rich text) occur before the target subline
 	CharsInPrecedingSublines = 0
 	for ThisSubline in TextObj.SublineX[:TargetLineIndex]: CharsInPrecedingSublines += len(ThisSubline)
@@ -1045,11 +1031,4 @@ def NearestCharIndexLeanAtXY(TextObj, TargetX, TargetY):
 	TargetSubline = DistanceYFromSublines.index(min(DistanceYFromSublines))
 	# find the subline's nearest character in the X direction
 	CharIndexRich = FindCharAtPosXInLine(TextObj=TextObj, PosX=TargetX, TargetLineIndex=TargetSubline)
-	# below is another way we started building
-#	DistanceXFromChars = [abs(int(TargetX - 0.5 * (TextObj.SublineX[ThisIndex] + TextObj.SublineX[ThisIndex + 1])))
-#		for ThisIndex in range(len(TextObj.SublineX) - 1)]
-#	# add element for the last char in the subline, assuming same spacing between last 3 characters
-#	if len(SublineX)
-#	DistanceXFromChars.append(abs(int(TargetX + (0.5 * TextObj.SublineX[-2]) - (1.5 * TextObj.SublineX[-1]))))
-#	return FindnthChar(RichStr=TextObj.Content, n=CharIndexRich)
 	return FindnthCharLean(TextObj=TextObj, CharIndexRich=CharIndexRich)

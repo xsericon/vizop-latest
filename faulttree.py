@@ -48,7 +48,7 @@ FTEventTypesWithFreqValue = ['InitiatingEvent', 'SIFFailureEvent', 'Intermediate
 FTEventTypesWithProbValue = ['IPL', 'EnablingCondition', 'ConditionalModifier']
 FTEventTypeNameHash = {'InitiatingEvent': _('Initiating event'), 'SIFFailureEvent': _('SIF failure event'),
 	'IntermediateEvent': _('Intermediate event'), 'IPL': _('Independent protection layer'),
-	'TopEvent': _('Top event'),
+	'TopEvent': _('Top event'), 'Connector': _('Connector'),
 	'ConnectorIn': _('Inward connector'), 'ConnectorOut': _('Outward connector'),
 	'EnablingCondition': _('Enabling condition'), 'ConditionalModifier': _('Conditional modifier')}
 
@@ -624,6 +624,12 @@ class FTBoxyObject(object): # superclass of vaguely box-like FT components for u
 				RedrawEntireFT=True, SetAsLastSelected=True,
 				Deselect=(Args['Event'].CmdDown() and (self in self.FT.CurrentElements)))
 
+	def HandleContextMenuOnMe(self, **Args): # handle context menu request on element
+		# Currently, this handles requests from anywhere in the element, even inside components, as we haven't
+		# implemented this method for any components
+		print('FT629 requested context menu on element')
+		self.FT.DisplDevice.PopupMenu(menu=self.MyContextMenu)
+
 class TextElement(FTBoxyObject): # object containing a text object and other attributes and methods needed to render it
 	# Consists of a single text inside a coloured box. It's a component of an FTHeader, FTConnector, FTGate or FTEvent.
 
@@ -1097,6 +1103,7 @@ class FTEvent(FTBoxyObject): # FT event object in Viewport
 		(self.TopFixedEls, self.ValueFixedEls) = self.CreateFixedTextElements()
 		# colour definitions such as BorderColour are in FTBoxyObject's __init__
 		self.MaxElementsConnectedToThis = FTEventInCore.MaxElementsConnectedToThis
+		self.MyContextMenu = self.CreateContextMenu()
 
 	def GetMyClassHumanName(self): # return human name of this type of FT element
 		# We can't do this as a @classmethod because, for other classes, it depends on attrib values of the instance, and also
@@ -1360,6 +1367,15 @@ class FTEvent(FTBoxyObject): # FT event object in Viewport
 			SubElements={info.IDTag: 'ID', info.ShowDescriptionCommentsTag: 'ShowDescriptionComments',
 			info.ShowValueCommentsTag: 'ShowValueComments', info.ShowActionItemsTag: 'ShowActionItems',
 			info.ShowParkingLotItemsTag: 'ShowParkingLotItems'})
+
+	def CreateContextMenu(self):
+		# create and return context menu (wx.Menu instance)
+		MyCM = wx.Menu(title=_('Fault Tree event'))
+		self.DeleteMItemID = wx.NewId()
+		self.DeleteMItem = MyCM.Append(self.DeleteMItemID, _('Delete event'), '')
+		self.FT.DisplDevice.Bind(wx.EVT_MENU, lambda Event: self.FT.OnDeleteEventRequest(Event, DoomedEvent=self),
+			self.DeleteMItem)
+		return MyCM
 
 class FTGate(FTBoxyObject): # object containing FT gates for display in Viewport. These belong to FTColumn's.
 	NeedsConnectButton = True # whether to provide connect buttons
@@ -1837,6 +1853,7 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 		self.Visible = True # bool; whether it would be visible if currently panned onto the display device
 		self.Selected = False # bool; whether currently user-selected i.e. highlighted
 		self.MaxElementsConnectedToThis = FTConnectorItemInCore.MaxElementsConnectedToThis
+		self.MyContextMenu = self.CreateContextMenu()
 
 	def CreateFixedTextElements(self):
 		# create elements for fixed text items in FTConnector. Return list of elements
@@ -2032,6 +2049,15 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 			info.ShowDescriptionCommentsTag: 'ShowDescriptionComments', info.ShowValueCommentsTag: 'ShowValueComments',
 			info.ShowActionItemsTag: 'ShowActionItems',
 			info.ShowParkingLotItemsTag: 'ShowParkingLotItems'})
+
+	def CreateContextMenu(self):
+		# create and return context menu (wx.Menu instance)
+		MyCM = wx.Menu(title=type(self).HumanName)
+		self.DeleteMItemID = wx.NewId()
+		self.DeleteMItem = MyCM.Append(self.DeleteMItemID, _('Delete event'), '')
+		self.FT.DisplDevice.Bind(wx.EVT_MENU, lambda Event: self.FT.OnDeleteEventRequest(Event, DoomedEvent=self),
+			self.DeleteMItem)
+		return MyCM
 
 class FTConnectorIn(FTConnector):
 	HumanName = _('Inward connector') # class name
@@ -2878,7 +2904,7 @@ class FTEventInCore(FTElementInCore): # FT event object used in DataCore by FTOb
 		projects.AddAttribsInSubelements(StartEl=TopTag, DataObj=self,
 			SubElements={info.IDTag: 'ID', info.IsIPLTag: 'IsIPL', info.EventTypeTag: 'EventType',
 			info.EventDescriptionTag: 'EventDescription', info.BackgColourTag: 'BackgColour',
-			info.IsSIFFailureEventInRelevantOpmodeTag: 'IsSIFFailureEventInRelevantOpmode'})
+			info.IsSIFFailureEventInRelevantOpmodeTag: 'IsSIFFailureEventInRelevantOpMode'})
 		# add tags containing lists of IDs
 		projects.AddIDListAttribsInSubelements(StartEl=TopTag, DataObj=self,
 			SubElements={info.RiskReceptorsTag: 'ApplicableRiskReceptors',
@@ -2912,7 +2938,7 @@ class FTEventInCore(FTElementInCore): # FT event object used in DataCore by FTOb
 		self.IsIPL = utilities.Bool2Str(Input=StartTag.findtext(info.IsIPLTag))
 		self.EventDescription = StartTag.findtext(info.EventDescriptionTag)
 		self.BackgColour = StartTag.findtext(info.BackgColourTag)
-		self.IsSIFFailureEventInRelevantOpmode = utilities.Bool2Str(Input=StartTag.findtext(
+		self.IsSIFFailureEventInRelevantOpMode = utilities.Bool2Str(Input=StartTag.findtext(
 			info.IsSIFFailureEventInRelevantOpmodeTag))
 		# unpack tags containing lists of IDs
 		self.ApplicableRiskReceptors = utilities.FetchObjsFromIDList(IDList=StartTag.findtext(info.RiskReceptorsTag),
@@ -3265,8 +3291,6 @@ class FTGateItemInCore(object): # logic gate in a Fault Tree, used in DataCore
 		self.GateDescription = StartTag.findtext(info.GateDescriptionTag)
 		self.Algorithm = StartTag.findtext(info.AlgorithmTag)
 		self.BackgColour = StartTag.findtext(info.BackgColourTag)
-		self.IsSIFFailureEventInRelevantOpmode = utilities.Bool2Str(Input=StartTag.findtext(
-			info.IsSIFFailureEventInRelevantOpmodeTag))
 		# unpack tags containing lists of IDs
 		self.GateDescriptionComments = [Comments[i] for i in
 			StartTag.findtext(info.GateDescriptionCommentsTag).replace(',', ' ').split()]
@@ -3588,7 +3612,7 @@ class FTCollapseGroup(object): # collapse group containing one or more FT elemen
 		self.BackgColour = '0,0,255' # blue
 
 	def StoreAllDataInXML(self, ParentTag):
-		# write all storeable data into an XML subelement of ParentTag. %%% incomplete TODO
+		# write all storeable data into an XML subelement of ParentTag. TODO complete me
 		assert isinstance(ParentTag, ElementTree.Element)
 		MyTopTag = ElementTree.SubElement(ParentTag, info.CollapseGroupTag)
 		projects.AddAttribsInSubelements(StartEl=MyTopTag, DataObj=self, SubElements={info.IDTag: 'ID',
@@ -5141,6 +5165,9 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		elif Command == 'RQ_FT_DeleteAssociatedText':
 			Reply = self.HandleDeleteAssociatedTextRequest(XMLRoot, Viewport=SourceViewport, Zoom=Zoom, PanX=PanX,
 				PanY=PanY)
+		elif Command == 'RQ_FT_DeleteElement':
+			Reply = self.HandleDeleteElementRequest(XMLRoot, Viewport=SourceViewport, Zoom=Zoom, PanX=PanX,
+				PanY=PanY)
 		elif Command == 'OK': # dummy for 'OK' responses - received only to clear the sockets
 			Reply = vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
 		if Reply.tag == 'Fail': print('FT4490 command not recognised: ', Command)
@@ -5208,10 +5235,22 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		AssociatedTextListAttrib = XMLRoot.findtext('AssociatedTextListAttrib') # name of attrib containing AssociatedText list
 		# delete the AssociatedText from the required AssociatedText list
 		self.DoDeleteAssociatedText(DoomedAssociatedTextIndex=int(XMLRoot.findtext(info.AssociatedTextIndexTag)),
-							 PHAElement=ThisPHAElement, AssociatedTextListAttrib=AssociatedTextListAttrib,
-							 ComponentName=XMLRoot.findtext(info.ComponentTag), Viewport=Viewport, Redoing=False,
-							 AssociatedTextKind=XMLRoot.findtext(info.AssociatedTextKindTag),
-							 Zoom=Zoom, PanX=PanX, PanY=PanY)
+			PHAElement=ThisPHAElement, AssociatedTextListAttrib=AssociatedTextListAttrib,
+			ComponentName=XMLRoot.findtext(info.ComponentTag), Viewport=Viewport, Redoing=False,
+			AssociatedTextKind=XMLRoot.findtext(info.AssociatedTextKindTag),
+			Zoom=Zoom, PanX=PanX, PanY=PanY)
+		return vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
+
+	def HandleDeleteElementRequest(self, XMLRoot, Viewport, Zoom, PanX, PanY):
+		# handle request to delete FT element
+		print('FT5236 in HandleDeleteElementRequest')
+		# find the corresponding element, its hosting column, and the index in the column
+		ThisPHAElement = [e for e in WalkOverAllFTObjs(self) if e.ID == XMLRoot.findtext(info.FTEventTag)][0]
+		ThisColumn = [c for c in self.Columns if ThisPHAElement in c.FTElements][0]
+		IndexInColumn = ThisColumn.FTElements.index(ThisPHAElement)
+		# delete the event from the required AssociatedText list
+		self.DoDeleteElement(PHAElement=ThisPHAElement, Column=ThisColumn, IndexInColumn=IndexInColumn,
+			ViewportID=Viewport.ID, Redoing=False, Zoom=Zoom, PanX=PanX, PanY=PanY)
 		return vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
 
 	def DoAddNewComment(self, NewComment=None, PHAElement=None, ComponentName=None, CommentListAttrib='', Viewport=None,
@@ -5458,6 +5497,71 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 
 	def DeleteAssociatedText_Redo(self, Proj, RedoRecord, **Args): # handle redo for delete associated text
 		pass
+
+	def DoDeleteElement(self, PHAElement, Column, IndexInColumn,
+			ViewportID=None, Redoing=False, Zoom=1.0, PanX=0, PanY=0):
+		# delete PHAElement from Column at IndexInColumn
+		# Viewport: ViewportShadow corresponding to the Viewport from where the delete element request was made
+		assert isinstance(PHAElement, (FTEventInCore, FTConnectorItemInCore))
+		assert isinstance(Column, FTColumnInCore)
+		assert isinstance(IndexInColumn, int)
+		assert 0 <= IndexInColumn < len(Column.FTElements)
+		UndoData = {} # for additional attribs and values to be stored in the Undo record, depending on PHAElement type
+		# disconnect the element from any elements to which it is connected%%%
+		ConnectedOnLeft = JoinedFrom(FT=self, FTObj=PHAElement)
+		ConnectedOnRight = PHAElement.ConnectTo[:]
+		# if the element is a connector, disconnect it from any connected connector of the opposite type%%%
+		if isinstance(PHAElement, FTConnectorItemInCore):
+			if PHAElement.Out:
+				# find the related CX-in (list); could be in any other Fault Tree in the project
+				RelatedCXIn = PHAElement.ConnectedToConnectorsIn() # it's a list of CX-in
+				for ThisCXIn in RelatedCXIn: ThisCXIn.RelatedCX = None
+				UndoData['RelatedCXIn'] = RelatedCXIn
+			else:
+				UndoData['RelatedCXOut'] = PHAElement.RelatedCX # it's a single CX-Out or None
+		# TODO make list of LinkedFrom elements (anywhere in the project) and unlink them
+		# TODO make record of all numbers linked to/copied from the value of PHAElement; unlink them
+		# remove the doomed element from the column
+		DoomedElement = Column.FTElements.pop(IndexInColumn)
+		# remove connections from all elements connected on the left
+		for ThisEl in ConnectedOnLeft: ThisEl.ConnectTo.remove(PHAElement)
+		undo.AddToUndoList(Proj=self.Proj, Redoing=Redoing,
+			UndoObj=undo.UndoItem(UndoHandler=self.DeleteElement_Undo,
+			RedoHandler=self.DeleteElement_Redo,
+			DeletedElement=PHAElement,
+			Column=Column, IndexInColumn=IndexInColumn, ConnectedOnLeft=ConnectedOnLeft,
+			ConnectedOnRight=ConnectedOnRight,
+			HumanText=_('delete %s') % FTEventTypeNameHash[PHAElement.EventType],
+			ViewportID=ViewportID, Zoom=Zoom, PanX=PanX, PanY=PanY, **UndoData))
+
+	def DeleteElement_Undo(self, Proj, UndoRecord, **Args): # handle undo for delete element
+		assert isinstance(Proj, projects.ProjectItem)
+		assert isinstance(UndoRecord, undo.UndoItem)
+		# find out which datacore socket to send messages on
+		SocketFromDatacore = vizop_misc.SocketWithName(TargetName=Args['SocketFromDatacoreName'])
+		# reinstate the element
+		UndoRecord.Column.FTElements.insert(UndoRecord.IndexInColumn, UndoRecord.DeletedElement)
+		# reinstate connections to left and right
+		for LeftEl in UndoRecord.ConnectedOnLeft: LeftEl.ConnectTo.append(UndoRecord.DeletedElement)
+		for RightEl in UndoRecord.ConnectedOnRight: UndoRecord.DeletedElement.ConnectTo.append(RightEl)
+		# request Control Frame to switch to the Viewport that was visible when the original edit was made
+		self.RedrawAfterUndoOrRedo(UndoRecord, SocketFromDatacore)
+		projects.SaveOnFly(Proj, UpdateData=vizop_misc.MakeXMLMessage(RootName=info.FTTag,
+			Elements={info.IDTag: self.ID})) # Save On Fly needs to save the whole FT, to preserve connections.
+		# TODO later, when we add linking of elements and numbers, Save On Fly also needs to save linked objects.
+		return {'Success': True}
+
+	def DeleteElement_Redo(self, Proj, RedoRecord, **Args): # handle redo for delete element
+		self.DoDeleteElement(PHAElement=RedoRecord.DeletedElement, Column=RedoRecord.Column,
+			IndexInColumn=RedoRecord.IndexInColumn, ViewportID=RedoRecord.ViewportID,
+			Zoom=RedoRecord.Zoom, PanX=RedoRecord.PanX, PanY=RedoRecord.PanY,
+			Redoing=True)
+		self.RedrawAfterUndoOrRedo(RedoRecord, SocketFromDatacore=vizop_misc.SocketWithName(
+			TargetName=Args['SocketFromDatacoreName']))
+		projects.SaveOnFly(Proj, UpdateData=vizop_misc.MakeXMLMessage(RootName=info.FTTag,
+			Elements={info.IDTag: self.ID})) # Save On Fly needs to save the whole FT, to preserve connections.
+		# TODO later, when we add linking of elements and numbers, Save On Fly also needs to save linked objects.
+		return {'Success': True}
 
 	def UpdateFullExportAttribs(self, Proj, XMLRoot):
 		# store attribs for full FT export dialogue in project
@@ -6505,10 +6609,12 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		# handle any kind of mouse click inside the display device displaying the FT
 		# ClickX/YInPx (int): coord of mouse click in pixels relative to display device, i.e. directly comparable with
 		# PosX/YInPx of FT elements
-		# ClickKind (str): 'XY' where X is Left, Centre or Right; Y is Single, Long, Double, Triple
+		# ClickKind (str): 'XY' where X is Left, Centre or Right; Y is Single, Long, Double, Triple; or ContextMenu
+		#	if a ContextMenu click was received
 		# Args can include: CanStartDrag, CanSelect, Event
 		# Find out which element(s), if any, are clicked
-		assert ClickKind in [X + Y for X in ['Left', 'Centre', 'Right'] for Y in ['Single', 'Long', 'Double', 'Triple']]
+		assert ClickKind in [X + Y for X in ['Left', 'Centre', 'Right'] for Y in ['Single', 'Long', 'Double', 'Triple']]\
+			or (ClickKind == 'ContextMenu')
 		Hits = [] # list of dict of elements/hotspots clicked
 		Handler = '?' # name of click handler method to invoke
 		for ThisEl in self.AllClickableObjects():
@@ -6518,7 +6624,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			HighestZ = max(ThisHit['Element'].PosZ for ThisHit in Hits)
 			HitWithHighestZ = [ThisHit for ThisHit in Hits if ThisHit['Element'].PosZ == HighestZ][0]
 			# capture which element and hotspot were clicked; needed for drag handler
-			if ClickKind.startswith('Left'):
+			if ClickKind.startswith('Left') or (ClickKind == 'ContextMenu'):
 				ElToHandleLClick = HitWithHighestZ['Element']
 				ElHotspotToHandle = HitWithHighestZ['Hotspot']
 			# check if the topmost clicked element is already doing an editing operation, and call appropriate handler
@@ -6526,25 +6632,29 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 				# identify appropriate handler for click
 				if ClickKind == 'LeftSingle': Handler = 'HandleMouseLClickOnMeDuringEditing'
 				elif ClickKind == 'LeftDouble': Handler = 'HandleMouseLDClickOnMeDuringEditing'
+				else: Handler = None
 				# invoke handler, if clicked element has implemented it
-				if hasattr(ElToHandleLClick, Handler):
+				if False if Handler is None else hasattr(ElToHandleLClick, Handler):
 					getattr(ElToHandleLClick, Handler)(HitHotspot=HitHotspot, HostViewport=self, MouseX=ClickXInPx,
 						MouseY=ClickYInPx, **Args)
 			else:
 				# identify appropriate handler for click
 				if ClickKind == 'LeftSingle': Handler = 'HandleMouseLClickOnMe'
 				elif ClickKind == 'LeftDouble': Handler = 'HandleMouseLDClickOnMe'
+				elif ClickKind == 'ContextMenu': Handler = 'HandleContextMenuOnMe'
+				else: Handler = None
 				self.EndEditingOperation() # close out any operation in progress
 				self.LastElLClicked = ElToHandleLClick # needed for drag handler
 				self.LastElLClickedHotspot = ElHotspotToHandle
 				# invoke handler, if clicked element has implemented it
-				if hasattr(ElToHandleLClick, Handler):
+				if False if Handler is None else hasattr(ElToHandleLClick, Handler):
 					getattr(ElToHandleLClick, Handler)(HitHotspot=HitHotspot, HostViewport=self, MouseX=ClickXInPx,
 						MouseY=ClickYInPx, **Args)
 				else: print("FT2105 %s handler not implemented" % ClickKind)
 		else: # click on empty space within FT
 			self.EndEditingOperation() # close out any operation in progress
-			if ClickKind.startswith('Left'): self.HandleMouseLClickOnEmptySpace(ClickX=ClickXInPx, ClickY=ClickYInPx, ClickKind=ClickKind)
+			if ClickKind.startswith('Left'): self.HandleMouseLClickOnEmptySpace(ClickX=ClickXInPx, ClickY=ClickYInPx,
+				ClickKind=ClickKind)
 
 	def HandleMouseLClick(self, ClickXInPx, ClickYInPx, TolXInPx, TolYInPx, **Args):
 		self.HandleMouseAnyClick(ClickXInPx, ClickYInPx, TolXInPx, TolYInPx, ClickKind='LeftSingle', **Args)
@@ -6742,6 +6852,11 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		# check if Ctrl key (Mac: Command key) is down; if so, zoom
 		if MouseState.ControlDown():
 			self.MyZoomWidget.HandleMouseWheel(Event=Event, HostViewport=self)
+
+	def HandleContextMenuRequest(self, ScreenX, ScreenY, Event):
+		# handle request for context menu (right click or (on Mac OS) ^Click)
+		self.HandleMouseAnyClick(ClickXInPx=ScreenX, ClickYInPx=ScreenY, TolXInPx=self.DisplDevice.TolXInPx,
+			TolYInPx=self.DisplDevice.TolYInPx, ClickKind='ContextMenu', Event=Event)
 
 	def RefreshZoomWidget(self, StillZooming=True, **Args):
 		# get FT to refresh the zoom widget. Sends request to re-blit the FT, but no need to render from scratch.
@@ -7063,6 +7178,16 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		else: # make a new undo record
 			self.UndoListDuringTextEditing.append(undo.UndoRecordDuringTextEditing(OldTextContentRich=OldTextContentRich,
 				NewTextContentRich=NewTextContentRich, EditAction=EditAction, CursorIndexLean=CursorIndexLean))
+
+	def OnDeleteEventRequest(self, Event, DoomedEvent):
+		# handle request to delete DoomedEl (an FT event, connector-in/out)%%%
+		# Event: the wx.Event, wx.Connector instance associated with the request (e.g. mouse right click)
+		print('FT7093 in OnDeleteEventRequest')
+		assert isinstance(DoomedEvent, (FTEvent, FTConnector))
+		ArgsToSend = {info.FTEventTag: DoomedEvent.ID, info.ZoomTag: str(self.Zoom),
+			info.PanXTag: str(self.PanX), info.PanYTag: str(self.PanY)}
+		vizop_misc.SendRequest(Socket=self.C2DSocketREQ, Command='RQ_FT_DeleteElement',
+			Proj=self.Proj.ID, PHAObj=self.PHAObjID, Viewport=self.ID, **ArgsToSend)
 
 	def GetMilestoneData(self):
 		# return (dict) data needing to be stored in milestone for navigation
