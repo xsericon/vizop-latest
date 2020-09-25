@@ -315,7 +315,7 @@ class ButtonObjectNotInElement(ButtonElement):
 class FTHeader(object): # FT header object. Rendered by drawing text into bitmap (doesn't use native widgets or sizer)
 	# This class is used by FTForDisplay but not by FTObjectInCore (keeps header data in itself, not in sub-object)
 	# ComponentEnglishNames: used for display in Control Panel
-	ComponentEnglishNames = {'HumanName': 'SIF name', 'Rev': 'Revision', 'OpMode': 'Operating mode',
+	ComponentEnglishNames = {'HumanName': 'Fault tree name', 'Rev': 'Revision', 'OpMode': 'Operating mode',
 		'TolFreq': 'Tolerable frequency', 'SILTargetValue': 'SIL target', 'Description': 'Description'}
 
 	def __init__(self, FT):
@@ -361,52 +361,70 @@ class FTHeader(object): # FT header object. Rendered by drawing text into bitmap
 
 		# internal names must match attrib names in FTObjectInCore instance
 		SIFNameLabel = TextElement(self.FT, Row=0, ColStart=0, ColSpan=1, StartX=0, EndX=Col1XStartInCU-1,
-			HostObject=self, InternalName='SIFNameLabel', DefaultFgColour=LabelFgColour)
+			HostObject=self, InternalName='SIFNameLabel', DefaultFgColour=LabelFgColour,
+			ContextMenuMethod=self.FT.CreateContextMenu)
 		HumanName = TextElement(self.FT, Row=0, ColStart=1, ColSpan=3, StartX=Col1XStartInCU, EndX=999,
-			HostObject=self, InternalName='HumanName', EditBehaviour='Text', MaxWidthInCU=600)
+			HostObject=self, InternalName='HumanName', EditBehaviour='Text', MaxWidthInCU=600,
+			ContextMenuMethod=self.FT.CreateContextMenu)
 		RevLabel = TextElement(self.FT, Row=1, ColStart=0, ColSpan=1, StartX=0, EndX=Col1XStartInCU-1,
-			HostObject=self, InternalName='RevLabel', DefaultFgColour=LabelFgColour)
+			HostObject=self, InternalName='RevLabel', DefaultFgColour=LabelFgColour,
+			ContextMenuMethod=self.FT.CreateContextMenu)
 		Rev = TextElement(self.FT, Row=1, ColStart=1, ColSpan=1, StartX=Col1XStartInCU, EndX=499,
-			HostObject=self, InternalName='Rev', EditBehaviour='Text', MaxWidthInCU=200)
+			HostObject=self, InternalName='Rev', EditBehaviour='Text', MaxWidthInCU=200,
+			ContextMenuMethod=self.FT.CreateContextMenu)
 		ModeLabel = TextElement(self.FT, Row=1, ColStart=2, ColSpan=1, StartX=500, EndX=749,
-			HostObject=self, InternalName='ModeLabel', DefaultFgColour=LabelFgColour)
+			HostObject=self, InternalName='ModeLabel', DefaultFgColour=LabelFgColour,
+			ContextMenuMethod=self.FT.CreateContextMenu)
 		self.OpModeComponent = TextElement(self.FT, Row=1, ColStart=3, ColSpan=1, StartX=750, EndX=999,
 			HostObject=self, InternalName='OpMode', EditBehaviour='Choice', ObjectChoices=[],
-			DisplAttrib='HumanName')
+			DisplAttrib='HumanName',
+			ContextMenuMethod=self.FT.CreateContextMenu)
 		self.RRLabel = TextElement(self.FT, Row=2, ColStart=0, ColSpan=1, StartX=0, EndX=Col1XStartInCU-1,
 			HostObject=self, InternalName='RRLabel', EditBehaviour='Choice', ObjectChoices=[],
-			DisplAttrib='HumanName', DefaultFgColour=LabelFgColour)
+			DisplAttrib='HumanName', DefaultFgColour=LabelFgColour,
+			ContextMenuMethod=self.FT.CreateContextMenu)
 		self.RRComponent = TextElement(self.FT, Row=2, ColStart=1, ColSpan=3, StartX=Col1XStartInCU, EndX=749,
 			HostObject=self, InternalName='RR', EditBehaviour='Choice', ObjectChoices=[],
-			DisplAttrib='HumanName')
+			DisplAttrib='HumanName',
+			ContextMenuMethod=self.FT.CreateContextMenu)
 		SeverityLabel = TextElement(self.FT, Row=3, ColStart=0, ColSpan=1, StartX=0, EndX=Col1XStartInCU-1,
-			HostObject=self, InternalName='SeverityLabel', DefaultFgColour=LabelFgColour)
+			HostObject=self, InternalName='SeverityLabel', DefaultFgColour=LabelFgColour,
+			ContextMenuMethod=self.FT.CreateContextMenu)
 		self.SeverityComponent = TextElement(self.FT, Row=3, ColStart=1, ColSpan=1, StartX=Col1XStartInCU, EndX=499,
-			HostObject=self, InternalName='Severity', EditBehaviour='Choice', ObjectChoices=[], DisplAttrib='HumanName')
+			HostObject=self, InternalName='Severity', EditBehaviour='Choice', ObjectChoices=[], DisplAttrib='HumanName',
+			ContextMenuMethod=self.FT.CreateContextMenu)
 		TolFreqLabel = TextElement(self.FT, Row=4, ColStart=0, ColSpan=1, StartX=0, EndX=Col1XStartInCU-1,
-			HostObject=self, InternalName='TolFreqLabel', DefaultFgColour=LabelFgColour)
+			HostObject=self, InternalName='TolFreqLabel', DefaultFgColour=LabelFgColour,
+			ContextMenuMethod=self.FT.CreateContextMenu)
 		TolFreq = TextElement(self.FT, Row=4, ColStart=1, ColSpan=1, StartX=Col1XStartInCU, EndX=499,
 			HostObject=self, InternalName='TolFreq', EditBehaviour='EditInControlPanel',
-			ControlPanelAspect='CPAspect_NumValue')
+			ControlPanelAspect='CPAspect_NumValue',
+			ContextMenuMethod=self.FT.CreateContextMenu)
 		UELLabel = TextElement(self.FT, Row=4, ColStart=2, ColSpan=1, StartX=500, EndX=749,
-			HostObject=self, InternalName='UELLabel', DefaultFgColour=LabelFgColour)
+			HostObject=self, InternalName='UELLabel', DefaultFgColour=LabelFgColour,
+			ContextMenuMethod=self.FT.CreateContextMenu)
 		UEL = TextElement(self.FT, Row=4, ColStart=3, ColSpan=1, StartX=750, EndX=999,
-			HostObject=self, InternalName='UEL')
+			HostObject=self, InternalName='UEL',
+			ContextMenuMethod=self.FT.CreateContextMenu)
 		RRFLabel = TextElement(self.FT, Row=5, ColStart=0, ColSpan=1, StartX=0, EndX=Col1XStartInCU-1,
-			HostObject=self, InternalName='RRFLabel', DefaultFgColour=LabelFgColour)
+			HostObject=self, InternalName='RRFLabel', DefaultFgColour=LabelFgColour,
+			ContextMenuMethod=self.FT.CreateContextMenu)
 		RRF = TextElement(self.FT, Row=5, ColStart=1, ColSpan=1, StartX=Col1XStartInCU, EndX=499,
-			HostObject=self, InternalName='RRF')
+			HostObject=self, InternalName='RRF',
+			ContextMenuMethod=self.FT.CreateContextMenu)
 		SILLabel = TextElement(self.FT, Row=5, ColStart=2, ColSpan=1, StartX=500, EndX=749,
-			HostObject=self, InternalName='SILLabel', DefaultFgColour=LabelFgColour)
+			HostObject=self, InternalName='SILLabel', DefaultFgColour=LabelFgColour,
+			ContextMenuMethod=self.FT.CreateContextMenu)
 		SIL = TextElement(self.FT, Row=5, ColStart=3, ColSpan=1, StartX=750, EndX=999,
-			HostObject=self, InternalName='SIL')
+			HostObject=self, InternalName='SIL',
+			ContextMenuMethod=self.FT.CreateContextMenu)
 		# make lists of label and content elements (used for setting colours, below)
 		LabelEls = [SIFNameLabel, RevLabel, ModeLabel, self.RRLabel, SeverityLabel, TolFreqLabel, UELLabel, RRFLabel, SILLabel]
 		self.ContentEls = [HumanName, Rev, self.OpModeComponent, self.RRComponent, RRF, self.SeverityComponent, TolFreq,
 			UEL, RRF, SIL]
 
 		# populate labels (content elements get populated in PopulateHeaderData() )
-		SIFNameLabel.Text.Content = _('SIF name')
+		SIFNameLabel.Text.Content = _('Fault tree name')
 		RevLabel.Text.Content = _('Revision')
 		ModeLabel.Text.Content = _('Operating mode')
 		self.RRLabel.Text.Content = _('Risk receptors')
@@ -528,6 +546,8 @@ class FTBoxyObject(object): # superclass of vaguely box-like FT components for u
 		if (MouseXInPx - TolXInPx >= self.PosXInPx) and (MouseYInPx - TolYInPx >= self.PosYInPx) and \
 			(MouseXInPx + TolXInPx <= self.PosXInPx + self.SizeXInPx) and \
 			(MouseYInPx + TolYInPx <= self.PosYInPx + self.SizeYInPx):
+			print('FT531 hit detected: ', getattr(self, 'InternalName', 'NoName'), 'Mouse: ', MouseXInPx, MouseYInPx,
+				'Tol: ', TolXInPx, TolYInPx, 'Pos: ', self.PosXInPx, self.PosYInPx, 'Size: ', self.SizeXInPx, self.SizeYInPx)
 			return "Whole"
 		else: return None
 
@@ -624,11 +644,11 @@ class FTBoxyObject(object): # superclass of vaguely box-like FT components for u
 				RedrawEntireFT=True, SetAsLastSelected=True,
 				Deselect=(Args['Event'].CmdDown() and (self in self.FT.CurrentElements)))
 
-	def HandleContextMenuOnMe(self, **Args): # handle context menu request on element
-		# Currently, this handles requests from anywhere in the element, even inside components, as we haven't
-		# implemented this method for any components
-		print('FT629 requested context menu on element')
-		self.FT.DisplDevice.PopupMenu(menu=self.MyContextMenu)
+	def HandleContextMenuOnMe(self, **Args): # handle context menu request on element or component
+		print('FT628 invoking context menu for object: ', getattr(self, 'InternalName', 'NoInternalName'))
+		# get this component or element to generate a context menu
+		CMenu = self.CreateContextMenu(HostEl=getattr(self, 'HostObject', None))
+		self.FT.DisplDevice.PopupMenu(menu=CMenu)
 
 class TextElement(FTBoxyObject): # object containing a text object and other attributes and methods needed to render it
 	# Consists of a single text inside a coloured box. It's a component of an FTHeader, FTConnector, FTGate or FTEvent.
@@ -646,6 +666,7 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 		#		'Choice': provide choice widget
 		#		'EditInControlPanel': don't allow edit-in-place; editing allowed only in a control panel aspect
 		#	DefaultFgColour (3-tuple of int) Normal colour of text; if not supplied, uses DefaultTextFgColour
+		#	ContextMenu (wx.Menu instance) - if we want to use e.g. the host element's context menu
 		FTBoxyObject.__init__(self, **Args)
 		assert isinstance(FT, FTForDisplay)
 		assert isinstance(RowSpan, int)
@@ -673,8 +694,6 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 		# StaticText every time. FIXME
 		DefaultFont = wx.StaticText().GetFont().GetFaceName()
 		self.Text.Font = DefaultFont # system name for actual font used (str)
-#		self.Text.Font = wx.Font(pointSize=12, style=wx.FONTSTYLE_NORMAL, weight=wx.FONTWEIGHT_NORMAL,
-#			family=DefaultFontFamily).GetFaceName() # system name for actual font used (str)
 		self.Text.ParaHorizAlignment = Args.get('HorizAlignment', 'Centre') # centre aligned horizontally by default
 		self.PromptTextObj = copy.copy(self.Text) # text object to use for prompt text when actual text is empty
 		self.PromptTextObj.Content = PromptText
@@ -685,8 +704,33 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 		self.Selected = False # whether highlighted as part of user selection
 		self.IsClickable = True
 		self.MaxWidthInCU = 999
+#		self.MyContextMenu = self.CreateContextMenu(HostEl=self.HostObject)
+#			# may be overwritten by attrib supplied in Args
 		# fetch any remaining attribs supplied in Args
 		for (Attrib, Value) in Args.items(): setattr(self, Attrib, Value)
+
+	def CreateContextMenu(self, HostEl=None):
+		# create and return context menu (wx.Menu instance)%%%
+		# HostEl: host object, or None
+		assert isinstance(HostEl,  (FTEvent, FTGate, FTConnector)) or (HostType is None)
+		HostTypeHumanName = '' if HostEl is None else HostEl.ClassHumanName
+		MyCM = wx.Menu(title='<Text>')
+		MyCM.Debug = 717
+		DeleteMItemID = wx.NewId()
+		DeleteMItem = MyCM.Append(DeleteMItemID, _('Delete %s') % HostTypeHumanName, '')
+		# put required binding in FT's list - can't bind yet, as FT.DisplDevice isn't assigned
+#		self.FT.RequiredBindingsToDisplDevice.append( (wx.EVT_MENU,
+#			lambda Event: self.FT.OnDeleteEventRequest(Event, DoomedEvent=self.HostObject), self.DeleteMItem) )
+		self.FT.DisplDevice.Bind(wx.EVT_MENU, lambda Event: self.FT.OnDeleteEventRequest(Event, DoomedEvent=HostEl),
+			DeleteMItem)
+		return MyCM
+
+	def CreateContextMenu(self, HostEl=None):
+		# create and return context menu (wx.Menu instance)%%%
+		# HostEl: host object, or None
+		print('FT731 HostEl: ', type(HostEl))
+		assert isinstance(HostEl,  (FTEvent, FTGate, FTConnector, FTHeader))
+		return getattr(self, 'ContextMenuMethod')(HostEl=self.HostObject)
 
 	def MinTextXat(self, TextIdentifier=0, StartY=0, EndY=10):
 		# returns minimum X coord (canvas coords) available for text within element in the Y-range StartY to EndY
@@ -1103,7 +1147,7 @@ class FTEvent(FTBoxyObject): # FT event object in Viewport
 		(self.TopFixedEls, self.ValueFixedEls) = self.CreateFixedTextElements()
 		# colour definitions such as BorderColour are in FTBoxyObject's __init__
 		self.MaxElementsConnectedToThis = FTEventInCore.MaxElementsConnectedToThis
-		self.MyContextMenu = self.CreateContextMenu()
+#		self.MyContextMenu = self.CreateContextMenu()
 
 	def GetMyClassHumanName(self): # return human name of this type of FT element
 		# We can't do this as a @classmethod because, for other classes, it depends on attrib values of the instance, and also
@@ -1368,7 +1412,7 @@ class FTEvent(FTBoxyObject): # FT event object in Viewport
 			info.ShowValueCommentsTag: 'ShowValueComments', info.ShowActionItemsTag: 'ShowActionItems',
 			info.ShowParkingLotItemsTag: 'ShowParkingLotItems'})
 
-	def CreateContextMenu(self):
+	def CreateContextMenu(self, **Args):
 		# create and return context menu (wx.Menu instance)
 		MyCM = wx.Menu(title=_('Fault Tree event'))
 		self.DeleteMItemID = wx.NewId()
@@ -1384,7 +1428,8 @@ class FTGate(FTBoxyObject): # object containing FT gates for display in Viewport
 		('Description', str, False), ('Value', str, False), ('ValueUnit', str, False), ('Status', int, False), ('CanEdit', bool, False),
 		('DescriptionComment', str, True), ('ValueComment', str, True), ('ValueUnitComment', str, True), ('ConnectTo', int, True)]
 	# class human name
-	HumanName = _('gate')
+	HumanName = _('gate') # used as part of another text
+	HumanNameStandalone = _('Gate') # used where standalone name is required, e.g. in context menu
 	# human readable names per algorithm
 	GateKindHash = {'AND': _('AND gate'), 'OR': _('OR gate'), 'MutExcOR': _('Mutually exclusive'),
 		'NAND': _('NAND gate'), 'NOR': _('NOR gate'), '2ooN': _(u'≥2 out of N'), '3ooN': _(u'≥3 out of N')}
@@ -1419,11 +1464,21 @@ class FTGate(FTBoxyObject): # object containing FT gates for display in Viewport
 		self.CollapseGroups = [] # FTCollapseGroup objects this gate belongs to
 		self.ValueProblemObjectID = '' # ID of an FT object that is causing a value problem in this gate. '' = no problem
 		self.ValueProblemID = '' # ID of NumProblemValue instance. '' = no problem
+#		self.MyContextMenu = self.CreateContextMenu()
 		(self.TopFixedEls, self.ValueFixedEls) = self.CreateFixedTextElements()
 		self.Clickable = True # bool; whether instance is intended to respond to user clicks
 		self.Visible = True # bool; whether it would be visible if currently panned onto the display device
 		self.Selected = False # bool; whether currently user-selected i.e. highlighted
 		self.MaxElementsConnectedToThis = FTGateItemInCore.MaxElementsConnectedToThis
+
+	def CreateContextMenu(self, **Args):
+		# create and return context menu (wx.Menu instance)
+		MyCM = wx.Menu(title=type(self).HumanNameStandalone)
+		DeleteMItemID = wx.NewId()
+		DeleteMItem = MyCM.Append(DeleteMItemID, _('Delete gate'), '')
+		self.FT.DisplDevice.Bind(wx.EVT_MENU, lambda Event: self.FT.OnDeleteEventRequest(Event, DoomedEvent=self),
+			DeleteMItem)
+		return MyCM
 
 	def GetMyClassHumanName(self): # return human name of this type of FT element
 		# We can't do this as a @classmethod because, for other classes, it depends on attrib values of the instance, and also
@@ -1848,12 +1903,12 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 		self.LinkedFrom = []
 		self.ValueProblemID = '' # ID of NumValueProblem instance, or '' if no problem (not used yet)
 		self.ValueProblemObjectID = '' # ID of an FT object that is causing a value problem in this object. '' = no problem
+#		self.MyContextMenu = self.CreateContextMenu()
 		(self.TopFixedEls, self.ValueFixedEls) = self.CreateFixedTextElements()
 		self.Clickable = True # bool; whether instance is intended to respond to user clicks
 		self.Visible = True # bool; whether it would be visible if currently panned onto the display device
 		self.Selected = False # bool; whether currently user-selected i.e. highlighted
 		self.MaxElementsConnectedToThis = FTConnectorItemInCore.MaxElementsConnectedToThis
-		self.MyContextMenu = self.CreateContextMenu()
 
 	def CreateFixedTextElements(self):
 		# create elements for fixed text items in FTConnector. Return list of elements
@@ -1869,39 +1924,44 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 		# it should be assigned to the Row that it can force to grow
 		# Stati: valid self.Status settings for buttons
 		# ConnectorKindHuman: Human description of the kind of comment; shown in Control Panel
+		# MyContextMenu: which context menu to offer for this component. If offering the host element's context menu,
+		# set it to self.MyContextMenu
 		ConnKind = TextElement(self.FT, Row=0, ColStart=0, ColSpan=4, EndX=199, HostObject=self,
-			InternalName='ConnKind', DisplAttrib='HumanName', DefaultFgColour=LabelFgColour)
+			InternalName='ConnKind', DisplAttrib='HumanName', DefaultFgColour=LabelFgColour,
+			ContextMenuMethod=self.CreateContextMenu)
 		ConnName = TextElement(self.FT, Row=0, ColStart=4, ColSpan=3, EndX=274, HostObject=self, MinSizeX=75,
-			InternalName='ConnName')
+			InternalName='ConnName', ContextMenuMethod=self.CreateContextMenu)
 		ConnDescription = TextElement(self.FT, Row=1, ColStart=0, ColSpan=4, EndX=199, MinHeight=50, HostObject=self,
 			InternalName='ConnectorDescription', PromptText=_('Type a description'), EditBehaviour='Text',
-			HorizAlignment='Left', debug=True)
+			HorizAlignment='Left', ContextMenuMethod=self.CreateContextMenu)
 		self.ConnDescriptionCommentButton = ButtonElement(self.FT, Row=1, ColStart=4, ColSpan=1, StartX=200, EndX=224,
 			HostObject=self, InternalName='ConnDescriptionCommentButton', Stati=('OutNotExist', 'OutExist'),
 			LSingleClickHandler='HandleMouseLClickOnCommentButton', CommentKind='ConnectorDescriptionComments',
-			ControlPanelAspect='CPAspect_Comment', CommentKindHuman=_('Connector description'))
-#		ConnGroupedButton = ButtonElement(self.FT, Row=1, ColStart=6, ColSpan=1, StartX=250, EndX=274,
-#			HostObject=self, InternalName='ConnGroupedButton', Stati=('OutNotExist', 'OutExist'),
-#			LSingleClickHandler=None)
+			ControlPanelAspect='CPAspect_Comment', CommentKindHuman=_('Connector description'),
+			ContextMenuMethod=self.CreateContextMenu)
 		self.ConnValue = TextElement(self.FT, Row=2, ColStart=0, ColSpan=1, EndX=99, HostObject=self, debug=True,
-			InternalName='Value', ControlPanelAspect='CPAspect_NumValue', EditBehaviour='Text', HorizAlignment='Left')
+			InternalName='Value', ControlPanelAspect='CPAspect_NumValue', EditBehaviour='Text', HorizAlignment='Left',
+			ContextMenuMethod=self.CreateContextMenu)
 		self.ConnValueUnitComponent = TextElement(self.FT, Row=2, ColStart=1, ColSpan=1, EndX=149, HostObject=self,
-			InternalName='ConnValueUnit')
+			InternalName='ConnValueUnit', ContextMenuMethod=self.CreateContextMenu)
 		self.ValueProblemButton = ButtonElement(self.FT, Row=2, ColStart=2, ColSpan=1, StartX=150, EndX=174,
 			HostObject=self, InternalName='ValueProblemButton', Stati=('Out', 'Alert'),
-			LSingleClickHandler=None)
+			LSingleClickHandler=None, ContextMenuMethod=self.CreateContextMenu)
 		self.ConnValueCommentButton = ButtonElement(self.FT, Row=2, ColStart=4, ColSpan=1, StartX=200, EndX=224,
 			HostObject=self, InternalName='ConnValueCommentButton', Stati=('OutNotExist', 'OutExist'),
 			LSingleClickHandler='HandleMouseLClickOnCommentButton', CommentKind='ValueComments',
-			ControlPanelAspect='CPAspect_Comment', CommentKindHuman=_('Connector value'))
+			ControlPanelAspect='CPAspect_Comment', CommentKindHuman=_('Connector value'),
+			ContextMenuMethod=self.CreateContextMenu)
 		self.ConnActionItemButton = ButtonElement(self.FT, Row=2, ColStart=5, ColSpan=1, StartX=225, EndX=249,
 			HostObject=self, InternalName='ConnActionItemButton', Stati=('OutNotExist', 'OutExist'),
 			LSingleClickHandler='HandleMouseLClickOnActionItemButton', AssociatedTextListAttrib='ActionItems',
-			AssociatedTextNumberingListAttrib='ActionItemNumbering', ControlPanelAspect='CPAspect_ActionItems')
+			AssociatedTextNumberingListAttrib='ActionItemNumbering', ControlPanelAspect='CPAspect_ActionItems',
+			ContextMenuMethod=self.CreateContextMenu)
 		self.ConnParkingLotItemButton = ButtonElement(self.FT, Row=3, ColStart=6, ColSpan=1, StartX=250, EndX=274,
 			HostObject=self, InternalName='ConnParkingLotItemButton', Stati=('OutNotExist', 'OutExist'),
 			LSingleClickHandler='HandleMouseLClickOnActionItemButton', AssociatedTextListAttrib='ParkingLot',
-			AssociatedTextNumberingListAttrib='ParkingLotItemNumbering', ControlPanelAspect='CPAspect_ParkingLot')
+			AssociatedTextNumberingListAttrib='ParkingLotItemNumbering', ControlPanelAspect='CPAspect_ParkingLot',
+			ContextMenuMethod=self.CreateContextMenu)
 		# make lists of elements: TopEls at top of connector, ValueEls relating to connector value
 		TopEls = [ConnKind, ConnName, ConnDescription, self.ConnDescriptionCommentButton]
 		ValueEls = [self.ConnValue, self.ConnValueUnitComponent, self.ValueProblemButton, self.ConnValueCommentButton,
@@ -2050,13 +2110,14 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 			info.ShowActionItemsTag: 'ShowActionItems',
 			info.ShowParkingLotItemsTag: 'ShowParkingLotItems'})
 
-	def CreateContextMenu(self):
+	def CreateContextMenu(self, **Args):
 		# create and return context menu (wx.Menu instance)
 		MyCM = wx.Menu(title=type(self).HumanName)
-		self.DeleteMItemID = wx.NewId()
-		self.DeleteMItem = MyCM.Append(self.DeleteMItemID, _('Delete event'), '')
+		MyCM.Debug = 2083
+		DeleteMItemID = wx.NewId()
+		DeleteMItem = MyCM.Append(DeleteMItemID, _('Delete connector'), '')
 		self.FT.DisplDevice.Bind(wx.EVT_MENU, lambda Event: self.FT.OnDeleteEventRequest(Event, DoomedEvent=self),
-			self.DeleteMItem)
+			DeleteMItem)
 		return MyCM
 
 class FTConnectorIn(FTConnector):
@@ -2145,6 +2206,15 @@ class FTBuilder(FTBoxyObject): # 'add' button object within an FTColumn.
 		self.PosZ = 0 # z-coordinate
 		self.Bitmap = None # wx.Bitmap instance. Created in self.RenderIntoBitmap()
 		self.ObjTypeRequested = Args['ObjTypeRequested']
+#		self.MyContextMenu = self.CreateContextMenu()
+
+	def CreateContextMenu(self, **Args):
+		# create and return default context menu for builder button (wx.Menu instance)
+		MyCM = wx.Menu(title=_('Builder button'))
+		MyCM.Debug = 2200
+		self.DeleteMItemID = wx.NewId()
+		self.DeleteMItem = MyCM.Append(self.DeleteMItemID, _('No actions available yet'), '')
+		return MyCM
 
 	def RenderIntoBitmap(self, Zoom): # draw FTBuilder in self.Bitmap. Also sets FTBuilder size attributes
 		# set FTBuilder size
@@ -3637,7 +3707,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 	TextComponentNames = ['HumanName', 'Description', 'Rev', 'SILTargetValue', 'TargetRiskRedMeasure', 'BackgColour',
 		'TextColour']
 	# English names for components; keys are attrib names in this class. Values are translated at point of display
-	ComponentEnglishNames = {'HumanName': 'SIF name', 'Rev': 'Revision', 'OpMode': 'Operating mode',
+	ComponentEnglishNames = {'HumanName': 'Fault tree name', 'Rev': 'Revision', 'OpMode': 'Operating mode',
 		'TolFreq': 'Tolerable frequency', 'SILTargetValue': 'SIL target', 'EventDescription': 'Description',
 		'Value': 'event value', 'ConnectorDescription': 'connector description'}
 			# key 'Value' is used for elements other than the FT itself
@@ -5502,15 +5572,15 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			ViewportID=None, Redoing=False, Zoom=1.0, PanX=0, PanY=0):
 		# delete PHAElement from Column at IndexInColumn
 		# Viewport: ViewportShadow corresponding to the Viewport from where the delete element request was made
-		assert isinstance(PHAElement, (FTEventInCore, FTConnectorItemInCore))
+		assert isinstance(PHAElement, (FTEventInCore, FTConnectorItemInCore, FTGateItemInCore))
 		assert isinstance(Column, FTColumnInCore)
 		assert isinstance(IndexInColumn, int)
 		assert 0 <= IndexInColumn < len(Column.FTElements)
 		UndoData = {} # for additional attribs and values to be stored in the Undo record, depending on PHAElement type
-		# disconnect the element from any elements to which it is connected%%%
+		# disconnect the element from any elements to which it is connected
 		ConnectedOnLeft = JoinedFrom(FT=self, FTObj=PHAElement)
 		ConnectedOnRight = PHAElement.ConnectTo[:]
-		# if the element is a connector, disconnect it from any connected connector of the opposite type%%%
+		# if the element is a connector, disconnect it from any connected connector of the opposite type
 		if isinstance(PHAElement, FTConnectorItemInCore):
 			if PHAElement.Out:
 				# find the related CX-in (list); could be in any other Fault Tree in the project
@@ -5519,6 +5589,12 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 				UndoData['RelatedCXIn'] = RelatedCXIn
 			else:
 				UndoData['RelatedCXOut'] = PHAElement.RelatedCX # it's a single CX-Out or None
+		# if the element is a gate and it's the model gate, unset model gate
+		elif isinstance(PHAElement, FTGateItemInCore):
+			if self.ModelGate is PHAElement:
+				UndoData['IsModelGate'] = True
+				self.ModelGate = None
+			else: UndoData['IsModelGate'] = False
 		# TODO make list of LinkedFrom elements (anywhere in the project) and unlink them
 		# TODO make record of all numbers linked to/copied from the value of PHAElement; unlink them
 		# remove the doomed element from the column
@@ -5531,16 +5607,27 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			DeletedElement=PHAElement,
 			Column=Column, IndexInColumn=IndexInColumn, ConnectedOnLeft=ConnectedOnLeft,
 			ConnectedOnRight=ConnectedOnRight,
-			HumanText=_('delete %s') % FTEventTypeNameHash[PHAElement.EventType],
+			HumanText=_('delete %s') % PHAElement.ClassHumanName,
 			ViewportID=ViewportID, Zoom=Zoom, PanX=PanX, PanY=PanY, **UndoData))
 
 	def DeleteElement_Undo(self, Proj, UndoRecord, **Args): # handle undo for delete element
 		assert isinstance(Proj, projects.ProjectItem)
 		assert isinstance(UndoRecord, undo.UndoItem)
+		AdditionalElementsToSaveOnFly = [] # these elements should be saved, in addition to UndoRecord.DeletedElement
 		# find out which datacore socket to send messages on
 		SocketFromDatacore = vizop_misc.SocketWithName(TargetName=Args['SocketFromDatacoreName'])
 		# reinstate the element
 		UndoRecord.Column.FTElements.insert(UndoRecord.IndexInColumn, UndoRecord.DeletedElement)
+		# if the element is a connector, reconnect it to any connected connector of the opposite type
+		if isinstance(UndoRecord.DeletedElement, FTConnectorItemInCore):
+			if UndoRecord.DeletedElement.Out:
+				for ThisCXIn in UndoRecord.RelatedCXIn: ThisCXIn.RelatedCX = UndoRecord.DeletedElement
+				AdditionalElementsToSaveOnFly.extend(UndoRecord.RelatedCXIn)
+			else:
+				UndoRecord.DeletedElement.RelatedCX = UndoRecord.RelatedCXOut
+		# if the element is a gate and it was the model gate, restore it as the model gate
+		elif isinstance(UndoRecord.DeletedElement, FTGateItemInCore):
+			if UndoRecord.IsModelGate: self.ModelGate = UndoRecord.DeletedElement
 		# reinstate connections to left and right
 		for LeftEl in UndoRecord.ConnectedOnLeft: LeftEl.ConnectTo.append(UndoRecord.DeletedElement)
 		for RightEl in UndoRecord.ConnectedOnRight: UndoRecord.DeletedElement.ConnectTo.append(RightEl)
@@ -5549,6 +5636,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		projects.SaveOnFly(Proj, UpdateData=vizop_misc.MakeXMLMessage(RootName=info.FTTag,
 			Elements={info.IDTag: self.ID})) # Save On Fly needs to save the whole FT, to preserve connections.
 		# TODO later, when we add linking of elements and numbers, Save On Fly also needs to save linked objects.
+		# Also save any elements in AdditionalElementsToSaveOnFly.
 		return {'Success': True}
 
 	def DeleteElement_Redo(self, Proj, RedoRecord, **Args): # handle redo for delete element
@@ -5621,7 +5709,6 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		RRGroupingOpenTag = ElementTree.SubElement(StartTag, info.RiskReceptorGroupingOptionTag)
 		RRGroupingOpenTag.text = self.RRGroupingOption
 		# not storing TolFreq explictly. It is recalculated from the tol risk model when the file is loaded
-#		projects.AddValueElement(StartEl=StartTag, ValueTag=info.TolFreqTag, ValueObj=self.TolFreq)
 		if self.ModelGate is not None:
 			ThisModelGateTag = ElementTree.SubElement(StartTag, info.ModelGateTag)
 			ThisModelGateTag.text = self.ModelGate.ID
@@ -5791,6 +5878,10 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		self.RiskReceptorObjs = [] # ChoiceItem instances, in the order RR groups should be displayed
 		self.RRGroupingOptionObjs = [] # ChoiceItem instances, options for whether RR's should be grouped
 		self.SeverityCatObjs = [] # SeverityCatInFT instances, in the order severity categories should be displayed
+		# List of required bindings (e.g. context menu items) to display device. Needed before defining self.Header.
+		# List contains tuples: (event type, handler, object to bind)
+#		self.RequiredBindingsToDisplDevice = []
+#		self.MyContextMenu = self.CreateContextMenu() # default FT-level context menu
 		self.Header = FTHeader(FT=self)
 		self.Columns = [] # this will be FTColumn objects
 		self.InterColumnStripWidth = 100 # (int) in canvas coords
@@ -5851,6 +5942,22 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		self.Header.InitializeData()
 		self.Columns = []
 		self.ConnectButtons = []
+
+	def CreateContextMenu(self, **Args):
+		# create and return default context menu for FT (wx.Menu instance)%%%
+		MyCM = wx.Menu(title=_('Fault tree'))
+		# it would be nice to put self.HumanName as title, but it would need to be dynamically refreshed every time
+		# the menu is displayed
+		MyCM.Debug = 5908
+		self.DeleteMItemID = wx.NewId()
+		self.DeleteMItem = MyCM.Append(self.DeleteMItemID, _('No actions available yet'), '')
+		# put required binding in FT's list - can't bind yet, as FT.DisplDevice isn't assigned
+#		self.FT.RequiredBindingsToDisplDevice.append((wx.EVT_MENU,
+#			lambda Event: self.FT.OnDeleteEventRequest(Event,
+#			DoomedEvent=self.HostObject), self.DeleteMItem))
+		#		self.FT.DisplDevice.Bind(wx.EVT_MENU, lambda Event: self.FT.OnDeleteEventRequest(Event, DoomedEvent=self),
+		#			self.DeleteMItem)
+		return MyCM
 
 	def YGapBetweenItemsInCU(self, ItemAbove, ItemBelow):
 		# returns min Y-gap in canvas coords between 2 items in a column. This can vary depending on the types of items.
@@ -5969,7 +6076,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 #						(info.ValueKindOptionTag, 'ValueKindOptions'), (info.ConstantOptionTag, 'ConstantOptions'),
 						(info.ConstantOptionTag, 'ConstantOptions'),
 						(info.MatrixOptionTag, 'MatrixOptions')]:
-					# create and populate each option list in turn%%% working here; get specific data from each option tag, esp. constants
+					# create and populate each option list in turn
 					setattr(ThisNumAttrib, ThisOption, [])
 					ThisOptionList = getattr(ThisNumAttrib, ThisOption)
 					for ThisOptionTagFound in HeaderXMLRoot.findall(ThisOptionTag):
@@ -6207,8 +6314,14 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 				else: # value found; set the attrib value
 					setattr(FT, AttribName, AttribType(ThisElement.text))
 
+		def ActivateBindings(BindingsToDisplDevice):
+			# bind required events to display device, e.g. context menu items
+			# TODO this isn't a good solution, find a better one
+			# BindingsToDisplDevice is a list of tuples: (event type, handler, object to bind)
+			for (ThisEvent, Handler, ThisObj) in BindingsToDisplDevice:
+				self.DisplDevice.Bind(ThisEvent, Handler, ThisObj)
+
 		# main procedure for PrepareFullDisplay()
-#		ElementTree.dump(XMLData) # print all data received, for debugging
 		self.Wipe() # start with a blank FT
 		# find the outer tag containing the FT data
 		FTData = [t for t in XMLData.iter(info.PHAModelRedrawDataTag)][0]
@@ -6249,6 +6362,8 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		# request appropriate control panel aspect
 		self.SwitchToPreferredControlPanelAspect(CurrentElements=self.CurrentElements,
 			AspectRequired=self.PreferredControlPanelAspect, ComponentEdited=self.ComponentEdited)
+#		# bind required events to display device
+#		ActivateBindings(BindingsToDisplDevice=self.RequiredBindingsToDisplDevice)
 
 	def RenderInDC(self, TargetDC, FullRefresh=True, BitmapMinSize=None, DrawZoomTool=True, **Args):
 		# render all FT elements into TargetDC provided
@@ -6337,12 +6452,12 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			# set PosX/Y attribs of connect buttons in pixels (needed to detect mouse clicks)
 			SetConnectButtonPos()
 		if DrawZoomTool:
-			# draw zoom widget. First, set its position: 50% across the panel, and slightly above the bottom of the panel
+			# draw zoom widget. First, set its position: 50% across the panel, and slightly below the top of the panel
 			HostPanelSizeX, HostPanelSizeY = self.DisplDevice.GetSize()
 #			self.MyZoomWidget.SetPos(HostPanelSizeX * 0.5, HostPanelSizeY - self.MyZoomWidget.GetSize()[1] - 10)
 			self.MyZoomWidget.SetPos(HostPanelSizeX * 0.5, 10)
 			self.MyZoomWidget.SetZoom(self.Zoom) # update zoom setting of zoom widget
-			self.MyZoomWidget.DrawInBitmap() # draw zoom widget in its own bitmap
+			self.MyZoomWidget.DrawInBitmap(DisplDevice=self.DisplDevice) # draw zoom widget in its own bitmap
 		BlitIntoDC(BaseLayerBitmap=self.BaseLayerBitmap, TargetDC=TargetDC)
 		return self.BaseLayerBitmap
 
@@ -7010,9 +7125,9 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		StripCentreXInPx = 0.5 * (StripMinXInPx + StripMaxXInPx)
 		return StripCentreXInPx, StripMinXInPx, StripMinYInPx, StripMaxXInPx, StripMaxYInPx
 
-	def ReleaseDisplayDevice(self, DisplDevice, **Args):  # wrap-up actions needed when display device is no longer showing FT
+	def ReleaseDisplayDevice(self, DisplDevice, **Args): # wrap-up actions needed when display device is no longer showing FT
 		self.DisplDevice = None
-		# later, might need to store any unstored user inputs, and kill any active widgets
+		# later, might need to store any unstored user inputs, and kill any active widgets. TODO unbind context menus?
 
 	def SetElementAsCurrent(self, TargetFTElement, UnsetPrevious=False, RedrawEntireFT=False, SetAsLastSelected=True,
 			Deselect=False):
@@ -7180,10 +7295,9 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 				NewTextContentRich=NewTextContentRich, EditAction=EditAction, CursorIndexLean=CursorIndexLean))
 
 	def OnDeleteEventRequest(self, Event, DoomedEvent):
-		# handle request to delete DoomedEl (an FT event, connector-in/out)%%%
+		# handle request to delete DoomedEl (an FT event, connector-in/out or gate)
 		# Event: the wx.Event, wx.Connector instance associated with the request (e.g. mouse right click)
-		print('FT7093 in OnDeleteEventRequest')
-		assert isinstance(DoomedEvent, (FTEvent, FTConnector))
+		assert isinstance(DoomedEvent, (FTEvent, FTConnector, FTGate))
 		ArgsToSend = {info.FTEventTag: DoomedEvent.ID, info.ZoomTag: str(self.Zoom),
 			info.PanXTag: str(self.PanX), info.PanYTag: str(self.PanY)}
 		vizop_misc.SendRequest(Socket=self.C2DSocketREQ, Command='RQ_FT_DeleteElement',

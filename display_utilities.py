@@ -351,7 +351,8 @@ class ZoomWidgetObj(object):
 	MinZoomLimit = 1e-5 # absolute limits of zoom value
 	MaxZoomLimit = 1e5
 
-	def __init__(self, Viewport=None, PosXInPx=0, PosYInPx=0, InitialZoom=1.0, MaxZoom=5.0, MidZoom=1.0, MinZoom=0.2, SizeY=50):
+	def __init__(self, Viewport=None,
+		PosXInPx=0, PosYInPx=0, InitialZoom=1.0, MaxZoom=5.0, MidZoom=1.0, MinZoom=0.2, SizeY=50):
 		# Viewport: instance of a subclass of ViewportBaseClass
 		# PosXInPx, PosYInPx (2 x int): Centre position in pixels relative to panel
 		# InitialZoom (float): initial zoom setting to show
@@ -400,6 +401,22 @@ class ZoomWidgetObj(object):
 		self.PointerColourLeft = (0xed, 0xd1, 0xdc) # lighter blush white
 		self.DotColour = (0xbd, 0x86, 0x9c) # grey-pink
 
+	def HandleContextMenuOnMe(self, **Args): # handle context menu request on zoom widget
+		print('DU404 handling context menu request on zoom tool')
+		# get this component or element to generate a context menu
+		CMenu = self.CreateContextMenu()
+		self.DisplDevice.PopupMenu(menu=CMenu)
+
+	def CreateContextMenu(self, **Args):
+		# create and return context menu for zoom widget
+		MyCM = wx.Menu(title=_('Zoom tool'))
+		MyCM.Debug = 412
+		DeleteMItemID = wx.NewId()
+		DeleteMItem = MyCM.Append(DeleteMItemID, _('No actions available yet'), '')
+#		self.FT.DisplDevice.Bind(wx.EVT_MENU, lambda Event: self.FT.OnDeleteEventRequest(Event, DoomedEvent=self),
+#			DeleteMItem)
+		return MyCM
+
 	def SetPos(self, PosXInPx, PosYInPx): # set widget position in pixels relative to panel
 		self.PosXInPx = PosXInPx
 		self.PosYInPx = PosYInPx
@@ -417,7 +434,11 @@ class ZoomWidgetObj(object):
 		assert (0.999 * self.MinZoom) < TargetZoom < (self.MaxZoom * 1.001) # allowing for rounding errors
 		self.CurrentZoom = float(TargetZoom)
 
-	def DrawInBitmap(self): # draw zoom widget in own bitmap
+	def DrawInBitmap(self, DisplDevice): # draw zoom widget in own bitmap
+		# we provide DisplDevice at this point as it is needed for displaying context menu, and it's not available when
+		# zoom widget is initialized
+		assert isinstance(DisplDevice, wx.Panel)
+		self.DisplDevice = DisplDevice
 		# set StartX/Y, the position of the widget centre
 		StartX = self.HalfSizeXInPx
 		StartY = self.HalfSizeYInPx

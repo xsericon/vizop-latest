@@ -2242,8 +2242,9 @@ class ControlFrame(wx.Frame):
 			# check if the Viewport has a suitable handler; if so, call it
 			Viewport = self.ViewportOwner.CurrentViewport
 			if hasattr(Viewport, 'HandleContextMenuRequest'):
-				# get mouse coords relative to EditPanel
-				(ScreenX, ScreenY) = Event.GetPosition()
+				# get mouse coords relative to EditPanel. ScreenToClient() is needed here because context menu events
+				# provide a modified GetPosition() (telling the system where to draw the context menu)
+				(ScreenX, ScreenY) = self.ScreenToClient(Event.GetPosition())
 				Viewport.HandleContextMenuRequest(ScreenX, ScreenY, Event=Event)
 
 		def SetKeystrokeHandlerOnOff(self, On=True):
