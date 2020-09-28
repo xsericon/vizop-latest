@@ -587,17 +587,17 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 		#	AssocTextKind (str; info.ActionItemLabel or info.ParkingLotItemLabel) (now changed: this is in Viewport.RedrawData)
 		# return the data as XML string
 
-		def MakeAssocTextLookupTable(Proj, ATKind):
-			# make and return dictionary with keys = ATs, values = list of PHA elements containing the AT
-			# We assume the element's attrib containing the AT is named the same as AssocTextKind; if not,
-			# its ATs won't be found
-			assert ATKind in (info.ActionItemLabel, info.ParkingLotItemLabel)
-			ATTable = {}
-			for ThisPHAElement in Proj.WalkOverAllPHAElements():
-				for ThisAT in getattr(ThisPHAElement, ATKind, []):
-					if ThisAT in ATTable: ATTable[ThisAT].append(ThisPHAElement)
-					else: ATTable[ThisAT] = [ThisPHAElement]
-			return ATTable
+		# def MakeAssocTextLookupTable(Proj, ATKind): # method moved to class ProjectItem in module projects
+		# 	# make and return dictionary with keys = ATs, values = list of PHA elements containing the AT
+		# 	# We assume the element's attrib containing the AT is named the same as AssocTextKind; if not,
+		# 	# its ATs won't be found
+		# 	assert ATKind in (info.ActionItemLabel, info.ParkingLotItemLabel)
+		# 	ATTable = {}
+		# 	for ThisPHAElement in Proj.WalkOverAllPHAElements():
+		# 		for ThisAT in getattr(ThisPHAElement, ATKind, []):
+		# 			if ThisAT in ATTable: ATTable[ThisAT].append(ThisPHAElement)
+		# 			else: ATTable[ThisAT] = [ThisPHAElement]
+		# 	return ATTable
 
 		# start of GetFullRedrawData()
 		assert Viewport.RedrawData[info.AssociatedTextKindTag] in (info.ActionItemLabel,  info.ParkingLotItemLabel)
@@ -605,7 +605,8 @@ class AssocTextListViewport(display_utilities.ViewportBaseClass):
 		# find out what kind of AT is required, from the Viewport shadow's redraw data
 		ATKind = Viewport.RedrawData[info.AssociatedTextKindTag]
 		# get a lookup table of all ATs of the appropriate kind in the project
-		ATTable = MakeAssocTextLookupTable(Proj=Proj, ATKind=ATKind)
+		# (keys = ATs, values = list of PHA elements containing the AT)
+		ATTable = Proj.MakeAssocTextLookupTable(ATKind=ATKind)
 		# First, make the root element
 		RootElement = ElementTree.Element(info.PHAModelRedrawDataTag)
 		RootElement.set(info.PHAModelTypeTag, cls.InternalName)

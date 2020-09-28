@@ -510,7 +510,7 @@ class AssocTextReportViewport(display_utilities.ViewportBaseClass):
 		# currently this method is identical to the one in class AssocTextListViewport.
 		# TODO reuse same code - could be done via decorator, as for UnpackDataFromDatacore()
 
-		def MakeAssocTextLookupTable(Proj, ATKind):
+		def MakeAssocTextLookupTable(Proj, ATKind): # consider using identical method in class ProjectItem instead
 			# make and return dictionary with keys = ATs, values = list of PHA elements containing the AT
 			# We assume the element's attrib containing the AT is named the same as AssocTextKind; if not,
 			# its ATs won't be found

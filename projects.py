@@ -952,6 +952,18 @@ class ProjectItem(object): # class of PHA project instances
 		self.PHAObjShadows.append(NewPHAObj) # put the same object in the shadows list, for local display devices to access
 		return NewPHAObj
 
+	def MakeAssocTextLookupTable(self, ATKind):
+		# make and return dictionary with keys = ATs, values = list of PHA elements containing the AT
+		# We assume the element's attrib containing the AT is named the same as AssocTextKind; if not,
+		# its ATs won't be found
+		assert ATKind in (info.ActionItemLabel, info.ParkingLotItemLabel)
+		ATTable = {}
+		for ThisPHAElement in self.WalkOverAllPHAElements():
+			for ThisAT in getattr(ThisPHAElement, ATKind, []):
+				if ThisAT in ATTable: ATTable[ThisAT].append(ThisPHAElement)
+				else: ATTable[ThisAT] = [ThisPHAElement]
+		return ATTable
+
 def LegalString(InStr, Strip=True, FilterForbiddenChar=False, NoSpace=False) -> str:
 	# return modified InStr (str) for storing in XML. If Strip, remove leading and trailing white space.
 	# If FilterForbiddenChar, remove any char not in approved list. If NoSpace, replace all spaces with _
@@ -1493,8 +1505,8 @@ def MakeXMLMessageForDrawViewport(Proj, MessageHead, PHAObj, Viewport, ViewportI
 	return Reply
 
 def DatacoreDoNewViewport_Undo(Proj, UndoRecord, **Args): # undo creation of new Viewport
-	global UndoChainWaiting # FIXME move this elsewhere, maybe as an attrib of Proj
-	assert isinstance(Proj, projects.ProjectItem)
+	global UndoChainWaiting # FIXME move this variable elsewhere, maybe as an attrib of Proj
+	assert isinstance(Proj, ProjectItem)
 	assert isinstance(UndoRecord, undo.UndoItem)
 	# find out which datacore socket to send messages on
 	SocketFromDatacore = vizop_misc.SocketWithName(TargetName=Args['SocketFromDatacoreName'])
@@ -1509,7 +1521,7 @@ def DatacoreDoNewViewport_Undo(Proj, UndoRecord, **Args): # undo creation of new
 		info.ProjIDTag: Proj.ID})
 	vizop_misc.SendRequest(Socket=SocketFromDatacore.Socket,
 		Command='NO_NewViewport_Undo', XMLRoot=Notification)
-	projects.SaveOnFly(Proj, UpdateData=vizop_misc.MakeXMLMessage(RootName=info.ViewportTag,
+	SaveOnFly(Proj, UpdateData=vizop_misc.MakeXMLMessage(RootName=info.ViewportTag,
 		Elements={info.IDTag: ViewportToRemove.ID, info.DeleteTag: ''}))
 	UndoChainWaiting = Args.get('ChainWaiting', False)
 	return {'Success': True}

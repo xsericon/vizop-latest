@@ -142,6 +142,24 @@ class ButtonElement(object): # object containing a button and attributes and met
 		self.Selected = False # whether highlighted as part of user selection
 		self.IsClickable = True
 
+	def HandleContextMenuOnMe(self, **Args): # handle context menu request on button
+		# get this button to generate a context menu
+		CMenu = self.CreateContextMenu(HostEl=getattr(self, 'HostObject', None))
+		self.FT.DisplDevice.PopupMenu(menu=CMenu)
+
+	def CreateContextMenu(self, HostEl=None):
+		# create and return context menu (wx.Menu instance)
+		# HostEl: host object, or None
+		assert isinstance(HostEl, (FTEvent, FTGate, FTConnector)) or (HostEl is None)
+		HostTypeHumanName = '' if HostEl is None else HostEl.ClassHumanName
+		MyCM = wx.Menu(title=HostTypeHumanName if HostTypeHumanName else _('<Button>'))
+		MyCM.Debug = 157
+		DeleteMItemID = wx.NewId()
+		DeleteMItem = MyCM.Append(DeleteMItemID, _('Delete %s') % HostTypeHumanName, '')
+		self.FT.DisplDevice.Bind(wx.EVT_MENU, lambda Event: self.FT.OnDeleteEventRequest(Event, DoomedEvent=HostEl),
+			DeleteMItem)
+		return MyCM
+
 	def SetupImages(self): # populate self.BitmapZoomed with images for the button
 		self.ChangeZoom(NewZoom=self.BitmapZoomLevel) # make initial bitmaps
 
@@ -546,8 +564,6 @@ class FTBoxyObject(object): # superclass of vaguely box-like FT components for u
 		if (MouseXInPx - TolXInPx >= self.PosXInPx) and (MouseYInPx - TolYInPx >= self.PosYInPx) and \
 			(MouseXInPx + TolXInPx <= self.PosXInPx + self.SizeXInPx) and \
 			(MouseYInPx + TolYInPx <= self.PosYInPx + self.SizeYInPx):
-			print('FT531 hit detected: ', getattr(self, 'InternalName', 'NoName'), 'Mouse: ', MouseXInPx, MouseYInPx,
-				'Tol: ', TolXInPx, TolYInPx, 'Pos: ', self.PosXInPx, self.PosYInPx, 'Size: ', self.SizeXInPx, self.SizeYInPx)
 			return "Whole"
 		else: return None
 
@@ -712,7 +728,7 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 	def CreateContextMenu(self, HostEl=None):
 		# create and return context menu (wx.Menu instance)%%%
 		# HostEl: host object, or None
-		assert isinstance(HostEl,  (FTEvent, FTGate, FTConnector)) or (HostType is None)
+		assert isinstance(HostEl,  (FTEvent, FTGate, FTConnector)) or (HostEl is None)
 		HostTypeHumanName = '' if HostEl is None else HostEl.ClassHumanName
 		MyCM = wx.Menu(title='<Text>')
 		MyCM.Debug = 717
@@ -890,7 +906,6 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 
 	def HandleMouseLClickOnMeDuringEditing(self, **Args): # handle mouse left single click on text element during editing
 		# available in Args: HitHotspot=HitHotspot, HostViewport=self, MouseX=ClickXInPx, MouseY=ClickYInPx, Event
-		print('FT848 in click handler during editing: ', Args['MouseX'], Args['MouseY'], self.TextCtrlPosXInPxWithinDisplDevice)
 		TargetCharIndexLean = text.NearestCharIndexLeanAtXY(TextObj=self.Text, TargetX=Args['MouseX'] - self.PosXInPx,
 			TargetY=Args['MouseY'] - self.PosYInPx)
 		self.MoveCursorTo(Event=Args['Event'], OldIndex=self.FT.TextEditCursorIndex, NewIndex=TargetCharIndexLean,
@@ -1147,7 +1162,6 @@ class FTEvent(FTBoxyObject): # FT event object in Viewport
 		(self.TopFixedEls, self.ValueFixedEls) = self.CreateFixedTextElements()
 		# colour definitions such as BorderColour are in FTBoxyObject's __init__
 		self.MaxElementsConnectedToThis = FTEventInCore.MaxElementsConnectedToThis
-#		self.MyContextMenu = self.CreateContextMenu()
 
 	def GetMyClassHumanName(self): # return human name of this type of FT element
 		# We can't do this as a @classmethod because, for other classes, it depends on attrib values of the instance, and also
@@ -1212,40 +1226,52 @@ class FTEvent(FTBoxyObject): # FT event object in Viewport
 		# EditInOpModes attrib: which OpModes the component can be user-edited in (if omitted, allowed in all OpModes)
 		self.EventTypeComponent = TextElement(self.FT, Row=0, ColStart=0, ColSpan=7, EndX=399,
 			HostObject=self, InternalName='EventType', EditBehaviour='Choice', ObjectChoices=[],
-			DisplAttrib='HumanName', DefaultFgColour=LabelFgColour)
+			DisplAttrib='HumanName', DefaultFgColour=LabelFgColour,
+			ContextMenuMethod=self.CreateContextMenu)
 			# DisplAttrib is the attrib of the ChoiceItem instance to display in the choice box
 		self.EventNumberingComponent = TextElement(self.FT, Row=1, ColStart=0, ColSpan=1, EndX=399,
-			HostObject=self, InternalName=info.NumberingTag)
+			HostObject=self, InternalName=info.NumberingTag,
+			ContextMenuMethod = self.CreateContextMenu)
 		self.EventDescriptionComponent = TextElement(self.FT, Row=1, ColStart=1, ColSpan=5, EndX=299, MinHeight=25,
 			HostObject=self, InternalName='EventDescription', EditBehaviour='Text', HorizAlignment='Left',
-			MaxWidthInCU=400)
+			MaxWidthInCU=400,
+			ContextMenuMethod = self.CreateContextMenu)
 		EventLinkedButton = ButtonElement(self.FT, Row=2, ColStart=1, ColSpan=1, StartX=300, EndX=349,
 			HostObject=self, InternalName='EventLinkedButton', Stati=('OutNotExist', 'OutExist'),
-			LSingleClickHandler=None)
+			LSingleClickHandler=None,
+			ContextMenuMethod = self.CreateContextMenu)
 		EventGroupedButton = ButtonElement(self.FT, Row=2, ColStart=2, ColSpan=1, StartX=350, EndX=399,
 			HostObject=self, InternalName='EventGroupedButton', Stati=('OutNotExist', 'OutExist'),
-			LSingleClickHandler=None)
+			LSingleClickHandler=None,
+			ContextMenuMethod = self.CreateContextMenu)
 		EventCommentButton = ButtonElement(self.FT, Row=1, ColStart=6, ColSpan=1, StartX=300, EndX=349,
 			HostObject=self, InternalName='EventCommentButton', Stati=('OutNotExist', 'OutExist'),
-			LSingleClickHandler='HandleMouseLClickOnCommentButton', CommentKind='EventDescriptionComments')
+			LSingleClickHandler='HandleMouseLClickOnCommentButton', CommentKind='EventDescriptionComments',
+			ContextMenuMethod = self.CreateContextMenu)
 		EventActionItemButton = ButtonElement(self.FT, Row=2, ColStart=3, ColSpan=1, StartX=350, EndX=399,
 			HostObject=self, InternalName='EventActionItemButton', Stati=('OutNotExist', 'OutExist'),
-			LSingleClickHandler='HandleMouseLClickOnActionItemButton')
+			LSingleClickHandler='HandleMouseLClickOnActionItemButton',
+			ContextMenuMethod = self.CreateContextMenu)
 		EventValue = TextElement(self.FT, RowBase=0, ColStart=0, ColSpan=1, EndX=99, EditBehaviour='Text',
-			HostObject=self, InternalName='Value', ControlPanelAspect='CPAspect_NumValue')
+			HostObject=self, InternalName='Value', ControlPanelAspect='CPAspect_NumValue',
+			ContextMenuMethod=self.CreateContextMenu)
 			# internal name = 'Value' to match attrib name in Core object
 		self.EventValueUnitComponent = TextElement(self.FT, RowBase=0, ColStart=1, ColSpan=2, EndX=199,
 			HostObject=self, InternalName='EventValueUnit', EditBehaviour='Choice', ObjectChoices=[],
-			DisplAttrib='HumanName')
+			DisplAttrib='HumanName',
+			ContextMenuMethod = self.CreateContextMenu)
 		self.EventValueKindComponent = TextElement(self.FT, RowBase=0, ColStart=3, ColSpan=2, EndX=299,
 			HostObject=self, InternalName='EventValueKind', EditBehaviour='Choice', ObjectChoices=[],
-			DisplAttrib='HumanName')
+			DisplAttrib='HumanName',
+			ContextMenuMethod = self.CreateContextMenu)
 		ValueCommentButton = ButtonElement(self.FT, RowBase=0, ColStart=6, ColSpan=1, StartX=300, EndX=349,
 			HostObject=self, InternalName='ValueCommentButton', Stati=('OutNotExist', 'OutExist'),
-			LSingleClickHandler='HandleMouseLClickOnCommentButton', CommentKind='ValueComments')
+			LSingleClickHandler='HandleMouseLClickOnCommentButton', CommentKind='ValueComments',
+			ContextMenuMethod = self.CreateContextMenu)
 		self.ValueProblemButton = ButtonElement(self.FT, RowBase=0, ColStart=5, ColSpan=1, StartX=350, EndX=399,
 			HostObject=self, InternalName='ValueProblemButton', Stati=('Out', 'Alert'),
-			LSingleClickHandler=None)
+			LSingleClickHandler=None,
+			ContextMenuMethod = self.CreateContextMenu)
 
 		# make lists of elements: TopEls at top of event, ValueEls relating to event value
 		TopEls = [self.EventTypeComponent, self.EventNumberingComponent, self.EventDescriptionComponent,
@@ -1280,17 +1306,17 @@ class FTEvent(FTBoxyObject): # FT event object in Viewport
 			if ShowFlag: # check whether this set of items is required to be displayed
 				for (CommentIndex, Comment) in enumerate(CommentList):
 					CommentElementList.append(TextElement(self.FT, RowBase=CommentIndex, ColStart=1, ColSpan=5,
-						EndX=399, MinHeight=25, HostObject=self))
+						EndX=399, MinHeight=25, HostObject=self, ContextMenuMethod=self.CreateContextMenu,
+						BkgColour=ColourContentBkg))
 					CommentElementList[-1].Text.Content = Comment
 					CommentElementList[-1].Text.Colour = ColourContentFg
-					CommentElementList[-1].BkgColour = ColourContentBkg
 					CommentElementList[-1].Text.ParaHorizAlignment = 'Left'
 				# add item label (e.g. 'Comment') at left side of first row of items
 				CommentElementList.append(TextElement(self.FT, RowBase=0, ColStart=0, ColSpan=1, EndX=99,
-					HostObject=self, DefaultFgColour=LabelFgColour))
+					HostObject=self, DefaultFgColour=LabelFgColour, ContextMenuMethod=self.CreateContextMenu,
+					BkgColour=ColourContentBkg))
 				CommentElementList[-1].Text.Content = CommentLabel
 				CommentElementList[-1].Text.Colour = ColourLabelFg
-				CommentElementList[-1].BkgColour = ColourLabelBkg
 				CommentElementList[-1].Text.ParaHorizAlignment = 'Centre'
 		return (DescrComments, ValueComments, ActionItems)
 
@@ -1464,7 +1490,6 @@ class FTGate(FTBoxyObject): # object containing FT gates for display in Viewport
 		self.CollapseGroups = [] # FTCollapseGroup objects this gate belongs to
 		self.ValueProblemObjectID = '' # ID of an FT object that is causing a value problem in this gate. '' = no problem
 		self.ValueProblemID = '' # ID of NumProblemValue instance. '' = no problem
-#		self.MyContextMenu = self.CreateContextMenu()
 		(self.TopFixedEls, self.ValueFixedEls) = self.CreateFixedTextElements()
 		self.Clickable = True # bool; whether instance is intended to respond to user clicks
 		self.Visible = True # bool; whether it would be visible if currently panned onto the display device
@@ -1498,30 +1523,34 @@ class FTGate(FTBoxyObject): # object containing FT gates for display in Viewport
 		HeaderLabelBkg = ElementHeaderBkgColour
 		self.GateKind = TextElement(self.FT, Row=0, ColStart=0, ColSpan=4, EndX=299, HostObject=self,
 			InternalName='GateKind', EditBehaviour='Choice', ObjectChoices=[], DisplAttrib='HumanName',
-			DefaultFgColour=LabelFgColour)
+			DefaultFgColour=LabelFgColour, ContextMenuMethod=self.CreateContextMenu)
 		self.GateStyleButton = ButtonElement(self.FT, Row=0, ColStart=4, ColSpan=1, StartX=200, EndX=249,
 			HostObject=self, InternalName='GateStyleButton', Stati=['Default'],
-			LSingleClickHandler='HandleMouseLClickOnGateStyleButton')
+			LSingleClickHandler='HandleMouseLClickOnGateStyleButton', ContextMenuMethod=self.CreateContextMenu)
 		self.GateDescription = TextElement(self.FT, Row=2, ColStart=0, ColSpan=2, EndX=199, MinHeight=50,
-			HostObject=self, InternalName='GateDescription', EditBehaviour='Text')
+			HostObject=self, InternalName='GateDescription', EditBehaviour='Text',
+			ContextMenuMethod=self.CreateContextMenu)
 		self.GateLinkedButton = ButtonElement(self.FT, Row=1, ColStart=3, ColSpan=1, StartX=200, EndX=249,
 			HostObject=self, InternalName='GateLinkedButton', Stati=('OutNotExist', 'OutExist'),
-			LSingleClickHandler=None)
+			LSingleClickHandler=None, ContextMenuMethod=self.CreateContextMenu)
 		self.GateGroupedButton = ButtonElement(self.FT, Row=1, ColStart=4, ColSpan=1, StartX=250, EndX=299,
 			HostObject=self, InternalName='GateGroupedButton', Stati=('OutNotExist', 'OutExist'),
-			LSingleClickHandler=None)
+			LSingleClickHandler=None, ContextMenuMethod=self.CreateContextMenu)
 		self.GateCommentButton = ButtonElement(self.FT, Row=2, ColStart=3, ColSpan=1, StartX=200, EndX=249,
 			HostObject=self, InternalName='GateCommentButton', Stati=('OutNotExist', 'OutExist'),
-			LSingleClickHandler='HandleMouseLClickOnCommentButton', CommentKind='GateDescriptionComments')
+			LSingleClickHandler='HandleMouseLClickOnCommentButton', CommentKind='GateDescriptionComments',
+			ContextMenuMethod=self.CreateContextMenu)
 		self.GateActionItemButton = ButtonElement(self.FT, Row=2, ColStart=4, ColSpan=1, StartX=250, EndX=299,
 			HostObject=self, InternalName='GateActionItemButton', Stati=('OutNotExist', 'OutExist'),
-			LSingleClickHandler='HandleMouseLClickOnActionItemButton')
-		self.GateValue = TextElement(self.FT, RowBase=0, ColStart=0, ColSpan=1, EndX=99, HostObject=self, InternalName='GateValue')
+			LSingleClickHandler='HandleMouseLClickOnActionItemButton', ContextMenuMethod=self.CreateContextMenu)
+		self.GateValue = TextElement(self.FT, RowBase=0, ColStart=0, ColSpan=1, EndX=99, HostObject=self,
+			InternalName='GateValue', ContextMenuMethod=self.CreateContextMenu)
 		self.GateValueUnit = TextElement(self.FT, RowBase=0, ColStart=1, ColSpan=1, EndX=199, HostObject=self,
 			InternalName='GateValueUnit', EditBehaviour='Choice', ObjectChoices=[],
-			DisplAttrib='HumanName')
+			DisplAttrib='HumanName', ContextMenuMethod=self.CreateContextMenu)
 		self.ValueProblemButton = ButtonElement(self.FT, RowBase=0, ColStart=4, ColSpan=1, StartX=250, EndX=299,
-			HostObject=self, InternalName='ValueProblemButton', Stati=('Out', 'Alert'))
+			HostObject=self, InternalName='ValueProblemButton', Stati=('Out', 'Alert'),
+			ContextMenuMethod=self.CreateContextMenu)
 		# Gates don't have "value types" (it's always calculated) or "value comments"
 
 		# make lists of elements: TopEls at top of event, ValueEls relating to event value
@@ -1549,17 +1578,17 @@ class FTGate(FTBoxyObject): # object containing FT gates for display in Viewport
 			if ShowFlag: # check whether this set of items is required to be displayed
 				for (CommentIndex, Comment) in enumerate(CommentList):
 					CommentElementList.append(TextElement(self.FT, RowBase=CommentIndex, ColStart=1, ColSpan=5,
-						EndX=399, MinHeight=25, HostObject=self))
+						EndX=399, MinHeight=25, HostObject=self, ContextMenuMethod=self.CreateContextMenu,
+						BkgColour=GateTextBkgColour))
 					CommentElementList[-1].Text.Content = Comment
 					CommentElementList[-1].Text.Colour = GateTextFgColour
-					CommentElementList[-1].BkgColour = GateTextBkgColour
 					CommentElementList[-1].Text.ParaHorizAlignment = 'Left'
 				# add item label (e.g. 'Comment') at left side of first row of items
 				CommentElementList.append(TextElement(self.FT, RowBase=0, ColStart=0, ColSpan=1, EndX=99,
-					HostObject=self, DefaultFgColour=LabelFgColour))
+					HostObject=self, DefaultFgColour=LabelFgColour, ContextMenuMethod=self.CreateContextMenu,
+					BkgColour=GateTextBkgColour))
 				CommentElementList[-1].Text.Content = CommentLabel
 				CommentElementList[-1].Text.Colour = GateLabelFgColour
-				CommentElementList[-1].BkgColour = GateLabelBkgColour
 				CommentElementList[-1].Text.ParaHorizAlignment = 'Centre'
 		return (DescrComments, ActionItems)
 
@@ -1903,7 +1932,6 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 		self.LinkedFrom = []
 		self.ValueProblemID = '' # ID of NumValueProblem instance, or '' if no problem (not used yet)
 		self.ValueProblemObjectID = '' # ID of an FT object that is causing a value problem in this object. '' = no problem
-#		self.MyContextMenu = self.CreateContextMenu()
 		(self.TopFixedEls, self.ValueFixedEls) = self.CreateFixedTextElements()
 		self.Clickable = True # bool; whether instance is intended to respond to user clicks
 		self.Visible = True # bool; whether it would be visible if currently panned onto the display device
@@ -1993,20 +2021,23 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 			 (ActionItems, self.ActionItems, self.ShowActionItems, _('Action items')),
 			 (ParkingLotItems, self.ParkingLot, self.ShowParkingLotItems, _('Parking lot items'))]:
 			if True: # populate all lists irrespective of whether associated texts are visible (formerly "if ShowFlag:")
+				# This 'if' structure left here in case we want to reinstate the condition for optimization later
 				for (CommentIndex, Comment) in enumerate(CommentList):
-					CommentElementList.append(TextElement(self.FT, RowBase=CommentIndex, ColStart=1, ColSpan=6,
-						EndX=274, MinHeight=25, HostObject=self))
-					CommentElementList[-1].Text.Content = Comment
-					CommentElementList[-1].Text.Colour = GateTextFgColour
-					CommentElementList[-1].BkgColour = GateTextBkgColour
-					CommentElementList[-1].Text.ParaHorizAlignment = 'Left'
+					ListComponent = TextElement(self.FT, RowBase=CommentIndex, ColStart=1, ColSpan=6,
+						EndX=274, MinHeight=25, HostObject=self, ContextMenuMethod=self.CreateContextMenu,
+						BkgColour=GateTextBkgColour)
+					CommentElementList.append(ListComponent)
+					ListComponent.Text.Content = Comment
+					ListComponent.Text.Colour = GateTextFgColour
+					ListComponent.Text.ParaHorizAlignment = 'Left'
 				# add item label (e.g. 'Comment') at left side of first row of items, occupying as many rows as comments
-				CommentElementList.append(TextElement(self.FT, RowBase=0, ColStart=0, ColSpan=1, EndX=99,
-					RowSpan=max(1, len(CommentList)), HostObject=self, DefaultFgColour=LabelFgColour))
-				CommentElementList[-1].Text.Content = CommentLabel
-				CommentElementList[-1].Text.Colour = GateLabelFgColour
-				CommentElementList[-1].BkgColour = GateLabelBkgColour
-				CommentElementList[-1].Text.ParaHorizAlignment = 'Centre'
+				LabelComponent = TextElement(self.FT, RowBase=0, ColStart=0, ColSpan=1, EndX=99,
+					RowSpan=max(1, len(CommentList)), HostObject=self, DefaultFgColour=LabelFgColour,
+					BkgColour=GateLabelBkgColour, ContextMenuMethod = self.CreateContextMenu)
+				CommentElementList.append(LabelComponent)
+				LabelComponent.Text.Content = CommentLabel
+				LabelComponent.Text.Colour = GateLabelFgColour
+				LabelComponent.Text.ParaHorizAlignment = 'Centre'
 		return (DescrComments, ValueComments, ActionItems, ParkingLotItems)
 
 	def PopulateTextComponents(self, Components):
@@ -2206,7 +2237,6 @@ class FTBuilder(FTBoxyObject): # 'add' button object within an FTColumn.
 		self.PosZ = 0 # z-coordinate
 		self.Bitmap = None # wx.Bitmap instance. Created in self.RenderIntoBitmap()
 		self.ObjTypeRequested = Args['ObjTypeRequested']
-#		self.MyContextMenu = self.CreateContextMenu()
 
 	def CreateContextMenu(self, **Args):
 		# create and return default context menu for builder button (wx.Menu instance)
@@ -5306,7 +5336,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		# delete the AssociatedText from the required AssociatedText list
 		self.DoDeleteAssociatedText(DoomedAssociatedTextIndex=int(XMLRoot.findtext(info.AssociatedTextIndexTag)),
 			PHAElement=ThisPHAElement, AssociatedTextListAttrib=AssociatedTextListAttrib,
-			ComponentName=XMLRoot.findtext(info.ComponentTag), Viewport=Viewport, Redoing=False,
+			ComponentName=XMLRoot.findtext(info.ComponentTag), ViewportID=Viewport.ID, Redoing=False,
 			AssociatedTextKind=XMLRoot.findtext(info.AssociatedTextKindTag),
 			Zoom=Zoom, PanX=PanX, PanY=PanY)
 		return vizop_misc.MakeXMLMessage(RootName='OK', RootText='OK')
@@ -5519,30 +5549,39 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		pass
 
 	def DoDeleteAssociatedText(self, DoomedAssociatedTextIndex=None, PHAElement=None, ComponentName=None,
-			AssociatedTextListAttrib='', AssociatedTextKind='',
-			Viewport=None, Redoing=False, Zoom=1.0, PanX=0, PanY=0):
+			AssociatedTextListAttrib='', AssociatedTextKind='', ChainUndo=False,
+			ViewportID=None, Redoing=False, Zoom=1.0, PanX=0, PanY=0):
 		# delete AssociatedText at DoomedAssociatedTextIndex (int) from PHAElement's list in attrib named AssociatedTextListAttrib (str)
 		# ComponentName is the InternalName of the Viewport PHAElement's component that selects the AssociatedText for editing;
 		# needed for undo implementation
-		# Viewport: ViewportShadow corresponding to the Viewport from where the delete AssociatedText request was made
+		# ViewportID: ViewportShadow corresponding to the Viewport from where the delete AssociatedText request was made
 		assert AssociatedTextKind in (info.ActionItemLabel, info.ParkingLotItemLabel)
+		# get a lookup table of all ATs in all elements in the project. TODO can optimise - don't need complete table
+		ATTable = self.Proj.MakeAssocTextLookupTable(ATKind=AssociatedTextKind)
+		# find appropriate AT lists to use
 		AssociatedTextList = getattr(PHAElement, AssociatedTextListAttrib)
 		AssociatedTextListInProj = getattr(self.Proj, AssociatedTextListAttrib)
 		# remove the doomed AssociatedText from PHAElement's list
 		DoomedAssociatedText = AssociatedTextList.pop(DoomedAssociatedTextIndex)
-		# remove the AssociatedText from the project's list
-		DoomedAssociatedTextIndexInProject = AssociatedTextListInProj.index(DoomedAssociatedText)
-		AssociatedTextListInProj.pop(DoomedAssociatedTextIndexInProject)
+		# check whether the AT is used in any other element. We use get() because, if PHAElement is already deleted
+		# from the project, and if PHAElement is the only host of the AT, it won't appear in ATTable
+		if ATTable.get(DoomedAssociatedText, [PHAElement]) == [PHAElement]: # it's only in this element
+			# remove the AssociatedText from the project's list
+			DoomedAssociatedTextIndexInProject = AssociatedTextListInProj.index(DoomedAssociatedText)
+			AssociatedTextListInProj.pop(DoomedAssociatedTextIndexInProject)
+			RemovedFromProject = True
+		else:
+			RemovedFromProject = False
 		UndoEnglishText = 'delete %s in' % core_classes.AssociatedTextEnglishNamesSingular[AssociatedTextKind]
 		undo.AddToUndoList(Proj=self.Proj, Redoing=Redoing,
 			UndoObj=undo.UndoItem(UndoHandler=self.DeleteAssociatedText_Undo,
 			RedoHandler=self.DeleteAssociatedText_Redo, DeletedAssociatedText=DoomedAssociatedText,
 			AssociatedTextIndex=DoomedAssociatedTextIndex, AssociatedTextIndexInProj=DoomedAssociatedTextIndexInProject,
-#			Chain={False: 'NoChain', True: 'Avalanche', 'NoChain': 'NoChain'}[ChainUndo],
-			PHAElement=PHAElement, ComponentName=ComponentName,
+			Chain={False: 'NoChain', True: 'Avalanche', 'NoChain': 'NoChain'}[ChainUndo],
+			PHAElement=PHAElement, ComponentName=ComponentName, RemovedFromProject=RemovedFromProject,
 			AssociatedTextListAttrib=AssociatedTextListAttrib,
 			HumanText=_(UndoEnglishText + ' %s') % type(PHAElement).HumanName,
-			ViewportID=Viewport.ID, Zoom=Zoom,
+			ViewportID=ViewportID, Zoom=Zoom, debug=5584,
 			PanX=PanX, PanY=PanY, HostElementID=PHAElement.ID))
 
 	def DeleteAssociatedText_Undo(self, Proj, UndoRecord, **Args): # handle undo for delete associated text
@@ -5550,16 +5589,18 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		assert isinstance(UndoRecord, undo.UndoItem)
 		# find out which datacore socket to send messages on
 		SocketFromDatacore = vizop_misc.SocketWithName(TargetName=Args['SocketFromDatacoreName'])
-		# reinsert the deleted AssociatedText into the host PHA element
+		# reinsert the deleted AssociatedText into the host PHA element, then put the edited lists back into their hosts
 		AssociatedTextListInPHAElement = getattr(UndoRecord.PHAElement, UndoRecord.AssociatedTextListAttrib)
-		AssociatedTextListInProj = getattr(Proj, UndoRecord.AssociatedTextListAttrib)
 		AssociatedTextListInPHAElement.insert(UndoRecord.AssociatedTextIndex, UndoRecord.DeletedAssociatedText)
-		AssociatedTextListInProj.insert(UndoRecord.AssociatedTextIndexInProj, UndoRecord.DeletedAssociatedText)
-		# put the edited lists back into their hosts
 		setattr(UndoRecord.PHAElement, UndoRecord.AssociatedTextListAttrib, AssociatedTextListInPHAElement)
-		setattr(Proj, UndoRecord.AssociatedTextListAttrib, AssociatedTextListInProj)
+		# reinsert into project list if it had been removed
+		if UndoRecord.RemovedFromProject:
+			AssociatedTextListInProj = getattr(Proj, UndoRecord.AssociatedTextListAttrib)
+			AssociatedTextListInProj.insert(UndoRecord.AssociatedTextIndexInProj, UndoRecord.DeletedAssociatedText)
+			setattr(Proj, UndoRecord.AssociatedTextListAttrib, AssociatedTextListInProj)
 		# request Control Frame to switch to the Viewport that was visible when the original edit was made
-		self.RedrawAfterUndoOrRedo(UndoRecord, SocketFromDatacore)
+		if UndoRecord.Chain != 'Avalanche':
+			self.RedrawAfterUndoOrRedo(UndoRecord, SocketFromDatacore)
 		projects.SaveOnFly(Proj, UpdateData=vizop_misc.MakeXMLMessage(RootName=info.FTTag,
 			Elements={info.IDTag: self.ID, info.ComponentHostIDTag: UndoRecord.PHAElement.ID}))
 		# TODO add data for the changed component to the Save On Fly data
@@ -5607,8 +5648,18 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			DeletedElement=PHAElement,
 			Column=Column, IndexInColumn=IndexInColumn, ConnectedOnLeft=ConnectedOnLeft,
 			ConnectedOnRight=ConnectedOnRight,
-			HumanText=_('delete %s') % PHAElement.ClassHumanName,
+			HumanText=_('delete %s') % PHAElement.ClassHumanName, debug=5661,
 			ViewportID=ViewportID, Zoom=Zoom, PanX=PanX, PanY=PanY, **UndoData))
+		# delete any associated texts (action items or parking lot items) associated with this element
+		# We do this AFTER deleting the element itself, so that the undo chain works properly
+		for ThisATIndex in range(len(PHAElement.ActionItems)):
+			self.DoDeleteAssociatedText(DoomedAssociatedTextIndex=ThisATIndex, PHAElement=PHAElement,
+				ViewportID=ViewportID, ComponentName=None,
+				AssociatedTextListAttrib=info.ActionItemLabel, AssociatedTextKind=info.ActionItemLabel, ChainUndo=True)
+		for ThisATIndex in range(len(PHAElement.ParkingLot)):
+			self.DoDeleteAssociatedText(DoomedAssociatedTextIndex=ThisATIndex, PHAElement=PHAElement,
+				ViewportID=ViewportID, ComponentName=None, AssociatedTextListAttrib=info.ParkingLotItemLabel,
+				AssociatedTextKind=info.ParkingLotItemLabel, ChainUndo=True)
 
 	def DeleteElement_Undo(self, Proj, UndoRecord, **Args): # handle undo for delete element
 		assert isinstance(Proj, projects.ProjectItem)
@@ -5881,7 +5932,6 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		# List of required bindings (e.g. context menu items) to display device. Needed before defining self.Header.
 		# List contains tuples: (event type, handler, object to bind)
 #		self.RequiredBindingsToDisplDevice = []
-#		self.MyContextMenu = self.CreateContextMenu() # default FT-level context menu
 		self.Header = FTHeader(FT=self)
 		self.Columns = [] # this will be FTColumn objects
 		self.InterColumnStripWidth = 100 # (int) in canvas coords

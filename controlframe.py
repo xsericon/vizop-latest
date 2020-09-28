@@ -1800,7 +1800,7 @@ class ControlFrame(wx.Frame):
 			ThisPHAElement = self.TopLevelFrame.PHAElementInControlPanel
 			ThisComponent = self.TopLevelFrame.ComponentInControlPanel
 			# submit 'delete associated text' request to datacore
-			self.TopLevelFrame.DoDeleteAssociatedText(Proj=Proj, PHAObj=CurrentViewport.PHAObj, Viewport=CurrentViewport,
+			self.TopLevelFrame.DoDeleteAssociatedText(Proj=Proj, Viewport=CurrentViewport,
 				PHAElement=ThisPHAElement, AssociatedTextKind=Aspect.ATKind,
 				Component=ThisComponent, DoomedAssociatedTextIndex=DeleteWidgetClicked.AssociatedTextIndex)
 
@@ -1822,7 +1822,7 @@ class ControlFrame(wx.Frame):
 				# check the user typed some visible characters
 				if AssociatedTextAsTyped:
 					# submit to datacore as a new associated text
-					self.TopLevelFrame.DoNewAssociatedText(Proj=Proj, PHAObj=CurrentViewport.PHAObj, Viewport=CurrentViewport,
+					self.TopLevelFrame.DoNewAssociatedText(Proj=Proj, Viewport=CurrentViewport,
 						PHAElement=ThisPHAElement, AssociatedTextKind=Aspect.ATKind,
 						Component=ThisComponent, AssociatedTextContent=AssociatedTextAsTyped)
 			else: # user typed in an existing associated text
@@ -3480,11 +3480,10 @@ class ControlFrame(wx.Frame):
 		# request Viewport to update the PHAObj with the new comment
 		Viewport.DeleteComment(PHAElement=PHAElement, PHAComponent=Component, DoomedCommentIndex=DoomedCommentIndex)
 
-	def DoNewAssociatedText(self, Proj, PHAObj, Viewport, PHAElement, AssociatedTextKind, Component,
+	def DoNewAssociatedText(self, Proj, Viewport, PHAElement, AssociatedTextKind, Component,
 			AssociatedTextContent, Redoing=False):
 		# handle new associated text (action item/parking lot item) creation in a Component of a PHAElement
 		assert isinstance(Proj, projects.ProjectItem)
-		assert isinstance(PHAObj, core_classes.PHAModelBaseClass)
 		assert AssociatedTextKind in (info.ActionItemLabel, info.ParkingLotItemLabel)
 		assert isinstance(AssociatedTextContent, str)
 		assert isinstance(Redoing, bool)
@@ -3506,11 +3505,10 @@ class ControlFrame(wx.Frame):
 			AssociatedTextKind=AssociatedTextKind,
 			AssociatedTextIndex=AssociatedTextIndex, AssociatedTextContent=AssociatedTextContent)
 
-	def DoDeleteAssociatedText(self, Proj, PHAObj, Viewport, PHAElement, Component, DoomedAssociatedTextIndex,
+	def DoDeleteAssociatedText(self, Proj, Viewport, PHAElement, Component, DoomedAssociatedTextIndex,
 			AssociatedTextKind, Redoing=False):
 		# handle deletion of an associated text (action item/parking lot item) in a Component of a PHAElement
 		assert isinstance(Proj, projects.ProjectItem)
-		assert isinstance(PHAObj, core_classes.PHAModelBaseClass)
 		assert isinstance(DoomedAssociatedTextIndex, int)
 		assert AssociatedTextKind in (info.ActionItemLabel, info.ParkingLotItemLabel)
 		assert isinstance(Redoing, bool)
