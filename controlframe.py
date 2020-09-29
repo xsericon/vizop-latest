@@ -630,8 +630,44 @@ class ControlFrame(wx.Frame):
 #				self.GotoControlPanelAspect('Edit-Element-Text', NextMode=self.EditPanelCurrentMode, NextModeArgs=self.CurrentModeArgs, ResetCursorPos=True)
 #				SetTextCtrlFocusAndInsertionPoint(self.ETcontentText, self.ETcontentTextSelection)
 
-		def OnExitVizopRequest(self, Event=None, **Args):
+		def OnExitVizopRequest(self, Event=None, **Args): # redundant?
 			self.TopLevelParent.OnExitVizopRequest(Event)
+
+		def SetAttribsInControlPanelAspects(self, RequiredAspectNames, Viewport, PHAElement, Component):
+			# preset persistent attribs in control panel aspects named in RequiredAspectNames, to enable them to be
+			# refreshed correctly
+			# Viewport: the client-side Viewport to be treated as currently displayed
+			# PHAElement: the element in the client-side Viewport to be treated as currently active, or None
+			# Component: the component in PHAElement to be treated as last clicked (e.g. for comments), or None
+			assert isinstance(RequiredAspectNames, list)
+			assert all(a in self.ControlPanelAspectHash.keys() for a in RequiredAspectNames)
+			assert Viewport in self.CurrentProj.ClientViewports
+			for ThisAspectName in RequiredAspectNames:
+				ThisAspect = self.ControlPanelAspectHash[ThisAspectName]
+				ThisAspect.CurrentArgs['PHAObjInControlPanel'] = Viewport
+				ThisAspect.CurrentArgs['PHAElementInControlPanel'] = PHAElement
+				ThisAspect.CurrentArgs['ComponentInControlPanel'] = Component
+
+		def LineupControlPanelAspects(self, RequiredAspectNames):
+			# show required aspects in ControlPanel and hide all others
+			# RequiredAspectNames (list of str): names of aspects required, in order%%%
+			assert isinstance(RequiredAspectNames, list)
+			assert all(a in self.ControlPanelAspectHash.keys() for a in RequiredAspectNames)
+			# hide all existing aspects: work through existing notebook tabs in reverse order
+			for ThisTabIndex in range(self.MyNotebook.GetPageCount() - 1, -1, -1):
+				ThisAspect = self.MyNotebook.GetPage(ThisTabIndex)
+				# deactivate current aspect
+				if ThisAspect is self.ControlPanelCurrentAspect:
+					ThisAspect.Deactivate(Widgets=ThisAspect.WidgetList)
+				# remove tab
+				self.MyNotebook.RemovePage(ThisTabIndex)
+				ThisAspect.IsInNotebook = False
+			# insert required aspects into the now-empty notebook
+			for AspectNameToAdd in RequiredAspectNames:
+				AspectToAdd = self.ControlPanelAspectHash[AspectNameToAdd]
+				self.MyNotebook.AddPage(page=AspectToAdd.NotebookPage, text=AspectToAdd.TabText)
+				AspectToAdd.IsInNotebook = True
+				self.RedrawControlPanelAspect(Aspect=AspectToAdd)
 
 		def GotoControlPanelAspect(self, NewAspect=None, Viewport=None, **Args):
 			# Display required widgets in ControlPanel according to requested NewAspect
@@ -686,13 +722,7 @@ class ControlFrame(wx.Frame):
 				self.ControlPanelCurrentAspect.Deactivate(Widgets=self.ControlPanelCurrentAspect.WidgetList)
 			# get target aspect, if supplied as a string
 			if isinstance(NewAspect, str):
-				TargetAspect = {'CPAspect_NumValue': self.NumericalValueAspect,
-					'CPAspect_FaultTree': self.FaultTreeAspect,
-					'CPAspect_FTConnectorOut': self.FTConnectorOutAspect,
-					'CPAspect_Comment': self.CommentAspect,
-					'CPAspect_ActionItems': self.ActionItemsAspect,
-					'CPAspect_ParkingLot': self.ParkingLotAspect
-										}.get(NewAspect, None)
+				TargetAspect = self.ControlPanelAspectHash.get(NewAspect, None)
 			else: TargetAspect = NewAspect
 			if TargetAspect: # any recognised aspect supplied?
 				self.ControlPanelCurrentAspect = TargetAspect # store new aspect
@@ -701,7 +731,8 @@ class ControlFrame(wx.Frame):
 				self.ComponentInControlPanel = Args.get('ComponentInControlPanel', None)
 				# fetch UndoOnCancel value to store in undo record for any tasks that should be undone when Cancel pressed
 				self.UndoOnCancel = Args.get('UndoOnCancel', None)
-				# prefill widgets in new aspect and activate it. TODO consider calling RedrawControlPanelAspect() instead
+				# prefill widgets in new aspect and activate it
+				self.RedrawControlPanelAspect(Aspect=TargetAspect)
 				TargetAspect.Prefill(**Args)
 				TargetAspect.SetWidgetVisibility(**Args)
 				# set up the notebook tab for the aspect
@@ -717,11 +748,12 @@ class ControlFrame(wx.Frame):
 			else: print('CF744 warning, unrecognised control panel aspect "%s" requested' % str(NewAspect))
 			# Note: we may need to remove notebook pages not currently required; use Notebook.RemovePage(page=PageIndex)
 
-		def RedrawControlPanelAspect(self):
-			# repopulates all widgets in the current control panel aspect
-			self.ControlPanelCurrentAspect.Prefill(**self.ControlPanelCurrentAspect.CurrentArgs)
-			self.ControlPanelCurrentAspect.SetWidgetVisibility(**self.ControlPanelCurrentAspect.CurrentArgs)
-			self.ControlPanelCurrentAspect.Activate(**self.ControlPanelCurrentAspect.CurrentArgs)
+		def RedrawControlPanelAspect(self, Aspect):
+			# repopulates all widgets in the required control panel aspect%%%
+			assert isinstance(Aspect, self.ControlPanelAspectItem)
+			Aspect.Prefill(**Aspect.CurrentArgs)
+			Aspect.SetWidgetVisibility(**Aspect.CurrentArgs)
+			Aspect.Activate(**Aspect.CurrentArgs)
 
 		def WidgetsInPosition(self, WidgList, StartingRow=1, ColOffset=0):
 			# set up widgets in WidgList (list of UIWidgetItems) for insertion into an overall widget list at StartingRow
@@ -1000,7 +1032,15 @@ class ControlFrame(wx.Frame):
 #			self.ECWidgets = [self.ECHeadTitle, self.ECProjTitle, self.ECViewportTitle, self.OnECNewViewportButton,
 #				self.ECViewportDestroyButton, self.InputDocsButton, self.ECAboutButton, self.ECExitButton]
 #			self.ExitVizopWidget = [self.ECExitButton]
-#
+			# make hash with keys = aspect names, values = aspect objects
+			self.ControlPanelAspectHash = {'CPAspect_NumValue': self.NumericalValueAspect,
+				'CPAspect_PHAModels': self.PHAModelsAspect,
+				'CPAspect_FaultTree': self.FaultTreeAspect,
+				'CPAspect_FTConnectorOut': self.FTConnectorOutAspect,
+				'CPAspect_Comment': self.CommentAspect,
+				'CPAspect_ActionItems': self.ActionItemsAspect,
+				'CPAspect_ParkingLot': self.ParkingLotAspect
+					}
 			self.SetInitialControlPanelAspect() # set initial appearance of control panel, before loading project
 
 		def UpdateNavigationButtonStatus(self, Proj):
@@ -1566,15 +1606,15 @@ class ControlFrame(wx.Frame):
 			# set up ConnectorNameText and ConnectorDescriptionText
 			# TODO limit length displayed. Smart ellipsization?
 			self.FTConnectorOutAspect.ConnectorNameText.Widget.ChangeValue(
-				self.TopLevelFrame.PHAObjInControlPanel.HumanName)
+				self.TopLevelFrame.PHAElementInControlPanel.HumanName)
 			self.FTConnectorOutAspect.ConnectorNameText.Widget.SelectAll()
 			self.FTConnectorOutAspect.ConnectorNameText.PHAObj = self.TopLevelFrame.PHAObjInControlPanel
 			self.FTConnectorOutAspect.ConnectorDescriptionText.Widget.ChangeValue(
-				self.TopLevelFrame.PHAObjInControlPanel.Description)
+				self.TopLevelFrame.PHAElementInControlPanel.Description)
 			self.FTConnectorOutAspect.ConnectorDescriptionText.Widget.SelectAll()
 			self.FTConnectorOutAspect.ConnectorDescriptionText.PHAObj = self.TopLevelFrame.PHAObjInControlPanel
 			# set up lineup of variable widgets
-			self.LineupVariableWidgetsForFTConnectorOutAspect(ConnectorOut=self.TopLevelFrame.PHAObjInControlPanel,
+			self.LineupVariableWidgetsForFTConnectorOutAspect(ConnectorOut=self.TopLevelFrame.PHAElementInControlPanel,
 				NotebookPage=self.FTConnectorOutAspect.NotebookPage)
 
 		def SetWidgetVisibilityforFTConnectorOutAspect(self, **Args): # set IsVisible attrib for each widget
@@ -1734,12 +1774,13 @@ class ControlFrame(wx.Frame):
 				type(self.TopLevelFrame.PHAElementInControlPanel).HumanName)
 			self.CommentAspect.ElementNameLabel.Widget.SetLabel(
 				self.TopLevelFrame.PHAElementInControlPanel.HumanName)
-			self.CommentAspect.CommentKindLabel.Widget.SetLabel(
-				self.TopLevelFrame.ComponentInControlPanel.CommentKindHuman)
+			self.CommentAspect.CommentKindLabel.Widget.SetLabel(getattr(self.TopLevelFrame.ComponentInControlPanel,
+				'CommentKindHuman', _('<No commentable item selected>')))
 			# set up lineup of variable widgets
-			self.LineupVariableWidgetsForCommentAspect(TargetElement=Args['PHAElementInControlPanel'],
-				CommentListAttrib=self.TopLevelFrame.ComponentInControlPanel.CommentKind,
-				NotebookPage=self.CommentAspect.NotebookPage)
+			if self.TopLevelFrame.ComponentInControlPanel is not None:
+				self.LineupVariableWidgetsForCommentAspect(TargetElement=Args['PHAElementInControlPanel'],
+					CommentListAttrib=self.TopLevelFrame.ComponentInControlPanel.CommentKind,
+					NotebookPage=self.CommentAspect.NotebookPage)
 
 		def SetWidgetVisibilityforCommentAspect(self, **Args): # set IsVisible attrib for each widget
 			# set IsVisible attribs for all fixed and variable widgets
@@ -1963,6 +2004,7 @@ class ControlFrame(wx.Frame):
 				self.ParentFrame = ParentFrame
 				self.TopLevelFrame = TopLevelFrame
 				self.PrefillMethod = PrefillMethod
+				self.CurrentArgs = {} # args to restore when aspect is redrawn
 				self.SetWidgetVisibilityMethod = SetWidgetVisibilityMethod
 				self.NotebookPage = NotebookPage
 				self.TabText = TabText
@@ -3318,7 +3360,7 @@ class ControlFrame(wx.Frame):
 		# refresh control frame GUI
 		self.UpdateMenuStatus()
 		# refresh control panel
-		self.MyControlPanel.RedrawControlPanelAspect()
+		self.MyControlPanel.RedrawControlPanelAspect(Aspect=self.MyControlPanel.ControlPanelCurrentAspect)
 		self.MyControlPanel.UpdateNavigationButtonStatus(Proj=Proj)
 
 	def ShowViewport(self, MessageReceived=None, MessageAsXMLTree=None, **Args):

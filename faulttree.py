@@ -726,7 +726,7 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 		for (Attrib, Value) in Args.items(): setattr(self, Attrib, Value)
 
 	def CreateContextMenu(self, HostEl=None):
-		# create and return context menu (wx.Menu instance)%%%
+		# create and return context menu (wx.Menu instance)
 		# HostEl: host object, or None
 		assert isinstance(HostEl,  (FTEvent, FTGate, FTConnector)) or (HostEl is None)
 		HostTypeHumanName = '' if HostEl is None else HostEl.ClassHumanName
@@ -742,7 +742,7 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 		return MyCM
 
 	def CreateContextMenu(self, HostEl=None):
-		# create and return context menu (wx.Menu instance)%%%
+		# create and return context menu (wx.Menu instance)
 		# HostEl: host object, or None
 		print('FT731 HostEl: ', type(HostEl))
 		assert isinstance(HostEl,  (FTEvent, FTGate, FTConnector, FTHeader))
@@ -5994,7 +5994,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		self.ConnectButtons = []
 
 	def CreateContextMenu(self, **Args):
-		# create and return default context menu for FT (wx.Menu instance)%%%
+		# create and return default context menu for FT (wx.Menu instance)
 		MyCM = wx.Menu(title=_('Fault tree'))
 		# it would be nice to put self.HumanName as title, but it would need to be dynamically refreshed every time
 		# the menu is displayed
@@ -6409,11 +6409,11 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 					RedrawEntireFT=False, SetAsLastSelected=(ThisEl is NewlyCreatedElements[-1]))
 		else: self.CurrentElements = [e for e in WalkOverAllFTObjs(self) if e.ID in self.CurrentElementIDsToSelectOnRefresh]
 		self.ExistingElementIDsOnLastRefresh = [e.ID for e in WalkOverAllFTObjs(self)]
+		# line up required control panel aspects
+		self.LineupControlPanelAspects(CurrentElements=self.CurrentElements, CurrentComponent=None)
 		# request appropriate control panel aspect
 		self.SwitchToPreferredControlPanelAspect(CurrentElements=self.CurrentElements,
 			AspectRequired=self.PreferredControlPanelAspect, ComponentEdited=self.ComponentEdited)
-#		# bind required events to display device
-#		ActivateBindings(BindingsToDisplDevice=self.RequiredBindingsToDisplDevice)
 
 	def RenderInDC(self, TargetDC, FullRefresh=True, BitmapMinSize=None, DrawZoomTool=True, **Args):
 		# render all FT elements into TargetDC provided
@@ -7208,6 +7208,30 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 				self.LastElementSelected = TargetFTElement
 			# store which elements are selected, for next refresh
 			self.CurrentElementIDsToSelectOnRefresh = [e.ID for e in self.CurrentElements]
+
+	def LineupControlPanelAspects(self, CurrentElements, CurrentComponent):
+		# identify which control panel aspects should be shown, depending on CurrentElements (list of element items)
+		# and request control panel to line up and populate the required aspects%%%
+		# CurrentComponent: the relevant component of a PHAElement, e.g. a comment button
+		assert isinstance(CurrentElements, list)
+		# first, make list of always-visible control panel aspects
+		RequiredAspects = ['CPAspect_PHAModels', 'CPAspect_FaultTree']
+		# if exactly one element is selected, add comment, action item and parking lot aspects.
+		# Also insert specific aspect to show for current element, if it has one
+		if len(self.CurrentElements) == 1:
+			if hasattr(type(self.CurrentElements[0]), 'ControlPanelAspect'):
+				RequiredAspects.append(type(self.CurrentElements[0]).ControlPanelAspect)
+			RequiredAspects.append('CPAspect_Comment') # TODO only if a relevant component is activated?
+			# add action items and parking lot aspects, if a relevant component has been activated
+			if hasattr(CurrentComponent, 'AssociatedTextListAttrib'):
+				RequiredAspects.extend(['CPAspect_ActionItems', 'CPAspect_ParkingLot'])
+			ActiveElementForControlPanel = self.CurrentElements[0]
+		else: ActiveElementForControlPanel = None
+		# populate args of all required aspects, so that they get refreshed properly; then line them up and refresh them
+		self.DisplDevice.TopLevelFrame.MyControlPanel.SetAttribsInControlPanelAspects(
+			RequiredAspectNames=RequiredAspects, Viewport=self, PHAElement=ActiveElementForControlPanel,
+			Component=None)
+		self.DisplDevice.TopLevelFrame.MyControlPanel.LineupControlPanelAspects(RequiredAspectNames=RequiredAspects)
 
 	def SwitchToPreferredControlPanelAspect(self, CurrentElements, AspectRequired=None, **Args):
 		# if appropriate, ask our display device's Control Panel to go to the preferred aspect, considering which
