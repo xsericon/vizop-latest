@@ -478,6 +478,10 @@ class NumValueItem(object): # superclass of objects in Datacore having a numeric
 		self.InfinityFlagFamily[RR] = True
 		self.SetMyStatus(NewStatus='ValueStatus_OK', RR=RR)
 
+	def SetToUndefined(self, RR=DefaultRiskReceptor): # set value as undefined for this risk receptor)
+		assert RR in self.ValueFamily.keys()
+		self.SetMyStatus(NewStatus='ValueStatus_Unset', RR=RR)
+
 	def GetMyUnit(self): # returns unit (instance of UnitItem)
 		assert isinstance(self.MyUnit, UnitItem)
 		return self.MyUnit

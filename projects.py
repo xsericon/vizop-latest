@@ -1357,8 +1357,9 @@ def AddValueElement(StartEl, ValueTag, ValueObj):
 			ThisRRTag = ElementTree.SubElement(TopTag, info.RiskReceptorTag)
 			ThisRRIDTag = ElementTree.SubElement(ThisRRTag, info.IDTag)
 			ThisRRIDTag.text = ThisRR.ID
+			# write number value. Invalid numbers (e.g. undefined) are stored as InvalidNumberLabel
 			ThisRRValueTag = ElementTree.SubElement(ThisRRTag, info.ValueTag)
-			ThisRRValueTag.text = str(ValueObj.GetMyValue(RR=ThisRR))
+			ThisRRValueTag.text = str(ValueObj.GetMyValue(RR=ThisRR, InvalidResult=info.InvalidNumberLabel))
 			# TODO also store SigFigs and Sci per RR?
 			if ValueObj.InfinityFlagFamily[ThisRR]:
 				ThisRRInfiniteTag = ElementTree.SubElement(ThisRRTag, info.InfiniteTag)
@@ -1413,7 +1414,9 @@ def UnpackValueFromXML(Proj, XMLEl):
 				NewNumber.SetToInfinite(RR=RRToUse)
 			else: # finite value
 				ThisRRValue = ThisRRTag.findtext(info.ValueTag)
-				NewNumber.SetMyValue(NewValue=utilities.str2real(s=ThisRRValue), RR=RRToUse)
+				# check if number value is invalid
+				if ThisRRValue == info.InvalidNumberLabel: NewNumber.SetToUndefined(RR=RRToUse)
+				else: NewNumber.SetMyValue(NewValue=utilities.str2real(s=ThisRRValue), RR=RRToUse)
 		# fetch unit
 		NewNumber.SetMyUnit(utilities.InstanceWithAttribValue(ObjList=core_classes.AllSelectableUnits,
 			AttribName='XMLName', TargetValue=XMLEl.findtext(info.UnitTag)))

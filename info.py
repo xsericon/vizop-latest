@@ -295,6 +295,7 @@ AssociatedTextsSelectedTag = 'ATsSelected'
 ItemsToIncludeTag = 'ItemsToInclude'
 UserTag = 'User'
 UnknownTag = 'Unknown'
+InvalidNumberLabel = 'Invalid'
 
 FTImagePrefix = 'FT_' # filenames containing all images used in FT must begin with this
 ProjInfoImagePrefix = 'ProjInfo_'

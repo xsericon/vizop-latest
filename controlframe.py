@@ -739,6 +739,7 @@ class ControlFrame(wx.Frame):
 				TargetAspect.Activate()
 				# switch to tab for new aspect
 				if TargetAspect.IsInNotebook: # does the notebook already have a tab for this aspect?
+					print('CF742 switching to notebook tab: ', TargetAspect.InternalName)
 					self.MyNotebook.ChangeSelection(self.MyNotebook.FindPage(TargetAspect.NotebookPage))
 				else: # no tab yet; make one, and insert it at the end
 					self.MyNotebook.InsertPage(index=self.MyNotebook.GetPageCount(), page=TargetAspect.NotebookPage,
