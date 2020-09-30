@@ -88,10 +88,10 @@ class ProjectItem(object): # class of PHA project instances
 		self.CauseKinds = []
 		# instances of RiskReceptorItem defined for this project. This is temporary; currently it gets overwritten in
 		# SetupDefaultTolRiskModel()
-		self.RiskReceptors = [core_classes.RiskReceptorItem(ID='DefaultNewProj', XMLName='People', HumanName=_('People'))]
+#		self.RiskReceptors = [core_classes.RiskReceptorItem(ID='DefaultNewProj', XMLName='People', HumanName=_('People'))]
+		self.RiskReceptors = []
 		self.NumberSystems = [core_classes.SerialNumberChunkItem()] # instances of NumberSystemItem. Not used;
 			# to get number systems, call GetAllNumberingSystems()
-#		self.TolRiskModels = [] # instances of TolRiskModel subclasses; superseded by RiskMatrices
 		self.CurrentTolRiskModel = None
 		self.Constants = [] # instances of ConstantItem
 		# the following is for testing
@@ -1178,15 +1178,15 @@ def SetupDefaultTolRiskModel(Proj):
 	TolFreqValues = [ [1e-2, 1e-3, 1e-4, 1e-5], [1e-2, 1e-3, 1e-4, 1e-5], [1e-1, 1e-2, 1e-3, 1e-4],
 					  [5e-2, 5e-3, 5e-4, 5e-5] ]
 	# populate tol freq table with empty value objects
-	MyTolFreqTable.Values = [core_classes.UserNumValueItem() for ThisCat in MyTolFreqTable.Keys[0]]
+	MyTolFreqTable.Values = [core_classes.UserNumValueItem(DefaultRR=False) for ThisCat in MyTolFreqTable.Keys[0]]
 	# put the required values from TolFreqValues into the value objects
 	for ThisSevCatIndex in range(len(MyTolFreqTable.Keys[ThisDimension])):
 		ThisTolFreqValue = MyTolFreqTable.Values[ThisSevCatIndex]
 		for ThisRRIndex, ThisRR in enumerate(TolRiskModel.RiskReceptors):
 			ThisTolFreqValue.SetMyValue(NewValue=TolFreqValues[ThisRRIndex][ThisSevCatIndex], RR=ThisRR)
 		ThisTolFreqValue.SetMyUnit(core_classes.PerYearUnit)
+		print('PR1188 risk receptors in matrix values: ', len(ThisTolFreqValue.ValueFamily))
 	# put tol risk model into project
-#	Proj.TolRiskModels.append(TolRiskModel)
 	Proj.RiskMatrices.append(TolRiskModel)
 	Proj.CurrentTolRiskModel = TolRiskModel
 

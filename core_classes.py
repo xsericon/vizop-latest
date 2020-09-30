@@ -401,21 +401,31 @@ class NumValueItem(object): # superclass of objects in Datacore having a numeric
 	AttribsWithRRKeys = [ ('ValueFamily', None), ('UserValueFamily', None), ('IsSetFlagFamily', None),
 		('InfinityFlagFamily', False), ('SigFigs', info.DefaultSigFigs), ('Sci', False) ]
 
-	def __init__(self, HostObj=None, **Args):
+	def __init__(self, HostObj=None, DefaultRR=True, **Args):
 		# HostObj: None, or the object containing this NumValueItem instance,
 		# which can optionally provide a CheckValue(v=NumValueItem instance) method
+		# DefaultRR (bool): whether to insert a default risk receptor into the number
+		assert isinstance(DefaultRR, bool)
 		object.__init__(self)
 		self.HumanName = _('<undefined>')
-		# set numerical values per risk receptor. Must include DefaultRiskReceptor key. None means value not defined
-		self.ValueFamily = {DefaultRiskReceptor: None} # current numerical values of instance per risk receptor
-		self.UserValueFamily = {DefaultRiskReceptor: None} # values provided by user.
-			# Kept for reversion if we switch to another type (eg constant), then back again
-			# TODO superseded by PersistentAttribs?
-		self.IsSetFlagFamily = {DefaultRiskReceptor: None} # ValueStatus (member of ValueStati) per risk receptor
-		self.InfinityFlagFamily = {DefaultRiskReceptor: False} # bool per risk receptor; whether value is infinite
-		self.SigFigs = {DefaultRiskReceptor: info.DefaultSigFigs} # int per risk receptor; how many sig figs for display
-		self.Sci = {DefaultRiskReceptor: False} # bool per risk receptor; whether to always use scientific notation
-			# TODO: consider whether SigFigs and Sci should be common for all RR's
+		# set numerical values per risk receptor. None means value not defined
+		if DefaultRR:
+			self.ValueFamily = {DefaultRiskReceptor: None} # current numerical values of instance per risk receptor
+			self.UserValueFamily = {DefaultRiskReceptor: None} # values provided by user.
+				# Kept for reversion if we switch to another type (eg constant), then back again
+				# TODO superseded by PersistentAttribs?
+			self.IsSetFlagFamily = {DefaultRiskReceptor: None} # ValueStatus (member of ValueStati) per risk receptor
+			self.InfinityFlagFamily = {DefaultRiskReceptor: False} # bool per risk receptor; whether value is infinite
+			self.SigFigs = {DefaultRiskReceptor: info.DefaultSigFigs} # int per risk receptor; how many sig figs for display
+			self.Sci = {DefaultRiskReceptor: False} # bool per risk receptor; whether to always use scientific notation
+		else: # no default RR
+			self.ValueFamily = {}
+			self.UserValueFamily = {}
+			self.IsSetFlagFamily = {}
+			self.InfinityFlagFamily = {}
+			self.SigFigs = {}
+			self.Sci = {}
+		# TODO: consider whether SigFigs and Sci should be common for all RR's
 		self.MyUnit = NullUnit
 		self.HostObj = HostObj
 
@@ -670,9 +680,11 @@ class UserNumValueItem(NumValueItem): # class of NumValues for which user suppli
 	HumanName = _('User defined')
 	XMLName = 'User'
 
-	def __init__(self, HostObj=None, **Args): # Args can contain any special attribs with initial values. These will be preserved on
+	def __init__(self, HostObj=None, DefaultRR=True, **Args):
+		# DefaultRR (bool): whether to insert a default risk receptor
+		# Args can contain any special attribs with initial values. These will be preserved on
 		# save only if listed in NumValueItem.PersistentAttribs
-		NumValueItem.__init__(self, HostObj, **Args)
+		NumValueItem.__init__(self, HostObj=HostObj, DefaultRR=DefaultRR, **Args)
 		self.MyAcceptableUnits = []
 		self.__dict__.update(Args)
 

@@ -3767,10 +3767,12 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		self.Columns = [FTColumnInCore(self)] # contains FTColumnInCore instances. Start with one empty column
 		# AttribTypeHash (dict): keys are attrib names in FTObjectInCore (str), values are acceptable values for the attrib (list)
 		# Need a key for each attrib that presents to the user as a choice widget
+		print('FT3770 risk model type: ', type(Proj.RiskMatrices[0]))
 		self.MyTolRiskModel = Proj.RiskMatrices[0]
 		# set initial severity per risk receptor = maximum severity. Severity is dict: {RR: Severity category object}
 		SeverityObjs = self.MyTolRiskModel.Keys[self.MyTolRiskModel.SeverityDimensionIndex]
 		# preset default severity per risk receptor to max severity. List of RRs is grabbed from 0th value in RiskMatrix
+		print('FT3774 number of RRs in severity: ', len(utilities.Flatten(l=self.MyTolRiskModel.Values)[0].ValueFamily.keys()))
 		self.Severity = dict([(RR, SeverityObjs[-1])
 			for RR in utilities.Flatten(l=self.MyTolRiskModel.Values)[0].ValueFamily.keys()])
 		# get initial tolerable frequency value (value object containing all RRs), based on defaults in tolerable risk model
@@ -5815,8 +5817,6 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		for ThisRRTag in SeverityTopTag.findall(info.RRTag):
 			self.Severity[utilities.ObjectWithID(Objects=Proj.RiskReceptors, TargetID=ThisRRTag.findtext(info.IDTag))] \
 				= AvailableSeverities[int(ThisRRTag.findtext(info.SeverityValueTag))]
-#				= utilities.InstanceWithAttribValue(ObjList=AvailableSeverities, AttribName='XMLName',
-#				TargetValue=ThisRRTag.findtext(info.XMLNameTag))
 		# set TolFreq based on severity
 		self.SetTolFreq()
 		# get ModelGate tag, if any, ready to identify actual gate
@@ -6949,67 +6949,158 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			# tidy up display
 			self.DisplDevice.Redraw(FullRefresh=False)
 
+		# start of main procedure for HandleMouseLDragEndEditingConnection()
 		StartClickObj = self.EditingConnectionStartButton.HostObject # the object associated with the connect button dragged from
 		self.EditingConnection = False
 		# remove floating layer containing the drag buttons and line
 		self.FloatingLayers.remove(self.EditingConnectionStartButton.FloatLayer)
-		# we consider the 12 possible cases listed in FT specification.
-		# Did we hit a connect button (apart from the starting button)? (filters out "drag to itself" in cases 2, 8)
+		# Did we hit a connect button? Find it
 		EndButtonCandidates = [b for b in self.ConnectButtons if b.MouseHit(MouseX, MouseY,
-			TolXInPx=self.DisplDevice.TolXInPx, TolYInPx=self.DisplDevice.TolYInPx)
-			if b is not self.EditingConnectionStartButton]
-		# did we hit a connect button that we can connect to?
-#		EndButtonCandidates = [b for b in self.EditingConnectionCanConnectTo if b.MouseHit(MouseX, MouseY,
-#			TolXInPx=self.DisplDevice.TolXInPx, TolYInPx=self.DisplDevice.TolYInPx)]
-		if EndButtonCandidates:
-			EndClickObj = EndButtonCandidates[0].HostObject # destination FT object for the connection
-			# did we start at a left button (output)?
-			if self.EditingConnectionStartButton.IsLeft:
-				# is the starting output already connected to any input?
-				if StartClickObj.ConnectTo:
-					# did we end at another output?
-					if EndButtonCandidates[0].IsLeft:
-						# move all the connections from the old output to the new one, case 4
-						SendRequest(DisconnectList=[(StartClickObj, To) for To in StartClickObj.ConnectTo],
-							ConnectList=[(EndClickObj, To) for To in StartClickObj.ConnectTo])
-					else: # ended at an input: add connection from output to input if not already connected, cases 5 and 6
-						SendRequest(ConnectList=[(StartClickObj, EndClickObj)])
-				else: # starting output not connected to anything
-					if EndButtonCandidates[0].IsLeft: # did we drag to another output? do nothing, case 2b
-						NoChangeToConnections()
-					else: # dragged to an input: make new connection, case 1
-						print("FT3908 case 1: from, to: ",  StartClickObj.ID, EndClickObj.ID)
-						SendRequest(ConnectList=[(StartClickObj, EndClickObj)])
-			else: # started at a right button (input)
-				StartObjConnectedFrom = JoinedFrom(FT=self, FTObj=StartClickObj, FirstOnly=False) # get connected outputs
-				if StartObjConnectedFrom: # is the starting input already connected?
-					if EndButtonCandidates[0].IsLeft: # did we end at an output?
-						# connect if not already connected, cases 11 and 12
-						SendRequest(ConnectList=[(EndClickObj, StartClickObj)])
-					else: # ended at an input: move connections from old to new input, case 10
-						print("FT3915 case 10")
-						SendRequest(DisconnectList=[(From, StartClickObj) for From in StartObjConnectedFrom],
-							ConnectList=[(From, EndClickObj) for From in StartObjConnectedFrom])
-				else: # starting input not connected to anything
-					if EndButtonCandidates[0].IsLeft: # did we end at an output? connect output to input, case 7
-						SendRequest(ConnectList=[(EndClickObj, StartClickObj)])
-					else: # dragged from unconnected input to another input: do nothing, case 8b
-						NoChangeToConnections()
-		else: # no valid end button hit
-			if self.EditingConnectionStartButton.IsLeft: # started at a left (output) button?
-				if StartClickObj.ConnectTo:
-					# already connected to something(s)? Disconnect all of them, case 3
-					SendRequest(DisconnectList=[(StartClickObj, To) for To in StartClickObj.ConnectTo])
-				else: # not connected to anything; do nothing, case 2a
+			TolXInPx=self.DisplDevice.TolXInPx, TolYInPx=self.DisplDevice.TolYInPx)]
+		EndButton = EndButtonCandidates[0] if EndButtonCandidates else None
+#			if b is not self.EditingConnectionStartButton]
+		if EndButton:
+			EndClickObj = EndButton.HostObject # destination FT element for the connection
+			EndClickObjIsGate = isinstance(EndClickObj, FTGate)
+			# find the element(s) to which end button's host element is connected, whether on left or right%%%
+			EndClickObjConnectedTo = EndClickObj.ConnectTo[:] if EndButton.IsLeft else \
+				JoinedFrom(FT=self, FTObj=EndClickObj, FirstOnly=False)
+		ConnectList = [] # new connections to be made
+		DisconnectList = []
+		# we consider the 35 possible cases listed in FT Viewport specification 390.
+		if self.EditingConnectionStartButton.IsLeft: # cases 1~11: started on left button
+			if not StartClickObj.ConnectTo: # cases 1~6: started on left button not connected to anything
+				if not EndButton: # case 1: end on empty space
 					NoChangeToConnections()
-			else: # started at a right (input) button
-				# get list of outputs this input is connected to
-				JoinedFromObjs = JoinedFrom(FT=self, FTObj=StartClickObj, FirstOnly=False)
-				if JoinedFromObjs:
-					# already connected to something(s)? Disconnect all of them, case 9
-					SendRequest(DisconnectList=[(From, StartClickObj) for From in JoinedFromObjs])
-				else: # not connected to anything; do nothing, case 8
+				elif EndButton is self.EditingConnectionStartButton: # case 2: dragged back to same button
 					NoChangeToConnections()
+				elif EndButton.IsLeft: # case 3: dragged to another left button
+					NoChangeToConnections()
+				elif not EndClickObjConnectedTo: # case 4: dragged to unconnected right button: Make connection
+					ConnectList = [ (StartClickObj, EndClickObj) ]
+				elif EndClickObjIsGate: # case 5: dragged to gate: make connection
+					ConnectList = [ (StartClickObj, EndClickObj) ]
+				else: # case 6: dragged to other occupied element: delete existing connection and add new connection
+					ConnectList = [ (StartClickObj, EndClickObj) ]
+					DisconnectList = [(e, EndClickObj) for e in EndClickObjConnectedTo]
+			else: # cases 7~11: started on left button already connected to something
+				if not EndButton: # case 7: end on empty space: disconnect all connections to the start button
+					DisconnectList = [ (StartClickObj, e) for e in StartClickObj.ConnectTo ]
+				elif EndButton is self.EditingConnectionStartButton: # case 8: dragged back to same button
+					NoChangeToConnections()
+				elif EndButton.IsLeft and not EndClickObjConnectedTo: # case 9: dragged to another empty left button:
+					# move connections
+					ConnectList = [ (EndClickObj, e) for e in StartClickObj.ConnectTo ]
+					DisconnectList = [ (StartClickObj, e) for e in StartClickObj.ConnectTo ]
+				elif EndButton.IsLeft: # case 10: move any connections allowed by fan-out rules
+					if self.FanOutRulesAllowConnection(LeftEl=EndClickObj, CandidateRightEls=StartClickObj.ConnectTo):
+						ConnectList = [(EndClickObj, e) for e in StartClickObj.ConnectTo]
+						DisconnectList = [(StartClickObj, e) for e in StartClickObj.ConnectTo]
+					else: NoChangeToConnections()
+				elif not (EndClickObj in StartClickObj.ConnectTo): # case 11a: dragged to any right button not already
+					# connected to the left button: make connection if allowed by fan-out rules
+					if self.FanOutRulesAllowConnection(LeftEl=StartClickObj, CandidateRightEls=[EndClickObj]):
+						ConnectList = [(StartClickObj, EndClickObj) ]
+					else: NoChangeToConnections()
+				else: # case 11b: dragged to any right button already connected to the left button: delete connection
+					DisconnectList = [ (StartClickObj, EndClickObj) ]
+		else: # cases 12~34: started on right button
+			StartClickObjConnectedTo = JoinedFrom(FT=self, FTObj=StartClickObj, FirstOnly=False)
+			if not StartClickObjConnectedTo: # cases 12~16: started on right button not connected to anything
+				if not EndButton: # case 12: end on empty space
+					NoChangeToConnections()
+				elif EndButton is self.EditingConnectionStartButton: # case 13: dragged back to same button
+					NoChangeToConnections()
+				elif not EndButton.IsLeft: # case 14: dragged to any other right button
+					NoChangeToConnections()
+				elif not EndClickObjConnectedTo: # case 15: dragged to empty left button: make new connection
+					ConnectList = [ (EndClickObj, StartClickObj) ]
+				else: # case 16: dragged to occupied left button: make connections if allowed by fan-out rules
+					if self.FanOutRulesAllowConnection(LeftEl=EndClickObj, CandidateRightEls=[StartClickObj]):
+						ConnectList = [(EndClickObj, StartClickObj) ]
+					else: NoChangeToConnections()
+			elif isinstance(StartClickObj, FTGate): # cases 17~25: started on right button on gate
+				if not EndButton: # case 17: end on empty space: delete all connections to start button
+					DisconnectList = [(e, StartClickObj) for e in StartClickObjConnectedTo]
+				elif EndButton is self.EditingConnectionStartButton: # case 18: dragged back to same button
+					NoChangeToConnections()
+				elif not EndButton.IsLeft: # cases 19~22: ended on another right button
+					if isinstance(EndClickObj, FTGate): # cases 19 and 20: ended on another gate: move connections
+						ConnectList = [(e, EndClickObj) for e in StartClickObjConnectedTo]
+						DisconnectList = [(e, StartClickObj) for e in StartClickObjConnectedTo]
+					elif not EndClickObjConnectedTo: # case 21: ended on an unconnected non-gate
+						if len(StartClickObjConnectedTo) == 1: # exactly 1 connection to start button: move connection
+							ConnectList = [(e, EndClickObj) for e in StartClickObjConnectedTo]
+							DisconnectList = [(e, StartClickObj) for e in StartClickObjConnectedTo]
+						else: # do nothing, as we cannot make multiple connections to a non-gate
+							NoChangeToConnections()
+					else: # case 22: ended on a connected non-gate
+						if len(StartClickObjConnectedTo) == 1: # exactly 1 connection to start button:
+							# move connection, and delete existing connections to the end button
+							ConnectList = [(e, EndClickObj) for e in StartClickObjConnectedTo]
+							DisconnectList = [(e, StartClickObj) for e in StartClickObjConnectedTo] + \
+											 [(e, EndClickObj) for e in EndClickObjConnectedTo]
+						else: # do nothing, as we cannot make multiple connections to a non-gate
+							NoChangeToConnections()
+				else: # cases 23~25: started on connected gate on right, ended on left button
+					if not EndClickObjConnectedTo: # case 23: ended on unconnected left button: add new connection
+						ConnectList = [ (EndClickObj, StartClickObj) ]
+					elif not (StartClickObj in EndClickObjConnectedTo): # case 24:
+						# ended on a left button connected to something else, but not to the starting gate:
+						# make new connection, and disconnect everything else connected to the left button
+						ConnectList = [ (EndClickObj, StartClickObj) ]
+						DisconnectList = [(EndClickObj, e) for e in EndClickObjConnectedTo]
+					else: # case 25: ended on a left button already connected to the gate on the right: delete connection
+						DisconnectList = [ (EndClickObj, StartClickObj) ]
+			else: # cases 26~34: started on right button on non-gate
+				if not EndButton: # case 26: end on empty space: disconnect connections to right button
+					DisconnectList = [(e, StartClickObj) for e in StartClickObjConnectedTo]
+				elif EndButton is self.EditingConnectionStartButton: # case 27: dragged back to same button
+					NoChangeToConnections()
+				elif not EndButton.IsLeft: # cases 28~31: ended on right button
+					if EndClickObjIsGate: # cases 28 and 29: ended on a gate on the right: move connections
+						ConnectList = [(e, EndClickObj) for e in StartClickObjConnectedTo]
+						DisconnectList = [(e, StartClickObj) for e in StartClickObjConnectedTo]
+					elif not EndClickObjConnectedTo: # case 30: ended on an unconnected non-gate: move connections
+						ConnectList = [(e, EndClickObj) for e in StartClickObjConnectedTo]
+						DisconnectList = [(e, StartClickObj) for e in StartClickObjConnectedTo]
+					else: # case 31: ended on a connected non-gate:
+						# delete existing connections to the new element, and move connections from old to new element
+						ConnectList = [(e, EndClickObj) for e in StartClickObjConnectedTo]
+						DisconnectList = [(e, StartClickObj) for e in StartClickObjConnectedTo] + \
+							[(e, EndClickObj) for e in EndClickObjConnectedTo]
+				else: # cases 32~34: ended on left button
+					if not EndClickObjConnectedTo: # case 32: ended on an unconnected left button:
+						# do nothing, as user's intention is not clear
+						NoChangeToConnections()
+					elif not (StartClickObj in EndClickObjConnectedTo): # case 33: ended on a left button that's
+						# connected to other objects, but not to the start button:
+						# add a new connection if allowed by fan-out rules
+						if self.FanOutRulesAllowConnection(LeftEl=EndClickObj, CandidateRightEls=[StartClickObj]):
+							ConnectList = [(EndClickObj, StartClickObj)]
+							DisconnectList = [(e, StartClickObj) for e in StartClickObjConnectedTo]
+						else:
+							NoChangeToConnections()
+					else: # case 34: ended on a left button already connected to the right button: delete connection
+						DisconnectList = [ (EndClickObj, StartClickObj) ]
+		# request any required dis/connections
+		if ConnectList or DisconnectList:
+			SendRequest(DisconnectList=DisconnectList, ConnectList=ConnectList)
+
+	def FanOutRulesAllowConnection(self, LeftEl, CandidateRightEls):
+		# determine whether fan-out rules (defined in spec 390) allow all CandidateRightEls (list of FT elements) to
+		# LeftEl (FT element). Return bool: True if all of CandidateRightEls can legally connect to LeftEl.
+		# If CandidateRightEls is empty, return True.
+		assert isinstance(LeftEl, (FTEvent, FTGate, FTConnector))
+		assert isinstance(CandidateRightEls, list)
+		assert all(isinstance(e, (FTEvent, FTGate, FTConnector)) for e in CandidateRightEls)
+		# find out if any FTEvents and FTGates are already connected to LeftEl
+		EventGateAlreadyConnected = any(isinstance(e, (FTEvent, FTGate)) for e in LeftEl.ConnectTo)
+		# count how many FTEvents and FTGates are in CandidateRightEls
+		EventGateCount = [isinstance(e, (FTEvent, FTGate)) for e in CandidateRightEls].count(True)
+		# we can allow a maximum of 1 event or gate in CandidateRightEls if there aren't any already connected to LeftEl,
+		# else none are allowed
+		return (EventGateCount == 0) if EventGateAlreadyConnected else (EventGateCount <= 1)
 
 	def HandleMouseWheel(self, ScreenX, ScreenY, Event):
 		# handle mouse wheel event

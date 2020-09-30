@@ -1771,7 +1771,8 @@ class ControlFrame(wx.Frame):
 			# set up ElementKindLabel, ElementNameLabel and CommentKindLabel
 			# TODO limit length displayed. Smart ellipsization?
 			self.CommentAspect.ElementKindLabel.Widget.SetLabel(
-				type(self.TopLevelFrame.PHAElementInControlPanel).HumanName)
+				self.TopLevelFrame.PHAElementInControlPanel.ClassHumanName)
+#				type(self.TopLevelFrame.PHAElementInControlPanel).HumanName)
 			self.CommentAspect.ElementNameLabel.Widget.SetLabel(
 				self.TopLevelFrame.PHAElementInControlPanel.HumanName)
 			self.CommentAspect.CommentKindLabel.Widget.SetLabel(getattr(self.TopLevelFrame.ComponentInControlPanel,
