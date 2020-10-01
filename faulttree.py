@@ -127,7 +127,8 @@ class ButtonElement(object): # object containing a button and attributes and met
 		self.ControlPanelAspect = ControlPanelAspect
 		self.ArtProviderName = {'EventLinkedButton': 'FT_LinkButton', 'EventGroupedButton': 'FT_GroupButton',
 			'EventCommentButton': 'FT_CommentButton', 'ConnectButton': 'FT_ConnectButton',
-			'EventActionItemButton': 'FT_ActionButton', 'ValueCommentButton': 'FT_CommentButton',
+			'EventActionItemButton': 'FT_ActionButton', 'EventParkingLotItemButton': 'FT_ParkingLotButton',
+			'ValueCommentButton': 'FT_CommentButton',
 			'ValueProblemButton': 'FT_ProblemButton', 'GateLinkedButton': 'FT_LinkButton',
 			'GateLinkedButton': 'FT_LinkButton', 'GateCommentButton': 'FT_CommentButton',
 			'GateActionItemButton': 'FT_ActionButton', 'ValueProblemButton': 'FT_ProblemButton',
@@ -661,7 +662,6 @@ class FTBoxyObject(object): # superclass of vaguely box-like FT components for u
 				Deselect=(Args['Event'].CmdDown() and (self in self.FT.CurrentElements)))
 
 	def HandleContextMenuOnMe(self, **Args): # handle context menu request on element or component
-		print('FT628 invoking context menu for object: ', getattr(self, 'InternalName', 'NoInternalName'))
 		# get this component or element to generate a context menu
 		CMenu = self.CreateContextMenu(HostEl=getattr(self, 'HostObject', None))
 		self.FT.DisplDevice.PopupMenu(menu=CMenu)
@@ -913,16 +913,17 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 		# set drag start position, in case user drags mouse
 		self.FT.LDragStartIndexLean = TargetCharIndexLean
 
-	def HandleMouseLDragOnMe(self, MouseX, MouseY, Event, **Args): # handle mouse left button drag on text element during editing
-		TargetCharIndexLean = text.NearestCharIndexLeanAtXY(TextObj=self.Text, TargetX=MouseX - self.PosXInPx,
-			TargetY=MouseY - self.PosYInPx)
-		self.MoveCursorTo(Event=Event, OldIndex=self.FT.TextEditCursorIndex, NewIndex=TargetCharIndexLean,
-			ExtendSelection=True)
+	def HandleMouseLDragOnMe(self, MouseX, MouseY, Event, **Args):
+		# handle mouse left button drag on text element during editing
+		if self.FT.CurrentEditComponent: # are we editing a text component?
+			TargetCharIndexLean = text.NearestCharIndexLeanAtXY(TextObj=self.Text, TargetX=MouseX - self.PosXInPx,
+				TargetY=MouseY - self.PosYInPx)
+			self.MoveCursorTo(Event=Event, OldIndex=self.FT.TextEditCursorIndex, NewIndex=TargetCharIndexLean,
+				ExtendSelection=True)
 
 	def RedrawDuringEditing(self, Zoom):
 		# redraw the text component during editing, with cursor
 		Buffer = wx.Bitmap(width=self.SizeXInCU * Zoom, height=self.SizeYInCU * Zoom, depth=wx.BITMAP_SCREEN_DEPTH)
-#		Buffer = wx.Bitmap(width=1000, height=500, depth=wx.BITMAP_SCREEN_DEPTH)
 		TextEditDC = wx.MemoryDC(Buffer)
 		# draw background box
 		TextEditDC.SetPen(wx.Pen(EditingTextBorderColour))
@@ -1188,6 +1189,7 @@ class FTEvent(FTBoxyObject): # FT event object in Viewport
 		self.ShowValueComments = True # whether value comments are visible
 		self.ActionItems = [] # str values
 		self.ShowActionItems = True
+		self.ParkingLot = []
 		self.ShowParkingLotItems = True
 		self.EventCommentWidgets = []
 		self.ValueCommentWidgets = []
@@ -1210,13 +1212,13 @@ class FTEvent(FTBoxyObject): # FT event object in Viewport
 	# colours for text and background are defined for individual text components, not for whole FTEvent
 
 	def CreateFixedTextElements(self):
-		# create elements for fixed text items in FTEvent. Return (list of elements at top of FTEvent, list of elements relating to FTEvent's value)
-#		HeaderLabelBkg = (0xdb, 0xf7, 0xf0) # pale green
-		HeaderLabelBkg = ElementHeaderBkgColour
-		ColourLabelBkg = (0x80, 0x3E, 0x51) # plum
-		ColourLabelFg = (0xFF, 0xFF, 0xFF) # white
-		ColourContentBkg = (0x6A, 0xDA, 0xBD) # mint green
-		ColourContentFg = (0x00, 0x00, 0x00) # black
+		# create elements for fixed text items in FTEvent
+		# Return (list of elements at top of FTEvent, list of elements relating to FTEvent's value)
+#		HeaderLabelBkg = ElementHeaderBkgColour
+#		ColourLabelBkg = (0x80, 0x3E, 0x51) # plum
+#		ColourLabelFg = (0xFF, 0xFF, 0xFF) # white
+#		ColourContentBkg = (0x6A, 0xDA, 0xBD) # mint green
+#		ColourContentFg = (0x00, 0x00, 0x00) # black
 		# column widths: 100, 100, 100, 50, 50
 		# any element with MinHeight attrib set is growable in the y axis to fit the text.
 		# it should be assigned to the Row that it can force to grow
@@ -1236,89 +1238,87 @@ class FTEvent(FTBoxyObject): # FT event object in Viewport
 			HostObject=self, InternalName='EventDescription', EditBehaviour='Text', HorizAlignment='Left',
 			MaxWidthInCU=400,
 			ContextMenuMethod = self.CreateContextMenu)
-		EventLinkedButton = ButtonElement(self.FT, Row=2, ColStart=1, ColSpan=1, StartX=300, EndX=349,
-			HostObject=self, InternalName='EventLinkedButton', Stati=('OutNotExist', 'OutExist'),
-			LSingleClickHandler=None,
-			ContextMenuMethod = self.CreateContextMenu)
-		EventGroupedButton = ButtonElement(self.FT, Row=2, ColStart=2, ColSpan=1, StartX=350, EndX=399,
-			HostObject=self, InternalName='EventGroupedButton', Stati=('OutNotExist', 'OutExist'),
-			LSingleClickHandler=None,
-			ContextMenuMethod = self.CreateContextMenu)
 		EventCommentButton = ButtonElement(self.FT, Row=1, ColStart=6, ColSpan=1, StartX=300, EndX=349,
 			HostObject=self, InternalName='EventCommentButton', Stati=('OutNotExist', 'OutExist'),
 			LSingleClickHandler='HandleMouseLClickOnCommentButton', CommentKind='EventDescriptionComments',
-			ContextMenuMethod = self.CreateContextMenu)
-		EventActionItemButton = ButtonElement(self.FT, Row=2, ColStart=3, ColSpan=1, StartX=350, EndX=399,
-			HostObject=self, InternalName='EventActionItemButton', Stati=('OutNotExist', 'OutExist'),
-			LSingleClickHandler='HandleMouseLClickOnActionItemButton',
+			ControlPanelAspect='CPAspect_Comment', CommentKindHuman=_('Event description'),
 			ContextMenuMethod = self.CreateContextMenu)
 		EventValue = TextElement(self.FT, RowBase=0, ColStart=0, ColSpan=1, EndX=99, EditBehaviour='Text',
-			HostObject=self, InternalName='Value', ControlPanelAspect='CPAspect_NumValue',
+			HostObject=self, InternalName='Value', ControlPanelAspect='CPAspect_NumValue', HorizAlignment='Left',
 			ContextMenuMethod=self.CreateContextMenu)
 			# internal name = 'Value' to match attrib name in Core object
-		self.EventValueUnitComponent = TextElement(self.FT, RowBase=0, ColStart=1, ColSpan=2, EndX=199,
+		self.EventValueUnitComponent = TextElement(self.FT, RowBase=0, ColStart=1, ColSpan=1, EndX=199,
 			HostObject=self, InternalName='EventValueUnit', EditBehaviour='Choice', ObjectChoices=[],
 			DisplAttrib='HumanName',
 			ContextMenuMethod = self.CreateContextMenu)
-		self.EventValueKindComponent = TextElement(self.FT, RowBase=0, ColStart=3, ColSpan=2, EndX=299,
-			HostObject=self, InternalName='EventValueKind', EditBehaviour='Choice', ObjectChoices=[],
-			DisplAttrib='HumanName',
+		self.ValueProblemButton = ButtonElement(self.FT, RowBase=0, ColStart=2, ColSpan=1, StartX=350, EndX=399,
+			HostObject=self, InternalName='ValueProblemButton', Stati=('Out', 'Alert'),
+			LSingleClickHandler=None,
 			ContextMenuMethod = self.CreateContextMenu)
-		ValueCommentButton = ButtonElement(self.FT, RowBase=0, ColStart=6, ColSpan=1, StartX=300, EndX=349,
+		ValueCommentButton = ButtonElement(self.FT, RowBase=0, ColStart=4, ColSpan=1, StartX=300, EndX=349,
 			HostObject=self, InternalName='ValueCommentButton', Stati=('OutNotExist', 'OutExist'),
 			LSingleClickHandler='HandleMouseLClickOnCommentButton', CommentKind='ValueComments',
 			ContextMenuMethod = self.CreateContextMenu)
-		self.ValueProblemButton = ButtonElement(self.FT, RowBase=0, ColStart=5, ColSpan=1, StartX=350, EndX=399,
-			HostObject=self, InternalName='ValueProblemButton', Stati=('Out', 'Alert'),
-			LSingleClickHandler=None,
+		EventActionItemButton = ButtonElement(self.FT, Row=2, ColStart=5, ColSpan=1, StartX=350, EndX=399,
+			HostObject=self, InternalName='EventActionItemButton', Stati=('OutNotExist', 'OutExist'),
+			LSingleClickHandler='HandleMouseLClickOnActionItemButton', AssociatedTextListAttrib='ActionItems',
+			AssociatedTextNumberingListAttrib='ActionItemNumbering', ControlPanelAspect='CPAspect_ActionItems',
+			ContextMenuMethod = self.CreateContextMenu)
+		EventParkingLotItemButton = ButtonElement(self.FT, Row=2, ColStart=6, ColSpan=1, StartX=350, EndX=399,
+			HostObject=self, InternalName='EventParkingLotItemButton', Stati=('OutNotExist', 'OutExist'),
+			LSingleClickHandler='HandleMouseLClickOnActionItemButton', AssociatedTextListAttrib='ParkingLot',
+			AssociatedTextNumberingListAttrib='ParkingLotItemNumbering', ControlPanelAspect='CPAspect_ParkingLot',
 			ContextMenuMethod = self.CreateContextMenu)
 
 		# make lists of elements: TopEls at top of event, ValueEls relating to event value
 		TopEls = [self.EventTypeComponent, self.EventNumberingComponent, self.EventDescriptionComponent,
-			EventLinkedButton, EventGroupedButton, EventCommentButton,
-			EventActionItemButton]
-		ValueEls = [EventValue, self.EventValueUnitComponent, self.EventValueKindComponent, ValueCommentButton,
-			self.ValueProblemButton]
-		# set text element colours
+			EventCommentButton]
+		ValueEls = [EventValue, self.EventValueUnitComponent, self.ValueProblemButton, ValueCommentButton,
+			EventActionItemButton, EventParkingLotItemButton]
+		# set text element colours %%% working here
 		for El in TopEls + ValueEls:
 			if type(El) is TextElement:
-				El.Text.Colour = El.PromptTextObj.Colour = ColourContentFg
-				El.BkgColour = ColourContentBkg
-		self.EventTypeComponent.BkgColour = HeaderLabelBkg
+				El.Text.Colour = El.PromptTextObj.Colour = GateTextFgColour
+				El.BkgColour = GateTextBkgColour
+		self.EventTypeComponent.BkgColour = ElementHeaderBkgColour
 		return TopEls, ValueEls
 
 	def CreateVariableTextElements(self):
 		# create elements that vary depending on display settings - currently comments and action items
 		# return list of elements for each of description comments, action items, and value comments
-		ColourLabelBkg = (0x80, 0x3E, 0x51) # plum
-		ColourLabelFg = (0xFF, 0xFF, 0xFF) # white
-		ColourContentBkg = (0x6A, 0xDA, 0xBD) # mint green
-		ColourContentFg = (0x00, 0x00, 0x00) # black
+#		ColourLabelBkg = (0x80, 0x3E, 0x51) # plum
+#		ColourLabelFg = (0xFF, 0xFF, 0xFF) # white
+#		ColourContentBkg = (0x6A, 0xDA, 0xBD) # mint green
+#		ColourContentFg = (0x00, 0x00, 0x00) # black
 
 		# Make description comments, value comments and action items
 		DescrComments = []
 		ValueComments = []
 		ActionItems = []
+		ParkingLotItems = []
 		for (CommentElementList, CommentList, ShowFlag, CommentLabel) in \
-			[(DescrComments, self.EventDescriptionComments, self.ShowDescriptionComments, _('Comment on\ndescription')),
-			 (ValueComments, self.ValueComments, self.ShowValueComments, _('Comment on\nvalue')),
-			 (ActionItems, self.ActionItems, self.ShowActionItems, _('Action items'))]:
-			if ShowFlag: # check whether this set of items is required to be displayed
+			[(DescrComments, self.EventDescriptionComments, self.ShowDescriptionComments, _('Comments on\ndescription')),
+			 (ValueComments, self.ValueComments, self.ShowValueComments, _('Comments on\nvalue')),
+			 (ActionItems, self.ActionItems, self.ShowActionItems, _('Action items')),
+			 (ParkingLotItems, self.ParkingLot, self.ShowParkingLotItems, _('Parking lot items'))]:
+				# This 'if' structure left here in case we want to reinstate the condition for optimization later
 				for (CommentIndex, Comment) in enumerate(CommentList):
-					CommentElementList.append(TextElement(self.FT, RowBase=CommentIndex, ColStart=1, ColSpan=5,
+					ListComponent = TextElement(self.FT, RowBase=CommentIndex, ColStart=1, ColSpan=5,
 						EndX=399, MinHeight=25, HostObject=self, ContextMenuMethod=self.CreateContextMenu,
-						BkgColour=ColourContentBkg))
-					CommentElementList[-1].Text.Content = Comment
-					CommentElementList[-1].Text.Colour = ColourContentFg
-					CommentElementList[-1].Text.ParaHorizAlignment = 'Left'
+						BkgColour=GateTextBkgColour)
+					CommentElementList.append(ListComponent)
+					ListComponent.Text.Content = Comment
+					ListComponent.Text.Colour = GateTextFgColour
+					ListComponent.Text.ParaHorizAlignment = 'Left'
 				# add item label (e.g. 'Comment') at left side of first row of items
-				CommentElementList.append(TextElement(self.FT, RowBase=0, ColStart=0, ColSpan=1, EndX=99,
+				LabelComponent = TextElement(self.FT, RowBase=0, ColStart=0, ColSpan=1, EndX=99,
 					HostObject=self, DefaultFgColour=LabelFgColour, ContextMenuMethod=self.CreateContextMenu,
-					BkgColour=ColourContentBkg))
-				CommentElementList[-1].Text.Content = CommentLabel
-				CommentElementList[-1].Text.Colour = ColourLabelFg
-				CommentElementList[-1].Text.ParaHorizAlignment = 'Centre'
-		return (DescrComments, ValueComments, ActionItems)
+					BkgColour=GateLabelBkgColour, RowSpan=max(1, len(CommentList)))
+				CommentElementList.append(LabelComponent)
+				LabelComponent.Text.Content = CommentLabel
+				LabelComponent.Text.Colour = GateLabelFgColour
+				LabelComponent.Text.ParaHorizAlignment = 'Centre'
+		return (DescrComments, ValueComments, ActionItems, ParkingLotItems)
 
 	def PopulateTextElements(self, Elements):
 		# put required values into all fixed text components of this element
@@ -2613,7 +2613,8 @@ class FTEventInCore(FTElementInCore): # FT event object used in DataCore by FTOb
 		self.ShowDescriptionComments = True # whether description comments are visible
 		self.ShowValueComments = True # whether value comments are visible
 		self.ActionItems = [] # list of AssociatedTextItem instances
-		self.ShowActionItems = ShowActionItemsByDefault # initial default when events are first created
+		self.ParkingLot = [] # list of AssociatedTextItem instances
+		self.ShowActionItems = ShowActionItemsByDefault # initial default when events are first created. Redundant?
 		self.MakeTestComments()
 		self.ConnectTo = [] # FT object instances in next column to the right, to which this element is connected
 		self.LinkedFrom = [] # list of LinkItem instances for linking individual attribs to a master element elsewhere in the project
@@ -5345,7 +5346,6 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 
 	def HandleDeleteElementRequest(self, XMLRoot, Viewport, Zoom, PanX, PanY):
 		# handle request to delete FT element
-		print('FT5236 in HandleDeleteElementRequest')
 		# find the corresponding element, its hosting column, and the index in the column
 		ThisPHAElement = [e for e in WalkOverAllFTObjs(self) if e.ID == XMLRoot.findtext(info.FTEventTag)][0]
 		ThisColumn = [c for c in self.Columns if ThisPHAElement in c.FTElements][0]
@@ -6213,10 +6213,11 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			# set status of value problem button, and get help text relating to any value problem
 			SetValueProblemButtonStatus(FTElement=NewEvent, XMLObj=XMLObj)
 			# create variable elements and build combined component list comprising fixed and variable components
-			(NewEvent.DescriptionCommentEls, NewEvent.ValueCommentEls, NewEvent.ActionItemEls) = NewEvent.CreateVariableTextElements()
+			(NewEvent.DescriptionCommentEls, NewEvent.ValueCommentEls, NewEvent.ActionItemEls,
+				NewEvent.ParkingLotItemEls) = NewEvent.CreateVariableTextElements()
 			NewEvent.AllComponents = BuildFullElementList(
 				NewEvent.TopFixedEls, NewEvent.DescriptionCommentEls, NewEvent.ValueFixedEls, NewEvent.ValueCommentEls,
-				NewEvent.ActionItemEls)
+				NewEvent.ActionItemEls, NewEvent.ParkingLotItemEls)
 			NewEvent.PopulateTextElements(NewEvent.AllComponents)  # put required text values in the components
 			# recover preserved attribs from previous Viewport layout
 			NewEvent.RecoverPreservedAttribs()
@@ -6504,7 +6505,6 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		if DrawZoomTool:
 			# draw zoom widget. First, set its position: 50% across the panel, and slightly below the top of the panel
 			HostPanelSizeX, HostPanelSizeY = self.DisplDevice.GetSize()
-#			self.MyZoomWidget.SetPos(HostPanelSizeX * 0.5, HostPanelSizeY - self.MyZoomWidget.GetSize()[1] - 10)
 			self.MyZoomWidget.SetPos(HostPanelSizeX * 0.5, 10)
 			self.MyZoomWidget.SetZoom(self.Zoom) # update zoom setting of zoom widget
 			self.MyZoomWidget.DrawInBitmap(DisplDevice=self.DisplDevice) # draw zoom widget in its own bitmap
@@ -6830,11 +6830,10 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			self.CurrentEditComponent.HandleMouseLDragOnMe(MouseX=MouseX, MouseY=MouseY, Event=Event)
 		elif self.EditingConnection: # dragging from a connect button
 			self.HandleMouseLDragEditingConnection(MouseX, MouseY)
-		elif self.LastElLClicked: # did we click on an element?
-			pass # currently no action if we drag on a non-text element
-#			if hasattr(self.LastElLClicked, 'HandleMouseLDragOnMe'):
-#				self.LastElLClicked.HandleMouseLDragOnMe(Hotspot=self.LastElLClickedHotspot, HostViewport=self,
-#					MouseX=MouseX, MouseY=MouseY, Event=Event)
+		elif self.LastElLClicked: # did we click on an element or zoom widget?
+			if hasattr(self.LastElLClicked, 'HandleMouseLDragOnMe'):
+				self.LastElLClicked.HandleMouseLDragOnMe(Hotspot=self.LastElLClickedHotspot, HostViewport=self,
+					MouseX=MouseX, MouseY=MouseY, Event=Event)
 		else: # dragging in empty space: pan PHA model display
 			# set mouse pointer
 			wx.SetCursor(wx.Cursor(display_utilities.StockCursors['+Arrow']))
@@ -7104,6 +7103,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 
 	def HandleMouseWheel(self, ScreenX, ScreenY, Event):
 		# handle mouse wheel event
+		print('FT7105 handling mouse wheel')
 		MouseState = wx.GetMouseState()
 		# check if Ctrl key (Mac: Command key) is down; if so, zoom
 		if MouseState.ControlDown():
