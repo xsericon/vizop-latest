@@ -655,7 +655,7 @@ class ControlFrame(wx.Frame):
 			assert all(a in self.ControlPanelAspectHash.keys() for a in RequiredAspectNames)
 			# hide all existing aspects: work through existing notebook tabs in reverse order
 			for ThisTabIndex in range(self.MyNotebook.GetPageCount() - 1, -1, -1):
-				ThisAspect = self.MyNotebook.GetPage(ThisTabIndex)
+				ThisAspect = self.MyNotebook.GetPage(ThisTabIndex).HostAspect
 				# deactivate current aspect
 				if ThisAspect is self.ControlPanelCurrentAspect:
 					ThisAspect.Deactivate(Widgets=ThisAspect.WidgetList)
@@ -694,7 +694,8 @@ class ControlFrame(wx.Frame):
 					# (this is a workaround because EVT_LISTBOX is not raised when user clicks on item that's already selected,
 					# contrary to Rappin p218)
 				# store row count of basic widgets
-				if not hasattr(GotoNewPHAModelAspect, 'HowManyRows'): GotoNewPHAModelAspect.HowManyRows = self.HowManyWidgetRows(WidgList)
+				if not hasattr(GotoNewPHAModelAspect, 'HowManyRows'):
+					GotoNewPHAModelAspect.HowManyRows = self.HowManyWidgetRows(WidgList)
 				NextRow = GotoNewPHAModelAspect.HowManyRows + 1
 				# add either "Cancel" or "Exit Vizop" button
 				if PrevMode: # add the Cancel button if needed, and insert correct handler
@@ -739,7 +740,6 @@ class ControlFrame(wx.Frame):
 				TargetAspect.Activate()
 				# switch to tab for new aspect
 				if TargetAspect.IsInNotebook: # does the notebook already have a tab for this aspect?
-					print('CF742 switching to notebook tab: ', TargetAspect.InternalName)
 					self.MyNotebook.ChangeSelection(self.MyNotebook.FindPage(TargetAspect.NotebookPage))
 				else: # no tab yet; make one, and insert it at the end
 					self.MyNotebook.InsertPage(index=self.MyNotebook.GetPageCount(), page=TargetAspect.NotebookPage,
@@ -927,11 +927,6 @@ class ControlFrame(wx.Frame):
 			MySizer.Add(self.MyNotebook, 1, wx.EXPAND)
 			self.SetSizer(MySizer)
 
-			# generate list of system fonts (not currently used)
-#			e = wx.FontEnumerator()
-#			e.EnumerateFacenames()
-#			SystemFonts = e.GetFacenames()
-
 #				# widgets for edit-text screen
 #			self.ETheaderLabel = UIWidgetItem(wx.StaticText(self, -1, _('EDIT TEXT IN ELEMENT')), ColSpan=2)
 #			self.ETcontentText = UIWidgetItem(wx.TextCtrl(self, -1, size=(300, 150), \
@@ -1088,6 +1083,7 @@ class ControlFrame(wx.Frame):
 				TopLevelFrame=self.TopLevelFrame, PrefillMethod=self.PrefillWidgetsForPHAModelsAspect,
 				SetWidgetVisibilityMethod=self.SetWidgetVisibilityForPHAModelsAspect, NotebookPage=MyNotebookPage,
 				TabText=MyTabText)
+			MyNotebookPage.HostAspect = self.PHAModelsAspect
 			# make widgets
 			self.MakeStandardWidgets(Scope=self.PHAModelsAspect, NotebookPage=MyNotebookPage)
 			self.PHAModelsAspect.NewPHAModelTypesLabel = UIWidgetItem(wx.StaticText(MyNotebookPage, -1, _('Select a type of PHA model:')),
@@ -1108,6 +1104,7 @@ class ControlFrame(wx.Frame):
 				TopLevelFrame=self.TopLevelFrame, PrefillMethod=self.PrefillWidgetsForNumericalValueAspect,
 				SetWidgetVisibilityMethod=self.SetWidgetVisibilityforNumericalValueAspect, NotebookPage=MyNotebookPage,
 				TabText=MyTabText)
+			MyNotebookPage.HostAspect = self.NumericalValueAspect
 			# make widgets
 			self.MakeStandardWidgets(Scope=self.NumericalValueAspect, NotebookPage=MyNotebookPage)
 			self.NumericalValueAspect.HeaderLabel = UIWidgetItem(wx.StaticText(MyNotebookPage, -1, ''),
@@ -1358,6 +1355,7 @@ class ControlFrame(wx.Frame):
 				TopLevelFrame=self.TopLevelFrame, PrefillMethod=self.PrefillWidgetsForFaultTreeAspect,
 				SetWidgetVisibilityMethod=self.SetWidgetVisibilityforFaultTreeAspect, NotebookPage=MyNotebookPage,
 				TabText=MyTabText)
+			MyNotebookPage.HostAspect = self.FaultTreeAspect
 			# make widgets
 			self.MakeStandardWidgets(Scope=self.FaultTreeAspect, NotebookPage=MyNotebookPage)
 			self.FaultTreeAspect.HeaderLabel = UIWidgetItem(wx.StaticText(MyNotebookPage, -1, _('Fault Tree:')),
@@ -1511,6 +1509,7 @@ class ControlFrame(wx.Frame):
 				TopLevelFrame=self.TopLevelFrame, PrefillMethod=self.PrefillWidgetsForFTConnectorOutAspect,
 				SetWidgetVisibilityMethod=self.SetWidgetVisibilityforFTConnectorOutAspect, NotebookPage=MyNotebookPage,
 				TabText=MyTabText)
+			MyNotebookPage.HostAspect = self.FTConnectorOutAspect
 			# make fixed widgets (this aspect also has variable widgets depending on the number of associated connector-ins)
 			self.MakeStandardWidgets(Scope=self.FTConnectorOutAspect, NotebookPage=MyNotebookPage)
 			self.FTConnectorOutAspect.HeaderLabel = UIWidgetItem(wx.StaticText(MyNotebookPage, -1, _('Outward connector:')),
@@ -1645,6 +1644,7 @@ class ControlFrame(wx.Frame):
 				TopLevelFrame=self.TopLevelFrame, PrefillMethod=self.PrefillWidgetsForCommentAspect,
 				SetWidgetVisibilityMethod=self.SetWidgetVisibilityforCommentAspect, NotebookPage=MyNotebookPage,
 				TabText=MyTabText)
+			MyNotebookPage.HostAspect = self.CommentAspect
 			# make fixed widgets (this aspect also has variable widgets depending on the comments defined)
 			self.MakeStandardWidgets(Scope=self.CommentAspect, NotebookPage=MyNotebookPage)
 			self.CommentAspect.HeaderLabel = UIWidgetItem(wx.StaticText(MyNotebookPage, -1, _('Comments:')),
@@ -1707,7 +1707,6 @@ class ControlFrame(wx.Frame):
 				# check if edited comment is different from old comment
 				if CommentAsTyped == ThisCommentList[CommentWidgetEdited.CommentIndex]: pass
 				else:
-					print('CF1658 editing an existing comment, working here')
 					self.TopLevelFrame.DoChangeComment(Proj=Proj, PHAObj=CurrentViewport.PHAObj, Viewport=CurrentViewport,
 						PHAElement=ThisPHAElement, Component=ThisComponent,
 						CommentIndex=CommentWidgetEdited.CommentIndex, NewCommentText=CommentAsTyped)
@@ -1803,6 +1802,7 @@ class ControlFrame(wx.Frame):
 				SetWidgetVisibilityMethod=lambda **Args: self.SetWidgetVisibilityforAssociatedTextAspect(
 					Aspect=NewAspect, **Args),
 				NotebookPage=MyNotebookPage, TabText=TabText)
+			MyNotebookPage.HostAspect = NewAspect
 			NewAspect.ATKind = Aspect # store which kind of associated text is handled by this aspect
 			# make fixed widgets (this aspect also has variable widgets depending on the associated texts defined)
 			self.MakeStandardWidgets(Scope=NewAspect, NotebookPage=MyNotebookPage)
@@ -3202,35 +3202,6 @@ class ControlFrame(wx.Frame):
 #			ViewportShadow=DoomedViewport, PersistentAttribs=PersistentAttribs)
 		Reply = vizop_misc.MakeXMLMessage(RootName='RP_SetViewportAsNotInUse', RootText=DoomedViewportID, Elements={})
 		return Reply
-
-# 	def MakeXMLMessageForDrawViewport(self, Proj, MessageHead, PHAObj, Viewport, ViewportID, MilestoneID=None):
-		# This method is moved to module projects
-# 		# make and return XML element containing message required for SwitchToViewport, with all required redraw data
-# 		# MessageHead: command string required as XML root, e.g. 'RP_NewViewport'
-# 		# PHAObj: PHAObj to which Viewport belongs, or None if Viewport doesn't have an associated PHAObj
-# 		# MilestoneID: ID of any milestone in Proj.MilestonesForUndo that should be applied when Viewport is drawn, or None
-# 		assert isinstance(MessageHead, str)
-# 		assert isinstance(PHAObj, core_classes.PHAModelBaseClass) or (PHAObj is None)
-# 		assert isinstance(Viewport, ViewportShadow)
-# 		assert isinstance(ViewportID, str)
-# 		assert isinstance(MilestoneID, str) or (MilestoneID is None)
-# 		# fetch full redraw data for Viewport from PHA object, or from the Viewport itself if it doesn't have a PHAObj
-# 		if PHAObj is None:
-# 			RedrawXMLData = Viewport.MyClass.GetFullRedrawData(Proj=self.CurrentProj, Viewport=Viewport)
-# #				**Viewport.RedrawData)
-# 		else:
-# 			RedrawXMLData = PHAObj.GetFullRedrawData(Viewport=Viewport, ViewportClass=Viewport.MyClass)
-# 		# put ID of PHA object, followed by full redraw data, into XML element
-# 		Reply = vizop_misc.MakeXMLMessage(RootName=MessageHead, RootText=ViewportID,
-# 			Elements={info.IDTag: getattr(PHAObj, 'ID', '')})
-# 		Reply.append(RedrawXMLData)
-# 		# add milestone ID tag, if required
-# #		print('CF3138 adding milestoneID tag: ', MilestoneID)
-# 		if MilestoneID is not None:
-# 			MilestoneTag = ElementTree.Element(info.MilestoneIDTag)
-# 			MilestoneTag.text = MilestoneID
-# 			Reply.append(MilestoneTag)
-# 		return Reply
 
 	def DatacoreSwitchToViewport(self, XMLRoot=None, Proj=None, ViewportClass=None, ViewportID=None, HumanName='',
 			PHAObj=None, Chain='NoChain', MilestoneID=None):

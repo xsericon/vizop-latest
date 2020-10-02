@@ -1236,7 +1236,7 @@ class FTEvent(FTBoxyObject): # FT event object in Viewport
 			ContextMenuMethod = self.CreateContextMenu)
 		self.EventDescriptionComponent = TextElement(self.FT, Row=1, ColStart=1, ColSpan=5, EndX=299, MinHeight=25,
 			HostObject=self, InternalName='EventDescription', EditBehaviour='Text', HorizAlignment='Left',
-			MaxWidthInCU=400,
+			MaxWidthInCU=400, PromptText=_('Type a description'),
 			ContextMenuMethod = self.CreateContextMenu)
 		EventCommentButton = ButtonElement(self.FT, Row=1, ColStart=6, ColSpan=1, StartX=300, EndX=349,
 			HostObject=self, InternalName='EventCommentButton', Stati=('OutNotExist', 'OutExist'),
@@ -1320,9 +1320,10 @@ class FTEvent(FTBoxyObject): # FT event object in Viewport
 				LabelComponent.Text.ParaHorizAlignment = 'Centre'
 		return (DescrComments, ValueComments, ActionItems, ParkingLotItems)
 
-	def PopulateTextElements(self, Elements):
+	def PopulateTextElements(self, Elements, ValueIsEditable):
 		# put required values into all fixed text components of this element
 		# (variable elements are populated in CreateVariableTextElements() )
+		assert isinstance(ValueIsEditable, bool)
 		# The following list contains (attribs of FTEvent, element's InternalName)
 		# It's a combined list for both DescriptionElements and ValueElements, hence the "if" below
 		AttribInfo = [('EventTypeHumanName', 'EventType'), ('Value', 'Value'),
@@ -1337,6 +1338,9 @@ class FTEvent(FTBoxyObject): # FT event object in Viewport
 		if DescriptionEl: DescriptionEl.Text.Content = self.EventDescription
 		NumberingEl = ElementNamed(Elements, info.NumberingTag)
 		if NumberingEl: NumberingEl.Text.Content = self.Numbering
+		# if value is not set and editable, set prompt text
+		if (self.Value == '') and ValueIsEditable:
+			ElementNamed(Elements, 'Value').PromptTextObj.Content = _('Type value')
 
 	def RenderIntoBitmap(self, Zoom): # draw FTEvent in self.Bitmap. Also calculates FTEvent size attributes
 
@@ -4107,7 +4111,9 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			# XMLElement: the ElementTree element that will contain sendable data on ThisElement
 			# Return: ElementValue (displayable str), ElementUnit (UnitItem instance),
 			#	ProblemValue (a value status),
-			#	ProblemObj (instance of FT element causing the problem, or None if no problem)
+			#	ProblemObj (instance of FT element causing the problem, or None if no problem),
+			#	IsEditable (bool; whether the user is allowed to edit the value directly, not considering whether
+			#		user has edit privileges)
 
 			RRToDisplay = FT.RiskReceptorGroupOnDisplay[0]
 			ValueStatus = ThisElement.Value.Status(RR=RRToDisplay)
@@ -4120,8 +4126,8 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 				# decide whether a problem indicator is needed
 				if (ValueStatus == core_classes.NumProblemValue_NoProblem): ProblemLevel = None
 				else: ProblemLevel = 'Level10'
-			else: # can't display value; make tag for problem indicator
-				if ValueStatus == core_classes.NumProblemValue_UndefNumValue: ElementValue = _('not set')
+			else: # can't display value; make tag for problem indicator (formerly _('not set'))
+				if ValueStatus == core_classes.NumProblemValue_UndefNumValue: ElementValue = ''
 				else: ElementValue = info.CantDisplayValueOnScreen # signifying value unobtainable
 				ProblemLevel = 'Level10'
 			if ProblemLevel: # do we need to display value problem indicator?
@@ -4132,7 +4138,8 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			ElementUnit = ThisElement.Value.GetMyUnit()
 			ProblemValue = ThisElement.Value.Status(RR=RRToDisplay)
 			ProblemObj = None # TODO work out how to fetch this from the NumValueItem instance; also in FTConnectorInCore
-			return ElementValue, ElementUnit, ProblemValue, ProblemObj
+			return ElementValue, ElementUnit, ProblemValue, ProblemObj,\
+				isinstance(ThisElement.Value, (core_classes.UserNumValueItem, core_classes.ParentNumValueItem))
 
 
 		def PopulateFTEventData(FT, El, FTEvent, EventListForNumbering):
@@ -4158,36 +4165,14 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			# make FTEvent element to contain all the other elements
 			EventEl = ElementTree.SubElement(El, info.FTEventTag)
 			# get value and unit for display
-			EventValue, EventUnit, ProblemValue, ProblemObj = GetValueAndUnitForDisplay(FT, FTEvent, EventEl)
-#			RRToDisplay = FT.RiskReceptorGroupOnDisplay[0]
-#			ValueStatus = FTEvent.Value.Status(RR=RRToDisplay)
-#			if ValueStatus == core_classes.NumProblemValue_NoProblem:
-#				# get the likelihood value of the FTEvent, and format for display
-#				EventValue = utilities.RoundValueForDisplay(InputValue=FTEvent.Value.GetMyValue(RR=RRToDisplay),
-#					SigFigs=info.EventValueSigFigs)
-#				# run value checks
-#				ValueStatus = FTEvent.CheckValue(NumValueInstance=FTEvent.Value)
-#				# decide whether a problem indicator is needed
-#				if (ValueStatus == core_classes.NumProblemValue_NoProblem): ProblemLevel = None
-#				else: ProblemLevel = 'Level10'
-#			else: # can't display value; make tag for problem indicator
-#				if ValueStatus == core_classes.NumProblemValue_UndefNumValue: EventValue = _('not set')
-#				else: EventValue = info.CantDisplayValueOnScreen # signifying value unobtainable
-#				ProblemLevel = 'Level10'
-#			if ProblemLevel: # do we need to display value problem indicator?
-#				ProblemTag = ElementTree.SubElement(EventEl, info.ProblemIndicatorTag)
-#				ProblemTag.text = ValueStatus.HumanHelp
-#				ProblemTag.set(info.ProblemLevelAttribName, ProblemLevel) # indicating the seriousness of the problem
-#			EventUnit = FTEvent.Value.GetMyUnit()
-#			ProblemValue = FTEvent.Value.Status(RR=RRToDisplay)
-#			ProblemObj = None # TODO work out how to fetch this from the NumValueItem instance; also in FTConnectorInCore
+			EventValue, EventUnit, ProblemValue, ProblemObj, CanEdit = GetValueAndUnitForDisplay(FT, FTEvent, EventEl)
 			# make sub-elements for all the required attribs:
 			# elements where the text is the same as the FTEvent attribute in str form
 			FTEvent.TextComponentHash = {info.IDTag: FTEvent.ID, 'IsIPL': FTEvent.IsIPL, 'EventType': FTEvent.EventType,
 				info.NumberingTag: FTEvent.Numbering.HumanValue(FTEvent, EventListForNumbering)[0],
 				'EventDescription': FTEvent.EventDescription,
 				'CanEditValue': FTEvent.CanEditValue, 'ValueProblemID': getattr(ProblemValue, 'ID', ''),
-				'Value': EventValue, info.ShowActionItemTag: FTEvent.ShowActionItems, 'BackgColour': FTEvent.BackgColour,
+				info.ShowActionItemTag: FTEvent.ShowActionItems, 'BackgColour': FTEvent.BackgColour,
 				info.ShowDescriptionCommentTag: FTEvent.ShowDescriptionComments,
 				info.ShowValueCommentTag: FTEvent.ShowValueComments,
 				'Unit': EventUnit.HumanName, 'ValueProblemObjectID': getattr(ProblemObj, 'ID', ''),
@@ -4195,6 +4180,11 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			for Tag, Attrib in FTEvent.TextComponentHash.items():
 				El = ElementTree.SubElement(EventEl, Tag)
 				El.text = str(Attrib)
+			# make element for event value, with subelement indicating whether it's editable%%%
+			ValueEl = ElementTree.SubElement(EventEl, info.ValueTag)
+			ValueEl.text = EventValue
+			EditableEl = ElementTree.SubElement(ValueEl, info.CanEditValueTag)
+			EditableEl.text = utilities.Bool2Str(Input=CanEdit)
 			# elements for lists of AssociatedTextItems: comments and action items
 			DataInfo = [ (info.DescriptionCommentTag, FTEvent.EventDescriptionComments, FTEvent.ShowDescriptionComments),
 				(info.ValueCommentTag, FTEvent.ValueComments, FTEvent.ShowValueComments),
@@ -4280,7 +4270,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			# make XML element to contain all the other sub-elements
 			ConnEl = ElementTree.SubElement(El, 'FTConnector')
 			# get value and unit for display
-			ConnValue, ConnUnit, ProblemValue, ProblemObj = GetValueAndUnitForDisplay(FTConn.FT, FTConn, ConnEl)
+			ConnValue, ConnUnit, ProblemValue, ProblemObj, CanEdit = GetValueAndUnitForDisplay(FTConn.FT, FTConn, ConnEl)
 
 			# make sub-elements for all the required attribs:
 			# elements where the text is the same as the FTConn attribute
@@ -6168,7 +6158,8 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			NewEvent = FTEvent(FT=self, Column=Column)
 			# get event data. In DataInfo, each pair of items is: (XML tag, FTEvent attrib name)
 			DataInfoAsStr = [ (info.IDTag, 'ID'), ('Numbering', 'Numbering'),
-				('EventDescription', 'EventDescription'), ('Value', 'Value'), ('ValueProblemObjectID', 'ValueProblemObjectID'),
+				('EventDescription', 'EventDescription'), (info.ValueTag, 'Value'),
+				('ValueProblemObjectID', 'ValueProblemObjectID'),
 				('Unit', 'ValueUnit'), ('ValueProblemID', 'ValueProblemID'), ('BackgColour', 'BackgColour') ]
 			for Tag, Attrib in DataInfoAsStr:
 				setattr(NewEvent, Attrib, XMLObj.findtext(Tag, default=''))
@@ -6196,6 +6187,10 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 				HumanName=self.EventTypeNameHash[ThisTag.text],
 				Applicable=utilities.Bool2Str(ThisTag.get(info.ApplicableAttribName)))
 				for ThisTag in XMLObj.findall(info.EventTypeOptionTag)]
+			# for event value, fetch CanEditValue tag%%% TODO similar for connectors
+			ValueTag = XMLObj.find(info.ValueTag)
+			NewEvent.CanEditValue = utilities.Bool2Str(Input=ValueTag.findtext(info.CanEditValueTag))
+			print('FT6189 setting event value as editable (should repeat for connectors): ', NewEvent.CanEditValue)
 			# populate event value unit choice; both NewEvent.UnitOptions (for Control Panel) and unit component's
 			# ObjectChoices list (for edit-in-place)
 			PopulateValueOptions(XMLRoot=XMLObj, HostEl=NewEvent, ComponentName='',
@@ -6218,7 +6213,8 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			NewEvent.AllComponents = BuildFullElementList(
 				NewEvent.TopFixedEls, NewEvent.DescriptionCommentEls, NewEvent.ValueFixedEls, NewEvent.ValueCommentEls,
 				NewEvent.ActionItemEls, NewEvent.ParkingLotItemEls)
-			NewEvent.PopulateTextElements(NewEvent.AllComponents)  # put required text values in the components
+			# put required text values in the components
+			NewEvent.PopulateTextElements(NewEvent.AllComponents, ValueIsEditable=NewEvent.CanEditValue)
 			# recover preserved attribs from previous Viewport layout
 			NewEvent.RecoverPreservedAttribs()
 			return NewEvent
