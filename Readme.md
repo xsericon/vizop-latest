@@ -15,7 +15,7 @@
 
 * Install required libraries:
 ```
-pip install wxPython==4.0.7.post2
+pip install wxPython==4.1.0
 pip install pyzmq
 pip install openpyxl
 pip install reportlab
