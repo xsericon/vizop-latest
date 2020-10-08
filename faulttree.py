@@ -486,8 +486,8 @@ class FTHeader(object): # FT header object. Rendered by drawing text into bitmap
 				ElementNamed(Elements, Name).Text.Content = self.__dict__[ValueAttrib] + ' ' + self.__dict__[UnitAttrib]
 
 		# start of main procedure for FTHeader's CalculateSize()
-		HeaderBorderX = HeaderBorderY = 20  # outer border in canvas coords
-		GapBetweenCols = GapBetweenRows = 5  # in canvas coords
+		HeaderBorderX = HeaderBorderY = 20 # outer border in canvas coords
+		GapBetweenCols = GapBetweenRows = 5 # in canvas coords
 		MinColWidth = 40 # in canvas coords
 		PopulateTextElements(self.Elements)  # put required text values in the elements
 		# calculate height of each "sizer" row in canvas coords
@@ -509,7 +509,7 @@ class FTHeader(object): # FT header object. Rendered by drawing text into bitmap
 			El.SizeYInPx = EndYInPx - El.PosYInPx + 1
 		# calculate size (canvas and screen units) of FTHeader
 		self.SizeXInCU = max([El.EndXInCU for El in self.Elements]) - GapBetweenRows + HeaderBorderX
-		self.SizeYInCU = RowEndYs[-1] - GapBetweenRows + HeaderBorderY  # remove bottom "gap", add bottom border
+		self.SizeYInCU = int(round(RowEndYs[-1] - GapBetweenRows + HeaderBorderY)) # remove bottom "gap", add bottom border
 		self.SizeXInPx = int(round(self.SizeXInCU * Zoom))
 		self.SizeYInPx = int(round(self.SizeYInCU * Zoom))
 
@@ -554,7 +554,7 @@ class FTBoxyObject(object): # superclass of vaguely box-like FT components for u
 		self.BackgroundColourUnselected = (0x54, 0xae, 0x97) # green, slightly darker than text entry boxes
 		self.BackgroundColourSelected = (0xf2, 0xc5, 0xab) # coral-orange
 
-	def MouseHit(self, MouseXInPx, MouseYInPx, TolXInPx, TolYInPx):
+	def MouseHit(self, MouseXInPx, MouseYInPx, TolXInPx, TolYInPx, debug=False):
 		# returns (str) hotspot hit in FTBoxyObject instance, or None if not hit
 		# Hotspots can be: "Whole" (whole object hit)
 		assert isinstance(MouseXInPx, (float, int))
@@ -1275,7 +1275,7 @@ class FTEvent(FTBoxyObject): # FT event object in Viewport
 			EventCommentButton]
 		ValueEls = [EventValue, self.EventValueUnitComponent, self.ValueProblemButton, ValueCommentButton,
 			EventActionItemButton, EventParkingLotItemButton]
-		# set text element colours %%% working here
+		# set text element colours
 		for El in TopEls + ValueEls:
 			if type(El) is TextElement:
 				El.Text.Colour = El.PromptTextObj.Colour = GateTextFgColour
@@ -4180,7 +4180,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			for Tag, Attrib in FTEvent.TextComponentHash.items():
 				El = ElementTree.SubElement(EventEl, Tag)
 				El.text = str(Attrib)
-			# make element for event value, with subelement indicating whether it's editable%%%
+			# make element for event value, with subelement indicating whether it's editable
 			ValueEl = ElementTree.SubElement(EventEl, info.ValueTag)
 			ValueEl.text = EventValue
 			EditableEl = ElementTree.SubElement(ValueEl, info.CanEditValueTag)
@@ -4271,7 +4271,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			ConnEl = ElementTree.SubElement(El, 'FTConnector')
 			# get value and unit for display
 			ConnValue, ConnUnit, ProblemValue, ProblemObj, CanEdit = GetValueAndUnitForDisplay(FTConn.FT, FTConn, ConnEl)
-
+			print('FT4274 connector Out, CanEdit: ', FTConn.Out, CanEdit)
 			# make sub-elements for all the required attribs:
 			# elements where the text is the same as the FTConn attribute
 			# for EventType tag, tag name must be a key in FTEventTypeNameHash
@@ -4280,12 +4280,17 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 				('Numbering', FTConn.Numbering.HumanValue(PHAItem=FTConn, Host=FTConn.Column.FTElements)[0]),
 				('Style', FTConn.Style), ('EventType', {True: 'ConnectorOut', False: 'ConnectorIn'}[FTConn.Out]),
 #				('ShowDescriptionComments', str(FTConn.ShowDescriptionComments)), ('Value', ConnValue),
-				('Value', ConnValue),
+#				('Value', ConnValue),
 				('Unit', ConnUnit.HumanName), ('ValueProblemID', getattr(ProblemValue, 'ID', '')),
 				('ValueProblemObjectID', getattr(ProblemObj, 'ID', '')), ('HumanName', FTConn.HumanName)]
 			for Tag, Attrib in DataInfo:
 				El = ElementTree.SubElement(ConnEl, Tag)
 				El.text = str(Attrib)
+			# make element for connector value, with subelement indicating whether it's editable
+			ValueEl = ElementTree.SubElement(ConnEl, info.ValueTag)
+			ValueEl.text = ConnValue
+			EditableEl = ElementTree.SubElement(ValueEl, info.CanEditValueTag)
+			EditableEl.text = utilities.Bool2Str(Input=CanEdit)
 			# elements for lists of AssociatedTextItems
 			# DataInfo tuples contain: XML tag for an instance, list attrib in the connector, list attrib in the project)
 			DataInfo = [(info.ConnectorDescriptionCommentsTag, FTConn.ConnectorDescriptionComments, None),
@@ -4977,7 +4982,7 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			# NewNumberKind (NumValueItem subclass or None): the number kind changed to, or None if number kind wasn't changed
 		assert isinstance(StoreUndoRecord, bool)
 		if StoreUndoRecord: assert (Viewport is not None) or (ViewportID is not None)
-		if NewNumberKindXMLName is 'LinkedFrom': assert LinkedFromElement is not None
+		if NewNumberKindXMLName == 'LinkedFrom': assert LinkedFromElement is not None
 		# find the applicable attrib in FTElement
 		if not ValueAttribName: ValueAttribNameToUse = 'Value'
 		else: ValueAttribNameToUse = ValueAttribName
@@ -6187,10 +6192,9 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 				HumanName=self.EventTypeNameHash[ThisTag.text],
 				Applicable=utilities.Bool2Str(ThisTag.get(info.ApplicableAttribName)))
 				for ThisTag in XMLObj.findall(info.EventTypeOptionTag)]
-			# for event value, fetch CanEditValue tag%%% TODO similar for connectors
+			# for event value, fetch CanEditValue tag
 			ValueTag = XMLObj.find(info.ValueTag)
 			NewEvent.CanEditValue = utilities.Bool2Str(Input=ValueTag.findtext(info.CanEditValueTag))
-			print('FT6189 setting event value as editable (should repeat for connectors): ', NewEvent.CanEditValue)
 			# populate event value unit choice; both NewEvent.UnitOptions (for Control Panel) and unit component's
 			# ObjectChoices list (for edit-in-place)
 			PopulateValueOptions(XMLRoot=XMLObj, HostEl=NewEvent, ComponentName='',
@@ -6235,9 +6239,10 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 				('Unit', 'ValueUnit'), ('ValueProblemID', 'ValueProblemID'), ('HumanName', 'HumanName') ]
 			for Tag, Attrib in DataInfoAsStr:
 				setattr(NewConnector, Attrib, XMLObj.findtext(Tag, default=''))
-			DataInfoAsBool = [ (info.CanEditValueTag, 'CanEditValue') ]
-			for Tag, Attrib in DataInfoAsBool:
-				setattr(NewConnector, Attrib, bool(XMLObj.findtext(Tag, default='False')))
+			# CanEditValue is now set specifically for connector value, see 25 lines down
+#			DataInfoAsBool = [ (info.CanEditValueTag, 'CanEditValue') ]
+#			for Tag, Attrib in DataInfoAsBool:
+#				setattr(NewConnector, Attrib, utilities.Bool2Str(Input=XMLObj.findtext(Tag, default='True')))
 			# DataInfoAsList: (Tag of each item in a list, name of the list to put the tag's text into, name of numbering list)
 			DataInfoAsList = [ (info.ConnectorDescriptionCommentsTag, 'ConnectorDescriptionComments', ''),
 				(info.ValueCommentsTag, 'ValueComments', ''),
@@ -6258,6 +6263,9 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 					NumberingTag = El.find(info.NumberingTag)
 					if NumberingTag is not None:
 						NumberingList.append(NumberingTag.text)
+			# for event value, fetch CanEditValue tag
+			ValueTag = XMLObj.find(info.ValueTag)
+			NewConnector.CanEditValue = utilities.Bool2Str(Input=ValueTag.findtext(info.CanEditValueTag))
 			# populate connector type name: internal name and human name
 			NewConnector.EventType = XMLObj.find('EventType').text
 			NewConnector.EventTypeHumanName = self.EventTypeNameHash[NewConnector.EventType]
@@ -6475,7 +6483,8 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 				ThisColumn.EndXInPx, ThisColumn.PosYInPx = utilities.ScreenCoords(
 					ThisColumn.PosXInCU + ThisColumn.SizeXInCU, 0,
 					Zoom=self.Zoom, PanX=self.PanX, PanY=self.PanY)
-			self.SetupInterColumnStrips() # set up and draw strips containing connecting lines between columns
+			# set up and draw strips containing connecting lines between columns
+			ICStripYOffsetInPx = int(round(self.SetupInterColumnStrips() * self.Zoom))
 			# make an overall bitmap, ready to blit constituent bitmaps into
 			MinBufferSizeXInPx, MinBufferSizeYInPx = self.CalculateFTScreenSize(self.InterColumnStripWidth)
 			ActualBufferSizeX = MinBufferSizeXInPx
@@ -6495,7 +6504,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 				Column.RenderInDC(self, BaseLayerDC, 0, 0)
 				# draw inter-column strip, to the right of the column
 				BaseLayerDC.DrawBitmap(self.InterColumnStripBuffers[ColIndex], Column.PosXInPx + Column.SizeXInPx,
-					Column.PosYInPx, useMask=False)
+					Column.PosYInPx + ICStripYOffsetInPx, useMask=False)
 			# set PosX/Y attribs of connect buttons in pixels (needed to detect mouse clicks)
 			SetConnectButtonPos()
 		if DrawZoomTool:
@@ -6609,19 +6618,22 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			ThisColOffsetXInCU += ColWidthInCU + self.InterColumnStripWidth
 
 	def SetupInterColumnStrips(self):
-		# draw inter-column strips with connection lines
+		# draw inter-column strips with connection lines. Return IC strip Y offset in CU (int)
 
-		def ConstructInterColumnStrip(LeftColIndex, ParentWindow):
+		def ConstructInterColumnStrip(LeftColIndex, ParentWindow, YOffsetInCU):
 			# prepare and draw one strip between columns with index LeftColIndex and ditto+1. Strip contains:
 			# - connecting lines between objects in left and right columns
 			# - "connect" buttons on unused outputs of objects in left column
 			# - "connect" buttons on unused inputs in right column
+			# YOffsetInCU (int): offset to top of inter-column strip due to gap for FT header and gap below header
 			# Returns buffer containing the strip image, list containing connect button objects
 
-			def DrawConnectingHorizontals(FTColumn, DrawDC, IsLeftCol=True, ConnectedEls=set()):
+			def DrawConnectingHorizontals(FTColumn, DrawDC, IsLeftCol=True, ConnectedEls=set(), YOffsetInCU=0):
 				# in DrawDC, draw horizontal parts of connecting lines attached to FTColumn on left or right (depending on IsLeftCol)
 				# If it's a right column, we need ConnectedEls, a list or set of objects in this column that are connected
 				# to items in the next column to the left
+				# YOffsetInCU: how much allowance to make for the FT header and gap below the header
+				assert isinstance(YOffsetInCU, int)
 				if IsLeftCol:
 					LineStartXInCU = 0
 					# end the line just inside strip for unconnected objs
@@ -6634,7 +6646,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 				# draw the lines for each connectable item in the column.
 				for ThisElement in FTColumn.FTElements:
 					if ThisElement.Connectable:
-						LineYInCU = ThisElement.HorizontalLineYInCU()
+						LineYInCU = ThisElement.HorizontalLineYInCU() - YOffsetInCU
 						# decide whether the item is connected
 						if IsLeftCol: IsConnected = bool(ThisElement.ConnectTo)
 						else: IsConnected = (ThisElement in ConnectedEls)
@@ -6646,9 +6658,11 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 							LineEndXInPx, LineEndYInPx = utilities.ScreenCoords(LineEndXStubInCU, LineYInCU, self.Zoom, PanX=0, PanY=0)
 						DrawDC.DrawLine(LineStartXInPx, LineStartYInPx, LineEndXInPx, LineEndYInPx)
 
-			def DrawConnectingVerticals(LeftColumn, RightColumn, DrawDC, ConnectedOnRightEls):
+			def DrawConnectingVerticals(LeftColumn, RightColumn, DrawDC, ConnectedOnRightEls, YOffsetInCU):
 				# In DrawDC, draw vertical parts of connecting lines between horizontals of connected items in Left and Right columns
 				# ConnectedOnRightEls is a list or set of FT elements in the right column that are connected
+				# YOffsetInCU (int): offset due to FT header
+				assert isinstance(YOffsetInCU, int)
 				LineThickness = 4 # in canvas coords
 				LineXInCU = int(round(0.5 * self.InterColumnStripWidth)) # line will be drawn in centre of strip
 				LineColour = (0xf6, 0xff, 0x2a) # golden yellow
@@ -6663,20 +6677,21 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 						[LeftObj for LeftObj in LeftColumn.FTElements if RightObj in LeftObj.ConnectTo]]
 					# find the min and max y coord for vertical line, based on coords of connected items in left and right columns
 					# Pan needn't be considered, as it is applied when copying bitmaps to display device
-					MinY = min(LeftItemYCoords + [RightObj.HorizontalLineYInCU()])
-					MaxY = max(LeftItemYCoords + [RightObj.HorizontalLineYInCU()])
+					MinY = min(LeftItemYCoords + [RightObj.HorizontalLineYInCU()]) - YOffsetInCU
+					MaxY = max(LeftItemYCoords + [RightObj.HorizontalLineYInCU()]) - YOffsetInCU
 					LineStartXInPx, LineStartYInPx = utilities.ScreenCoords(LineXInCU, MinY, self.Zoom, PanX=0, PanY=0)
 					LineEndXInPx, LineEndYInPx = utilities.ScreenCoords(LineXInCU, MaxY, self.Zoom, PanX=0, PanY=0)
 					DrawDC.DrawLine(LineStartXInPx, LineStartYInPx, LineEndXInPx, LineEndYInPx)
 
-			def DrawLeftOrRightConnectButtons(ThisColumn, DrawDC, ColIndex, IsLeft=True):
+			def DrawLeftOrRightConnectButtons(ThisColumn, DrawDC, ColIndex, IsLeft=True, YOffsetInCU=0):
 				# draw 'connect' button on the horizontal stub for each connectable object in ThisColumn (FTColumn instance)
 				# ThisColumn is the column containing the elements to make connect buttons for
 				# IsLeft (bool): whether we are drawing connect buttons coming from the left column
 				# ColIndex is the column number in the FT to the left of the connecting strip containing the buttons,
 				# even if the buttons are associated with objects in the next column.
-				# side, and therefore don't need connect buttons
+				# YOffsetInCU (int): Y offset within inter-column strip due to header
 				# returns list of new button widget objects
+				assert isinstance(YOffsetInCU, int)
 				ConnectButtonWidgets = []
 				for ThisElement in ThisColumn.FTElements:
 #					# check max connectivity not yet reached (for right elements) - no longer done, as we still need to
@@ -6698,12 +6713,14 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 								self.InterColumnStripWidth)) - NewButtonWidget.SizeXInCU
 							NewButtonWidget.IsLeft = False
 						# in y-axis, align button with connect line, and offset upwards by half the button's height
-						NewButtonWidget.PosYInCU = ThisElement.HorizontalLineYInCU() - 0.5 * NewButtonWidget.SizeYInCU
+						NewButtonWidget.PosYInCU = ThisElement.HorizontalLineYInCU() - 0.5 * NewButtonWidget.SizeYInCU \
+							- YOffsetInCU
 						# draw button in the inter-column strip
 						NewButtonWidget.Draw(DC=DrawDC, Zoom=self.Zoom)
 				return ConnectButtonWidgets
 
 			# main procedure for ConstructInterColumnStrip()
+			assert isinstance(YOffsetInCU, int)
 			self.ConnectingHorizStubFraction = 0.1 # fraction of strip width = length of horiz stub lines for unconnected objects
 			ConnectButtons = [] # connect button widgets created
 			# calculate the required length
@@ -6724,26 +6741,29 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			Buffer = wx.Bitmap(width=int(round(self.InterColumnStripWidth * self.Zoom)),
 				height=int(round(StripLength * self.Zoom)), depth=wx.BITMAP_SCREEN_DEPTH)
 			DrawDC = wx.MemoryDC(Buffer)
-			# draw connecting lines between left and right columns
-			DrawConnectingHorizontals(self.Columns[LeftColIndex], DrawDC, IsLeftCol=True)
+			# draw connecting lines between left and right columns%%%
+			DrawConnectingHorizontals(self.Columns[LeftColIndex], DrawDC, IsLeftCol=True, YOffsetInCU=YOffsetInCU)
 			if RightColConnectable:
 				# draw connect buttons for any unconnected elements in the left side column
 				ConnectButtons.extend(DrawLeftOrRightConnectButtons(self.Columns[LeftColIndex], DrawDC, LeftColIndex,
-					IsLeft=True))
+					IsLeft=True, YOffsetInCU=YOffsetInCU))
 				DrawConnectingHorizontals(self.Columns[LeftColIndex + 1], DrawDC, IsLeftCol=False,
-					ConnectedEls=ConnectedOnRightEls)
-				DrawConnectingVerticals(self.Columns[LeftColIndex], self.Columns[LeftColIndex + 1], DrawDC, ConnectedOnRightEls)
+					ConnectedEls=ConnectedOnRightEls, YOffsetInCU=YOffsetInCU)
+				DrawConnectingVerticals(self.Columns[LeftColIndex], self.Columns[LeftColIndex + 1], DrawDC,
+					ConnectedOnRightEls, YOffsetInCU)
 				ConnectButtons.extend(DrawLeftOrRightConnectButtons(self.Columns[LeftColIndex + 1], DrawDC,
-					LeftColIndex, IsLeft=False))
+					LeftColIndex, IsLeft=False, YOffsetInCU=YOffsetInCU))
 			return (Buffer, ConnectButtons)
 
 		# main procedure for SetupInterColumnStrips()
 		# draw inter-column strips
 		self.InterColumnStripBuffers = []
+		YOffsetInCU = self.Header.SizeYInCU # this already includes HeaderBorderY
 		for ColIndex in range(len(self.Columns)):
-			(ThisBuffer, ThisConnectButtons) = ConstructInterColumnStrip(ColIndex, self.ParentWindow)
+			(ThisBuffer, ThisConnectButtons) = ConstructInterColumnStrip(ColIndex, self.ParentWindow, YOffsetInCU)
 			self.InterColumnStripBuffers.append(ThisBuffer)
 			self.ConnectButtons.extend(ThisConnectButtons)
+		return YOffsetInCU
 
 	def GetColumnLengthInCU(self, Column): # return the length of the column in canvas units, including the header and post-header gap
 		# Column is a FTColumn instance
@@ -6779,7 +6799,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		Hits = [] # list of dict of elements/hotspots clicked
 		Handler = '?' # name of click handler method to invoke
 		for ThisEl in self.AllClickableObjects():
-			HitHotspot = ThisEl.MouseHit(ClickXInPx, ClickYInPx, TolXInPx=TolXInPx, TolYInPx=TolYInPx)
+			HitHotspot = ThisEl.MouseHit(ClickXInPx, ClickYInPx, TolXInPx=TolXInPx, TolYInPx=TolYInPx, debug=True)
 			if HitHotspot: Hits.append({'Element': ThisEl, 'Hotspot': HitHotspot})
 		if Hits: # any elements hit? Find the hit element with highest PosZ (z-coordinate)
 			HighestZ = max(ThisHit['Element'].PosZ for ThisHit in Hits)

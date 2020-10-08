@@ -489,7 +489,7 @@ class ZoomWidgetObj(object):
 	def GetSize(self): # returns (SizeX, SizeY) of widget in pixels
 		return self.SizeXInPx, self.SizeYInPx
 
-	def MouseHit(self, MouseXInPx, MouseYInPx, TolXInPx, TolYInPx):
+	def MouseHit(self, MouseXInPx, MouseYInPx, TolXInPx, TolYInPx, debug=False):
 		# returns (str) hotspot hit in widget instance, or None if not hit
 		# Hotspots can be: "Whole" (whole object hit)
 		# Currently, this is the same as in class FTBoxyObject
@@ -509,7 +509,6 @@ class ZoomWidgetObj(object):
 		# handle mouse left button down inside zoom widget at coords MouseX, MouseY (2 x int) in pixels relative to panel
 		# Ends by calling HostViewport.RefreshZoomWidget() with bitmap containing redrawn widget as arg
 		# No args required in Args
-		print('DU512 handling mouse click on zoom tool')
 		self.MouseLDownX = MouseX
 		self.MouseLDownY = MouseY # capture coords of original mouse down position
 		self.MouseLastX = MouseX # capture coords of last seen mouse position (used in HandleMouseLDrag)
@@ -524,7 +523,6 @@ class ZoomWidgetObj(object):
 		# FullZoomRange (int): square of number of mouse pixels dragged that corresponds to zooming from MidZoom to Min or Max.
 		# First, calculate square of number of pixels' distance from mouse drag start position to current position
 		# Calculate positive and negative zoom contributions separately
-		print('DU527 handling mouse drag on zoom tool')
 		SqrPixelsDraggedPos = max(0, MouseX - self.MouseLDownX)**2 + max(0, MouseY - self.MouseLDownY)**2
 		SqrPixelsDraggedNeg = min(0, MouseX - self.MouseLDownX)**2 + min(0, MouseY - self.MouseLDownY)**2
 		ZoomFraction = max(-FullZoomRange, min(FullZoomRange, SqrPixelsDraggedPos - SqrPixelsDraggedNeg)) / FullZoomRange
@@ -552,11 +550,13 @@ class ZoomWidgetObj(object):
 
 	def HandleMouseWheel(self, Event=None, HostViewport=None, **Args):
 		# handle mouse wheel event to zoom. Emulates a click and Y-drag on the zoom tool
+		print('DU553 received mouse wheel request on zoom tool')
 		WheelToPixelConversionFactor = 50 # sets the zoom sensitivity
 		InitialMouseX, InitialMouseY = Event.GetPosition()
 		self.HandleMouseLClickOnMe(HostViewport=HostViewport, MouseX=InitialMouseX, MouseY=InitialMouseY)
 		VirtualNewMousePositionY = InitialMouseY + (math.copysign(1, Event.GetWheelRotation()) \
 			* WheelToPixelConversionFactor * math.log10(abs(Event.GetWheelRotation())))
+		print('DU559 emulating mouse drag: oldY, newY: ', InitialMouseY, VirtualNewMousePositionY)
 		self.HandleMouseLDragOnMe(MouseX=InitialMouseX, MouseY=VirtualNewMousePositionY, HostViewport=HostViewport, **Args)
 		self.HandleMouseLDragEndOnMe(MouseX=InitialMouseX, MouseY=VirtualNewMousePositionY, HostViewport=HostViewport, **Args)
 

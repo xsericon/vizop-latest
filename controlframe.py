@@ -2400,20 +2400,20 @@ class ControlFrame(wx.Frame):
 			# find record that will be undone 'up to' (skipping over any chained records)
 			LastRecordToUndo = Proj.UndoList[undo.FindLastRecordToUndo(Proj.UndoList)]
 			UndoText = _(LastRecordToUndo.HumanText)
-			self.UndoMenuItem.SetText((_('&Undo %s')) % UndoText)
+			self.UndoMenuItem.SetItemLabel((_('&Undo %s')) % UndoText)
 			self.MenuBar.Enable(self.UndoMenuItemID, True)
 		else: # nothing to undo
-			self.UndoMenuItem.SetText(_('(Nothing to undo)'))
+			self.UndoMenuItem.SetItemLabel(_('(Nothing to undo)'))
 			self.MenuBar.Enable(self.UndoMenuItemID, False)
 		# Redo menu item
 		if Proj.RedoList:
 			# find record that will be undone 'up to' (skipping over any chained records)
 			LastRecordToRedo = Proj.RedoList[undo.FindLastRecordToUndo(Proj.RedoList)]
 			RedoText = _(LastRecordToRedo.HumanText)
-			self.RedoMenuItem.SetText((_('&Redo %s')) % RedoText)
+			self.RedoMenuItem.SetItemLabel((_('&Redo %s')) % RedoText)
 			self.MenuBar.Enable(self.RedoMenuItemID, True)
 		else: # nothing to redo
-			self.RedoMenuItem.SetText(_('(Nothing to redo)'))
+			self.RedoMenuItem.SetItemLabel(_('(Nothing to redo)'))
 			self.MenuBar.Enable(self.RedoMenuItemID, False)
 		# remove any unnecessary menu commands depending on Viewport state
 		for (ThisMenu, ThisMenuLabel) in self.MenuBar.GetMenus():

@@ -76,6 +76,8 @@ class TextObject(object):
 		self.LineSpacing = DefaultTextLineSpacing
 		self.ParentSizeBasis = {} # dict: {object size parm: value} used for calculating required text point size based on an object's actual size.
 		self.TextSize = None
+		# attribs used internally during text rendering
+		self.SublineXStart = [] # per subline, the starting X coord relative to frame
 		# soak up any attribs provided in Args (dangerous, no value checks done)
 		self.__dict__.update(Args)
 

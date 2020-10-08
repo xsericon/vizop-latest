@@ -52,7 +52,8 @@ def InitializeVizop():
 	#add our art provider to the stack of providers. We add it to the bottom, so that
 	#default icons will be used in preference to our own. It also means that GetSizeHint()
 	#will query a built-in provider rather than ours
-	wx.ArtProvider.Insert(art.ArtProvider())
+#	wx.ArtProvider.Insert(art.ArtProvider())
+	wx.ArtProvider.PushBack(art.ArtProvider())
 
 
 def GetAvailProjTemplates():
