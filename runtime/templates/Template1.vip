@@ -1,0 +1,20 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<VizopProject VizopVersion="0.1"><ShortTitle /><ProjNumber /><Description /><EditNumber>2478</EditNumber><MaxID>19</MaxID><TeamMembers /><NumberSystem><ID>0</ID><ShowInDisplay>True</ShowInDisplay><ShowInOutput>True</ShowInOutput><Chunk><Type>Serial</Type><FieldWidth>3</FieldWidth><PadChar>0</PadChar><StartSequenceAt>1</StartSequenceAt><GapBefore>0</GapBefore><IncludeInNumbering>True</IncludeInNumbering><NoValue>- -</NoValue><SkipTo>None</SkipTo></Chunk></NumberSystem><NumberSystem><ID>1</ID><ShowInDisplay>True</ShowInDisplay><ShowInOutput>True</ShowInOutput></NumberSystem>
+<RiskReceptor><ID>7</ID><XMLName>People</XMLName><HumanName>People</HumanName></RiskReceptor>
+<RiskReceptor><ID>8</ID><XMLName>Environment</XMLName><HumanName>Environment</HumanName></RiskReceptor>
+<RiskReceptor><ID>9</ID><XMLName>Assets</XMLName><HumanName>Assets</HumanName></RiskReceptor>
+<RiskReceptor><ID>10</ID><XMLName>Reputation</XMLName><HumanName>Reputation</HumanName></RiskReceptor>
+<RiskMatrix><ID>11</ID><HumanName>BigChemCo corporate tolerable risk matrix</HumanName>
+    <Category><XMLName>0</XMLName><HumanName>Negligible</HumanName><Description>No significant impact</Description></Category>
+    <Category><XMLName>1</XMLName><HumanName>Minor</HumanName><Description>Small, reversible impact</Description></Category>
+    <Category><XMLName>2</XMLName><HumanName>Moderate</HumanName><Description>Significant impact</Description></Category>
+    <Category><XMLName>3</XMLName><HumanName>Severe</HumanName><Description>Major impact with long-term consequences</Description></Category>
+    <SeverityDimension>0</SeverityDimension>
+    <Dimension>
+        <Name>Severity</Name><Unit>/yr</Unit><Key>0</Key><Key>1</Key><Key>2</Key><Key>3</Key></Dimension>
+    <Entry><Kind>User</Kind><RiskReceptor><ID>7</ID><Value>1e-02</Value></RiskReceptor><RiskReceptor><ID>8</ID><Value>1e-02</Value></RiskReceptor><RiskReceptor><ID>9</ID><Value>1e-01</Value></RiskReceptor><RiskReceptor><ID>10</ID><Value>5e-02</Value></RiskReceptor><Unit>/yr</Unit></Entry>
+    <Entry><Kind>User</Kind><RiskReceptor><ID>7</ID><Value>1e-03</Value></RiskReceptor><RiskReceptor><ID>8</ID><Value>1e-03</Value></RiskReceptor><RiskReceptor><ID>9</ID><Value>1e-02</Value></RiskReceptor><RiskReceptor><ID>10</ID><Value>5e-03</Value></RiskReceptor><Unit>/yr</Unit></Entry>
+    <Entry><Kind>User</Kind><RiskReceptor><ID>7</ID><Value>1e-04</Value></RiskReceptor><RiskReceptor><ID>8</ID><Value>1e-04</Value></RiskReceptor><RiskReceptor><ID>9</ID><Value>1e-03</Value></RiskReceptor><RiskReceptor><ID>10</ID><Value>5e-04</Value></RiskReceptor><Unit>/yr</Unit></Entry>
+    <Entry><Kind>User</Kind><RiskReceptor><ID>7</ID><Value>1e-05</Value></RiskReceptor><RiskReceptor><ID>8</ID><Value>1e-05</Value></RiskReceptor><RiskReceptor><ID>9</ID><Value>1e-04</Value></RiskReceptor><RiskReceptor><ID>10</ID><Value>5e-05</Value></RiskReceptor><Unit>/yr</Unit></Entry>
+    </RiskMatrix>
+</VizopProject>
