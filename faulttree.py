@@ -211,13 +211,12 @@ class ButtonElement(object): # object containing a button and attributes and met
 		assert isinstance(MouseYInPx, (float, int))
 		assert isinstance(TolXInPx, (float, int)) # mouse hit tolerance in pixels
 		assert isinstance(TolYInPx, (float, int))
-		if debug:
-			print("FT131 MouseHit: MouseXInPx, MouseYInPx, self.PosXInPx, self.PosYInPx, self.SizeXInPx, self.SizeYInPx: ", \
-				MouseXInPx, MouseYInPx, self.PosXInPx, self.PosYInPx, self.SizeXInPx, self.SizeYInPx)
+		# define y-offset to use for connect buttons
+		YOffset = self.FT.Header.SizeYInPx if self.InternalName == 'ConnectButton' else 0
 		# test if hotspot "Whole" hit
-		if (MouseXInPx - TolXInPx >= self.PosXInPx) and (MouseYInPx - TolYInPx >= self.PosYInPx) and \
+		if (MouseXInPx - TolXInPx >= self.PosXInPx) and (MouseYInPx - YOffset - TolYInPx >= self.PosYInPx) and \
 			(MouseXInPx + TolXInPx <= self.PosXInPx + self.SizeXInPx) and \
-			(MouseYInPx + TolYInPx <= self.PosYInPx + self.SizeYInPx):
+			(MouseYInPx - YOffset + TolYInPx <= self.PosYInPx + self.SizeYInPx):
 			return "Whole"
 		else: return None
 
@@ -298,16 +297,17 @@ class ButtonElement(object): # object containing a button and attributes and met
 		# find all other buttons this connect button could connect to (for possible future 'snap' to button effect)
 		self.FT.EditingConnectionCanConnectTo = self.FT.ConnectButtonsCanConnectTo(self)
 		# draw the connect button in a dedicated bitmap, with overhang on each edge
-		ConnectButtonBitmap = wx.Bitmap(width=self.SizeXInPx + 2 * self.FT.ConnectButtonBufferBorderX,
-			height=self.SizeYInPx + 2 * self.FT.ConnectButtonBufferBorderY, depth=wx.BITMAP_SCREEN_DEPTH)
+		ConnectButtonBitmap = wx.Bitmap.FromRGBA(width=self.SizeXInPx + 2 * self.FT.ConnectButtonBufferBorderX,
+			height=self.SizeYInPx + 2 * self.FT.ConnectButtonBufferBorderY)
+#			height=self.SizeYInPx + 2 * self.FT.ConnectButtonBufferBorderY, depth=wx.BITMAP_SCREEN_DEPTH)
 		DrawDC = wx.MemoryDC(ConnectButtonBitmap)
 		self.DrawConnectButton(DrawDC, self.FT.Zoom, InFloatLayer=True)
 		# make a floating layer for the connect button bitmap
 		self.FloatLayer = display_utilities.FloatLayer(Bitmap=ConnectButtonBitmap,
 				PosXInPx=self.PosXInPx - self.FT.ConnectButtonBufferBorderX,
-			PosYInPx=self.PosYInPx - self.FT.ConnectButtonBufferBorderY, PosZ=7)
+			PosYInPx=self.PosYInPx + self.FT.Header.SizeYInPx - self.FT.ConnectButtonBufferBorderY, PosZ=7)
 		self.FT.FloatingLayers.append(self.FloatLayer)
-		self.FT.DisplDevice.Redraw(FullRefresh=False) # refresh the display to show the changed comment button
+		self.FT.DisplDevice.Redraw(FullRefresh=False) # refresh the display to show the changed connect button
 
 	def HandleMouseLClickOnGateStyleButton(self, **Args):
 		# handle mouse left button single click on a gate style button
@@ -3772,7 +3772,6 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 		self.Columns = [FTColumnInCore(self)] # contains FTColumnInCore instances. Start with one empty column
 		# AttribTypeHash (dict): keys are attrib names in FTObjectInCore (str), values are acceptable values for the attrib (list)
 		# Need a key for each attrib that presents to the user as a choice widget
-		print('FT3770 risk model type: ', type(Proj.RiskMatrices[0]))
 		self.MyTolRiskModel = Proj.RiskMatrices[0]
 		# set initial severity per risk receptor = maximum severity. Severity is dict: {RR: Severity category object}
 		SeverityObjs = self.MyTolRiskModel.Keys[self.MyTolRiskModel.SeverityDimensionIndex]
@@ -4271,7 +4270,6 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			ConnEl = ElementTree.SubElement(El, 'FTConnector')
 			# get value and unit for display
 			ConnValue, ConnUnit, ProblemValue, ProblemObj, CanEdit = GetValueAndUnitForDisplay(FTConn.FT, FTConn, ConnEl)
-			print('FT4274 connector Out, CanEdit: ', FTConn.Out, CanEdit)
 			# make sub-elements for all the required attribs:
 			# elements where the text is the same as the FTConn attribute
 			# for EventType tag, tag name must be a key in FTEventTypeNameHash
@@ -6899,28 +6897,27 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		# find the position(s) of these button(s)
 		RubberBandToXInPx = [ThisButton.PosXInPx + HalfButtonSizeXInPx for ThisButton in self.RubberBandTo]
 		RubberBandToYInPx = [ThisButton.PosYInPx + HalfButtonSizeYInPx for ThisButton in self.RubberBandTo]
-#		# get start drag position based on centre position of button first clicked
-#		UseStartXInPx = self.EditingConnectionStartButton.PosXInPx + HalfButtonSizeXInPx
-#		UseStartYInPx = self.EditingConnectionStartButton.PosYInPx + HalfButtonSizeYInPx
 		# work out the end drag position to show (constrained within inter-column strip), which will be used as
 		# centre position of ending button at current drag position
 		UseEndXInPx = max(self.StripMinXInPx + HalfButtonSizeXInPx +
 			(self.ConnectingHorizStubFraction * self.InterColumnStripWidth * self.Zoom),
 			min(self.StripMaxXInPx - (self.ConnectingHorizStubFraction *
 			self.InterColumnStripWidth * self.Zoom) - HalfButtonSizeXInPx, MouseX))
-		UseEndYInPx = max(self.StripMinYInPx + self.Header.SizeYInPx + HalfButtonSizeYInPx,
-			min(self.StripMaxYInPx - HalfButtonSizeYInPx, MouseY))
+		UseEndYInPx = max(self.StripMinYInPx + HalfButtonSizeYInPx,
+			min(self.StripMaxYInPx - HalfButtonSizeYInPx, MouseY - self.Header.SizeYInPx))
 		# work out the buffer starting and ending coords relative to display device
 		BufferStartX = int(round(min(RubberBandToXInPx + [UseEndXInPx]) - self.ConnectButtonBufferBorderX - HalfButtonSizeXInPx))
 		BufferStartY = int(round(min(RubberBandToYInPx + [UseEndYInPx]) - self.ConnectButtonBufferBorderY - HalfButtonSizeYInPx))
 		BufferEndX = int(round(max(RubberBandToXInPx + [UseEndXInPx]) + self.ConnectButtonBufferBorderX + HalfButtonSizeXInPx))
 		BufferEndY = int(round(max(RubberBandToYInPx + [UseEndYInPx]) + self.ConnectButtonBufferBorderY + HalfButtonSizeYInPx))
 		# make buffer to draw connecting line
-		ConnectButtonBitmap = wx.Bitmap(
-			width=(BufferEndX - BufferStartX) + 2 * (HalfButtonSizeXInPx + self.ConnectButtonBufferBorderX),
-			height=(BufferEndY - BufferStartY) + 2 * (HalfButtonSizeYInPx + self.ConnectButtonBufferBorderY),
-			depth=wx.BITMAP_SCREEN_DEPTH)
+		ConnectButtonBitmap = wx.Bitmap.FromRGBA(
+			width=(BufferEndX - BufferStartX),
+			height=(BufferEndY - BufferStartY))
 		DrawDC = wx.MemoryDC(ConnectButtonBitmap)
+		# clear bitmap to transparent
+#		DrawDC.SetBackground(wx.Brush(wx.Colour(0, 0, 0, 0))) # TRANSPARENT_BRUSH and BRUSHSTYLE_TRANSPARENT not working here
+#		DrawDC.Clear()
 		# draw lines from rubber band button centres to ending button centre
 		DrawDC.SetPen(wx.Pen(wx.Colour(0xff, 0xcb, 0x29), width=max(1, int(round(2 * self.Zoom))))) # orange
 		for RubberBandToIndex in range(len(self.RubberBandTo)):
@@ -6941,7 +6938,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		FloatLayerToUse = self.EditingConnectionStartButton.FloatLayer
 		FloatLayerToUse.Bitmap = ConnectButtonBitmap
 		FloatLayerToUse.PosXInPx = BufferStartX
-		FloatLayerToUse.PosYInPx = BufferStartY
+		FloatLayerToUse.PosYInPx = BufferStartY + self.Header.SizeYInPx
 		self.DisplDevice.Redraw(FullRefresh=False) # refresh the display to show the draw buffer
 
 	def HandleMouseLDragEndEditingConnection(self, MouseX, MouseY):
