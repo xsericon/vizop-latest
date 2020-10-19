@@ -725,21 +725,21 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 		# fetch any remaining attribs supplied in Args
 		for (Attrib, Value) in Args.items(): setattr(self, Attrib, Value)
 
-	def CreateContextMenu(self, HostEl=None):
-		# create and return context menu (wx.Menu instance)
-		# HostEl: host object, or None
-		assert isinstance(HostEl,  (FTEvent, FTGate, FTConnector)) or (HostEl is None)
-		HostTypeHumanName = '' if HostEl is None else HostEl.ClassHumanName
-		MyCM = wx.Menu(title='<Text>')
-		MyCM.Debug = 717
-		DeleteMItemID = wx.NewId()
-		DeleteMItem = MyCM.Append(DeleteMItemID, _('Delete %s') % HostTypeHumanName, '')
-		# put required binding in FT's list - can't bind yet, as FT.DisplDevice isn't assigned
+#	def CreateContextMenu(self, HostEl=None):
+#		# create and return context menu (wx.Menu instance)
+#		# HostEl: host object, or None
+#		assert isinstance(HostEl,  (FTEvent, FTGate, FTConnector)) or (HostEl is None)
+#		HostTypeHumanName = '' if HostEl is None else HostEl.ClassHumanName
+#	#	MyCM = wx.Menu(title='<Text>')
+#		MyCM.Debug = 717
+#		DeleteMItemID = wx.NewId()
+#		DeleteMItem = MyCM.Append(DeleteMItemID, _('Delete %s') % HostTypeHumanName, '')
+#		# put required binding in FT's list - can't bind yet, as FT.DisplDevice isn't assigned
 #		self.FT.RequiredBindingsToDisplDevice.append( (wx.EVT_MENU,
 #			lambda Event: self.FT.OnDeleteEventRequest(Event, DoomedEvent=self.HostObject), self.DeleteMItem) )
-		self.FT.DisplDevice.Bind(wx.EVT_MENU, lambda Event: self.FT.OnDeleteEventRequest(Event, DoomedEvent=HostEl),
-			DeleteMItem)
-		return MyCM
+#		self.FT.DisplDevice.Bind(wx.EVT_MENU, lambda Event: self.FT.OnDeleteEventRequest(Event, DoomedEvent=HostEl),
+#			DeleteMItem)
+#		return MyCM
 
 	def CreateContextMenu(self, HostEl=None):
 		# create and return context menu (wx.Menu instance)
@@ -767,7 +767,10 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 	def MinTextY(self, TextIdentifier=0): # returns min Y coord (canvas coords) at which text will be drawn in the element
 		# this is used by text drawing routine in module text
 		# if currently editing this component, return position relative to the edit buffer. 0.8 is a fudge to make it look right
-		if self.FT.CurrentEditComponent == self: return 0.8 * self.SizeYInCU
+		# TODO rationalize "if" statement below - seems like it's not needed any longer
+		if self.FT.CurrentEditComponent == self:
+#			return 0.8 * self.SizeYInCU + self.StartY
+			return self.StartY + TextElementTopBufferInCU
 		# otherwise, return position relative to the canvas
 		else: return self.StartY + TextElementTopBufferInCU
 
@@ -819,7 +822,7 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 		TextToShow.Colour = EditingTextFgColour if EditingText else self.DefaultFgColour
 		# draw the text on top of the box
 		text.DrawTextInElement(self, DC, TextToShow, TextIdentifier=0, CanvZoomX=Zoom,
-			CanvZoomY=Zoom, PanX=0, PanY=0, VertAlignment='Top', debug=getattr(self, 'debug', False))
+			CanvZoomY=Zoom, PanX=0, PanY=0, VertAlignment='Top', debug=getattr(self, 'InternalName', False))
 
 	def HandleMouseLClickOnMe(self, **Args): # handle mouse left button single click on TextElement instance when not editing
 		# first, request control frame to show appropriate aspect in control panel
@@ -841,6 +844,7 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 			# get absolute position of textbox for editing: position within element + column + FT, then apply zoom and pan
 			Zoom = self.FT.Zoom
 			# check if HostObject of this element is in a column; if so, get PosX/Y within the column
+			# (only used for choice components)
 			if getattr(self.HostObject, 'Column', None):
 				PosXInCol = self.HostObject.Column.PosXInCU
 				PosYInCol = self.HostObject.Column.PosYInCU
@@ -884,6 +888,7 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 				pass
 
 	def StartEditingAsText(self, Zoom): # handle request to edit contents of component as text
+#		self.FT.PaintNeeded = False # suppress paint during editing, as full redraw is not necessary
 		# first, store the current content of the text component, in case the edit is rejected
 		self.Text.OldContent = self.Text.Content
 		self.FT.DisplDevice.Bind(wx.EVT_TEXT_ENTER, self.FT.EndEditingOperation)
@@ -923,22 +928,28 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 
 	def RedrawDuringEditing(self, Zoom):
 		# redraw the text component during editing, with cursor
+		print('FT927 in RedrawDuringEditing')
+		self.PaintNeeded = False
 		Buffer = wx.Bitmap(width=self.SizeXInCU * Zoom, height=self.SizeYInCU * Zoom, depth=wx.BITMAP_SCREEN_DEPTH)
 		TextEditDC = wx.MemoryDC(Buffer)
-		# draw background box
+		# draw background box (no longer visible?)
+		TextEditDC.SetPen(wx.Pen(EditingTextBorderColour))
 		TextEditDC.SetPen(wx.Pen(EditingTextBorderColour))
 		TextEditDC.SetBrush(wx.Brush(EditingTextBkgColour))
 		TextEditDC.DrawRectangle(0, 0, self.SizeXInCU * Zoom, self.SizeYInCU * Zoom)
+		TextEditDC.SetPen(wx.Pen((0,255,0)))
+		TextEditDC.DrawRectangle(0, 0, 200,20)
 		# populate the box with the current text
 		# factor of 8 for LayerOffsetY is a fudge factor to get the text position to look natural
-		text.DrawTextInElement(self, TextEditDC, self.Text, TextIdentifier=0, CanvZoomX=Zoom, debug=True,
-			CanvZoomY=Zoom, LayerOffsetX=-self.MinTextXat() * Zoom,
-			LayerOffsetY=-self.SizeYInCU * Zoom + int(round(8 * Zoom)),
-			VertAlignment='Top', DrawCursor=True, CursorIndex=self.FT.TextEditCursorIndex,
-			CursorColour=EditingTextCursorColour)
-		# copy TextEditDC into display device
+#		text.DrawTextInElement(self, TextEditDC, self.Text, TextIdentifier=0, CanvZoomX=Zoom, debug=True,
+#			CanvZoomY=Zoom, LayerOffsetX=-self.MinTextXat() * Zoom,
+#			LayerOffsetY=-self.SizeYInCU * Zoom + int(round(8 * Zoom)),
+#			VertAlignment='Top', DrawCursor=True, CursorIndex=self.FT.TextEditCursorIndex,
+#			CursorColour=EditingTextCursorColour)
+#		# copy TextEditDC into display device
 		DisplDeviceDC = wx.BufferedDC(wx.ClientDC(self.FT.DisplDevice))
-		DisplDeviceDC.DrawBitmap(Buffer, self.PosXInPx, self.PosYInPx, useMask=False)
+		# following line seems to be unnecessary - the bitmap gets drawn to the display device DC automatically
+#		DisplDeviceDC.DrawBitmap(Buffer, self.PosXInPx, self.PosYInPx, useMask=False)
 
 	def OnEditChoice(self, Event): # handle click in choice box during editing
 		self.FT.EndEditingOperation()
@@ -1415,6 +1426,7 @@ class FTEvent(FTBoxyObject): # FT event object in Viewport
 		DC = wx.MemoryDC(self.Bitmap)
 		# draw background box, then elements, into the bitmap
 		DrawBackgroundBox(DC, Zoom)
+		print('FT1427 calling DrawElements')
 		self.DrawElements(DC, self.AllComponents, Zoom)
 
 	def GetMyAcceptableUnits(self): # return list of units (UnitItem instances) this event can offer
@@ -2323,6 +2335,7 @@ class FTColumn(object): # object containing a column of FT objects for display, 
 
 	def RenderElementsInOwnBitmaps(self, Zoom):
 		# Get each element to calculate its own contents and draw itself in own individual bitmap
+		print('FT2336 starting RenderElementsInOwnBitmaps')
 		for ThisFTObject in self.FTElements:
 			ThisFTObject.RenderIntoBitmap(Zoom)
 
@@ -3020,9 +3033,9 @@ class FTEventInCore(FTElementInCore): # FT event object used in DataCore by FTOb
 		ThisNumberingTag = ElementTree.SubElement(TopTag, info.NumberingTag)
 		ThisNumberingTag.text = NumberingSystemHash[self]
 		# add Value tags
-		projects.AddValueElement(StartEl=self, ValueTag=info.ValueTag, ValueObj=self.Value)
-		projects.AddValueElement(StartEl=self, ValueTag=info.OldFreqValueTag, ValueObj=self.OldFreqValue)
-		projects.AddValueElement(StartEl=self, ValueTag=info.OldProbValueTag, ValueObj=self.OldProbValue)
+		projects.AddValueElement(StartEl=TopTag, ValueTag=info.ValueTag, ValueObj=self.Value)
+		projects.AddValueElement(StartEl=TopTag, ValueTag=info.OldFreqValueTag, ValueObj=self.OldFreqValue)
+		projects.AddValueElement(StartEl=TopTag, ValueTag=info.OldProbValueTag, ValueObj=self.OldProbValue)
 		# add LastSelectedUnit tags
 		for ThisQtyKind, ThisUnit in self.LastSelectedUnitPerQtyKind.items():
 			LastUnitTag = ElementTree.SubElement(TopTag, info.LastSelectedUnitTag)
@@ -6463,6 +6476,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 				source=BufferDC, xsrc=0, ysrc=0)
 
 		# main procedure for RenderInDC()
+		print('FT6477 starting RenderInDC with debug: ', Args['debug'])
 		assert isinstance(FullRefresh, bool)
 		assert isinstance(DrawZoomTool, bool)
 		assert isinstance(BitmapMinSize, wx.Size) or (BitmapMinSize is None)
@@ -7132,6 +7146,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		# StillZooming (bool): whether the user is continuing to change the zoom
 		assert isinstance(StillZooming, bool)
 		self.Zooming = StillZooming
+		print('FT7149 calling Redraw from RefreshZoomWidget')
 		self.DisplDevice.Redraw(FullRefresh=not StillZooming)
 
 	def RedrawDuringZoom(self, NewZoom=1.0):
@@ -7306,7 +7321,9 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 				if TargetFTElement not in self.CurrentElements: self.CurrentElements.append(TargetFTElement)
 			# update list of elements to set as current on next refresh
 			self.CurrentElementIDsToSelectOnRefresh = [e.ID for e in self.CurrentElements]
-			if RedrawEntireFT: self.DisplDevice.Redraw(FullRefresh=True)
+			if RedrawEntireFT:
+				print('FT7325 calling Redraw from SetElementAsCurrent (commented out)')
+#				self.DisplDevice.Redraw(FullRefresh=True)
 			if SetAsLastSelected:
 				# set this element as the last one selected, in case the user shift-clicks another element
 				self.LastElementSelected = TargetFTElement

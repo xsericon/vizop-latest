@@ -485,7 +485,7 @@ class ProjectItem(object): # class of PHA project instances
 						XMLNameTag.text = ThisKey.XMLName
 				# store values for the matrix
 				for ThisValue in utilities.Flatten(ThisMatrix.Values):
-					AddValueElement(StartEl=ThisMatrixTag, ValueTag=info.ValueTag, ValueObj=ThisValue)
+					AddValueElement(StartEl=ThisMatrixTag, ValueTag=info.EntryTag, ValueObj=ThisValue)
 
 		def AddPHAObjTags(XMLRoot, NumberingSystemHash):
 			# add tags for each PHA object in the project. Return comment hash (dict):
@@ -1398,7 +1398,7 @@ def UnpackValueFromXML(Proj, XMLEl):
 	NumberKind = XMLEl.findtext(info.KindTag)
 	if not (NumberKind in core_classes.NumValueKindHash.keys()):
 		ProblemReports.append(core_classes.ProblemReportItem(HumanDescription=_('Unrecognised number kind')))
-	NewNumber = core_classes.NumValueKindHash[NumberKind]()
+	NewNumber = core_classes.NumValueKindHash[NumberKind](DefaultRR=False)
 	# fetch specific data for each number kind
 	if NumberKind in ['User', 'Copied']:
 		# fetch risk receptors
@@ -1408,7 +1408,7 @@ def UnpackValueFromXML(Proj, XMLEl):
 				RRToUse = core_classes.DefaultRiskReceptor
 			else: # create new RR
 				RRToUse = utilities.ObjectWithID(Objects=Proj.RiskReceptors, TargetID=ThisRRID)
-				NewNumber.AddRiskReceptor(RR=RRToUse)
+			NewNumber.AddRiskReceptor(RR=RRToUse) # always adding RR because we created number with DefaultRR=False
 			# fetch value per risk receptor, checking if value is set as infinite
 			if utilities.Bool2Str(Input=ThisRRTag.findtext(info.InfiniteTag, default='False')):
 				NewNumber.SetToInfinite(RR=RRToUse)

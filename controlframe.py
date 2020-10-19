@@ -2132,16 +2132,17 @@ class ControlFrame(wx.Frame):
 			assert isinstance(FullRefresh, bool)
 			if self.ViewportOwner.CurrentViewport:
 				DC = wx.BufferedDC(wx.ClientDC(self))
-				self.DoRedraw(DC, FullRefresh=FullRefresh)
+				self.DoRedraw(DC, FullRefresh=FullRefresh, debug=2135)
 
-		def DoRedraw(self, DC, FullRefresh=True): # redraw Viewport in DC provided
+		def DoRedraw(self, DC, FullRefresh=True, debug=0): # redraw Viewport in DC provided
 			# FullRefresh (bool): whether to request redraw from scratch
 			# FIXME the problem with not filling the background in Windows may be here
+			print('CF2140 starting DoRedraw with debug: ', debug)
 			assert isinstance(FullRefresh, bool)
 			DC.SetBackground(wx.Brush(self.BackgColour))
 			DC.Clear()
 			self.ViewportOwner.CurrentViewport.RenderInDC(DC, FullRefresh=FullRefresh,
-				BitmapMinSize=self.GetSize(), DrawZoomTool=True)
+				BitmapMinSize=self.GetSize(), DrawZoomTool=True, debug=2144)
 			# may need self.Refresh() here to invoke OnPaint()
 
 		def ShowEmptyPanel(self): # clear edit panel display to background colour
@@ -2212,7 +2213,7 @@ class ControlFrame(wx.Frame):
 				# TODO set PaintNeeded to False during text editing (seems like the blinking cursor in the TextCtrl triggers paint events)
 				if getattr(self.ViewportOwner.CurrentViewport, 'PaintNeeded', True):
 					MyPaintDC = wx.PaintDC(self)
-					self.DoRedraw(MyPaintDC, FullRefresh=True)
+					self.DoRedraw(MyPaintDC, FullRefresh=True, debug=2216)
 
 		def OnMouseLClickEdit(self, Event, Viewport, CanStartDrag=True, CanSelect=True, **Args):
 			# handle mouse left button click inside EditPanel
@@ -3266,9 +3267,8 @@ class ControlFrame(wx.Frame):
 		# update display in local Control Frame, if SkipRefresh tag in XMLRoot is False
 		if not utilities.Bool2Str(XMLRoot.find(info.SkipRefreshTag).text):
 			# request redraw of Viewport, with changed element visible TODO make RenderInDC force element to be visible
-#			ThisViewport.RenderInDC(TargetDC, FullRefresh=True)
 			ThisViewport.RenderInDC(TargetDC, FullRefresh=FullRefresh,
-				BitmapMinSize=self.GetSize(), DrawZoomTool=True)
+				BitmapMinSize=self.GetSize(), DrawZoomTool=True, debug=3271)
 		# set UndoChainWaiting flag to trigger any further undo items
 		UndoChainWaiting = utilities.Bool2Str(XMLRoot.find(info.ChainWaitingTag).text)
 		return vizop_misc.MakeXMLMessage('Null', 'Null')

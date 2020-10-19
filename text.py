@@ -736,6 +736,7 @@ def DrawTextInElement(El, dc, Text, TextIdentifier, LayerOffsetX=0, LayerOffsetY
 		else: # cursor is in the middle of a subline
 			CursorX = XStartAbs + Text.SublineX[ThisSublineIndex][TargetIndex - CumulativeCharCount]
 		CursorY = LayerOffsetY + PanY + YStartAbs
+		print('TE759 CursorY position: LayerOffsetY + PanY + YStartAbs:', LayerOffsetY, PanY, YStartAbs)
 #		CursorY = LayerOffsetY + PanY + YStartAbs + SublineHeight - SublineY[SublineNo][CursorIndex - CumulativeCharCount][0]
 		# draw the cursor
 		dc.SetPen(wx.Pen(CursorColour, width=max(1, int(round(2 * Zoom)))))
@@ -743,6 +744,8 @@ def DrawTextInElement(El, dc, Text, TextIdentifier, LayerOffsetX=0, LayerOffsetY
 			SublineHeights[ThisSublineIndex][1])
 
 	# main procedure for DrawTextInElement()
+
+#	print('TE748 in DrawTextInElement with debug: ', debug)
 	# if text is empty (or whitespace only) and we need to draw cursor, add dummy content so that we can calculate
 	# correct position for cursor
 	if DrawCursor and not Text.Content.strip():
@@ -762,7 +765,9 @@ def DrawTextInElement(El, dc, Text, TextIdentifier, LayerOffsetX=0, LayerOffsetY
 		RenderText(YStartInPx, Text.Sublines, SublineHeights, Text.SublineX,
 			SublineY, ScaledPointSizeNoZoom, El.TextStandoutBackColour(TextIdentifier), ZoomX=CanvZoomX, ZoomY=CanvZoomY)
 	if DrawCursor:
-#			print('TE726 drawing cursor at index: ', CursorIndex)
+#		dc.SetPen(wx.Pen((255, 0, 0)))
+#		dc.DrawRectangle(0, 0, 100, 20)
+		print('TE726 drawing cursor at index: ', CursorIndex)
 		DrawTheCursor(TextIdentifier, CursorIndex, CursorColour, YStartInPx, Zoom=CanvZoomY)
 	# restore original text if we substituted dummy text
 	if UsingDummyText: Text.Content = OldText

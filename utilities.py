@@ -196,6 +196,7 @@ def ObjectWithID(Objects, TargetID): # return object instance among Objects (lis
 		return Objects[ObjIDs.index(TargetID.strip())]
 	else:
 		print("ObjectWithID: warning, requested object ID '%s' not found" % str(TargetID))
+		raise
 		return None
 
 def FetchObjsFromIDList(IDList, ObjList):
