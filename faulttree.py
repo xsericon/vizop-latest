@@ -6476,7 +6476,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 				source=BufferDC, xsrc=0, ysrc=0)
 
 		# main procedure for RenderInDC()
-		print('FT6477 starting RenderInDC with debug: ', Args['debug'])
+		print('FT6477 starting RenderInDC with debug: ', Args['debug'] if 'debug' in Args else 'undefined')
 		assert isinstance(FullRefresh, bool)
 		assert isinstance(DrawZoomTool, bool)
 		assert isinstance(BitmapMinSize, wx.Size) or (BitmapMinSize is None)

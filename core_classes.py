@@ -1898,7 +1898,9 @@ JPGFileType = ImageFileType(HumanName='JPG', XMLName='JPG', Extension='jpg', Sup
 PNGFileType = ImageFileType(HumanName='PNG', XMLName='PNG', Extension='png', SupportsMultiPage=False)
 TIFFFileType = ImageFileType(HumanName='TIFF', XMLName='TIFF', Extension='tiff', SupportsMultiPage=False)
 # file types to be offered for image file exports
-ImageFileTypesSupported = [PDFFileType, JPGFileType, PNGFileType, TIFFFileType]
+# MPA 2020-10-19 only PNG supported for now
+#ImageFileTypesSupported = [PDFFileType, JPGFileType, PNGFileType, TIFFFileType]
+ImageFileTypesSupported = [PNGFileType]
 # check default is one of these
 assert info.DefaultImageFileType in [t.Extension for t in ImageFileTypesSupported]
 

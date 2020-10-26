@@ -942,48 +942,16 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 		assert DateKind in core_classes.DateChoices
 		print('FR575 DoExportFTToFile: Work in progress. Options support is incomplete.')
 		
-		# required for any export file type
-		MyMemoryDC = wx.MemoryDC()
-		Bitmap = faulttree.FTForDisplay.RenderInDC(self, TargetDC=MyMemoryDC, FullRefresh=True, BitmapMinSize=None, DrawZoomTool=True)
-		MyMemoryDC.SelectObject(bitmap=Bitmap)
-		
-		if FileType == core_classes.PDFFileType:
-			# export temporary image file then embed it into PDF
-			TmpImageFilePath = FilePath + '.jpg'
-			Bitmap.SaveFile(TmpImageFilePath, wx.BITMAP_TYPE_JPEG)
-			
-			if Orientation == 'Portrait':
-				PageSizeXAxisLength = PageSizeShortAxis
-				PageSizeYAxisLength = PageSizeLongAxis
-			else:
-				PageSizeXAxisLength = PageSizeLongAxis
-				PageSizeYAxisLength = PageSizeShortAxis
-			
-			# convert page size from mm to points ("base unit" used by reportlab)
-			MmToPointsFactor = 0.1 * 72 / 2.54
-			PageSize = (PageSizeXAxisLength * MmToPointsFactor, PageSizeYAxisLength * MmToPointsFactor)
-			
-			# PDF creation, adapted from https://stackoverflow.com/a/16632518/488666
-			c = canvas.Canvas(FilePath, pagesize=PageSize)
-			c.drawImage(image=TmpImageFilePath, x=0, y=0, width=PageSizeXAxisLength*units.mm, height=PageSizeYAxisLength*units.mm, preserveAspectRatio=True)
-			
-			# clear temporary image file
-			os.remove(TmpImageFilePath)
-			
-			c.showPage()
-			try:
-				c.save()
-			except PermissionError:
-				wx.MessageBox(_('Could not create PDF file "%s" due to permission error. Please check directory permissions, close other programs, and try again.' % FilePath), 'Error', wx.OK | wx.ICON_ERROR)
-				return {'OK': False, 'Problem': 'Permission Error'}
-			
-		else:
-			BitmapTypes = {
-				core_classes.JPGFileType: wx.BITMAP_TYPE_JPEG,
-				core_classes.PNGFileType: wx.BITMAP_TYPE_PNG,
-				core_classes.TIFFFileType: wx.BITMAP_TYPE_TIFF
-			}
-			Bitmap.SaveFile(FilePath, BitmapTypes[FileType])
+		# TODO compute required bitmap dimensions
+		Width = 1024
+		Height = 768
+		Bitmap = wx.Bitmap(Width, Height, wx.BITMAP_SCREEN_DEPTH)
+		DC = wx.MemoryDC()
+		DC.SelectObject(Bitmap)
+		DC.SetBackground(wx.Brush("white"))  
+		DC.Clear()
+		Bitmap.SaveFile(FilePath, wx.BITMAP_TYPE_PNG)
+		DC.SelectObject(wx.NullBitmap)
 		
 		print('Fault tree exported to file', FilePath)
 		return {'OK': True, 'Problem': None}
