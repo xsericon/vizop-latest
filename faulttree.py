@@ -36,6 +36,17 @@ GateTextBkgColour = (0xb0, 0xb0, 0xff) # light grey
 GateTextFgColour = (0x00, 0x00, 0x00) # black
 HighlightColour = (0xfd, 0xf8, 0x47) # yellow
 HighlightColourStr = '253,248,71' # yellow
+
+# export colours
+ExportColours = {
+	'ConnectingLine': (0x99, 0x99, 0x99),
+	'ContentBkg': (0xEE, 0xEE, 0xEE),
+	'ContentFg': (0x00, 0x00, 0x00),
+	'GeneralBkg': (0xFF, 0xFF, 0xFF),
+	'LabelBkg': (0xAA, 0xAA, 0xAA),
+	'LabelFg': (0xFF, 0xFF, 0xFF)
+}
+
 # old colours no longer used
 OldHeaderLabelBkg = (0xdb, 0xf7, 0xf0)  # pale green
 OldColourLabelBkg = (0x80, 0x3E, 0x51)  # plum
@@ -198,7 +209,8 @@ class ButtonElement(object): # object containing a button and attributes and met
 			PosX = self.FT.ConnectButtonBufferBorderX
 			PosY = self.FT.ConnectButtonBufferBorderY
 		else: PosX = int(round(self.PosXInCU * Zoom)); PosY = int(round(self.PosYInCU * Zoom)) # use button's real position in display device
-		DC.DrawCircle(PosX + Radius, PosY + Radius, Radius)
+		if not self.FT.Exporting:
+			DC.DrawCircle(PosX + Radius, PosY + Radius, Radius)
 
 	def GetMinSizeInCU(self): # calculate property MinSize - in canvas units
 		return self.SizeXInCU, self.SizeYInCU
@@ -438,7 +450,7 @@ class FTHeader(object): # FT header object. Rendered by drawing text into bitmap
 			HostObject=self, InternalName='SIL',
 			ContextMenuMethod=self.FT.CreateContextMenu)
 		# make lists of label and content elements (used for setting colours, below)
-		LabelEls = [SIFNameLabel, RevLabel, ModeLabel, self.RRLabel, SeverityLabel, TolFreqLabel, UELLabel, RRFLabel, SILLabel]
+		self.LabelEls = [SIFNameLabel, RevLabel, ModeLabel, self.RRLabel, SeverityLabel, TolFreqLabel, UELLabel, RRFLabel, SILLabel]
 		self.ContentEls = [HumanName, Rev, self.OpModeComponent, self.RRComponent, RRF, self.SeverityComponent, TolFreq,
 			UEL, RRF, SIL]
 
@@ -454,7 +466,7 @@ class FTHeader(object): # FT header object. Rendered by drawing text into bitmap
 		SILLabel.Text.Content = _('SIL target')
 
 		# set element colours
-		for El in LabelEls:
+		for El in self.LabelEls:
 			El.Text.Colour = El.PromptTextObj.Colour = ColourLabelFg
 			El.BkgColour = ColourLabelBkg
 		for El in self.ContentEls:
@@ -527,6 +539,15 @@ class FTHeader(object): # FT header object. Rendered by drawing text into bitmap
 		self.Bitmap = wx.Bitmap(width=self.SizeXInPx, height=self.SizeYInPx, depth=wx.BITMAP_SCREEN_DEPTH)
 		# make a DC for drawing
 		DC = wx.MemoryDC(self.Bitmap)
+		if self.FT.Exporting:
+			DC.SetBackground(wx.Brush(ExportColours['GeneralBkg']))
+			DC.Clear()
+			for El in self.ContentEls:
+				El.Text.Colour = ExportColours['ContentFg']
+				El.BkgColour = ExportColours['ContentBkg']
+			for El in self.LabelEls:
+				El.Text.Colour = ExportColours['LabelFg']
+				El.BkgColour = ExportColours['LabelBkg']
 		# draw elements into the bitmap
 		DrawHeaderElements(DC, self.Elements, Zoom, self.ComponentNameToHighlight)
 
@@ -819,7 +840,9 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 			(self.EndYInCU - self.PosYInCU) * Zoom, radius=Args.get('BackBoxRoundedness', DefaultRound) * Zoom)
 		# if the text content is empty, provide a prompt text from the text component's PromptText attrib, if any
 		TextToShow = self.PromptTextObj if self.UsePromptText() else self.Text
-		TextToShow.Colour = EditingTextFgColour if EditingText else self.DefaultFgColour
+		# text colour
+		if not self.FT.Exporting:
+			TextToShow.Colour = EditingTextFgColour if EditingText else self.DefaultFgColour
 		# draw the text on top of the box
 		text.DrawTextInElement(self, DC, TextToShow, TextIdentifier=0, CanvZoomX=Zoom,
 			CanvZoomY=Zoom, PanX=0, PanY=0, VertAlignment='Top', debug=getattr(self, 'InternalName', False))
@@ -1375,7 +1398,10 @@ class FTEvent(FTBoxyObject): # FT event object in Viewport
 
 		def DrawBackgroundBox(DC, Zoom): # draw FTEvent's background box in DC
 			DC.SetPen(wx.Pen(self.BorderColour, width=1)) # for now, a 1 pixel border around the event. TODO make nicer and apply zoom
-			BackgColour = self.BackgroundColourSelected if self in self.FT.CurrentElements else self.BackgroundColourUnselected
+			if self.FT.Exporting:
+				BackgColour = ExportColours['GeneralBkg']
+			else:
+				BackgColour = self.BackgroundColourSelected if self in self.FT.CurrentElements else self.BackgroundColourUnselected
 			DC.SetBrush(wx.Brush(BackgColour))
 			# box is drawn in FTElement's own bitmap, so coords are relative to element (not using PosX/YInPx, which are relative to column)
 			DC.DrawRectangle(0, 0, self.SizeXInPx, self.SizeYInPx)
@@ -1645,7 +1671,11 @@ class FTGate(FTBoxyObject): # object containing FT gates for display in Viewport
 
 		def DrawBackgroundBox(DC, Zoom): # draw FTGate's background box in DC
 			DC.SetPen(wx.Pen(GateBorderColour, width=max(1, int(round(Zoom)))))
-			DC.SetBrush(wx.Brush(GateBaseColour))
+			if self.FT.Exporting:
+				BgColour = ExportColours['GeneralBkg']
+			else:
+				BgColour = GateBaseColour
+			DC.SetBrush(wx.Brush(BgColour))
 			# box is drawn in FTGate's own bitmap, so coords are relative to gate (not using PosX/YInPx, which are relative to column)
 			DC.DrawRectangle(0, 0, self.SizeXInPx, self.SizeYInPx)
 
@@ -2096,8 +2126,10 @@ class FTConnector(FTBoxyObject): # object defining Connectors-In and -Out for di
 
 		def DrawBackgroundBox(DC, Zoom): # draw FTConnector's background box in DC
 			DC.SetPen(wx.Pen(self.BorderColour, width=1)) # for now, a 1 pixel border around the event. TODO make nicer and apply zoom to border
-#			BackgColour = self.BackgroundColourSelected if self in self.FT.CurrentElements else self.BackgroundColourUnselected
-			BackgColour = ElementBaseColourSelected if self in self.FT.CurrentElements else GateBaseColour
+			if self.FT.Exporting:
+				BackgColour = ExportColours['GeneralBkg']
+			else:
+				BackgColour = ElementBaseColourSelected if self in self.FT.CurrentElements else GateBaseColour
 			DC.SetBrush(wx.Brush(BackgColour))
 			# box is drawn in FTConnector's own bitmap, so coords are relative to element (not using PosX/YInPx, which are relative to column)
 			DC.DrawRectangle(0, 0, self.SizeXInPx, self.SizeYInPx)
@@ -2264,12 +2296,21 @@ class FTBuilder(FTBoxyObject): # 'add' button object within an FTColumn.
 
 	def RenderIntoBitmap(self, Zoom): # draw FTBuilder in self.Bitmap. Also sets FTBuilder size attributes
 		# set FTBuilder size
-		self.SizeXInPx = int(round(self.SizeXInCU * Zoom))
-		self.SizeYInPx = int(round(self.SizeYInCU * Zoom))
+		if self.FT.Exporting:
+			self.SizeXInPx = 1
+			self.SizeYInPx = 1
+		else:
+			self.SizeXInPx = int(round(self.SizeXInCU * Zoom))
+			self.SizeYInPx = int(round(self.SizeYInCU * Zoom))
 		# make the bitmap
 		self.Bitmap = wx.Bitmap(width=self.SizeXInPx, height=self.SizeYInPx, depth=wx.BITMAP_SCREEN_DEPTH)
 		# make a DC for drawing
 		DC = wx.MemoryDC(self.Bitmap)
+		# if exporting, draw only export background & stop
+		if self.FT.Exporting:
+			DC.SetBrush(wx.Brush(ExportColours['GeneralBkg']))
+			DC.Clear()
+			return
 		# draw a large box
 		DC.SetPen(wx.Pen(ButtonGraphicColour, width=1))
 		DC.SetBrush(wx.Brush(ButtonBaseColour))
@@ -2356,7 +2397,11 @@ class FTColumn(object): # object containing a column of FT objects for display, 
 		if (FTElement.SizeXInPx < self.SizeXInPx) and FTElement.Connectable:
 			Zoom = self.FT.Zoom
 			LineYInCU = FTElement.HorizontalLineYInCU()
-			MyPen = wx.Pen(ConnectingLineColour, width=max(1, int(round(ConnectingLineThicknessInCU * Zoom))))
+			if self.FT.Exporting:
+				LineColour = ExportColours['ConnectingLine']
+			else:
+				LineColour = ConnectingLineColour
+			MyPen = wx.Pen(LineColour, width=max(1, int(round(ConnectingLineThicknessInCU * Zoom))))
 			MyPen.SetCap(wx.CAP_BUTT) # set square end for line, to prevent line encroaching on elements
 			DC.SetPen(MyPen)
 			LineStartXInPx, LineStartYInPx = utilities.ScreenCoords(self.PosXInCU + FTElement.PosXInCU + FTElement.SizeXInCU + 1,
@@ -6431,7 +6476,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		self.SwitchToPreferredControlPanelAspect(CurrentElements=self.CurrentElements,
 			AspectRequired=self.PreferredControlPanelAspect, ComponentEdited=self.ComponentEdited)
 
-	def RenderInDC(self, TargetDC, FullRefresh=True, BitmapMinSize=None, DrawZoomTool=True, **Args):
+	def RenderInDC(self, TargetDC, FullRefresh=True, BitmapMinSize=None, DrawZoomTool=True, Export=False, **Args):
 		# render all FT elements into TargetDC provided
 		# FullRefresh (bool): whether to redraw from scratch
 		# BitmapMinSize ( (X, Y) tuple of int, wx.Size, or None): Ensure bitmap has this min size
@@ -6479,7 +6524,9 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		print('FT6477 starting RenderInDC with debug: ', Args['debug'] if 'debug' in Args else 'undefined')
 		assert isinstance(FullRefresh, bool)
 		assert isinstance(DrawZoomTool, bool)
+		assert isinstance(Export, bool)
 		assert isinstance(BitmapMinSize, wx.Size) or (BitmapMinSize is None)
+		self.Exporting = Export
 		if FullRefresh:
 			# fetch display attribs from redraw milestone, if any
 			self.UpdateAttribsFromMilestone()
@@ -6508,6 +6555,9 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 				ActualBufferSizeY = max(BitmapMinSize[1], ActualBufferSizeY)
 			self.BaseLayerBitmap = wx.Bitmap(width=ActualBufferSizeX, height=ActualBufferSizeY, depth=wx.BITMAP_SCREEN_DEPTH)
 			BaseLayerDC = wx.MemoryDC(self.BaseLayerBitmap)
+			if Export:
+				BaseLayerDC.SetBackground(wx.Brush(ExportColours['GeneralBkg']))
+				BaseLayerDC.Clear()
 			# draw header in its own bitmap, then copy into BaseLayerDC
 			DrawHeader(self, BaseLayerDC)
 			# draw columns and inter-column strips in BaseLayerDC
@@ -6526,6 +6576,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			self.MyZoomWidget.SetZoom(self.Zoom) # update zoom setting of zoom widget
 			self.MyZoomWidget.DrawInBitmap(DisplDevice=self.DisplDevice) # draw zoom widget in its own bitmap
 		BlitIntoDC(BaseLayerBitmap=self.BaseLayerBitmap, TargetDC=TargetDC)
+		self.Exporting = False
 		return self.BaseLayerBitmap
 
 	def AddBuilderButtons(self): # add builder buttons between objects in each column, and in a "new" column to the right
@@ -6654,7 +6705,11 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 					LineStartXInCU = int(round(self.InterColumnStripWidth)) # start line at right edge of strip
 					LineEndXStubInCU = int(round((1 - self.ConnectingHorizStubFraction) * self.InterColumnStripWidth))
 				LineEndXFullInCU = int(round(0.5 * self.InterColumnStripWidth)) # end at centre of strip for connected objs
-				DrawDC.SetPen(wx.Pen(ConnectingLineColour, width=max(1, int(round(ConnectingLineThicknessInCU * self.Zoom)))))
+				if self.Exporting:
+					LineColour = ExportColours['ConnectingLine']
+				else:
+					LineColour = ConnectingLineColour
+				DrawDC.SetPen(wx.Pen(LineColour, width=max(1, int(round(ConnectingLineThicknessInCU * self.Zoom)))))
 				# draw the lines for each connectable item in the column.
 				for ThisElement in FTColumn.FTElements:
 					if ThisElement.Connectable:
@@ -6677,7 +6732,10 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 				assert isinstance(YOffsetInCU, int)
 				LineThickness = 4 # in canvas coords
 				LineXInCU = int(round(0.5 * self.InterColumnStripWidth)) # line will be drawn in centre of strip
-				LineColour = (0xf6, 0xff, 0x2a) # golden yellow
+				if self.Exporting: 
+					LineColour = ExportColours['ConnectingLine']
+				else:
+					LineColour = ConnectingLineColour
 				DrawDC.SetPen(wx.Pen(LineColour, width=max(1, int(round(LineThickness * self.Zoom)))))
 				# convert ConnectedOnRightEls into indices in RightColumn
 				ConnectedOnRightIndices = [RightColumn.FTElements.index(El) for El in ConnectedOnRightEls]
@@ -6753,6 +6811,9 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			Buffer = wx.Bitmap(width=int(round(self.InterColumnStripWidth * self.Zoom)),
 				height=int(round(StripLength * self.Zoom)), depth=wx.BITMAP_SCREEN_DEPTH)
 			DrawDC = wx.MemoryDC(Buffer)
+			if self.Exporting:
+				DrawDC.SetBrush(wx.Brush(ExportColours['GeneralBkg']))
+				DrawDC.Clear()
 			# draw connecting lines between left and right columns%%%
 			DrawConnectingHorizontals(self.Columns[LeftColIndex], DrawDC, IsLeftCol=True, YOffsetInCU=YOffsetInCU)
 			if RightColConnectable:

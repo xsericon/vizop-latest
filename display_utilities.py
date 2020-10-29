@@ -50,6 +50,7 @@ class ViewportBaseClass(object, metaclass=ViewportMetaClass): # base class for a
 		# store Viewport to restore when this one is destroyed
 		self.ViewportToRevertTo = Args.get('ViewportToRevertTo', None)
 #		self.GotoMilestoneOnUndoCreate = None # a milestone instance to revert to, if creation of this Viewport is undone
+		self.Exporting = False
 
 #	method StoreViewportCommonDataInXML() is in module projects
 

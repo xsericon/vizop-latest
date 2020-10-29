@@ -6,9 +6,6 @@
 from __future__ import division # makes a/b yield exact, not truncated, result. Must be 1st import
 import os, os.path, wx, platform # wx provides basic GUI functions
 
-from reportlab.pdfgen import canvas
-from reportlab.lib import units, pagesizes
-
 import core_classes, project_display, vizop_misc, info, utilities, faulttree, display_utilities
 from project_display import EditPanelAspectItem
 from display_utilities import UIWidgetItem
@@ -942,14 +939,9 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 		assert DateKind in core_classes.DateChoices
 		print('FR575 DoExportFTToFile: Work in progress. Options support is incomplete.')
 		
-		# TODO compute required bitmap dimensions
-		Width = 1024
-		Height = 768
-		Bitmap = wx.Bitmap(Width, Height, wx.BITMAP_SCREEN_DEPTH)
 		DC = wx.MemoryDC()
+		Bitmap = faulttree.FTForDisplay.RenderInDC(self, TargetDC=DC, FullRefresh=True, BitmapMinSize=None, DrawZoomTool=False, Export=True)
 		DC.SelectObject(Bitmap)
-		DC.SetBackground(wx.Brush("white"))  
-		DC.Clear()
 		Bitmap.SaveFile(FilePath, wx.BITMAP_TYPE_PNG)
 		DC.SelectObject(wx.NullBitmap)
 		
