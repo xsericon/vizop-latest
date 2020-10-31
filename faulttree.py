@@ -189,8 +189,9 @@ class ButtonElement(object): # object containing a button and attributes and met
 		else: # draw bitmap
 			# work out whether to resize button bitmaps
 			if Zoom != self.BitmapZoomLevel: self.ChangeZoom(Zoom)
-			DC.DrawBitmap(self.BitmapZoomed[self.Status], self.PosXInCU * Zoom,
-				self.PosYInCU * Zoom, useMask=False)
+			if not self.FT.Exporting:
+				DC.DrawBitmap(self.BitmapZoomed[self.Status], self.PosXInCU * Zoom,
+					self.PosYInCU * Zoom, useMask=False)
 
 	def DrawConnectButton(self, DC, Zoom, InFloatLayer=False, DesignatedX=None, DesignatedY=None): # draw a connect button
 		# InFloatLayer (bool): whether we are drawing in a dedicated layer buffer, rather than in the inter-column strip buffer
@@ -741,6 +742,7 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 		self.Selected = False # whether highlighted as part of user selection
 		self.IsClickable = True
 		self.MaxWidthInCU = 999
+		self.IsLabel = False
 #		self.MyContextMenu = self.CreateContextMenu(HostEl=self.HostObject)
 #			# may be overwritten by attrib supplied in Args
 		# fetch any remaining attribs supplied in Args
@@ -822,7 +824,7 @@ class TextElement(FTBoxyObject): # object containing a text object and other att
 	MinSizeInCU = property(fget=GetMinSizeInCU)
 
 	def UsePromptText(self): # return True if we should display a prompt text instead of the actual text
-		return (self.Text.Content == '')
+		return (self.Text.Content == '' and not self.FT.Exporting)
 
 	def Draw(self, DC, Zoom, **Args): # render text element, including background box, in DC
 		# Optional arg BackBoxRoundedness: radius of background box corner curvature, in canvas coords
@@ -1277,7 +1279,7 @@ class FTEvent(FTBoxyObject): # FT event object in Viewport
 			LSingleClickHandler='HandleMouseLClickOnCommentButton', CommentKind='EventDescriptionComments',
 			ControlPanelAspect='CPAspect_Comment', CommentKindHuman=_('Event description'),
 			ContextMenuMethod = self.CreateContextMenu)
-		EventValue = TextElement(self.FT, RowBase=0, ColStart=0, ColSpan=1, EndX=99, EditBehaviour='Text',
+		self.EventValue = TextElement(self.FT, RowBase=0, ColStart=0, ColSpan=1, EndX=99, EditBehaviour='Text',
 			HostObject=self, InternalName='Value', ControlPanelAspect='CPAspect_NumValue', HorizAlignment='Left',
 			ContextMenuMethod=self.CreateContextMenu)
 			# internal name = 'Value' to match attrib name in Core object
@@ -1307,7 +1309,7 @@ class FTEvent(FTBoxyObject): # FT event object in Viewport
 		# make lists of elements: TopEls at top of event, ValueEls relating to event value
 		TopEls = [self.EventTypeComponent, self.EventNumberingComponent, self.EventDescriptionComponent,
 			EventCommentButton]
-		ValueEls = [EventValue, self.EventValueUnitComponent, self.ValueProblemButton, ValueCommentButton,
+		ValueEls = [self.EventValue, self.EventValueUnitComponent, self.ValueProblemButton, ValueCommentButton,
 			EventActionItemButton, EventParkingLotItemButton]
 		# set text element colours
 		for El in TopEls + ValueEls:
@@ -1335,7 +1337,9 @@ class FTEvent(FTBoxyObject): # FT event object in Viewport
 			 (ValueComments, self.ValueComments, self.ShowValueComments, _('Comments on\nvalue')),
 			 (ActionItems, self.ActionItems, self.ShowActionItems, _('Action items')),
 			 (ParkingLotItems, self.ParkingLot, self.ShowParkingLotItems, _('Parking lot items'))]:
-				# This 'if' structure left here in case we want to reinstate the condition for optimization later
+				# hide comments from export when they are empty
+				if self.FT.Exporting and len(CommentList) == 0:
+					continue
 				for (CommentIndex, Comment) in enumerate(CommentList):
 					ListComponent = TextElement(self.FT, RowBase=CommentIndex, ColStart=1, ColSpan=5,
 						EndX=399, MinHeight=25, HostObject=self, ContextMenuMethod=self.CreateContextMenu,
@@ -1347,10 +1351,9 @@ class FTEvent(FTBoxyObject): # FT event object in Viewport
 				# add item label (e.g. 'Comment') at left side of first row of items
 				LabelComponent = TextElement(self.FT, RowBase=0, ColStart=0, ColSpan=1, EndX=99,
 					HostObject=self, DefaultFgColour=LabelFgColour, ContextMenuMethod=self.CreateContextMenu,
-					BkgColour=GateLabelBkgColour, RowSpan=max(1, len(CommentList)))
+					BkgColour=GateLabelBkgColour, RowSpan=max(1, len(CommentList)), IsLabel=True)
 				CommentElementList.append(LabelComponent)
 				LabelComponent.Text.Content = CommentLabel
-				LabelComponent.Text.Colour = GateLabelFgColour
 				LabelComponent.Text.ParaHorizAlignment = 'Centre'
 		return (DescrComments, ValueComments, ActionItems, ParkingLotItems)
 
@@ -1405,13 +1408,30 @@ class FTEvent(FTBoxyObject): # FT event object in Viewport
 			DC.SetBrush(wx.Brush(BackgColour))
 			# box is drawn in FTElement's own bitmap, so coords are relative to element (not using PosX/YInPx, which are relative to column)
 			DC.DrawRectangle(0, 0, self.SizeXInPx, self.SizeYInPx)
-
-#		def DrawElements(DC, Elements, Zoom): # render FTEvent's elements in DC. Method moved to superclass
-#			BackBoxRoundedness = 3 # for text elements, how rounded the background boxes' corners are
-#			for El in Elements:
-#				# render element, including any background box, in DC
-#				if getattr(El, 'Visible', True):
-#					El.Draw(DC, Zoom, BackBoxRoundedness=BackBoxRoundedness)
+		
+		# when exporting FT: change colours, remove buttons & increase colspan when possible
+		def AdaptForExport():
+			if not self.FT.Exporting:
+				return
+			# title: label colours
+			self.EventTypeComponent.Text.Colour = ExportColours['LabelFg']
+			self.EventTypeComponent.BkgColour = ExportColours['LabelBkg']
+			# fields: content colours
+			for El in [self.EventNumberingComponent, self.EventDescriptionComponent, self.EventValue, self.EventValueUnitComponent]:
+				El.Text.Colour = ExportColours['ContentFg']
+				El.BkgColour = ExportColours['ContentBkg']
+			# increase description & comments colspans because buttons are not rendered when exporting
+			self.EventDescriptionComponent.ColSpan += 1
+			for El in self.DescriptionCommentEls + self.ValueCommentEls:
+				if El.IsLabel:
+					El.Text.Colour = ExportColours['LabelFg']
+					El.BkgColour = ExportColours['LabelBkg']
+				else:
+					El.ColSpan += 1
+					El.Text.Colour = ExportColours['ContentFg']
+					El.BkgColour = ExportColours['ContentBkg']
+			if self.EventValue.Text.Content == '':
+				self.EventValue.Text.Content = '- - -'
 
 		# start of main procedure for RenderIntoBitmap() for FTEvent
 		BorderX = BorderY = 10 # outer border in canvas coords
@@ -1424,6 +1444,7 @@ class FTEvent(FTBoxyObject): # FT event object in Viewport
 #			self.TopFixedEls, self.DescriptionCommentEls, self.ValueFixedEls, self.ValueCommentEls, self.ActionItemEls)
 #
 #		PopulateTextElements(self.AllComponents) # put required text values in the components
+		AdaptForExport()
 		SetElementSizesInCU()
 		SetButtonStati(self.AllComponents) # set button components to required status
 		# calculate height of each "sizer" row in canvas coords
@@ -6031,6 +6052,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 		self.UndoListDuringTextEditing = [] # list of undo.UndoRecordDuringTextEditing instances
 		self.MilestoneForRedraw = None # instance of MilestoneItem, containing attribs needed to enable us to redraw
 			# the FT with same appearance as last time
+		self.XMLData = None # required for exporting feature
 
 	def Wipe(self): # preserve any attribs that need to be preserved. Then wipe all data in the FT and re-initialize
 		# first, preserve display-related attribs. Check all elements in the "old" (previously displayed) FT
@@ -6078,7 +6100,7 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 			[y for ThisEl in self.Columns for y in ThisEl.AllClickableObjects(SelectedOnly, VisibleOnly)] +\
 			[self.MyZoomWidget] + self.ConnectButtons
 
-	def PrepareFullDisplay(self, XMLData): # set up all data needed to display the FT, by
+	def PrepareFullDisplay(self, XMLData, Export=False): # set up all data needed to display the FT, by
 		# extracting all data from XML tree and use to build up FT data structure
 
 		def PopulateValueOptions(XMLRoot, HostEl, ComponentName, ListAttrib, OptionTagName, MasterOptionsList):
@@ -6433,6 +6455,13 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 				self.DisplDevice.Bind(ThisEvent, Handler, ThisObj)
 
 		# main procedure for PrepareFullDisplay()
+		self.Exporting = Export
+		# save reference to XMLData in case of export (requires a call to PrepareFullDisplay())
+		if XMLData is not None:
+			self.XMLData = XMLData
+		if Export: # use latest saved data
+			assert self.XMLData is not None
+			XMLData = self.XMLData
 		self.Wipe() # start with a blank FT
 		# find the outer tag containing the FT data
 		FTData = [t for t in XMLData.iter(info.PHAModelRedrawDataTag)][0]

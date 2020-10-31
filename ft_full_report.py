@@ -963,7 +963,7 @@ class FTFullExportViewport(faulttree.FTForDisplay):
 	def PrepareFullDisplay(self, XMLTree):
 		# display dialogue in our display device to get export parameters from user
 		# first, unpack data into the FT
-		super(type(self), self).PrepareFullDisplay(XMLTree)
+		super(type(self), self).PrepareFullDisplay(XMLTree, Export=True) # original FT will use its own stored XMLTree
 		# build the dialogue: prefill widgets in new aspect and activate it
 		self.DialogueAspect.Prefill(self.Proj, FT=self, SystemFontNames=self.SystemFontNames)
 		self.DialogueAspect.SetWidgetVisibility()
