@@ -4219,7 +4219,6 @@ class FTObjectInCore(core_classes.PHAModelBaseClass):
 			return ElementValue, ElementUnit, ProblemValue, ProblemObj,\
 				isinstance(ThisElement.Value, (core_classes.UserNumValueItem, core_classes.ParentNumValueItem))
 
-
 		def PopulateFTEventData(FT, El, FTEvent, EventListForNumbering):
 			# put FT event data into XML element El
 			# EventListForNumbering: list containing all FTEvents to consider when numbering this one
@@ -6253,12 +6252,15 @@ class FTForDisplay(display_utilities.ViewportBaseClass): # object containing all
 				setattr(NewEvent, Attrib, utilities.Bool2Str(XMLObj.findtext(Tag, default='False')))
 			# DataInfoAsList: (Tag of each item in a list, name of the list to put the tag's text into,
 			# whether to fetch numbering)
-			DataInfoAsList = [ (info.DescriptionCommentTag, 'EventDescriptionComments', True),
-				(info.ValueCommentTag, 'ValueComments', True),
+			# Currently we are not fetching numbering for comments, as we don't need it; also, as it gets prepended to
+			# the text, this messes up the text when the user edits it.
+			DataInfoAsList = [ (info.DescriptionCommentTag, 'EventDescriptionComments', False),
+				(info.ValueCommentTag, 'ValueComments', False),
 				(info.ActionItemTag, 'ActionItems', True),
+				(info.ParkingLotItemTag, 'ParkingLot', True),
 				('ConnectTo', 'ConnectToIDs', False), ('CollapseGroups', 'CollapseGroupIDs', False) ]
 			for Tag, Attrib, FetchNumbering in DataInfoAsList:
-				if FetchNumbering: # prefix text with numbering
+				if FetchNumbering:
 					setattr(NewEvent, Attrib, [El.get(info.NumberingTag, '') + ' ' + El.text for El in XMLObj.findall(Tag)])
 				else: # just get text, don't look for numbering
 					setattr(NewEvent, Attrib, [El.text for El in XMLObj.findall(Tag)])
